@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Item" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:sdk="http://schemas.microsoft.com/developer/vstemplate-sdkextension/2010">
+  <TemplateData>
+    <Name>Orleans Grain Interface</Name>
+    <Description>An empty Orleans grain class</Description>
+    <Icon>Orleans.ico</Icon>
+    <TemplateID>5fa7bdc6-6304-41bf-927d-b3bec7261d16</TemplateID>
+    <SortOrder>1000</SortOrder>
+    <DefaultName>IGrain1.vb</DefaultName>
+    <ProjectType>VisualBasic</ProjectType>
+    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
+  </TemplateData>
+  <TemplateContent>
+    <References>
+      <Reference>
+        <Assembly>System</Assembly>
+      </Reference>
+      <Reference>
+        <Assembly>Orleans</Assembly>
+      </Reference>
+    </References>
+    <ProjectItem ReplaceParameters="true">GrainInterfaceTemplate.vb</ProjectItem>
+  </TemplateContent>
+</VSTemplate>

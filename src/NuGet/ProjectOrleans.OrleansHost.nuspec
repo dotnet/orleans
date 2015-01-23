@@ -1,0 +1,29 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>ProjectOrleans.OrleansHost</id>
+    <version>$version$</version>
+    <title>Project Orleans Silo Host</title>
+    <authors>Microsoft Research</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <summary>
+      Default silo host of Project Orleans - OrleansHost.exe.
+    </summary>
+    <description>
+      Default silo host process that starts a silo as a process.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="ProjectOrleans.Orleans" version="1.0.0.0" />
+      <dependency id="ProjectOrleans.OrleansRuntime" version="1.0.0.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="OrleansHost.exe" target="lib\net45" />
+    <file src="OrleansHost.exe.config" target="lib\net45" />
+  </files>
+</package>

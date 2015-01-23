@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:sdk="http://schemas.microsoft.com/developer/vstemplate-sdkextension/2010">
+  <TemplateData>
+    <Name>Orleans Dev/Test Host</Name>
+    <Description>A project for creating a console application hosting an Orleans silo, intended for use during development and test</Description>
+    <Icon>Orleans.ico</Icon>
+    <ProjectType>CSharp</ProjectType>
+    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <SortOrder>1000</SortOrder>
+    <TemplateID>ba427b09-614a-41ef-ac5e-49c47909f209</TemplateID>
+    <CreateNewFolder>true</CreateNewFolder>
+    <DefaultName>SiloHost</DefaultName>
+    <ProvideDefaultName>true</ProvideDefaultName>
+  </TemplateData>
+  <TemplateContent>
+    <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
+      <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="App.config">App.config</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="DevTestClientConfiguration.xml">DevTestClientConfiguration.xml</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="DevTestServerConfiguration.xml">DevTestServerConfiguration.xml</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="OrleansHostWrapper.cs">OrleansHostWrapper.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" OpenInEditor="true">Program.cs</ProjectItem>
+    </Project>
+  </TemplateContent>
+</VSTemplate>
