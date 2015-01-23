@@ -311,8 +311,8 @@ namespace Orleans.Runtime.Configuration
                 unitSize = 1000; // Default is seconds
                 numberInput = trimmedInput;
             }
-            int rawTimeSpan;
-            if (!Int32.TryParse(numberInput, out rawTimeSpan))
+            double rawTimeSpan;
+            if (!double.TryParse(numberInput, out rawTimeSpan))
             {
                 throw new FormatException(errorMessage + ". Tried to parse " + input);
             }
