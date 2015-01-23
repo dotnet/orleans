@@ -5,7 +5,7 @@ Orleans is a framework that provides a straightforward approach to building dist
 
 Documenation 
 =======
-Documenation is localed [here] (https://github.com/dotnet/orleans/wiki).
+Documenation is located [here] (https://github.com/dotnet/orleans/wiki).
 
 
 License
