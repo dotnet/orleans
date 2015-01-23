@@ -20,7 +20,7 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 @REM xcopy /s /y %CMDHOME%\SDK\VSIX %OutDir%\VSIX\
 @REM @if ERRORLEVEL 1 GOTO :ErrorStop
 
-%MSBUILDEXE% /p:Configuration=%CONFIGURATION% /p:OutputPath=. Build\OrleansSetup.wixproj
+%MSBUILDEXE% /p:Configuration=%CONFIGURATION% /p:OutputPath=. %CMDHOME%\Build\OrleansSetup.wixproj
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD succeeded for %CONFIGURATION%
 
@@ -39,7 +39,7 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 @REM xcopy /s /y %CMDHOME%\SDK\VSIX %OutDir%\VSIX\
 @REM @if ERRORLEVEL 1 GOTO :ErrorStop
 
-%MSBUILDEXE% /p:Configuration=%CONFIGURATION% /p:OutputPath=. Build\OrleansSetup.wixproj
+%MSBUILDEXE% /p:Configuration=%CONFIGURATION% /p:OutputPath=. %CMDHOME%\Build\OrleansSetup.wixproj
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD succeeded for %CONFIGURATION%
 @GOTO :EOF
