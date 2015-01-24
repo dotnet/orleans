@@ -278,7 +278,7 @@
     <Compile Include="Async\ObserverSubscriptionManager.cs" />
     <Compile Include="CodeGeneration\GrainInterfaceData.cs" />
     <Compile Include="IDs\ActivationAddress.cs" />
-    <Compile Include="IDs\ActivationID.cs" />
+    <Compile Include="IDs\ActivationId.cs" />
     <Compile Include="Runtime\AsynchAgent.cs" />
     <Compile Include="Runtime\AsynchQueueAgent.cs" />
     <Compile Include="Messaging\ByteArrayBuilder.cs" />
@@ -291,7 +291,7 @@
     <Compile Include="Logging\ConsoleText.cs" />
     <Compile Include="Runtime\Constants.cs" />
     <Compile Include="Messaging\CorrelationId.cs" />
-    <Compile Include="IDs\GrainID.cs" />
+    <Compile Include="IDs\GrainId.cs" />
     <Compile Include="Messaging\IMessageCenter.cs" />
     <Compile Include="IDs\Interner.cs" />
     <Compile Include="Placement\PlacementResult.cs" />

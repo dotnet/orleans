@@ -63,9 +63,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
         {
-            if (id == null)
-                throw new ArgumentNullException("id");
-
             var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
             return providerRuntime.GetStreamDirectory().GetOrAddStream<T>(
                 streamId,
