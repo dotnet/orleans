@@ -38,9 +38,9 @@ namespace Orleans.Runtime.Host
     public static class AzureClient
     {
         /// <summary>Number of retry attempts to make when searching for gateway silos to connect to.</summary>
-        public static int MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
+        public static readonly int MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
         /// <summary>Amount of time to pause before each retry attempt.</summary>
-        public static TimeSpan StartupRetryPause = AzureConstants.STARTUP_TIME_PAUSE; // 5 seconds
+        public static readonly TimeSpan StartupRetryPause = AzureConstants.STARTUP_TIME_PAUSE; // 5 seconds
 
         /// <summary>
         /// Whether the Orleans Azure client runtime has already been initialized
