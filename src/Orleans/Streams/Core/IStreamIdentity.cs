@@ -33,4 +33,4 @@ namespace Orleans.Streams
         /// <summary> Stream namespace. </summary>
         string Namespace { get; }
     }
-}
+}

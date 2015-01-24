@@ -1932,4 +1932,4 @@ namespace Orleans.Serialization
             }
         }
     }
-}
+}

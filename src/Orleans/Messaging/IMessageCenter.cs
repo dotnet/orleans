@@ -48,4 +48,3 @@ namespace Orleans.Runtime
         IMessagingConfiguration MessagingConfiguration { get; }
     }
 }
-

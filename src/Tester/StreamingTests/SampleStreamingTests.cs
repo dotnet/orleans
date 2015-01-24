@@ -170,4 +170,4 @@ namespace UnitTests.SampleStreaming
             }
         }
     }
-}
+}

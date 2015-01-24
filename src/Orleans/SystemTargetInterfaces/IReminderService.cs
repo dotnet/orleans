@@ -52,4 +52,3 @@ namespace Orleans
         Task<List<IGrainReminder>> GetReminders(GrainReference grainRef);
     }
 }
-

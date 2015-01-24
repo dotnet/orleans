@@ -64,4 +64,3 @@ namespace Orleans.Runtime.ConsistentRing
         void RangeChangeNotification(IRingRange old, IRingRange now, bool increased);
     }
 }
-

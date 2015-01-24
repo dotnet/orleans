@@ -36,4 +36,4 @@ namespace Orleans.Streams
 
         Task<IQueueAdapter> CreateAdapter();
     }
-}
+}

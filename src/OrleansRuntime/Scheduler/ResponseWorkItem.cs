@@ -59,4 +59,3 @@ namespace Orleans.Runtime.Scheduler
         }
     }
 }
-

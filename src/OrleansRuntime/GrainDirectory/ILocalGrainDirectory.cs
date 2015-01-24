@@ -174,4 +174,3 @@ namespace Orleans.Runtime.GrainDirectory
         List<ActivationAddress> GetLocalCacheData(GrainId grain);
     }
 }
-

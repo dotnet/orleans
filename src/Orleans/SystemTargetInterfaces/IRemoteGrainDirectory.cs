@@ -158,4 +158,3 @@ namespace Orleans.Runtime
         Task UnregisterMany(List<ActivationAddress> activationAddresses, int retries);
     }
 }
-

@@ -108,4 +108,4 @@ namespace Orleans.Streams
                 Stream, Consumer, StreamSequenceToken);
         }
     }
-}
+}

@@ -879,4 +879,4 @@ namespace Orleans.Serialization
             trace.Flush();
         }
     }
-}
+}

@@ -37,4 +37,4 @@ namespace Orleans.Streams
         /// <returns>Completion promise for the cleanup operstions for this stream.</returns>
         Task Cleanup();
     }
-}
+}

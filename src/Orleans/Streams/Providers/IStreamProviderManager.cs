@@ -30,4 +30,4 @@ namespace Orleans.Streams
     {
         IEnumerable<IStreamProvider> GetStreamProviders();
     }
-}
+}

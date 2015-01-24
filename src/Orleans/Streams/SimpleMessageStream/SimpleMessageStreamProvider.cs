@@ -79,4 +79,4 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
         }
     }
-}
+}

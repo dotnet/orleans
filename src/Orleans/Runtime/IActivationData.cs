@@ -40,4 +40,4 @@ namespace Orleans.Runtime
         void DelayDeactivation(TimeSpan timeSpan);
         IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
     }
-}
+}

@@ -837,4 +837,3 @@ namespace Orleans.Runtime
         internal static bool TestOnlySuppressStreamCleanupOnDeactivate;
     }
 }
-

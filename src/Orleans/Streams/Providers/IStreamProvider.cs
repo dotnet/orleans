@@ -37,4 +37,4 @@ namespace Orleans.Streams
         /// <returns>True if this is a rewindable provider, false otherwise.</returns>
         bool IsRewindable { get; }
     }
-}
+}

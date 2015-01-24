@@ -114,4 +114,3 @@ namespace Orleans.Runtime
         public bool Equals(SystemStatus other) { return (other != null) && this.value.Equals(other.value); }
     }
 }
-
