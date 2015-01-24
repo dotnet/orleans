@@ -86,7 +86,7 @@ CREATE TABLE [dbo].[OrleansClientMetricsTable]
     [ReceiveQueue] INT NOT NULL, 
     [SentMessages] BIGINT NOT NULL,
     [ReceivedMessages] BIGINT NOT NULL,
-    [ConnectedGWCount] BIGINT NOT NULL,
+    [ConnectedGatewayCount] BIGINT NOT NULL,
     PRIMARY KEY ([DeploymentId],[ClientId])
 )
 
