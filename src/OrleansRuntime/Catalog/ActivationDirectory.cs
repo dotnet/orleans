@@ -163,7 +163,9 @@ namespace Orleans.Runtime
             }
         }
 
-        // Returns null if no activations exist for this grain ID, rather than an empty list
+        /// <summary>
+        /// Returns null if no activations exist for this grain ID, rather than an empty list
+        /// </summary>
         public List<ActivationData> FindTargets(GrainId key)
         {
             List<ActivationData> tmp;

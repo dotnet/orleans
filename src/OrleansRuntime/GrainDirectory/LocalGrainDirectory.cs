@@ -360,7 +360,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (index == -1)
                 {
                     log.Warn(ErrorCode.Runtime_Error_100201, "Got request to find predecessors of silo " + silo + ", which is not in the list of members");
-                    return null;
+                    return new List<SiloAddress>();
                 }
 
                 var result = new List<SiloAddress>();
@@ -382,7 +382,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (index == -1)
                 {
                     log.Warn(ErrorCode.Runtime_Error_100203, "Got request to find successors of silo " + silo + ", which is not in the list of members");
-                    return null;
+                    return new List<SiloAddress>();
                 }
 
                 var result = new List<SiloAddress>();
