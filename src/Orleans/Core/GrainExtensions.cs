@@ -131,6 +131,11 @@ namespace Orleans
         {
             return GetGrainId(grain).GetPrimaryKey();
         }
+
+        public static string GetPrimaryKeyString(this IGrainWithStringKey grain)
+        {
+            return GetGrainId(grain).GetPrimaryKeyString();
+        }
     }
 }
 
