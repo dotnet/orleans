@@ -4,7 +4,7 @@
 
 SET CMDHOME=%~dp0.
 SET MSBUILDVER=v4.0.30319
-SET MSBUILDEXE=%FrameworkDir%%MSBUILDVER%\MSBuild.exe
+SET MSBUILDEXE=%FrameworkDir%\%MSBUILDVER%\MSBuild.exe
 
 @echo Build Debug
 SET CONFIGURATION=Debug
