@@ -87,6 +87,15 @@ namespace UnitTests.SampleStreaming
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
+        [TestMethod, TestCategory( "Nightly" ), TestCategory( "Streaming" )]
+        public async Task SampleStreamingTests_3()
+        {
+            logger.Info( "\n\n************************ SampleStreamingTests_3 ********************************* \n\n" );
+            streamId = Guid.NewGuid();
+            streamProvider = SMS_STREAM_PROVIDER_NAME;
+            await StreamingTests_Producer_InlineConsumer( streamId, streamProvider );
+        }
+
         // To run the streaming test with Azure Queue adapter you need:
         // 1) Uncomment the AzureQueueProvider element in StreamProviders section in the Config_StreamProvidersForUnitTests.xml.
         // 1) Add DataConnectionString to AzureQueueProvider element.
@@ -150,6 +159,28 @@ namespace UnitTests.SampleStreaming
 
             await UnitTestUtils.WaitUntilAsync(() => CheckCounters(producer, consumer, assertAreEqual: false), _timeout);
             await CheckCounters(producer, consumer);
+
+            await consumer.StopConsuming();
+        }
+
+        private async Task StreamingTests_Producer_InlineConsumer( Guid streamId, string streamProvider )
+        {
+            // producer joins first, consumer later
+            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain( Guid.NewGuid() );
+            await producer.BecomeProducer( streamId, streamProvider );
+
+            ISampleStreaming_InlineConsumerGrain consumer = SampleStreaming_InlineConsumerGrainFactory.GetGrain( Guid.NewGuid() );
+            await consumer.BecomeConsumer( streamId, streamProvider );
+
+            await producer.StartPeriodicProducing();
+
+            Thread.Sleep( 1000 );
+
+            await producer.StopPeriodicProducing();
+            //int numProduced = producer.NumberProduced.Result;
+
+            await UnitTestUtils.WaitUntilAsync( () => CheckCounters( producer, consumer, assertAreEqual: false ), _timeout );
+            await CheckCounters( producer, consumer );
 
             await consumer.StopConsuming();
         }

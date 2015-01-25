@@ -156,4 +156,64 @@ namespace UnitTests.SampleStreaming
             return Task.FromResult(numConsumedItems);
         }
     }
+
+    public class SampleStreaming__InlineConsumerGrain : Grain, ISampleStreaming_InlineConsumerGrain
+    {
+        private IAsyncObservable<int> consumer;
+        internal int numConsumedItems;
+        internal Logger logger;
+        private StreamSubscriptionHandle<int> consumerInterface;
+
+        public override Task OnActivateAsync()
+        {
+            logger = base.GetLogger( "SampleStreaming_InlineConsumerGrain " + base.IdentityString );
+            logger.Info( "OnActivateAsync" );
+            numConsumedItems = 0;
+            consumerInterface = null;
+            return TaskDone.Done;
+        }
+
+        public async Task BecomeConsumer( Guid streamId, string providerToUse )
+        {
+            logger.Info( "BecomeConsumer" );
+            IStreamProvider streamProvider = base.GetStreamProvider( providerToUse );
+            consumer = streamProvider.GetStream<int>( streamId, SampleStreaming_ProducerGrain.StreamNamespace );
+            consumerInterface = await consumer.SubscribeAsync( OnNextAsync, OnCompletedAsync, OnErrorAsync );
+        }
+
+        public async Task StopConsuming()
+        {
+            logger.Info( "StopConsuming" );
+            if ( consumerInterface != null )
+            {
+                await consumer.UnsubscribeAsync( consumerInterface );
+                //consumerInterface.Dispose();
+                consumerInterface = null;
+            }
+        }
+
+        public Task<int> GetNumberConsumed()
+        {
+            return Task.FromResult( numConsumedItems );
+        }
+
+        public Task OnNextAsync( int item, StreamSequenceToken token = null )
+        {
+            logger.Info( "OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null" );
+            numConsumedItems++;
+            return TaskDone.Done;
+        }
+
+        public Task OnCompletedAsync()
+        {
+            logger.Info( "OnCompletedAsync()" );
+            return TaskDone.Done;
+        }
+
+        public Task OnErrorAsync( Exception ex )
+        {
+            logger.Info( "OnErrorAsync({0})", ex );
+            return TaskDone.Done;
+        }
+    }
 }
