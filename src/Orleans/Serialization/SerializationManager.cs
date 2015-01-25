@@ -133,7 +133,7 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        static internal void Initialize(bool useStandardSerializer)
+        internal static void Initialize(bool useStandardSerializer)
         {
             UseStandardSerializer = useStandardSerializer;
             if (StatisticsCollector.CollectSerializationStats)
