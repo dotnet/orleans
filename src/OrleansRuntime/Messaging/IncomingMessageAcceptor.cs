@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Messaging
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
 
-        internal readonly static string PingHeader = Message.Header.APPLICATION_HEADER_FLAG + Message.Header.PING_APPLICATION_HEADER;
+        internal static readonly string PingHeader = Message.Header.APPLICATION_HEADER_FLAG + Message.Header.PING_APPLICATION_HEADER;
 
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;

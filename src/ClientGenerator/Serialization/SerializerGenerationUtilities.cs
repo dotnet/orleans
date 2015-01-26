@@ -30,7 +30,7 @@ namespace Orleans.CodeGeneration.Serialization
 {
     class SerializerGenerationUtilities
     {
-        static internal CodeMemberMethod GenerateCopier(string name, string typeName, CodeTypeParameterCollection genericTypeParams = null)
+        internal static CodeMemberMethod GenerateCopier(string name, string typeName, CodeTypeParameterCollection genericTypeParams = null)
         {
             var copier = new CodeMemberMethod { Name = name };
             copier.Attributes = (copier.Attributes & ~MemberAttributes.AccessMask) | MemberAttributes.Public;
@@ -42,7 +42,7 @@ namespace Orleans.CodeGeneration.Serialization
             return copier;
         }
 
-        static internal CodeMemberMethod GenerateSerializer(string name, string typeName, CodeTypeParameterCollection genericTypeParams = null)
+        internal static CodeMemberMethod GenerateSerializer(string name, string typeName, CodeTypeParameterCollection genericTypeParams = null)
         {
             var serializer = new CodeMemberMethod { Name = name };
             serializer.Attributes = (serializer.Attributes & ~MemberAttributes.AccessMask) | MemberAttributes.Public;
@@ -56,7 +56,7 @@ namespace Orleans.CodeGeneration.Serialization
             return serializer;
         }
 
-        static internal CodeMemberMethod GenerateDeserializer(string name, string typeName, CodeTypeParameterCollection genericTypeParams = null)
+        internal static CodeMemberMethod GenerateDeserializer(string name, string typeName, CodeTypeParameterCollection genericTypeParams = null)
         {
             var deserializer = new CodeMemberMethod { Name = name };
             deserializer.Attributes = (deserializer.Attributes & ~MemberAttributes.AccessMask) | MemberAttributes.Public;

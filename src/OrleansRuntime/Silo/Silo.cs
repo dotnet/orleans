@@ -93,6 +93,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
         private readonly List<IHealthCheckParticipant> healthCheckParticipants;
+        private readonly object lockable = new object();
         
         
         internal readonly string Name;
@@ -357,7 +358,7 @@ namespace Orleans.Runtime
 
         private void DoStart()
         {
-            lock (this)
+            lock (lockable)
             {
                 if (SystemStatus.Current != SystemStatus.Created)
                     throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Start state. This silo is in the {0} state.", SystemStatus.Current));
@@ -523,7 +524,7 @@ namespace Orleans.Runtime
         public void Stop()
         {
             bool stopAlreadyInProgress = false;
-            lock (this)
+            lock (lockable)
             {
                 if (SystemStatus.Current.Equals(SystemStatus.Stopping) || 
                     SystemStatus.Current.Equals(SystemStatus.ShuttingDown) || 
@@ -649,7 +650,7 @@ namespace Orleans.Runtime
 
             try
             {
-                lock (this)
+                lock (lockable)
                 {
                     if (SystemStatus.Current != SystemStatus.Running) return;
                     
