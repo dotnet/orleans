@@ -103,4 +103,4 @@ namespace Orleans.Streams
             return string.Format("StreamFilterFunction:Class={0},Method={1}", className, methodName);
         }
     }
-}
+}

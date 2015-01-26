@@ -51,4 +51,3 @@ namespace Orleans.Runtime.Messaging
         Func<SiloAddress, bool> SiloDeadOracle { get; set; }
     }
 }
-

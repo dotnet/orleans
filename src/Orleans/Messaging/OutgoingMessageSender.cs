@@ -227,4 +227,4 @@ namespace Orleans.Messaging
         protected abstract void ProcessMessageAfterSend(Message msg, bool sendError, string sendErrorStr);
         protected abstract void FailMessage(Message msg, string reason);
     }
-}
+}

@@ -45,4 +45,4 @@ namespace UnitTests.GrainInterfaces
     public interface ISimpleCLIGrain : ISimpleGrain
     {
     }
-}
+}

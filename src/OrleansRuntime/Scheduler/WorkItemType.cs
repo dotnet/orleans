@@ -37,4 +37,3 @@ namespace Orleans.Runtime.Scheduler
         Invoke = 0x0020,          // Invoke a method on an activation
     }
 }
-

@@ -118,4 +118,4 @@ namespace Orleans.Runtime
         /// <returns>bool value indicating that subscription succeeded or not.</returns>
         bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer);
     }
-}
+}

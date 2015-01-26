@@ -228,4 +228,3 @@ namespace Orleans.CodeGeneration
         #endregion
     }
 }
-

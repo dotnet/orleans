@@ -107,4 +107,4 @@ namespace Orleans.Streams
         /// <returns>A Task that is completed when the batch has been accepted.</returns>
         Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token = null);
     }
-}
+}

@@ -131,4 +131,4 @@ namespace Orleans.Providers.Streams.AzureQueue
             return new SimpleQueueAdapterCacheCursor(cache, streamGuid, streamNamespace, sequenceToken);
         }
     }
-}
+}

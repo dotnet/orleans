@@ -95,4 +95,4 @@ namespace Orleans.Providers.Streams.AzureQueue
             return string.Format("AzureQueueBatchContainer:Stream={0},#Items={1}", StreamGuid, events.Count);
         }
     }
-}
+}

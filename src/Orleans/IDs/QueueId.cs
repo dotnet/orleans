@@ -110,4 +110,4 @@ namespace Orleans.Streams
             return String.Format("{0}-0x{1, 8:X8}", this.ToString(), this.GetUniformHashCode());
         }
     }
-}
+}

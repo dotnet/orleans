@@ -512,4 +512,3 @@ namespace Orleans.Runtime.MembershipService
             "WHERE DeploymentId = @deploymentid";
     }
 }
-

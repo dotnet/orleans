@@ -156,4 +156,4 @@ namespace UnitTests.SampleStreaming
             return Task.FromResult(numConsumedItems);
         }
     }
-}
+}

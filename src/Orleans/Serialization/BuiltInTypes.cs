@@ -1367,4 +1367,3 @@ namespace Orleans.Serialization
         #endregion
     }
 }
-

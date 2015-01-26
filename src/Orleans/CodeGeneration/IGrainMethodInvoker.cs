@@ -62,4 +62,4 @@ namespace Orleans.CodeGeneration
         /// <returns>Value promise for the result of the method invoke.</returns>
         Task<object> Invoke(IGrainExtension extension, int interfaceId, int methodId, object[] arguments);
     }
-}
+}

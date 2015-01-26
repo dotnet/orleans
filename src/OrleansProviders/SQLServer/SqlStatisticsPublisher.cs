@@ -263,4 +263,4 @@ namespace Orleans.Providers.SqlServer
             "(DeploymentId,Date,TimeStamp,Id,Counter,HostName,Name,IsDelta,StatValue,Statistic) " +
             "VALUES (@deploymentid,@date,@timestamp,@id,@counter,@hostname,@name,@isdelta,@statvalue,@statistic)";
     }
-}
+}

@@ -33,4 +33,4 @@ namespace Orleans.Runtime.Host
         public static string SiloEndpointConfigurationKeyName = "OrleansSiloEndpoint";
         public static string ProxyEndpointConfigurationKeyName = "OrleansProxyEndpoint";
     }
-}
+}

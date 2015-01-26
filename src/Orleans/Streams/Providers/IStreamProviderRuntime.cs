@@ -118,4 +118,4 @@ namespace Orleans.Streams
 
         Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
     }
-}
+}

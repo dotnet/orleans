@@ -148,4 +148,4 @@ namespace Orleans.Streams
             return implicitPubSub.IsImplicitSubscriber(GrainExtensions.GetGrainId(addressable), streamId);
         }
     }
-}
+}
