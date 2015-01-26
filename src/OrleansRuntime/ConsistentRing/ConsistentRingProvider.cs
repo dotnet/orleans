@@ -81,11 +81,17 @@ namespace Orleans.Runtime.ConsistentRing
             return MyRange; // its immutable, so no need to clone
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         public List<SiloAddress> GetMySucessors(int n = 1)
         {
             return FindSuccessors(MyAddress, n);
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         public List<SiloAddress> GetMyPredecessors(int n = 1)
         {
             return FindPredecessors(MyAddress, n);
@@ -205,6 +211,9 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         internal List<SiloAddress> FindPredecessors(SiloAddress silo, int count)
         {
             lock (membershipRingList)
@@ -227,6 +236,9 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         internal List<SiloAddress> FindSuccessors(SiloAddress silo, int count)
         {
             lock (membershipRingList)
