@@ -178,7 +178,7 @@ namespace UnitTests.SampleStreaming
             logger.Info( "BecomeConsumer" );
             IStreamProvider streamProvider = base.GetStreamProvider( providerToUse );
             consumer = streamProvider.GetStream<int>( streamId, SampleStreaming_ProducerGrain.StreamNamespace );
-            consumerInterface = await consumer.SubscribeAsync( OnNextAsync, OnCompletedAsync, OnErrorAsync );
+            consumerInterface = await consumer.SubscribeAsync( OnNextAsync, OnErrorAsync, OnCompletedAsync );
         }
 
         public async Task StopConsuming()

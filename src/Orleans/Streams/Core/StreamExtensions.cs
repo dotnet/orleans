@@ -32,17 +32,17 @@ namespace Orleans.Streams
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
         /// <param name="obs">The Observable object.</param>
         /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
-        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <param name="onErrorAsync">Delegte that is called for IAsyncObserver.OnErrorAsync.</param>
+        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitely unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>( this IAsyncObservable<T> obs, 
                                                                            Func<T, StreamSequenceToken, Task> onNextAsync, 
-                                                                           Func<Task> onCompletedAsync, 
-                                                                           Func<Exception, Task> onErrorAsync )
+                                                                           Func<Exception, Task> onErrorAsync, 
+                                                                           Func<Task> onCompletedAsync )
         {
-            var genericObserver = new GenericAsyncObserver<T>( onNextAsync, onCompletedAsync, onErrorAsync );
+            var genericObserver = new GenericAsyncObserver<T>( onNextAsync, onErrorAsync, onCompletedAsync );
             return obs.SubscribeAsync( genericObserver );
         }
 
@@ -55,8 +55,8 @@ namespace Orleans.Streams
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
         /// <param name="obs">The Observable object.</param>
         /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
-        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <param name="onErrorAsync">Delegte that is called for IAsyncObserver.OnErrorAsync.</param>
+        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <param name="filterFunc">Filter to be applied for this subscription</param>
         /// <param name="filterData">Data object that will be passed in to the filterFunc.
@@ -69,13 +69,13 @@ namespace Orleans.Streams
         /// Usually this is because it is not a static method. </exception>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>( this IAsyncObservable<T> obs, 
                                                                            Func<T, StreamSequenceToken, Task> onNextAsync, 
-                                                                           Func<Task> onCompletedAsync, 
-                                                                           Func<Exception, Task> onErrorAsync, 
+                                                                           Func<Exception, Task> onErrorAsync,
+                                                                           Func<Task> onCompletedAsync,
                                                                            StreamSequenceToken token,
                                                                            StreamFilterPredicate filterFunc = null,
                                                                            object filterData = null )
         {
-            var genericObserver = new GenericAsyncObserver<T>( onNextAsync, onCompletedAsync, onErrorAsync );
+            var genericObserver = new GenericAsyncObserver<T>( onNextAsync, onErrorAsync, onCompletedAsync );
             return obs.SubscribeAsync( genericObserver, token, filterFunc, filterData );
         }
     }

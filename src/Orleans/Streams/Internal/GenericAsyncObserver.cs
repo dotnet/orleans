@@ -29,29 +29,41 @@ namespace Orleans.Streams
     internal class GenericAsyncObserver<T> : IAsyncObserver<T>
     {
         private Func<T, StreamSequenceToken, Task> _NextAsync;
-        private Func<Task> _CompletedAsync;
         private Func<Exception, Task> _ErrorAsync;
+        private Func<Task> _CompletedAsync;
 
-        public GenericAsyncObserver( Func<T, StreamSequenceToken, Task> onNextAsync, Func<Task> onCompletedAsync, Func<Exception, Task> onErrorAsync )
+        public GenericAsyncObserver( Func<T, StreamSequenceToken, Task> onNextAsync, Func<Exception, Task> onErrorAsync, Func<Task> onCompletedAsync )
         {
             _NextAsync = onNextAsync;
-            _CompletedAsync = onCompletedAsync;
             _ErrorAsync = onErrorAsync;
+            _CompletedAsync = onCompletedAsync;
         }
 
         public Task OnNextAsync( T item, StreamSequenceToken token = null )
         {
-            return _NextAsync( item, token );
+            if ( _NextAsync != null )
+            {
+                return _NextAsync( item, token );
+            }
+            return TaskDone.Done;
         }
 
         public Task OnCompletedAsync()
         {
-            return _CompletedAsync();
+            if ( _CompletedAsync != null )
+            {
+                return _CompletedAsync();
+            }
+            return TaskDone.Done;
         }
 
         public Task OnErrorAsync( Exception ex )
         {
-            return _ErrorAsync( ex );
+            if ( _ErrorAsync != null )
+            {
+                return _ErrorAsync( ex );
+            }
+            return TaskDone.Done;
         }
     }
 }
