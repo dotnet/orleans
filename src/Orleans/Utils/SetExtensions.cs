@@ -42,7 +42,7 @@ namespace Orleans
         public static HashSet<T> ToSet<T>(this IEnumerable<T> values)
         {
             if (values == null)
-                return new HashSet<T>();
+                return null;
             return new HashSet<T>(values);
         }
 
@@ -201,7 +201,7 @@ namespace Orleans
         public static List<T> Union<T>(List<T> list1, List<T> list2)
         {
             if (list1 == null && list2 == null)
-                return new List<T>();
+                return null;
             if (list1 == null)
                 return list2;
             if (list2 == null)

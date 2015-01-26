@@ -81,11 +81,17 @@ namespace Orleans.Runtime.ConsistentRing
             return MyRange; // its immutable, so no need to clone
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         public List<SiloAddress> GetMySucessors(int n = 1)
         {
             return FindSuccessors(MyAddress, n);
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         public List<SiloAddress> GetMyPredecessors(int n = 1)
         {
             return FindPredecessors(MyAddress, n);
@@ -205,6 +211,9 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         internal List<SiloAddress> FindPredecessors(SiloAddress silo, int count)
         {
             lock (membershipRingList)
@@ -213,7 +222,7 @@ namespace Orleans.Runtime.ConsistentRing
                 if (index == -1)
                 {
                     log.Warn(ErrorCode.Runtime_Error_100201, "Got request to find predecessors of silo " + silo + ", which is not in the list of members.");
-                    return new List<SiloAddress>();
+                    return null;
                 }
 
                 var result = new List<SiloAddress>();
@@ -227,6 +236,9 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         internal List<SiloAddress> FindSuccessors(SiloAddress silo, int count)
         {
             lock (membershipRingList)
@@ -235,7 +247,7 @@ namespace Orleans.Runtime.ConsistentRing
                 if (index == -1)
                 {
                     log.Warn(ErrorCode.Runtime_Error_100203, "Got request to find successors of silo " + silo + ", which is not in the list of members.");
-                    return new List<SiloAddress>();
+                    return null;
                 }
 
                 var result = new List<SiloAddress>();

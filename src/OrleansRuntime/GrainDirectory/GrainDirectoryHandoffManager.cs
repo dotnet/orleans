@@ -67,7 +67,7 @@ namespace Orleans.Runtime.GrainDirectory
                     return result.Item1.Select(pair => ActivationAddress.GetAddress(pair.Item1, grain, pair.Item2)).ToList();
                 }
             }
-            return new List<ActivationAddress>();
+            return null;
         }
 
         private async Task HandoffMyPartitionUponStop(Dictionary<GrainId, IGrainInfo> batchUpdate, bool isFullCopy)
