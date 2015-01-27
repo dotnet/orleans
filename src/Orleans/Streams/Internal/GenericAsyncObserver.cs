@@ -34,6 +34,10 @@ namespace Orleans.Streams
 
         public GenericAsyncObserver( Func<T, StreamSequenceToken, Task> onNextAsync, Func<Exception, Task> onErrorAsync, Func<Task> onCompletedAsync )
         {
+            if ( onNextAsync == null ) throw new ArgumentNullException( "onNextAsync" );
+            if ( onErrorAsync == null ) throw new ArgumentNullException( "onErrorAsync" );
+            if ( onCompletedAsync == null ) throw new ArgumentNullException( "onCompletedAsync" );
+
             _NextAsync = onNextAsync;
             _ErrorAsync = onErrorAsync;
             _CompletedAsync = onCompletedAsync;
@@ -41,29 +45,17 @@ namespace Orleans.Streams
 
         public Task OnNextAsync( T item, StreamSequenceToken token = null )
         {
-            if ( _NextAsync != null )
-            {
-                return _NextAsync( item, token );
-            }
-            return TaskDone.Done;
+            return _NextAsync( item, token );
         }
 
         public Task OnCompletedAsync()
         {
-            if ( _CompletedAsync != null )
-            {
-                return _CompletedAsync();
-            }
-            return TaskDone.Done;
+            return _CompletedAsync();
         }
 
         public Task OnErrorAsync( Exception ex )
         {
-            if ( _ErrorAsync != null )
-            {
-                return _ErrorAsync( ex );
-            }
-            return TaskDone.Done;
+            return _ErrorAsync( ex );
         }
     }
 }
