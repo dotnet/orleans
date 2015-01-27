@@ -9,7 +9,7 @@ Orleans has been used extensively running in Microsoft Azure by several Microsof
 
 Documentation 
 =======
-Documentation is located [here] (https://github.com/dotnet/orleans/wiki).
+Documentation is located [here][Orleans Documentation]
 
 License
 =======
@@ -22,7 +22,6 @@ Contributing To This Project
 
 * How to Contribute
     * [Contributing Guide]
-    * [Developer Guide]
 
 * Coding Standards
 	* The coding standards / style guide used for Orleans code is the [.NET Framework Design Guidelines][DotNet Framework Design Guidelines]:
@@ -32,7 +31,7 @@ See the [contributing guides][Contributing Guide] for more details.
 
 
 [MSR-ProjectOrleans]: http://research.microsoft.com/projects/orleans/
+[Orleans Documentation]: https://github.com/dotnet/orleans/wiki
 [Ideas for Contributions]: https://github.com/dotnet/orleans/wiki/Ideas-for-Contributions
 [Contributing Guide]: https://github.com/dotnet/corefx/wiki/Contributing
-[Developer Guide]: https://github.com/dotnet/corefx/wiki/Developer-Guide
 [DotNet Framework Design Guidelines]: https://github.com/dotnet/corefx/wiki/Framework-Design-Guidelines-Digest
