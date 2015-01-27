@@ -79,4 +79,4 @@ namespace Orleans.Providers.Streams.AzureQueue
             await queue.AddQueueMessage(cloudMsg);
         }
     }
-}
+}

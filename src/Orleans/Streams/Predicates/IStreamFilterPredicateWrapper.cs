@@ -40,4 +40,4 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
         /// <returns>Return <c>true</c> if this item should be delivered to the intended recipient.</returns>
         bool ShouldReceive(IStreamIdentity stream, object filterData, object item);
     }
-}
+}

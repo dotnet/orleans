@@ -624,4 +624,3 @@ namespace Orleans.CodeGeneration.Serialization
                     }
                 }
             }
-

@@ -46,4 +46,3 @@ namespace Orleans.Runtime
         Task UnregisterClientObserver(GrainId target);
     }
 }
-

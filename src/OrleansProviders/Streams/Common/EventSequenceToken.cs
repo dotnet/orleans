@@ -102,4 +102,4 @@ namespace Orleans.Providers.Streams.Common
             return string.Format(CultureInfo.InvariantCulture, "EventSequenceToken: SequenceNumber={0}, EventIndex={1}", sequenceNumber, eventIndex);
         }
     }
-}
+}

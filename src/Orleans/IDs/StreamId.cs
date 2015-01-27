@@ -206,4 +206,4 @@ namespace Orleans.Streams
             return Guid.GetHashCode() ^ (ProviderName != null ? ProviderName.GetHashCode() : 0) ^ (Namespace != null ? Namespace.GetHashCode() : 0);
         }
     }
-}
+}

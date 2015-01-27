@@ -1,24 +1,24 @@
 ﻿<?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
-    <id>ProjectOrleans.Templates.Grains</id>
+    <id>Microsoft.Orleans.Templates.Interfaces</id>
     <version>$version$</version>
-    <title>Project Orleans VS Templates for Grain Classes</title>
+    <title>Microsoft Orleans VS Templates for Grain Interfaces</title>
     <authors>Microsoft Research</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
     <summary>
-      Project Orleans VS Templates for Grain Classes.
+      Microsoft Orleans VS Templates for Grain Interfaces.
     </summary>
     <description>
-      Project Orleans VS Templates for Grain Classes.
+      Microsoft Orleans VS Templates for Grain Interfaces.
     </description>
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="ProjectOrleans.Development" version="1.0.0.0" />
+      <dependency id="Microsoft.Orleans.Development" version="1.0.0.0" />
     </dependencies>
   </metadata>
   <files>
@@ -32,7 +32,7 @@
     <!-- Auto-import MSBuild targets and props files into target project.
            http://docs.nuget.org/docs/creating-packages/creating-and-publishing-a-package#Import_MSBuild_targets_and_props_files_into_project_(Requires_NuGet_2.5_or_above)
       -->
-    <file src="Orleans.SDK.targets" target="build\Orleans.Grains.targets" />
-    <file src="Orleans.Grains.props" target="build\Orleans.Grains.props" />
+    <file src="Orleans.SDK.targets" target="build\Orleans.Interfaces.targets" />
+    <file src="Orleans.Interfaces.props" target="build\Orleans.Interfaces.props" />
   </files>
 </package>

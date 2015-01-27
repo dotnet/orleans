@@ -41,6 +41,7 @@ namespace Orleans.Storage
         [NonSerialized]
         private readonly IDictionary<string, IDictionary<string, object>> dataTable;
         private readonly int numKeyLayers;
+        private readonly object lockable = new object();
 
         public HierarchicalKeyStore(int keyLayers)
         {
@@ -57,7 +58,7 @@ namespace Orleans.Storage
                 throw new ArgumentOutOfRangeException("keys", keys.Count, error);
             }
 
-            lock (this)
+            lock (lockable)
             {
                 var storedData = GetDataStore(keys);
 
@@ -85,7 +86,7 @@ namespace Orleans.Storage
                 throw new ArgumentOutOfRangeException("keys", keys.Count, error);
             }
 
-            lock (this)
+            lock (lockable)
             {
                 IDictionary<string, object> data = GetDataStore(keys);
                 
@@ -105,7 +106,7 @@ namespace Orleans.Storage
                     string.Format("Too many key supplied -- Expected count = {0} Received = {1}", numKeyLayers, keys.Count));
             }
 
-            lock (this)
+            lock (lockable)
             {
                 IList<IDictionary<string, object>> results = FindDataStores(keys);
 #if DEBUG
@@ -127,7 +128,7 @@ namespace Orleans.Storage
             string keyStr = MakeStoreKey(keys);
 
             bool removedEntry = false;
-            lock (this)
+            lock (lockable)
             {
                 IDictionary<string, object> data;
                 if (dataTable.TryGetValue(keyStr, out data))
@@ -153,7 +154,7 @@ namespace Orleans.Storage
 #if DEBUG
             Trace.TraceInformation("Clear Table");
 #endif
-            lock (this)
+            lock (lockable)
             {
                 dataTable.Clear();
             }
@@ -162,7 +163,7 @@ namespace Orleans.Storage
         public string DumpData(bool printDump = true)
         {
             var sb = new StringBuilder();
-            lock (this)
+            lock (lockable)
             {
                 string[] keys = dataTable.Keys.ToArray();
                 foreach (var key in keys)
@@ -184,7 +185,7 @@ namespace Orleans.Storage
         {
             string keyStr = MakeStoreKey(keys);
 
-            lock (this)
+            lock (lockable)
             {
                 IDictionary<string, object> data;
                 if (dataTable.ContainsKey(keyStr))
@@ -215,7 +216,7 @@ namespace Orleans.Storage
             {
                 string keyStr = MakeStoreKey(keys);
 
-                lock (this)
+                lock (lockable)
                 {
                     foreach (var key in dataTable.Keys)
                     if (key.StartsWith(keyStr))
@@ -247,4 +248,3 @@ namespace Orleans.Storage
         }
     }
 }
-

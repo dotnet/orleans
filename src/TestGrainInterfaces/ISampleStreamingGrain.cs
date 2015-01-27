@@ -50,5 +50,4 @@ namespace UnitTests.SampleStreaming
     public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
     {
     }
-
 }

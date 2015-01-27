@@ -126,7 +126,7 @@ namespace Orleans.Runtime
 
         private readonly LoggerType loggerType;
         private readonly string logName;
-        private readonly static object lockable;
+        private static readonly object lockable;
 
         private static readonly List<Tuple<string, Severity>> traceLevelOverrides = new List<Tuple<string, Severity>>();
 
@@ -1115,4 +1115,3 @@ namespace Orleans.Runtime
         // ReSharper restore UnusedMember.Global
     }
 }
-

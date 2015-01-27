@@ -37,6 +37,7 @@ namespace Orleans.Runtime
         private readonly TraceLogger logger = TraceLogger.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
+        private static readonly object lockable = new object();
 
         public static GrainTypeManager Instance { get; private set; }
 
@@ -50,7 +51,7 @@ namespace Orleans.Runtime
         public GrainTypeManager(bool localTestMode)
         {
             grainInterfaceMap = new GrainInterfaceMap(localTestMode);
-            lock (typeof (GrainTypeManager))
+            lock (lockable)
             {
                 if (Instance != null)
                     throw new InvalidOperationException("An attempt to create a second insance of GrainTypeManager.");
@@ -270,4 +271,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

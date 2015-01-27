@@ -335,4 +335,4 @@ namespace Orleans.Streams
                         Utils.EnumerableToString(captureConsumers), Utils.EnumerableToString(State.Consumers)));
         }
     }
-}
+}

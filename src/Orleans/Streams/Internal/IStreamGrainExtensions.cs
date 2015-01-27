@@ -49,4 +49,4 @@ namespace Orleans.Streams
         [AlwaysInterleave]
         Task RemoveSubscriber(StreamId streamId, IStreamConsumerExtension streamConsumer);
     }
-}
+}

@@ -57,4 +57,3 @@ namespace Orleans.Storage
         Task DeleteStateAsync(string grainType, string grainId);
     }
 }
-

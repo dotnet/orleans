@@ -585,4 +585,4 @@ namespace Orleans.CodeGeneration
             return typeCode;
         }
     }
-}
+}

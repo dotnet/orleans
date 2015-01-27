@@ -604,4 +604,3 @@ namespace Orleans.CodeGeneration
         #endregion
     }
 }
-

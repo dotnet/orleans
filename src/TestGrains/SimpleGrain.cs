@@ -46,7 +46,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(String.Format("{0}-{1}-{1}", typeof(SimpleGrain).Name, base.IdentityString, base.RuntimeIdentity));
+            logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
             return TaskDone.Done;
         }
@@ -86,4 +86,3 @@ namespace UnitTests.Grains
         }
     }
 }
-

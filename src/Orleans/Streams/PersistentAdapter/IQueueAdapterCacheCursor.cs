@@ -50,4 +50,4 @@ namespace Orleans.Streams
         /// <returns></returns>
         bool MoveNext();
     }
-}
+}

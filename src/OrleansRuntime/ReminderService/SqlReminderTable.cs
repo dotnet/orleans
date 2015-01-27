@@ -245,4 +245,3 @@ namespace Orleans.Runtime.ReminderService
             "DELETE FROM [OrleansRemindersTable]   WHERE [ServiceId] = @id AND [GrainId] = @grainid AND [ReminderName] = @name AND ETag = @etag";
     }
 }
-

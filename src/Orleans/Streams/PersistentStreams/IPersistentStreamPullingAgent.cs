@@ -37,4 +37,4 @@ namespace Orleans.Streams
     {
         Task Initialize(Immutable<IQueueAdapter> queueAdapter);
     }
-}
+}

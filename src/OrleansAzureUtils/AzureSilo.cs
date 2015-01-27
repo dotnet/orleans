@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
- using System;
+using System;
 using System.Diagnostics;
 using System.Globalization;
 using Microsoft.WindowsAzure.ServiceRuntime;
@@ -256,4 +256,4 @@ namespace Orleans.Runtime.Host
             host.StopOrleansSilo();
         }
     }
-}
+}

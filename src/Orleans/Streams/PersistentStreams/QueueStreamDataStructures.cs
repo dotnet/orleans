@@ -49,4 +49,4 @@ namespace Orleans.Streams
             Filter = filter;
         }
     }
-}
+}

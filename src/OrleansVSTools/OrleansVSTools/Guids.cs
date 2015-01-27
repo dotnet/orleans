@@ -34,4 +34,4 @@ namespace OrleansVSTools
 
         public static readonly Guid guidOrleansVSTools11CmdSet = new Guid(guidOrleansVSTools11CmdSetString);
     };
-}
+}

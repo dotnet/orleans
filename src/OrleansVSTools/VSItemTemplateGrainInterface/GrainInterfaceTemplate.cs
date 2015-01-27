@@ -41,4 +41,3 @@ namespace $rootnamespace$
         // since regular property setters cannot return Task.
 	}
 }
-
