@@ -20,14 +20,11 @@ Contributing To This Project
 
 * List of [Ideas for Contributions]
 
-* How to Contribute
-    * [Contributing Guide]
+* [Contributing Guide]
 
-* Coding Standards
-	* The coding standards / style guide used for Orleans code is the [.NET Framework Design Guidelines][DotNet Framework Design Guidelines]:
+* The coding standards / style guide used for Orleans code is the [.NET Framework Design Guidelines][DotNet Framework Design Guidelines]:
 
 You are also encouraged to start a discussion by filing an issue.
-See the [contributing guides][Contributing Guide] for more details.
 
 
 [MSR-ProjectOrleans]: http://research.microsoft.com/projects/orleans/
