@@ -1,16 +1,16 @@
 ﻿<?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
-    <id>ProjectOrleans.Client</id>
+    <id>Microsoft.Orleans.Client</id>
     <version>$version$</version>
-    <title>Project Orleans Client Libraries</title>
+    <title>Microsoft Orleans Client Libraries</title>
     <authors>Microsoft Research</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
     <summary>
-      Collection of Project Orleans libraries and files needed on the client.
+      Collection of Microsoft Orleans libraries and files needed on the client.
     </summary>
     <description>
       Referencing this package is necessary for a client to communicate with an Orleans system.
@@ -18,9 +18,9 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="ProjectOrleans.Orleans" version="1.0.0.0" />
-      <dependency id="ProjectOrleans.OrleansAzureUtils" version="1.0.0.0" />
-      <dependency id="ProjectOrleans.OrleansProviders" version="1.0.0.0" />
+      <dependency id="Microsoft.Orleans.Core" version="1.0.0.0" />
+      <dependency id="Microsoft.Orleans.OrleansAzureUtils" version="1.0.0.0" />
+      <dependency id="Microsoft.Orleans.OrleansProviders" version="1.0.0.0" />
     </dependencies>
   </metadata>
   <files>

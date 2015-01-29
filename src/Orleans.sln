@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30723.0
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -56,21 +56,21 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 	ProjectSection(SolutionItems) = preProject
 		NuGet\CreateOrleansPackages.bat = NuGet\CreateOrleansPackages.bat
 		NuGet\EmptyFile.cs = NuGet\EmptyFile.cs
+		NuGet\Microsoft.Orleans.Client.nuspec = NuGet\Microsoft.Orleans.Client.nuspec
+		NuGet\Microsoft.Orleans.ClientGenerator.nuspec = NuGet\Microsoft.Orleans.ClientGenerator.nuspec
+		NuGet\Microsoft.Orleans.CounterControl.nuspec = NuGet\Microsoft.Orleans.CounterControl.nuspec
+		NuGet\Microsoft.Orleans.Development.nuspec = NuGet\Microsoft.Orleans.Development.nuspec
+		NuGet\Microsoft.Orleans.Orleans.nuspec = NuGet\Microsoft.Orleans.Orleans.nuspec
+		NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec = NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec
+		NuGet\Microsoft.Orleans.OrleansHost.nuspec = NuGet\Microsoft.Orleans.OrleansHost.nuspec
+		NuGet\Microsoft.Orleans.OrleansManager.nuspec = NuGet\Microsoft.Orleans.OrleansManager.nuspec
+		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
+		NuGet\Microsoft.Orleans.OrleansRuntime.nuspec = NuGet\Microsoft.Orleans.OrleansRuntime.nuspec
+		NuGet\Microsoft.Orleans.Server.nuspec = NuGet\Microsoft.Orleans.Server.nuspec
+		NuGet\Microsoft.Orleans.Templates.Grains.nuspec = NuGet\Microsoft.Orleans.Templates.Grains.nuspec
+		NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec = NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec
 		BuildDefinitions\NuGet\Orleans.Grains.props = BuildDefinitions\NuGet\Orleans.Grains.props
 		BuildDefinitions\NuGet\Orleans.Interfaces.props = BuildDefinitions\NuGet\Orleans.Interfaces.props
-		NuGet\ProjectOrleans.Client.nuspec = NuGet\ProjectOrleans.Client.nuspec
-		NuGet\ProjectOrleans.ClientGenerator.nuspec = NuGet\ProjectOrleans.ClientGenerator.nuspec
-		NuGet\ProjectOrleans.CounterControl.nuspec = NuGet\ProjectOrleans.CounterControl.nuspec
-		NuGet\ProjectOrleans.Development.nuspec = NuGet\ProjectOrleans.Development.nuspec
-		NuGet\ProjectOrleans.Orleans.nuspec = NuGet\ProjectOrleans.Orleans.nuspec
-		NuGet\ProjectOrleans.OrleansAzureUtils.nuspec = NuGet\ProjectOrleans.OrleansAzureUtils.nuspec
-		NuGet\ProjectOrleans.OrleansHost.nuspec = NuGet\ProjectOrleans.OrleansHost.nuspec
-		NuGet\ProjectOrleans.OrleansManager.nuspec = NuGet\ProjectOrleans.OrleansManager.nuspec
-		NuGet\ProjectOrleans.OrleansProviders.nuspec = NuGet\ProjectOrleans.OrleansProviders.nuspec
-		NuGet\ProjectOrleans.OrleansRuntime.nuspec = NuGet\ProjectOrleans.OrleansRuntime.nuspec
-		NuGet\ProjectOrleans.Server.nuspec = NuGet\ProjectOrleans.Server.nuspec
-		NuGet\ProjectOrleans.Templates.Grains.nuspec = NuGet\ProjectOrleans.Templates.Grains.nuspec
-		NuGet\ProjectOrleans.Templates.Interfaces.nuspec = NuGet\ProjectOrleans.Templates.Interfaces.nuspec
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{80801A64-30AD-4B07-801C-2479A87AC527}"
@@ -111,7 +111,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bitmaps", "Bitmaps", "{0BB4
 	EndProjectSection
 EndProject
 Global
-	
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|Mixed Platforms = Debug|Mixed Platforms

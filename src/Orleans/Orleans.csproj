@@ -1,10 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-
   <PropertyGroup>
     <DownloadNuGetExe>true</DownloadNuGetExe>
   </PropertyGroup>
-
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
@@ -136,10 +134,10 @@
     <Compile Include="AssemblyLoader\AssemblyLoaderCriterion.cs" />
     <Compile Include="Providers\StatisticsProviderManager.cs" />
     <Compile Include="AssemblyLoader\CachedTypeResolver.cs" />
-    <Compile Include="Configuration\LimitsConfiguration.cs" />
+    <Compile Include="Configuration\ILimitsConfiguration.cs" />
     <Compile Include="Configuration\MessagingConfiguration.cs" />
     <Compile Include="Configuration\ProviderConfiguration.cs" />
-    <Compile Include="Configuration\StatisticsConfiguration.cs" />
+    <Compile Include="Configuration\IStatisticsConfiguration.cs" />
     <Compile Include="Configuration\ApplicationConfiguration.cs" />
     <Compile Include="IDs\TypeCodeMapper.cs" />
     <Compile Include="Messaging\SqlMembershipTable.cs" />
@@ -287,7 +285,7 @@
     <Compile Include="Configuration\GlobalConfiguration.cs" />
     <Compile Include="Configuration\ITraceConfiguration.cs" />
     <Compile Include="Configuration\NodeConfiguration.cs" />
-    <Compile Include="Configuration\OrleansConfiguration.cs" />
+    <Compile Include="Configuration\ClusterConfiguration.cs" />
     <Compile Include="Logging\ConsoleText.cs" />
     <Compile Include="Runtime\Constants.cs" />
     <Compile Include="Messaging\CorrelationId.cs" />
@@ -371,7 +369,7 @@
       <Output TaskParameter="Result" ItemName="Peeked" />
     </XmlPeek>
     <PropertyGroup>
-      <ClientGenSources>@(Peeked-&gt;'$(SolutionDir)ClientGenerator\%(Identity)')</ClientGenSources>
+      <ClientGenSources>@(Peeked->'$(SolutionDir)ClientGenerator\%(Identity)')</ClientGenSources>
     </PropertyGroup>
     <Message Text="ClientGenSources extracted: $(ClientGenSources)" Importance="high" />
     <!-- Compile orleans dll-->
@@ -396,9 +394,9 @@
     <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(AssemblyOriginatorKeyFile)" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import-&gt;'/imports:%(Identity)')" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath-&gt;'/r:%(Identity)')" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/fsharp:$(FSharpCompilerPath)" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/cwd:$(ProjectDir)" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/config:$(Configuration)" />
@@ -407,7 +405,7 @@
     <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionStrict:$(OptionStrict)" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile-&gt;'/src:%(Identity)')" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')" />
   </Target>
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
