@@ -217,13 +217,21 @@ namespace Orleans.Runtime.Configuration
             return limit;
         }
 
-        internal void Load(TextReader input)
+        public void Load(TextReader input)
         {
             var xml = new XmlDocument();
             var xmlReader = XmlReader.Create(input);
             xml.Load(xmlReader);
-            var root = xml.DocumentElement;
+            XmlElement root = xml.DocumentElement;
 
+            LoadFromXml(root);
+
+            // Fix up any deployment specific values [eg DeploymentId] in [stream] provider configs.
+            AdjustConfiguration(); 
+        }
+
+        internal void LoadFromXml(XmlElement root)
+        {
             foreach (XmlNode node in root.ChildNodes)
             {
                 var child = node as XmlElement;
