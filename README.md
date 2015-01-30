@@ -22,7 +22,9 @@ Contributing To This Project
 
 * [Contributing Guide]
 
-* The coding standards / style guide used for Orleans code is the [.NET Framework Design Guidelines][DotNet Framework Design Guidelines]:
+* [CLA - Contribution License Agreement][CLA]
+
+* The coding standards / style guide used for Orleans code is the [.NET Framework Design Guidelines][DotNet Framework Design Guidelines]
 
 You are also encouraged to start a discussion by filing an issue.
 
@@ -31,4 +33,5 @@ You are also encouraged to start a discussion by filing an issue.
 [Orleans Documentation]: https://github.com/dotnet/orleans/wiki
 [Ideas for Contributions]: https://github.com/dotnet/orleans/wiki/Ideas-for-Contributions
 [Contributing Guide]: https://github.com/dotnet/corefx/wiki/Contributing
+[CLA]: https://github.com/dotnet/corefx/wiki/Contribution-License-Agreement-%28CLA%29
 [DotNet Framework Design Guidelines]: https://github.com/dotnet/corefx/wiki/Framework-Design-Guidelines-Digest
