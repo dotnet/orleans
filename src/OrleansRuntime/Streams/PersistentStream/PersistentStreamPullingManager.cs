@@ -136,7 +136,7 @@ namespace Orleans.Streams
         {
             List<QueueId> currentQueues = queueBalancer.GetMyQueues().ToList();
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_06,
-                "Executing QueueChangeNotification number {0} from the queue allocator. Current queues: {2}",
+                "Executing QueueChangeNotification number {0} from the queue allocator. Current queues: {1}",
                 notificationSeqNumber, ToString(currentQueues));
 
             Task t1 = AddNewQueues(currentQueues, false);
@@ -261,4 +261,4 @@ namespace Orleans.Streams
             return Utils.EnumerableToString(myQueues, q => q.ToStringWithHashCode());
         }
     }
-}
+}

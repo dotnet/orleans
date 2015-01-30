@@ -75,4 +75,3 @@ namespace Orleans.CodeGeneration
         AlwaysInterleave = 0x100, // AlwaysInterleave is a requst type that can interleave with any other request type, including write request.
     }
 }
-

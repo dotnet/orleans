@@ -27,4 +27,4 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
     internal interface IMembershipOracle : ISiloStatusOracle, IHealthCheckParticipant
     {
     }
-}
+}

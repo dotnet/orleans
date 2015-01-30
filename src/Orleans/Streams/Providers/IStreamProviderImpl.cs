@@ -31,4 +31,4 @@ namespace Orleans.Streams
         IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId);
         IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId);
     }
-}
+}

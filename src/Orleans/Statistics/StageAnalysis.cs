@@ -401,4 +401,4 @@ namespace Orleans.Runtime
             return sum / GetNumberOfRequests(stageName);
         }
     }
-}
+}

@@ -80,4 +80,4 @@ namespace Orleans.Concurrency
             return new Immutable<T>(value);
         }
     }
-}
+}

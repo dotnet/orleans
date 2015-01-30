@@ -42,4 +42,4 @@ namespace UnitTests.GrainInterfaces
     {
         void StateChanged(int a, int b);
     }
-}
+}

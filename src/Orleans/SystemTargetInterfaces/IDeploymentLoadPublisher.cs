@@ -30,4 +30,3 @@ namespace Orleans.Runtime
         Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats);
     }
 }
-

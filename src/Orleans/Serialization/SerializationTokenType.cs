@@ -108,4 +108,4 @@ namespace Orleans.Serialization
         // Last but not least...
         Error = 255,
     }
-}
+}

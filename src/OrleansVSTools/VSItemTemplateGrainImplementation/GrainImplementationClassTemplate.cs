@@ -39,4 +39,3 @@ namespace $rootnamespace$
         // communication interface(s).
     }
 }
-

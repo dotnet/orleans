@@ -69,4 +69,4 @@ namespace Orleans.Runtime.Placement
                 PlacementResult.SpecifyCreation(allSilos[random.Next(allSilos.Count)], strategy, grainType));
         }
     }
-}
+}

@@ -96,4 +96,4 @@ namespace Orleans.Runtime.Placement
             @this.GetGrainTypeInfo(grainId.GetTypeCode(), out grainClass, out placement, genericArguments);
         }
     }
-}
+}

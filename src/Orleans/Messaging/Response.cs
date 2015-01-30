@@ -61,4 +61,3 @@ namespace Orleans.Runtime
         public static Response Done { get { return done; } }
     }
 }
-

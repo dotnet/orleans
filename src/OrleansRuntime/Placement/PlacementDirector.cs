@@ -34,4 +34,3 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy strategy, GrainId grain, IPlacementContext context);
     }
 }
-

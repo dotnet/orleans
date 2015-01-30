@@ -42,4 +42,4 @@ namespace Orleans.Streams
         /// <summary> Stream Provider Name. </summary>
         string ProviderName { get; }
     }
-}
+}

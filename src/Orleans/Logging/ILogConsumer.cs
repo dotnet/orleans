@@ -75,4 +75,3 @@ namespace Orleans.Runtime
         void Close();
     }
 }
-

@@ -50,4 +50,3 @@ namespace Orleans
         Task<int> GetActivationCount();
     }
 }
-

@@ -226,4 +226,4 @@ namespace Orleans.Serialization
                 (t.IsArray && IsTypeIsInaccessibleForSerialization(t.GetElementType(), currentModule));
         }
     }
-}
+}

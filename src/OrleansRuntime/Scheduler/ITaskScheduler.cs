@@ -31,4 +31,3 @@ namespace Orleans.Runtime.Scheduler
         void RunTask(Task task);
     }
 }
-

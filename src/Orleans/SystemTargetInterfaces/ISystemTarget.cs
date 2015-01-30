@@ -53,4 +53,3 @@ namespace Orleans
         IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null);
     }
 }
-

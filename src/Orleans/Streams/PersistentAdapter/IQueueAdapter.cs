@@ -82,4 +82,4 @@ namespace Orleans.Streams
             return adapter.QueueMessageBatchAsync(streamGuid, streamNamespace, new[] { evt });
         }
     }
-}
+}
