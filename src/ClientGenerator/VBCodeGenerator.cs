@@ -524,11 +524,11 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
             {
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("If(typeof({0}) is Global.Orleans.Grain,{2}.{1}.Cast({0}.AsReference()),{0})",
-                        GrainInterfaceData.GetParameterName(paramInfo),
+                        GetParameterName(paramInfo),
                         GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType),
                         paramInfo.ParameterType.Namespace);
                 else
-                    invokeArguments += GrainInterfaceData.GetParameterName(paramInfo);
+                    invokeArguments += GetParameterName(paramInfo);
 
                 if (count++ < parameters.Length)
                     invokeArguments += ", ";
@@ -636,7 +636,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
 
             foreach (var paramInfo in methodInfo.GetParameters())
                 referenceMethod.Parameters.Add(new CodeParameterDeclarationExpression(
-                    new CodeTypeReference(paramInfo.ParameterType),GrainInterfaceData.GetParameterName(paramInfo)));
+                    new CodeTypeReference(paramInfo.ParameterType),GetParameterName(paramInfo)));
 
             referenceMethod.Attributes = MemberAttributes.Public | MemberAttributes.Final;
             var pit = new CodeTypeReference(GetGenericTypeName(methodInfo.DeclaringType, type => { }, t => false));
@@ -661,7 +661,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 if (typeof (IGrainObserver).IsAssignableFrom(p.ParameterType))
                     paramGuardStatements.AppendLine(string.Format(
                             @"Global.Orleans.CodeGeneration.GrainFactoryBase.CheckGrainObserverParamInternal({0})",
-                            GrainInterfaceData.GetParameterName(p)));
+                            GetParameterName(p)));
             }
             return paramGuardStatements.ToString();
         }
@@ -680,6 +680,17 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
             typeName = typeName.Replace("<", "(Of ").Replace(">", ")");
             return typeName;
         }
+
+        /// <summary>
+        /// Returns the Visual Basic name for the provided <paramref name="parameter"/>.
+        /// </summary>
+        /// <param name="parameter">The parameter.</param>
+        /// <returns>The Visual Basic name for the provided <paramref name="parameter"/>.</returns>
+        protected override string GetParameterName(ParameterInfo parameter)
+        {
+            return string.Format("[{0}]", GrainInterfaceData.GetParameterName(parameter));
+        }
+
         #endregion
     }
 }

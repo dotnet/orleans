@@ -474,12 +474,13 @@ namespace Orleans.CodeGeneration
 
             foreach (var param in methodInfo.GetParameters())
             {
+                var paramName = GetParameterName(param);
                 CodeParameterDeclarationExpression p = param.ParameterType.IsGenericType
                     ? new CodeParameterDeclarationExpression(
                         TypeUtils.GetParameterizedTemplateName(param.ParameterType, true,
                             tt => CurrentNamespace != tt.Namespace && !ReferencedNamespaces.Contains(tt.Namespace)),
-                        param.Name)
-                    : new CodeParameterDeclarationExpression(param.ParameterType, param.Name);
+                        paramName)
+                    : new CodeParameterDeclarationExpression(param.ParameterType, paramName);
 
                 p.Direction = FieldDirection.In;
                 referenceMethod.Parameters.Add(p);
@@ -515,7 +516,7 @@ namespace Orleans.CodeGeneration
                 // For any parameters of type IGrainObjerver, the object passed at runtime must also be a GrainReference
                 if (typeof (IGrainObserver).IsAssignableFrom(p.ParameterType))
                     paramGuardStatements.AppendLine(string.Format(@"GrainFactoryBase.CheckGrainObserverParamInternal({0});",
-                        GrainInterfaceData.GetParameterName(p)));
+                        GetParameterName(p)));
             }
             return paramGuardStatements.ToString();
         }
