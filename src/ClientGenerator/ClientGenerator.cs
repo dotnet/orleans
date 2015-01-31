@@ -647,7 +647,7 @@ namespace Orleans.CodeGeneration
                 var options = new CodeGenOptions();
                 bool bootstrap = false;             // Used to handle circular dependencies building the runtime
 
-                // STEP 1 : Parse parameters;
+                // STEP 1 : Parse parameters
                 if (args.Length == 1 && args[0].StartsWith("@"))
                 {
                     // Read command line args from file
