@@ -389,6 +389,17 @@ namespace Orleans.CodeGeneration
         {
             throw new NotImplementedException("GetGenericTypeName");
         }
+
+        /// <summary>
+        /// Returns the F# name for the provided <paramref name="parameter"/>.
+        /// </summary>
+        /// <param name="parameter">The parameter.</param>
+        /// <returns>The F# name for the provided <paramref name="parameter"/>.</returns>
+        protected override string GetParameterName(ParameterInfo parameter)
+        {
+            return string.Format("``{0}``", GrainInterfaceData.GetParameterName(parameter));
+        }
+
         #endregion
     }
 }

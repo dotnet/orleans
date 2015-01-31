@@ -270,6 +270,16 @@ namespace Orleans.CodeGeneration
             return GetNestedClassName(typeName);
         }
 
+        /// <summary>
+        /// Returns the language-dependent name for the provided <paramref name="parameter"/>.
+        /// </summary>
+        /// <param name="parameter">The parameter.</param>
+        /// <returns>The language-dependent name for the provided <paramref name="parameter"/>.</returns>
+        protected virtual string GetParameterName(ParameterInfo parameter)
+        {
+            throw new NotImplementedException("GetParamterName");
+        }
+
         protected void AddReferencedAssembly(Type t)
         {
             var assembly = t.Assembly.GetName().Name + Path.GetExtension(t.Assembly.Location).ToLowerInvariant();

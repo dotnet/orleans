@@ -78,6 +78,16 @@ namespace Orleans.CodeGeneration
             return builder.ToString();
         }
 
+        /// <summary>
+        /// Returns the C# name for the provided <paramref name="parameter"/>.
+        /// </summary>
+        /// <param name="parameter">The parameter.</param>
+        /// <returns>The C# name for the provided <paramref name="parameter"/>.</returns>
+        protected override string GetParameterName(ParameterInfo parameter)
+        {
+            return "@" + GrainInterfaceData.GetParameterName(parameter);
+        }
+
         #region Grain State Classes
         protected override void GenerateStateClassProperty(CodeTypeDeclaration stateClass, PropertyInfo propInfo, string name, string type)
         {
@@ -512,11 +522,11 @@ namespace Orleans.CodeGeneration
             {
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("{0} is global::Orleans.Grain ? {2}.{1}.Cast({0}.AsReference()) : {0}",
-                        GrainInterfaceData.GetParameterName(paramInfo),
+                        GetParameterName(paramInfo),
                         GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType),
                         paramInfo.ParameterType.Namespace);
                 else
-                    invokeArguments += GrainInterfaceData.GetParameterName(paramInfo);
+                    invokeArguments += GetParameterName(paramInfo);
 
                 if (count++ < parameters.Length)
                     invokeArguments += ", ";
@@ -597,7 +607,7 @@ namespace Orleans.CodeGeneration
                 if (typeof (IGrainObserver).IsAssignableFrom(parameterInfo.ParameterType))
                     paramGuardStatements.AppendLine( string.Format(
                         @"global::Orleans.CodeGeneration.GrainFactoryBase.CheckGrainObserverParamInternal({0});",
-                        GrainInterfaceData.GetParameterName(parameterInfo)));
+                        GetParameterName(parameterInfo)));
             }
             return paramGuardStatements.ToString();
         }
