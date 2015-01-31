@@ -47,4 +47,4 @@ namespace Orleans.Providers.Streams.Common
 
         void Add(IBatchContainer batch, StreamSequenceToken sequenceToken);
     }
-}
+}

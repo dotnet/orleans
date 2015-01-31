@@ -51,4 +51,3 @@ namespace $rootnamespace$
         // TODO: add a property for each item of the persisted grain state
     }
 }
-

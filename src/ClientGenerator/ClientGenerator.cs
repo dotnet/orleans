@@ -1036,4 +1036,4 @@ namespace Orleans.CodeGeneration
             }
         }
     }
-}
+}

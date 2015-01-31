@@ -40,4 +40,3 @@ namespace Orleans.Runtime
         Task DeleteActivations(List<ActivationAddress> activationAddresses);
     }
 }
-

@@ -37,4 +37,4 @@ namespace UnitTests.GrainInterfaces
         Task SetTarget(ISimpleObserverableGrain target);
         Task Subscribe(ISimpleGrainObserver observer);
     }
-}
+}

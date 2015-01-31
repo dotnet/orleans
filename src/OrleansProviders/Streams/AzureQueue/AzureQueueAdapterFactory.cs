@@ -67,4 +67,4 @@ namespace Orleans.Providers.Streams.AzureQueue
             return Task.FromResult<IQueueAdapter>(adapter);
         }
     }
-}
+}

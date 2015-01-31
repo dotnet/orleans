@@ -77,4 +77,4 @@ namespace Orleans.Providers.Streams.Common
                     batchContainer.StreamNamespace == streamNamespace;
         }
     }
-}
+}

@@ -126,7 +126,7 @@ namespace Orleans.Runtime
 
         private readonly LoggerType loggerType;
         private readonly string logName;
-        private readonly static object lockable;
+        private static readonly object lockable;
 
         private static readonly List<Tuple<string, Severity>> traceLevelOverrides = new List<Tuple<string, Severity>>();
 
@@ -825,7 +825,7 @@ namespace Orleans.Runtime
             bool logMessageTruncated = false;
             if (message.Length > MAX_LOG_MESSAGE_SIZE)
             {
-                message = String.Format("{0}. {1} {2}", message.Substring(0, MAX_LOG_MESSAGE_SIZE), "MESSAGE TRANCATED AT THIS POINT!! Max message size =", MAX_LOG_MESSAGE_SIZE);
+                message = String.Format("{0}. MESSAGE TRUNCATED AT THIS POINT!! Max message size = {1}", message.Substring(0, MAX_LOG_MESSAGE_SIZE), MAX_LOG_MESSAGE_SIZE);
                 logMessageTruncated = true;
             }
 
@@ -1115,4 +1115,3 @@ namespace Orleans.Runtime
         // ReSharper restore UnusedMember.Global
     }
 }
-

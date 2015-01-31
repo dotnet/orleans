@@ -354,4 +354,4 @@ namespace Orleans.CodeGeneration
             #endregion
         }
     }
-}
+}

@@ -80,4 +80,4 @@ namespace Orleans.Streams
             return string.Format("PubSubPublisherState:StreamId={0},Producer={1}.", Stream, Producer);
         }
     }
-}
+}

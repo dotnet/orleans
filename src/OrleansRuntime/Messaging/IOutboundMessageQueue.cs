@@ -48,4 +48,3 @@ namespace Orleans.Runtime.Messaging
         int Count { get; }
     }
 }
-

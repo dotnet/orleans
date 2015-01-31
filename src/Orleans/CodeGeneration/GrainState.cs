@@ -119,7 +119,7 @@ namespace Orleans.CodeGeneration
         public string Etag { get; set; }
 
         /// <summary>
-        /// Async method to cause refresh of the current grain state data from backin store.
+        /// Async method to cause refresh of the current grain state data from backing store.
         /// Any previous contents of the grain state data will be overwritten.
         /// </summary>
         public async Task ReadStateAsync()
@@ -151,7 +151,7 @@ namespace Orleans.CodeGeneration
         }
 
         /// <summary>
-        /// Async method to cause write of the current grain state data into backin store.
+        /// Async method to cause write of the current grain state data into backing store.
         /// </summary>
         public async Task WriteStateAsync()
         {
@@ -206,7 +206,7 @@ namespace Orleans.CodeGeneration
         }
 
         /// <summary>
-        /// Async method to cause write of the current grain state data into backin store.
+        /// Async method to cause write of the current grain state data into backing store.
         /// </summary>
         public async Task ClearStateAsync()
         {
@@ -280,4 +280,4 @@ namespace Orleans.CodeGeneration
             return storage;
         }
     }
- }
+ }

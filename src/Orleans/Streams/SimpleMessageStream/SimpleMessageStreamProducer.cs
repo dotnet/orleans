@@ -169,4 +169,4 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 onDisposeTestHook();
         }
     }
-}
+}

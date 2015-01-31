@@ -75,4 +75,3 @@ namespace $safeprojectname$
         private static OrleansHostWrapper hostWrapper;
     }
 }
-

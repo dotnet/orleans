@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
- using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -81,11 +81,17 @@ namespace Orleans.Runtime.ConsistentRing
             return MyRange; // its immutable, so no need to clone
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         public List<SiloAddress> GetMySucessors(int n = 1)
         {
             return FindSuccessors(MyAddress, n);
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         public List<SiloAddress> GetMyPredecessors(int n = 1)
         {
             return FindPredecessors(MyAddress, n);
@@ -205,6 +211,9 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         internal List<SiloAddress> FindPredecessors(SiloAddress silo, int count)
         {
             lock (membershipRingList)
@@ -227,6 +236,9 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
+        /// <summary>
+        /// Returns null if silo is not in the list of members
+        /// </summary>
         internal List<SiloAddress> FindSuccessors(SiloAddress silo, int count)
         {
             lock (membershipRingList)
@@ -367,4 +379,3 @@ namespace Orleans.Runtime.ConsistentRing
         }
     }
 }
-

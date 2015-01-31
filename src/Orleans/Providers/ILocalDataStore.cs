@@ -41,4 +41,3 @@ namespace Orleans.Storage
         public static ILocalDataStore LocalDataStore { get; internal set; }
     }
 }
-

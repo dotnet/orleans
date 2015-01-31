@@ -104,4 +104,3 @@ namespace Orleans.Runtime
         SiloStatus GetSiloStatus(SiloAddress siloAddress);
     }
 }
-

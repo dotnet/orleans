@@ -45,4 +45,4 @@ namespace Orleans.Streams
 
         Task Validate();
     }
-}
+}

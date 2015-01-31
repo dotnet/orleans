@@ -46,4 +46,4 @@ namespace UnitTests.SampleStreaming
 
         Task<int> GetNumberConsumed();
     }
-}
+}

@@ -58,4 +58,4 @@ namespace Orleans.Streams
         /// </summary>
         bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc);
     }
-}
+}

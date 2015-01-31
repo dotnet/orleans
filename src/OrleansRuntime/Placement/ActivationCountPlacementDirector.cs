@@ -207,4 +207,3 @@ namespace Orleans.Runtime.Placement
         }
     }
 }
-

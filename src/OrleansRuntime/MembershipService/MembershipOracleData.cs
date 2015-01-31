@@ -268,62 +268,6 @@ namespace Orleans.Runtime.MembershipService
             return true;
         }
 
-        internal bool TryUpdateStatusesAndNotify(Dictionary<SiloAddress, MembershipEntry> newEntries)
-        {
-            List<MembershipEntry> changed = TryUpdateStatuses(newEntries);
-            if (changed == null || changed.Count <= 0) return false;
-
-            localTableCopy = GetSiloStatuses(status => true, true); // all the silos including me.
-            localTableCopyOnlyActive = GetSiloStatuses(status => status.Equals(SiloStatus.Active), true);    // only active silos including me.
-            localNamesTableCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.InstanceName);   // all the silos excluding me.
-
-            foreach (var entry in changed)
-            {
-                if (logger.IsVerbose) logger.Verbose("-Updated my local view of {0} status. It is now {1}.", entry.SiloAddress.ToLongString(), GetSiloStatus(entry.SiloAddress));
-                NotifyLocalSubscribers(entry.SiloAddress, entry.Status);
-            }
-            return true;
-        }
-
-        // return the list of MembershipEntry that changed.
-        // first find all entries in the new list that either don't appear in the old list or have changed.
-        // second, find all entries in the old list that have been removed from the new list.
-        private List<MembershipEntry> TryUpdateStatuses(Dictionary<SiloAddress, MembershipEntry> newEntries)
-        {
-            List<MembershipEntry> changedEntries = null;
-            foreach (MembershipEntry updatedSilo in newEntries.Values.Where(
-                item => !item.SiloAddress.Endpoint.Equals(MyAddress.Endpoint)))
-            {
-                MembershipEntry currSiloData;
-                if (!localTable.TryGetValue(updatedSilo.SiloAddress, out currSiloData))
-                {
-                    // an optimization - if I learn about dead silo and I never knew about him before, I don't care, can just ignore him.
-                    if (updatedSilo.Status == SiloStatus.Dead) continue;
-
-                    localTable.Add(updatedSilo.SiloAddress, updatedSilo);
-                    changedEntries = changedEntries ?? new List<MembershipEntry>();
-                    changedEntries.Add(updatedSilo);
-                }
-                else if (currSiloData.Status != updatedSilo.Status)
-                {
-                    currSiloData.Update(updatedSilo);
-                    changedEntries = changedEntries ?? new List<MembershipEntry>();
-                    changedEntries.Add(updatedSilo);
-                }
-            }
-            List<MembershipEntry> removedEntries = null;
-            foreach (var currSilo in localTable.Values.Where(item => !item.Status.Equals(SiloStatus.Dead)))
-            {
-                if (newEntries.ContainsKey(currSilo.SiloAddress)) continue;
-
-                currSilo.Status = SiloStatus.Dead;
-                removedEntries = removedEntries ?? new List<MembershipEntry>();
-                removedEntries.Add(currSilo);
-            }
-            
-            return SetExtensions.Union(changedEntries, removedEntries);
-        }
-
         private void NotifyLocalSubscribers(SiloAddress siloAddress, SiloStatus newStatus)
         {
             if (logger.IsVerbose2) logger.Verbose2("-NotifyLocalSubscribers about {0} status {1}", siloAddress.ToLongString(), newStatus);
@@ -359,4 +303,3 @@ namespace Orleans.Runtime.MembershipService
         }
     }
 }
-

@@ -139,4 +139,3 @@ namespace Orleans.Runtime
         Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
     }
 }
-

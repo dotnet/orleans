@@ -36,4 +36,3 @@ namespace Orleans.Runtime
         Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(SiloAddress silo);
     }
 }
-
