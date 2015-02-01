@@ -70,8 +70,8 @@ namespace Orleans.Runtime.ReminderService
 
                 var command = new SqlCommand((begin < end) ? READ_RANGE_ROWS_1 : READ_RANGE_ROWS_2);
                 command.Parameters.Add(new SqlParameter { ParameterName = "@id", DbType = DbType.String, Value = serviceId });
-                command.Parameters.Add(new SqlParameter { ParameterName = "@beginhash", DbType = DbType.Int64, Value = begin });
-                command.Parameters.Add(new SqlParameter { ParameterName = "@endhash", DbType = DbType.Int64, Value = end });
+                command.Parameters.Add(new SqlParameter { ParameterName = "@beginhash", DbType = DbType.Int32, Value = (int)begin });
+                command.Parameters.Add(new SqlParameter { ParameterName = "@endhash", DbType = DbType.Int32, Value = (int)end });
                 command.Connection = conn;
 
                 return await ProcessResults(command);
@@ -200,7 +200,7 @@ namespace Orleans.Runtime.ReminderService
             command.Parameters.Add(new SqlParameter { ParameterName = "@name", DbType = DbType.String, Value = entry.ReminderName });
             command.Parameters.Add(new SqlParameter { ParameterName = "@starttime", DbType = DbType.DateTime, Value = entry.StartAt });
             command.Parameters.Add(new SqlParameter { ParameterName = "@period", DbType = DbType.Int32, Value = entry.Period.TotalMilliseconds });
-            command.Parameters.Add(new SqlParameter { ParameterName = "@hash", DbType = DbType.Int64, Value = entry.GrainRef.GetUniformHashCode() });
+            command.Parameters.Add(new SqlParameter { ParameterName = "@hash", DbType = DbType.Int32, Value = (int)entry.GrainRef.GetUniformHashCode() });
             command.Parameters.Add(new SqlParameter { ParameterName = "@newetag", DbType = DbType.String, Value = newETag });
             return newETag;
         }
