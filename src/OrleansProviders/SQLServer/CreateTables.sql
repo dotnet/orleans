@@ -43,7 +43,7 @@ CREATE TABLE [dbo].[OrleansRemindersTable]
     [ReminderName] NVARCHAR(150) NOT NULL,
     [StartTime] DATETIME NOT NULL, 
     [Period] INT NOT NULL,
-    [GrainIdConsistentHash] BIGINT NOT NULL,
+    [GrainIdConsistentHash] INT NOT NULL,
     [ETag] NVARCHAR(50) NOT NULL,
     PRIMARY KEY ([ServiceId],[GrainId],[ReminderName])
 )
