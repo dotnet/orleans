@@ -38,22 +38,19 @@ namespace Orleans.Providers.Streams.Common
     public class PersistentStreamProvider<TAdapterFactory> : IStreamProvider, IStreamProviderImpl
         where TAdapterFactory : IQueueAdapterFactory, new()
     {
-        
         private Logger                  logger;
         private IStreamProviderRuntime  providerRuntime;
         private IQueueAdapter           queueAdapter;
-        private int                     numPullingAgents;
         private TimeSpan                getQueueMsgsTimerPeriod;
         private TimeSpan                initQueueTimeout;
         private StreamQueueBalancerType balancerType;
 
-        private const string NUM_PULLING_AGENTS = "NumPullingAgents";
         private const string GET_QUEUE_MESSAGES_TIMER_PERIOD = "GetQueueMessagesTimerPeriod";
         private const string INIT_QUEUE_TIMEOUT = "InitQueueTimeout";
-        private readonly int DEFAULT_NUM_PULLING_AGENTS = Math.Max(1, Environment.ProcessorCount / 2);
+        private const string QUEUE_BALANCER_TYPE = "QueueBalancerType";
         private readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
         private readonly TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT = TimeSpan.FromSeconds(5);
-        private const string QUEUE_BALANCER_TYPE = "QueueBalancerType";
+        private const StreamQueueBalancerType DEFAULT_STREAM_QUEUE_BALANCER_TYPE = StreamQueueBalancerType.ConsistentRingBalancer;
 
         public string                   Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
@@ -71,10 +68,6 @@ namespace Orleans.Providers.Streams.Common
             factory.Init(config, Name, logger);
             queueAdapter = await factory.CreateAdapter();
 
-            string nAgents;
-            numPullingAgents = !config.Properties.TryGetValue(NUM_PULLING_AGENTS, out nAgents) ?
-                DEFAULT_NUM_PULLING_AGENTS : Int32.Parse(nAgents);
-
             string timePeriod;
             if (!config.Properties.TryGetValue(GET_QUEUE_MESSAGES_TIMER_PERIOD, out timePeriod))
                 getQueueMsgsTimerPeriod = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
@@ -91,12 +84,11 @@ namespace Orleans.Providers.Streams.Common
             
             string balanceTypeString;
             balancerType = !config.Properties.TryGetValue(QUEUE_BALANCER_TYPE, out balanceTypeString)
-                ? StreamQueueBalancerType.ConsistenRingBalancer
+                ? DEFAULT_STREAM_QUEUE_BALANCER_TYPE
                 : (StreamQueueBalancerType)Enum.Parse(typeof(StreamQueueBalancerType), balanceTypeString);
 
-            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5}, {6} = {7} and with Adapter {8}.",
+            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5} and with Adapter {6}.",
                 typeof(TAdapterFactory).Name, Name, 
-                NUM_PULLING_AGENTS, this.numPullingAgents, 
                 GET_QUEUE_MESSAGES_TIMER_PERIOD, getQueueMsgsTimerPeriod,
                 INIT_QUEUE_TIMEOUT, this.initQueueTimeout, 
                 queueAdapter.Name);
@@ -106,7 +98,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (providerRuntime.InSilo)
             {
-                IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(balancerType, Name, providerRuntime, queueAdapter.GetStreamQueueMapper());
+                IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(balancerType, Name, Silo.CurrentSilo.LocalSiloStatusOracle, providerRuntime, queueAdapter.GetStreamQueueMapper());
                 var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
                 var manager = new PersistentStreamPullingManager(managerId, Name, providerRuntime, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
                 providerRuntime.RegisterSystemTarget(manager);
@@ -119,8 +111,6 @@ namespace Orleans.Providers.Streams.Common
 
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
         {
-            if (id == null) throw new ArgumentNullException("id");
-
             var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
             return providerRuntime.GetStreamDirectory().GetOrAddStream<T>(
                 streamId, () => new StreamImpl<T>(streamId, this, IsRewindable));
@@ -136,4 +126,4 @@ namespace Orleans.Providers.Streams.Common
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
         }
     }
-}
+}

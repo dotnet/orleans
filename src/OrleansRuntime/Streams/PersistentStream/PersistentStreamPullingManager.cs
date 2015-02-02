@@ -44,7 +44,7 @@ namespace Orleans.Streams
 
         private int latestRingNotificationSequenceNumber;
         private IQueueAdapter queueAdapter;
-        private IStreamQueueBalancer queueBalancer;
+        private readonly IStreamQueueBalancer queueBalancer;
 
         internal PersistentStreamPullingManager(
             GrainId id, 
@@ -261,4 +261,4 @@ namespace Orleans.Streams
             return Utils.EnumerableToString(myQueues, q => q.ToStringWithHashCode());
         }
     }
-}
+}
