@@ -59,7 +59,6 @@ namespace Orleans.Streams
         /// <param name="obs">The Observable object.</param>
         /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
         /// <param name="onErrorAsync">Delegte that is called for IAsyncObserver.OnErrorAsync.</param>
-        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitely unsubscribed.</returns>
@@ -68,6 +67,25 @@ namespace Orleans.Streams
                                                                            Func<Exception, Task> onErrorAsync )
         {
             return obs.SubscribeAsync<T>( onNextAsync, onErrorAsync, defaultOnCompleted );
+        }
+
+        /// <summary>
+        /// Subscribe a consumer to this observable using delegates.
+        /// This method is a helper for the IAsyncObservable.SubscribeAsync allowing the subscribing class to inline the 
+        /// handler methods instead of requiring an instance of IAsyncObserver.
+        /// </summary>
+        /// <typeparam name="T">The type of object produced by the observable.</typeparam>
+        /// <param name="obs">The Observable object.</param>
+        /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
+        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
+        /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
+        /// The consumer may unsubscribe by using this handle.
+        /// The subscription remains active for as long as it is not explicitely unsubscribed.</returns>
+        public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>( this IAsyncObservable<T> obs,
+                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<Task> onCompletedAsync )
+        {
+            return obs.SubscribeAsync<T>( onNextAsync, defaultOnError, onCompletedAsync );
         }
 
         /// <summary>
@@ -147,6 +165,35 @@ namespace Orleans.Streams
                                                                            object filterData = null )
         {
             return obs.SubscribeAsync<T>( onNextAsync, onErrorAsync, defaultOnCompleted, token, filterFunc, filterData );
+        }
+
+        /// <summary>
+        /// Subscribe a consumer to this observable using delegates.
+        /// This method is a helper for the IAsyncObservable.SubscribeAsync allowing the subscribing class to inline the 
+        /// handler methods instead of requiring an instance of IAsyncObserver.
+        /// </summary>
+        /// <typeparam name="T">The type of object produced by the observable.</typeparam>
+        /// <param name="obs">The Observable object.</param>
+        /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
+        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
+        /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
+        /// <param name="filterFunc">Filter to be applied for this subscription</param>
+        /// <param name="filterData">Data object that will be passed in to the filterFunc.
+        /// This will usually contain any paramaters required by the filterFunc to make it's filtering decision.</param>
+        /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
+        /// The consumer may unsubscribe by using this handle.
+        /// The subscription remains active for as long as it is not explicitely unsubscribed.
+        /// </returns>
+        /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
+        /// Usually this is because it is not a static method. </exception>
+        public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>( this IAsyncObservable<T> obs,
+                                                                           Func<T, StreamSequenceToken, Task> onNextAsync,
+                                                                           Func<Task> onCompletedAsync,
+                                                                           StreamSequenceToken token,
+                                                                           StreamFilterPredicate filterFunc = null,
+                                                                           object filterData = null )
+        {
+            return obs.SubscribeAsync<T>( onNextAsync, defaultOnError, onCompletedAsync, token, filterFunc, filterData );
         }
 
         /// <summary>
