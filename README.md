@@ -11,10 +11,6 @@ Documentation
 =======
 Documentation is located [here][Orleans Documentation]
 
-License
-=======
-This project is licensed under the [MIT license] (https://github.com/dotnet/orleans/blob/master/LICENSE).
-
 Contributing To This Project
 =======
 
@@ -27,6 +23,10 @@ Contributing To This Project
 * The coding standards / style guide used for Orleans code is the [.NET Framework Design Guidelines][DotNet Framework Design Guidelines]
 
 You are also encouraged to start a discussion by filing an issue.
+
+License
+=======
+This project is licensed under the [MIT license] (https://github.com/dotnet/orleans/blob/master/LICENSE).
 
 
 [MSR-ProjectOrleans]: http://research.microsoft.com/projects/orleans/
