@@ -211,7 +211,11 @@
     <Compile Include="Core\InsideGrainClient.cs" />
     <Compile Include="GrainTypeManager\TypeManager.cs" />
     <Compile Include="Silo\Watchdog.cs" />
+    <Compile Include="Streams\QueueBalancer\AzureDelpoymentConfiguration.cs" />
+    <Compile Include="Streams\QueueBalancer\BestFitBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\ConsistentRingQueueBalancer.cs" />
+    <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
+    <Compile Include="Streams\QueueBalancer\IDelpoymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
   </ItemGroup>
   <ItemGroup>
