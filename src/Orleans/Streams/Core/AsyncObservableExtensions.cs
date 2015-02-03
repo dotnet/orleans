@@ -22,11 +22,10 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
-    public static class StreamExtensions
+    public static class AsyncObservableExtensions
     {
-
-        static readonly Func<Exception, Task> defaultOnError = ( a ) => { return TaskDone.Done; };
-        static readonly Func<Task> defaultOnCompleted = () => { return TaskDone.Done; };
+        private static readonly Func<Exception, Task> defaultOnError = ( a ) => { return TaskDone.Done; };
+        private static readonly Func<Task> defaultOnCompleted = () => { return TaskDone.Done; };
 
         /// <summary>
         /// Subscribe a consumer to this observable using delegates.

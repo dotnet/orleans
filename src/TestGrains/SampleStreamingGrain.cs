@@ -157,7 +157,7 @@ namespace UnitTests.SampleStreaming
         }
     }
 
-    public class SampleStreaming__InlineConsumerGrain : Grain, ISampleStreaming_InlineConsumerGrain
+    public class SampleStreaming_InlineConsumerGrain : Grain, ISampleStreaming_InlineConsumerGrain
     {
         private IAsyncObservable<int> consumer;
         internal int numConsumedItems;
