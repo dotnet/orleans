@@ -28,34 +28,34 @@ namespace Orleans.Streams
     /// <typeparam name="T">The type of object produced by the observable.</typeparam>
     internal class GenericAsyncObserver<T> : IAsyncObserver<T>
     {
-        private Func<T, StreamSequenceToken, Task> _NextAsync;
-        private Func<Exception, Task> _ErrorAsync;
-        private Func<Task> _CompletedAsync;
+        private Func<T, StreamSequenceToken, Task> onNextAsync;
+        private Func<Exception, Task> onErrorAsync;
+        private Func<Task> onCompletedAsync;
 
-        public GenericAsyncObserver( Func<T, StreamSequenceToken, Task> onNextAsync, Func<Exception, Task> onErrorAsync, Func<Task> onCompletedAsync )
+        public GenericAsyncObserver(Func<T, StreamSequenceToken, Task> onNext, Func<Exception, Task> onError, Func<Task> onCompleted)
         {
-            if ( onNextAsync == null ) throw new ArgumentNullException( "onNextAsync" );
-            if ( onErrorAsync == null ) throw new ArgumentNullException( "onErrorAsync" );
-            if ( onCompletedAsync == null ) throw new ArgumentNullException( "onCompletedAsync" );
+            if ( onNextAsync == null ) throw new ArgumentNullException( "onNext" );
+            if ( onErrorAsync == null ) throw new ArgumentNullException( "onError" );
+            if ( onCompletedAsync == null ) throw new ArgumentNullException( "onCompleted" );
 
-            _NextAsync = onNextAsync;
-            _ErrorAsync = onErrorAsync;
-            _CompletedAsync = onCompletedAsync;
+            onNextAsync = onNext;
+            onErrorAsync = onError;
+            onCompletedAsync = onCompleted;
         }
 
-        public Task OnNextAsync( T item, StreamSequenceToken token = null )
+        public Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
-            return _NextAsync( item, token );
+            return onNextAsync(item, token);
         }
 
         public Task OnCompletedAsync()
         {
-            return _CompletedAsync();
+            return onCompletedAsync();
         }
 
-        public Task OnErrorAsync( Exception ex )
+        public Task OnErrorAsync(Exception ex)
         {
-            return _ErrorAsync( ex );
+            return onErrorAsync(ex);
         }
     }
 }
