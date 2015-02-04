@@ -1,0 +1,423 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <DownloadNuGetExe>true</DownloadNuGetExe>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>10.0.20506</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Orleans</RootNamespace>
+    <AssemblyName>Orleans</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <PlatformTarget>x86</PlatformTarget>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkProfile />
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
+    <DocumentationFile>obj\Debug\Orleans.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+    <CodeAnalysisIgnoreGeneratedCode>false</CodeAnalysisIgnoreGeneratedCode>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
+    <DocumentationFile>obj\Release\Orleans.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.WindowsAzure.StorageClient, Version=1.7.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.Services.Client" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Async\AsyncSerialExecutor.cs" />
+    <Compile Include="Async\AsyncExecutorWithRetries.cs" />
+    <Compile Include="Async\AsyncLock.cs" />
+    <Compile Include="Async\AsyncPipeline.cs" />
+    <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
+    <Compile Include="Async\TaskExtensions.cs" />
+    <Compile Include="AzureUtils\AzureQueueDataManager.cs" />
+    <Compile Include="AzureUtils\AzureGatewayListProvider.cs" />
+    <Compile Include="AzureUtils\AzureStorageUtils.cs" />
+    <Compile Include="AzureUtils\AzureTableDefaultPolicies.cs" />
+    <Compile Include="AzureUtils\ClientMetricsTableDataManager.cs" />
+    <Compile Include="AzureUtils\AzureTableDataManager.cs" />
+    <Compile Include="AzureUtils\StatsTableDataManager.cs" />
+    <Compile Include="AzureUtils\OrleansSiloInstanceManager.cs" />
+    <Compile Include="AzureUtils\SiloMetricsTableDataManager.cs" />
+    <Compile Include="CodeGeneration\GrainState.cs" />
+    <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
+    <Compile Include="Configuration\LimitNames.cs" />
+    <Compile Include="Configuration\LimitValue.cs" />
+    <Compile Include="Core\Exceptions.cs" />
+    <Compile Include="Core\IGrainState.cs" />
+    <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="Messaging\GatewayManager.cs" />
+    <Compile Include="Messaging\RequestInvocationHistory.cs" />
+    <Compile Include="Messaging\Response.cs" />
+    <Compile Include="Runtime\IAddressable.cs" />
+    <Compile Include="Placement\PreferLocalPlacement.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoader.cs" />
+    <Compile Include="Providers\IMemoryStorageGrain.cs" />
+    <Compile Include="AssemblyLoader\CachedReflectionOnlyTypeResolver.cs" />
+    <Compile Include="Runtime\IActivationData.cs" />
+    <Compile Include="IDs\UniqueKey.cs" />
+    <Compile Include="Runtime\IRuntimeClient.cs" />
+    <Compile Include="Runtime\IGrainExtension.cs" />
+    <Compile Include="Statistics\StageAnalysis.cs" />
+    <Compile Include="Core\GrainFactory.cs" />
+    <Compile Include="Runtime\HashRing.cs" />
+    <Compile Include="Statistics\AverageTimeSpanStatistic.cs" />
+    <Compile Include="Statistics\StorageStatisticsGroup.cs" />
+    <Compile Include="Core\GrainExtensions.cs" />
+    <Compile Include="Runtime\IConsistentRingProviderForGrains.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderCriteria.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderReflectionCriterion.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderPathNameCriterion.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderCriterion.cs" />
+    <Compile Include="Providers\StatisticsProviderManager.cs" />
+    <Compile Include="AssemblyLoader\CachedTypeResolver.cs" />
+    <Compile Include="Configuration\ILimitsConfiguration.cs" />
+    <Compile Include="Configuration\MessagingConfiguration.cs" />
+    <Compile Include="Configuration\ProviderConfiguration.cs" />
+    <Compile Include="Configuration\IStatisticsConfiguration.cs" />
+    <Compile Include="Configuration\ApplicationConfiguration.cs" />
+    <Compile Include="IDs\TypeCodeMapper.cs" />
+    <Compile Include="Messaging\SqlMembershipTable.cs" />
+    <Compile Include="Providers\ILocalDataStore.cs" />
+    <Compile Include="Streams\Core\AsyncObservableExtensions.cs" />
+    <Compile Include="Streams\Internal\GenericAsyncObserver.cs" />
+    <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
+    <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />
+    <Compile Include="Streams\Predicates\FilterPredicateWrapperData.cs" />
+    <Compile Include="Streams\Predicates\IStreamFilterPredicateWrapper.cs" />
+    <Compile Include="Streams\Core\IAsyncObservable.cs" />
+    <Compile Include="Streams\Internal\IStreamControl.cs" />
+    <Compile Include="Streams\Core\IStreamIdentity.cs" />
+    <Compile Include="Streams\Providers\IStreamProviderImpl.cs" />
+    <Compile Include="Streams\Providers\IStreamProviderManager.cs" />
+    <Compile Include="Streams\Providers\IStreamProviderRuntime.cs" />
+    <Compile Include="Streams\PersistentAdapter\HashRingBasedStreamQueueMapper.cs" />
+    <Compile Include="Streams\PersistentAdapter\DataNotAvailableException.cs" />
+    <Compile Include="Streams\PersistentAdapter\IQueueAdapterReceiver.cs" />
+    <Compile Include="Streams\PersistentAdapter\IQueueAdapterCacheCursor.cs" />
+    <Compile Include="Streams\Predicates\OrFilter.cs" />
+    <Compile Include="Streams\PubSub\ImplicitStreamSubscriberTable.cs" />
+    <Compile Include="Streams\PubSub\PubSubPublisherState.cs" />
+    <Compile Include="Streams\PubSub\PubSubRuntime.cs" />
+    <Compile Include="Providers\IBootstrapProvider.cs" />
+    <Compile Include="Providers\ClientProviderRuntime.cs" />
+    <Compile Include="Providers\IOrleansProvider.cs" />
+    <Compile Include="Providers\IProviderRuntime.cs" />
+    <Compile Include="Statistics\ThreadCycleStopWatch.cs" />
+    <Compile Include="Streams\PubSub\PubSubSubscriptionState.cs" />
+    <Compile Include="Streams\SimpleMessageStream\SimpleMessageStreamProducer.cs" />
+    <Compile Include="Streams\PersistentAdapter\IBatchContainer.cs" />
+    <Compile Include="Streams\PersistentAdapter\IQueueAdapter.cs" />
+    <Compile Include="Streams\PersistentAdapter\IQueueAdapterFactory.cs" />
+    <Compile Include="Streams\SimpleMessageStream\SimpleMessageStreamProvider.cs" />
+    <Compile Include="Streams\Internal\StreamConsumer.cs" />
+    <Compile Include="Streams\Internal\StreamConsumerExtension.cs" />
+    <Compile Include="Streams\Internal\StreamDirectory.cs" />
+    <Compile Include="Streams\Internal\StreamImpl.cs" />
+    <Compile Include="Streams\SimpleMessageStream\SimpleMessageStreamProducerExtension.cs" />
+    <Compile Include="Streams\PersistentStreams\IPersistentStreamPullingAgent.cs" />
+    <Compile Include="Streams\PersistentStreams\PersistentStreamProducer.cs" />
+    <Compile Include="Streams\PersistentAdapter\IStreamQueueMapper.cs" />
+    <Compile Include="Streams\PersistentStreams\QueueStreamDataStructures.cs" />
+    <Compile Include="IDs\QueueId.cs" />
+    <Compile Include="IDs\StreamId.cs" />
+    <Compile Include="Streams\Internal\IStreamGrainExtensions.cs" />
+    <Compile Include="Streams\PubSub\IPubSubRendezvousGrain.cs" />
+    <Compile Include="Streams\Core\StreamSequenceToken.cs" />
+    <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
+    <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
+    <Compile Include="Utils\SetExtensions.cs" />
+    <Compile Include="Placement\ActivationCountBasedPlacement.cs" />
+    <Compile Include="Placement\StatelessWorkerPlacement.cs" />
+    <Compile Include="Placement\PlacementStrategy.cs" />
+    <Compile Include="Placement\RandomPlacement.cs" />
+    <Compile Include="Placement\SystemPlacement.cs" />
+    <Compile Include="Statistics\ApplicationRequestsStatisticsGroup.cs" />
+    <Compile Include="Statistics\AverageValueStatistic.cs" />
+    <Compile Include="Statistics\QueueTrackingStatistic.cs" />
+    <Compile Include="Statistics\StatisticsCollector.cs" />
+    <Compile Include="Statistics\ThreadTrackingStatistic.cs" />
+    <Compile Include="Runtime\RuntimeQueue.cs" />
+    <Compile Include="Statistics\TimeInterval.cs" />
+    <Compile Include="Statistics\MessagingProcessingStatisticsGroup.cs" />
+    <Compile Include="Messaging\GatewayClientReceiver.cs" />
+    <Compile Include="Messaging\GatewayConnection.cs" />
+    <Compile Include="Runtime\GrainInterfaceMap.cs" />
+    <Compile Include="Messaging\OutgoingMessageSender.cs" />
+    <Compile Include="Streams\Core\IAsyncObserver.cs" />
+    <Compile Include="Runtime\ITypeManager.cs" />
+    <Compile Include="Statistics\ClientStatisticsManager.cs" />
+    <Compile Include="Statistics\HistogramValueStatistic.cs" />
+    <Compile Include="Statistics\StatisticNames.cs" />
+    <Compile Include="Statistics\SchedulerStatisticsGroup.cs" />
+    <Compile Include="Statistics\NetworkingStatisticsGroup.cs" />
+    <Compile Include="Statistics\FloatValueStatistic.cs" />
+    <Compile Include="Statistics\LogStatistics.cs" />
+    <Compile Include="Statistics\RuntimeStatisticsGroup.cs" />
+    <Compile Include="Statistics\ClientTableStatistics.cs" />
+    <Compile Include="Core\Immutable.cs" />
+    <Compile Include="Providers\ProviderLoader.cs" />
+    <Compile Include="Providers\ProviderTypeLoader.cs" />
+    <Compile Include="Messaging\IOutgoingMessage.cs" />
+    <Compile Include="IDs\JenkinsHash.cs" />
+    <Compile Include="Streams\Core\IAsyncStream.cs" />
+    <Compile Include="Streams\Providers\IStreamProvider.cs" />
+    <Compile Include="Providers\IStorageProvider.cs" />
+    <Compile Include="Streams\Providers\StreamProviderManager.cs" />
+    <Compile Include="SystemTargetInterfaces\ICatalog.cs" />
+    <Compile Include="SystemTargetInterfaces\IMembershipTable.cs" />
+    <Compile Include="SystemTargetInterfaces\IManagementGrain.cs" />
+    <Compile Include="SystemTargetInterfaces\IMembershipService.cs" />
+    <Compile Include="SystemTargetInterfaces\IReminderTable.cs" />
+    <Compile Include="SystemTargetInterfaces\IReminderService.cs" />
+    <Compile Include="SystemTargetInterfaces\IRemoteGrainDirectory.cs" />
+    <Compile Include="SystemTargetInterfaces\IDeploymentLoadPublisher.cs" />
+    <Compile Include="SystemTargetInterfaces\ISiloControl.cs" />
+    <Compile Include="SystemTargetInterfaces\ISystemTarget.cs" />
+    <Compile Include="Timers\IRemindable.cs" />
+    <Compile Include="Statistics\MessagingStatisticsGroup.cs" />
+    <Compile Include="Statistics\StringValueStatistic.cs" />
+    <Compile Include="Messaging\GatewayProviderFactory.cs" />
+    <Compile Include="Messaging\BufferPool.cs" />
+    <Compile Include="Statistics\IPerformanceMetrics.cs" />
+    <Compile Include="Configuration\LimitManager.cs" />
+    <Compile Include="Timers\SafeTimerBase.cs" />
+    <Compile Include="Timers\SafeTimer.cs" />
+    <Compile Include="Utils\StandardExtensions.cs" />
+    <Compile Include="Runtime\GrainReferenceCache.cs" />
+    <Compile Include="Runtime\RequestContext.cs" />
+    <Compile Include="Logging\ErrorCodes.cs" />
+    <Compile Include="Messaging\IGatewayListProvider.cs" />
+    <Compile Include="Statistics\CounterStatistic.cs" />
+    <Compile Include="Statistics\IntValueStatistic.cs" />
+    <Compile Include="Runtime\RuntimeVersion.cs" />
+    <Compile Include="Utils\SafeRandom.cs" />
+    <Compile Include="Serialization\BinaryTokenStreamReader.cs" />
+    <Compile Include="Serialization\BinaryTokenStreamWriter.cs" />
+    <Compile Include="Serialization\SerializationTokenType.cs" />
+    <Compile Include="Serialization\TypeUtilities.cs" />
+    <Compile Include="Runtime\ISchedulingContext.cs" />
+    <Compile Include="Runtime\SiloStatus.cs" />
+    <Compile Include="Core\GrainClient.cs" />
+    <Compile Include="Runtime\OutsideRuntimeClient.cs" />
+    <Compile Include="Placement\GrainStrategy.cs" />
+    <Compile Include="Runtime\CallbackData.cs" />
+    <Compile Include="Core\GrainAttributes.cs" />
+    <Compile Include="CodeGeneration\GrainFactoryBase.cs" />
+    <Compile Include="Runtime\IClientObserverRegistrar.cs" />
+    <Compile Include="Logging\LogWriters.cs" />
+    <Compile Include="Logging\ILogConsumer.cs" />
+    <Compile Include="CodeGeneration\ActivationAttribute.cs" />
+    <Compile Include="Core\IGrainObserver.cs" />
+    <Compile Include="Core\IGrain.cs" />
+    <Compile Include="Messaging\ProxiedMessageCenter.cs" />
+    <Compile Include="Messaging\SocketManager.cs" />
+    <Compile Include="Async\ObserverSubscriptionManager.cs" />
+    <Compile Include="CodeGeneration\GrainInterfaceData.cs" />
+    <Compile Include="IDs\ActivationAddress.cs" />
+    <Compile Include="IDs\ActivationId.cs" />
+    <Compile Include="Runtime\AsynchAgent.cs" />
+    <Compile Include="Runtime\AsynchQueueAgent.cs" />
+    <Compile Include="Messaging\ByteArrayBuilder.cs" />
+    <Compile Include="Configuration\ClientConfiguration.cs" />
+    <Compile Include="Configuration\ConfigUtilities.cs" />
+    <Compile Include="Configuration\GlobalConfiguration.cs" />
+    <Compile Include="Configuration\ITraceConfiguration.cs" />
+    <Compile Include="Configuration\NodeConfiguration.cs" />
+    <Compile Include="Configuration\ClusterConfiguration.cs" />
+    <Compile Include="Logging\ConsoleText.cs" />
+    <Compile Include="Runtime\Constants.cs" />
+    <Compile Include="Messaging\CorrelationId.cs" />
+    <Compile Include="IDs\GrainId.cs" />
+    <Compile Include="Messaging\IMessageCenter.cs" />
+    <Compile Include="IDs\Interner.cs" />
+    <Compile Include="Placement\PlacementResult.cs" />
+    <Compile Include="Logging\TraceLogger.cs" />
+    <Compile Include="Utils\LRU.cs" />
+    <Compile Include="Messaging\Message.cs" />
+    <Compile Include="Logging\Logger.cs" />
+    <Compile Include="CodeGeneration\InvokeMethodRequest.cs" />
+    <Compile Include="IDs\SiloAddress.cs" />
+    <Compile Include="Runtime\SystemStatus.cs" />
+    <Compile Include="CodeGeneration\TypeUtils.cs" />
+    <Compile Include="IDs\UniqueIdentifier.cs" />
+    <Compile Include="Runtime\RuntimeContext.cs" />
+    <Compile Include="Serialization\BuiltInTypes.cs" />
+    <Compile Include="Serialization\DeserializationContext.cs" />
+    <Compile Include="Serialization\SerializationContext.cs" />
+    <Compile Include="Serialization\SerializationManager.cs" />
+    <Compile Include="Core\Grain.cs" />
+    <Compile Include="Runtime\RuntimeClient.cs" />
+    <Compile Include="Runtime\GrainReference.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="Utils\Utils.cs" />
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs">
+      <Link>Properties\GlobalAssemblyInfo.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\Orleans.SDK.targets">
+      <Link>Orleans.SDK.targets</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
+    <None Include="..\NuGet\Orleans.Grains.props">
+      <Link>Orleans.Grains.props</Link>
+    </None>
+    <None Include="..\NuGet\Orleans.Interfaces.props">
+      <Link>Orleans.Interfaces.props</Link>
+    </None>
+    <None Include="..\Orleans.snk">
+      <Link>Orleans.snk</Link>
+    </None>
+    <Content Include="Configuration\OrleansConfiguration.xsd">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <ClientGenReferences>System.Data.dll;System.Data.Services.Client.dll;</ClientGenReferences>
+    <!-- $(SolutionDir)Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.StorageClient.dll;$(SolutionDir)Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.Diagnostics.dll;$(SolutionDir)Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.ServiceRuntime.dll -->
+  </PropertyGroup>
+  <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
+    <PropertyGroup Condition="'$(BuildNumber)' == ''">
+      <BuildNumber>1</BuildNumber>
+    </PropertyGroup>
+  </Target>
+  <Target Name="VersionInit" BeforeTargets="BeforeBuild">
+    <!-- $(SolutionDir)Build\Version.txt; -->
+    <Copy SourceFiles="$(SolutionDir)NuGet\EmptyFile.cs" DestinationFolder="$(TargetDir)" ContinueOnError="true" />
+  </Target>
+  <Target Name="LogBuildProperties" BeforeTargets="CoreCompile" AfterTargets="VersionInit">
+    <!-- Show values of some useful properties -->
+    <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
+  </Target>
+  <Target Name="OrleansDllBootstrapUsingClientGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath);" Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Bootstrapping the Orleans.dll" Importance="high" />
+    <!-- Clean Generated directory -->
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
+    <!--<RemoveDir Directories="$(IntermediateOutputPath)Generated;" />-->
+    <MakeDir Directories="$(IntermediateOutputPath)Generated;" />
+    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
+    <!-- Extract the sources for clientgen -->
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Searching for ClientGen sources" Importance="high" />
+    <XmlPeek Namespaces="&lt;Namespace Prefix='msb' Uri='http://schemas.microsoft.com/developer/msbuild/2003'/&gt;" XmlInputPath="$(SolutionDir)\ClientGenerator\ClientGenerator.csproj" Query="/msb:Project/msb:ItemGroup/msb:Compile/@Include">
+      <Output TaskParameter="Result" ItemName="Peeked" />
+    </XmlPeek>
+    <PropertyGroup>
+      <ClientGenSources>@(Peeked->'$(SolutionDir)ClientGenerator\%(Identity)')</ClientGenSources>
+    </PropertyGroup>
+    <Message Text="ClientGenSources extracted: $(ClientGenSources)" Importance="high" />
+    <!-- Compile orleans dll-->
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Compiling Orleans.dll for boot strap" Importance="high" />
+    <csc Sources="@(Compile)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(ClientGenReferences);Microsoft.VisualBasic.dll;$(SolutionDir)packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll" DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN;" KeyFile="$(AssemblyOriginatorKeyFile)" TargetType="$(OutputType)" />
+    <!-- $(SolutionDir)Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.StorageClient.dll; -->
+    <!-- Compile clientgen-->
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Compiling ClientGenerator for BootStrap" Importance="high" />
+    <!-- Copy SourceFiles="$(SolutionDir)Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.StorageClient.dll" DestinationFolder="$(ProjectDir)$(IntermediateOutputPath)Generated" / -->
+    <csc Sources="$(ClientGenSources)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(ClientGenReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" DefineConstants="$(DefineConstants),CLIENTGEN_PROJECT" KeyFile="$(AssemblyOriginatorKeyFile)" />
+    <!-- Finally invoke ClientGenerator on the recently built Orleans dll-->
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
+    <Exec Command="&quot;$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe&quot; /nomerge /bootstrap &quot;/in:$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)&quot; &quot;/keyfile:$(AssemblyOriginatorKeyFile)&quot; &quot;/reference:@(ReferencePath)&quot; &quot;/sources:@(Compile)&quot; &quot;/define:$(DefineConstants)&quot; $(ClientGenOptions)" />
+  </Target>
+  <Target Name="WriteArgsToFileForDebugging" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath);" Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
+    <MakeDir Directories="$(IntermediateOutputPath)Generated;" />
+    <PropertyGroup>
+      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+    </PropertyGroup>
+    <Message Text="[OrleansClientPreprocessing] - Code-gen args file=$(ArgsFile)" />
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/nomerge" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(AssemblyOriginatorKeyFile)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/fsharp:$(FSharpCompilerPath)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/cwd:$(ProjectDir)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/config:$(Configuration)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionExplicit:$(OptionExplicit)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionCompare:$(OptionCompare)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionStrict:$(OptionStrict)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')" />
+  </Target>
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
+  </Target>
+</Project>

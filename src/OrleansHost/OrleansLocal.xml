@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Deployment>
+    <Silo Name="Primary" HostName="localhost" />
+    <Silo Name="Node2" HostName="localhost" />
+    <Silo Name="Node3" HostName="localhost" />
+  </Deployment>
+  <Globals>
+    <Persistence Type="None" Path=".\OrleansData" />
+    <SeedNode Address="localhost" Port="10000" />
+    <Tasks Disabled="false"/>
+  </Globals>
+  <Defaults>
+    <Networking Address="localhost" Port="0" />
+    <Scheduler MaxActiveThreads="10" />
+    <Tracing DefaultTraceLevel="Verbose" TraceToConsole="true" TraceToFile="{0}-{1}.log"/>
+  </Defaults>
+  <Override Node="Primary">
+    <Networking Port="10000" />
+  </Override>
+  <Override Node="Secondary_1">
+    <Networking Port="10001" />
+  </Override>
+  <Override Node="Node2">
+    <Networking Port="10002" />
+  </Override>
+  <Override Node="Node3">
+    <Networking Port="10003" />
+  </Override>
+</OrleansConfiguration>

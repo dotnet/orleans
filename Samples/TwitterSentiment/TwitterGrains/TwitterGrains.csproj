@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{32690C70-72AF-4C96-864F-A6D266898EC0}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>TwitterGrains</RootNamespace>
+    <AssemblyName>TwitterGrains</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartAction>Program</StartAction>
+    <StartProgram>$(OrleansSDK)\LocalSilo\OrleansHost.exe</StartProgram>
+    <StartWorkingDirectory>$(OrleansSDK)\LocalSilo</StartWorkingDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Orleans, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="CounterGrain.cs" />
+    <Compile Include="HashtagGrain.cs" />
+    <Compile Include="TweetDispatcherGrain.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TwitterGrainInterfaces\TwitterGrainInterfaces.csproj">
+      <Project>{9ce33584-c97e-4059-9973-73bb396112a9}</Project>
+      <Name>TwitterGrainInterfaces</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <OrleansProjectType>Server</OrleansProjectType>
+  </PropertyGroup>
+  <Import Project="$(OrleansSDK)\Binaries\OrleansClient\Orleans.SDK.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+      if exist "$(OrleansSDK)\LocalSilo" (
+      if not exist "$(OrleansSDK)\LocalSilo\Applications" (md "$(OrleansSDK)\LocalSilo\Applications")
+      if not exist  "$(OrleansSDK)\LocalSilo\Applications\TwitterSentiment" (md "$(OrleansSDK)\LocalSilo\Applications\TwitterSentiment")
+      copy /y *.dll  "$(OrleansSDK)\LocalSilo\Applications\TwitterSentiment\"
+      copy /y *.pdb  "$(OrleansSDK)\LocalSilo\Applications\TwitterSentiment\"
+      )
+      if exist "$(OrleansSDK)\Binaries" (
+      if not exist "$(OrleansSDK)\Binaries\Applications" (md "$(OrleansSDK)\Binaries\Applications")
+      if not exist  "$(OrleansSDK)\Binaries\Applications\TwitterSentiment" (md "$(OrleansSDK)\Binaries\Applications\TwitterSentiment")
+      copy /y *.dll "$(OrleansSDK)\Binaries\Applications\TwitterSentiment\"
+      copy /y *.pdb "$(OrleansSDK)\Binaries\Applications\TwitterSentiment\"
+      )
+    </PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>-->
+</Project>

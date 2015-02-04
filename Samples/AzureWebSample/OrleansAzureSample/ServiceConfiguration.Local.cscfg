@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ServiceConfiguration xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration" schemaVersion="2014-06.2.4" osFamily="3" osVersion="*" serviceName="OrleansAzureSample">
+  <Role name="OrleansAzureSilos">
+    <Instances count="1" />
+    <ConfigurationSettings>
+      <Setting name="DataConnectionString" value="UseDevelopmentStorage=true" />
+    </ConfigurationSettings>
+  </Role>
+  <Role name="WebRole">
+    <Instances count="1" />
+    <ConfigurationSettings>
+      <Setting name="DataConnectionString" value="UseDevelopmentStorage=true" />
+    </ConfigurationSettings>
+  </Role>
+</ServiceConfiguration>
