@@ -27,12 +27,12 @@ using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Streams;
 
-namespace TesterInternal.OrleansRuntime.Streams.QueueBalancer
+namespace TesterInternal.OrleansRuntime.Streams
 {
     [TestClass]
     public class BestFitBalancerTests
     {
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Nightly")]
         public void IdealCaseMoreResourcesThanBucketsTest()
         {
             const int resourceCount = 99;
@@ -45,7 +45,7 @@ namespace TesterInternal.OrleansRuntime.Streams.QueueBalancer
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Nightly")]
         public void IdealCaseLessResourcesThanBucketsTest()
         {
             const int bucketCount = 99;
@@ -58,7 +58,7 @@ namespace TesterInternal.OrleansRuntime.Streams.QueueBalancer
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Nightly")]
         public void HalfBucketsActiveTest()
         {
             const int resourceCount = 99;
@@ -73,7 +73,7 @@ namespace TesterInternal.OrleansRuntime.Streams.QueueBalancer
             ValidateBalance(activeBuckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Nightly")]
         public void OrderIrrelevantTest()
         {
             const int resourceCount = 99;

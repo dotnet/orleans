@@ -50,7 +50,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="OrleansRuntime\Streams\QueueBalancer\BestFitBalancerTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
