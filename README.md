@@ -9,7 +9,8 @@ Orleans has been used extensively running in Microsoft Azure by several Microsof
 
 Installation
 =======
-Download the MSI installer for [version 0.9][Download Link] (Azure SDK 2.5 refresh)
+Clone the sources, run build.cmd to build, install orleans_setup.msi. 
+Or install orleans_setup.msi from the latest CI build - http://dotnet-ci.cloudapp.net/job/dotnet_orleans/ws/Binaries/Release/.
 
 Documentation 
 =======
