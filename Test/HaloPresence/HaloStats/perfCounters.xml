@@ -1,0 +1,712 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<PerformanceCounters>
+  <Category Name="Halo-Service-Stats" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service</DisplayName>
+    <Help>Halo Stats Service</Help>
+    <Counters>
+      <Counter Name="StatsMissingFinalStatsBlobCount">
+        <DisplayName>Games Missing Final Stats Blob</DisplayName>
+        <Type>NumberOfItems32</Type>
+      </Counter>
+      <Counter Name="StatsMissingPartialsCount">
+        <DisplayName>Games Missing Partial Stats</DisplayName>
+        <Type>NumberOfItems32</Type>
+      </Counter>
+      <Counter Name="StatsDeserializationErrors">
+        <DisplayName>Stats Blob Deserialization Errors</DisplayName>
+        <Type>NumberOfItems32</Type>
+      </Counter>
+      <Counter Name="PartialStatsDeserializationErrors">
+        <DisplayName>Partial Stats Deserialization Errors</DisplayName>
+        <Type>NumberOfItems32</Type>
+      </Counter>
+      <Counter Name="StatsStorageErrors">
+        <DisplayName>Stats Azure Storage Errors</DisplayName>
+        <Type>CountPerTimeInterval32</Type>
+      </Counter>
+      <Counter Name="StatsReadFromPlayersTableTime">
+        <DisplayName>Stats Player Table Read Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="StatsSaveToPlayersTableTime">
+        <DisplayName>Stats Player Table Save Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="StatsGamesProcessedTotalUploadTime">
+        <DisplayName>Average Time for a game to process from the time it reaches the dispatcher to finished processing</DisplayName>
+        <Type>AverageCount64</Type>
+      </Counter>
+      <Counter Name="StatsGamesProcessedAccumulated">
+        <DisplayName>Total number of games Stats has finished processing</DisplayName>
+        <Type>NumberOfItems32</Type>
+      </Counter>
+      <Counter Name="StatsGamesProcessedPerSecond">
+        <DisplayName>Number of games Stats has finished processing per second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="PlayerSkillReadFromStorageTime">
+        <DisplayName>Player Skill Read Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="PlayerSkillSaveTime">
+        <DisplayName>Player Skill Save Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <!-- Dispatcher Counters -->
+      <Counter Name="StatsRequestsPerSecond">
+        <DisplayName>Stats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="StatsResponseTime">
+        <DisplayName>Stats Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="FullStatsRequestsPerSecond">
+        <DisplayName>Full Stats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="PartialStatsRequestsPerSecond">
+        <DisplayName>Partial Stats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="Stats400PerSecond">
+        <DisplayName>Stats 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="Stats500PerSecond">
+        <DisplayName>Stats 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="StatsErrorsPerSecond">
+        <DisplayName>Stats Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-UserFiles" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: User Files</DisplayName>
+    <Help>Halo Stats Service: User Files</Help>
+    <Counters>
+      <Counter Name="UserFileStorageErrorRate">
+        <DisplayName>User File Storage Error Rate</DisplayName>
+        <Type>CountPerTimeInterval32</Type>
+      </Counter>
+      <Counter Name="UserBinGrainResponseTime">
+        <DisplayName>User.bin Grain Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="RecentPlayersBinGrainResponseTime">
+        <DisplayName>Recent_Players.bin Grain Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="UserFileStorageResponseTime">
+        <DisplayName>User File Storage Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="UserFileCacheResponseTime">
+        <DisplayName>User File Cache Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <!-- Dispatcher Counters -->
+      <Counter Name="MachineUpdateNetworkStatsRequestsPerSecond">
+        <DisplayName>MachineUpdateNetworkStats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="MachineUpdateResponseTime">
+        <DisplayName>MachineUpdateNetworkStats Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="UserFileRequestsPerSecond">
+        <DisplayName>User File General Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserBinRequestsPerSecond">
+        <DisplayName>User.bin Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="RecentPlayersBinRequestsPerSecond">
+        <DisplayName>Recent_players.bin Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="MachineBinRequestsPerSecond">
+        <DisplayName>Machine.bin Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserBinResponseTime">
+        <DisplayName>User.bin Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="RecentPlayersBinResponseTime">
+        <DisplayName>Recent_Players.bin Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="MachineBinResponseTime">
+        <DisplayName>Machine.bin Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="UserFile400PerSecond">
+        <DisplayName>User File 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserFile500PerSecond">
+        <DisplayName>User File 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserFile404PerSecond">
+        <DisplayName>User File 404 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserFileErrorsPerSecond">
+        <DisplayName>User File Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="MachineUpdate400PerSecond">
+        <DisplayName>Machine Update 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="MachineUpdate500PerSecond">
+        <DisplayName>Machine Update 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="MachineUpdateErrorsPerSecond">
+        <DisplayName>Machine Update Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-QoS" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: QoS</DisplayName>
+    <Help>Halo Stats Service: QoS</Help>
+    <Counters>
+      <Counter Name="QosStorageErrorRate">
+        <DisplayName>QoS Storage Error Rate</DisplayName>
+        <Type>CountPerTimeInterval32</Type>
+      </Counter>
+      <!-- Dispatcher Counters -->
+      <Counter Name="QoSRequestsPerSecond">
+        <DisplayName>QoS Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-SpartanImage" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: Spartan Image</DisplayName>
+    <Help>Halo Stats Service: Spartan Image</Help>
+    <Counters>
+      <Counter Name="ImageUpdateUserRequestsPerSecond">
+        <DisplayName>Image Update User Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="ImageUpdateUserResponseTime">
+        <DisplayName>Image Update User Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="ImageUpdateUser400PerSecond">
+        <DisplayName>Image Update User 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="ImageUpdateUser500PerSecond">
+        <DisplayName>Image Update User 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetSpartanImageRequestsPerSecond">
+        <DisplayName>GetSpartanImage Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetSpartanImageResponseTime">
+        <DisplayName>GetSpartanImage Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="GetSpartanImage400PerSecond">
+        <DisplayName>GetSpartanImage 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetSpartanImage500PerSecond">
+        <DisplayName>GetSpartanImage 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="ImageUpdateUserErrorsPerSecond">
+        <DisplayName>Image Update User Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-UserUpdateReward" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: User Update Rewards</DisplayName>
+    <Help>Halo Stats Service: User Update Rewards</Help>
+    <Counters>
+      <Counter Name="UserUpdateRewards400PerSecond">
+        <DisplayName>User Update Rewards 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserUpdateRewards500PerSecond">
+        <DisplayName>User Update Rewards 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserUpdateRewardsErrorsPerSecond">
+        <DisplayName>User Update Rewards Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserUpdateRewardsAverageResponseTime">
+        <DisplayName>User Update Rewards Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-UserGetServiceRecord" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: Service Record</DisplayName>
+    <Help>Halo Stats Service: Service Record</Help>
+    <Counters>
+      <Counter Name="UserGetServiceRecord400PerSecond">
+        <DisplayName>User Get Service Record 400s per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserGetServiceRecord500PerSecond">
+        <DisplayName>User Get Service Record 500s per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserGetServiceRecordErrorsPerSecond">
+        <DisplayName>User Get Service Record Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="UserGetServiceRecordResponseTime">
+        <DisplayName>User Get Service Record Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-WaypointAPIs" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: Waypoint APIs</DisplayName>
+    <Help>Halo Stats Service: Waypoint APIs</Help>
+    <Counters>
+      <Counter Name="WaypointGetServiceRecordRequestsPerSecond">
+        <DisplayName>Waypoint GetServiceRecord Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetServiceRecord400PerSecond">
+        <DisplayName>Waypoint GetServiceRecord 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetServiceRecord500PerSecond">
+        <DisplayName>Waypoint GetServiceRecord 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetServiceRecordAverageResponseTime">
+        <DisplayName>Waypoint GetServiceRecord Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameHistoryRequestsPerSecond">
+        <DisplayName>Waypoint GetGameHistory Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameHistory400PerSecond">
+        <DisplayName>Waypoint GetGameHistory 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameHistory500PerSecond">
+        <DisplayName>Waypoint GetGameHistory 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameHistoryAverageResponseTime">
+        <DisplayName>Waypoint GetGameHistory Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameDetailsRequestsPerSecond">
+        <DisplayName>Waypoint GetGameDetails Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameDetails400PerSecond">
+        <DisplayName>Waypoint GetGameDetails 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameDetails500PerSecond">
+        <DisplayName>Waypoint GetGameDetails 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetGameDetailsAverageResponseTime">
+        <DisplayName>Waypoint GetGameDetails Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCardRequestsPerSecond">
+        <DisplayName>Waypoint GetPlayerCard Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCard400PerSecond">
+        <DisplayName>Waypoint GetPlayerCard 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCard500PerSecond">
+        <DisplayName>Waypoint GetPlayerCard 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCardAverageResponseTime">
+        <DisplayName>Waypoint GetPlayerCard Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCardBatchRequestsPerSecond">
+        <DisplayName>Waypoint GetPlayerCardBatch Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCardBatch400PerSecond">
+        <DisplayName>Waypoint GetPlayerCardBatch 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCardBatch500PerSecond">
+        <DisplayName>Waypoint GetPlayerCardBatch 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetPlayerCardBatchAverageResponseTime">
+        <DisplayName>Waypoint GetPlayerCardBatch Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCommendationsRequestsPerSecond">
+        <DisplayName>Waypoint GetCommendations Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCommendations400PerSecond">
+        <DisplayName>Waypoint GetCommendations 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCommendations500PerSecond">
+        <DisplayName>Waypoint GetCommendations 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCommendationsAverageResponseTime">
+        <DisplayName>Waypoint GetCommendations Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetRanksRequestsPerSecond">
+        <DisplayName>Waypoint GetRanks Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetRanks400PerSecond">
+        <DisplayName>Waypoint GetRanks 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetRanks500PerSecond">
+        <DisplayName>Waypoint GetRanks 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetRanksAverageResponseTime">
+        <DisplayName>Waypoint GetRanks Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetXuidFromGamertagPerSecond">
+        <DisplayName>Waypoint GetXuidFromGamertag Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetXuidFromGamertagAverageResponseTime">
+        <DisplayName>Waypoint GetXuidFromGamertag Average Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetXuidFromGamertagFailuresPerSecond">
+        <DisplayName>Waypoint GetXuidFromGamertag Failures Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCampaignStatsRequestsPerSecond">
+        <DisplayName>Waypoint GetCampaignStats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCampaignStats400PerSecond">
+        <DisplayName>Waypoint GetCampaignStats 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCampaignStats500PerSecond">
+        <DisplayName>Waypoint GetCampaignStats 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCampaignStatsAverageResponseTime">
+        <DisplayName>Waypoint GetCampaignStats Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetSpartanOpsStatsRequestsPerSecond">
+        <DisplayName>Waypoint GetSpartanOpsStats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetSpartanOpsStats400PerSecond">
+        <DisplayName>Waypoint GetSpartanOpsStats 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetSpartanOpsStats500PerSecond">
+        <DisplayName>Waypoint GetSpartanOpsStats 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetSpartanOpsStatsAverageResponseTime">
+        <DisplayName>Waypoint GetSpartanOpsStats Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetWarGamesStatsRequestsPerSecond">
+        <DisplayName>Waypoint GetWarGamesStats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetWarGamesStats400PerSecond">
+        <DisplayName>Waypoint GetWarGamesStats 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetWarGamesStats500PerSecond">
+        <DisplayName>Waypoint GetWarGamesStats 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetWarGamesStatsAverageResponseTime">
+        <DisplayName>Waypoint GetWarGamesStats Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCustomStatsRequestsPerSecond">
+        <DisplayName>Waypoint GetCustomStats Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCustomStats400PerSecond">
+        <DisplayName>Waypoint GetCustomStats 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCustomStats500PerSecond">
+        <DisplayName>Waypoint GetCustomStats 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetCustomStatsAverageResponseTime">
+        <DisplayName>Waypoint GetCustomStats Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-Challenges" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: Challenge APIs</DisplayName>
+    <Help>Halo Stats Service: Challenge APIs</Help>
+    <Counters>
+      <Counter Name="WaypointGetGlobalChallengesRequestsPerSecond">
+        <DisplayName>Waypoint GetGlobalChallenges Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointGetMyChallengesRequestsPerSecond">
+        <DisplayName>Waypoint GetMyChallenges Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="WaypointAdminAuthorizationFailurePerSecond">
+        <DisplayName>Waypoint Admin Authorization Failures Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-DownloadQueue" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: DownloadQueue APIs</DisplayName>
+    <Help>Halo Stats Service: DownloadQueue APIs</Help>
+    <Counters>
+      <!-- Dispatcher Counters -->
+      <Counter Name="AddUgcDownloadQueueItemRequestsPerSecond">
+        <DisplayName>AddUgcDownloadQueueItem Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="AddUgcDownloadQueueItemResponseTime">
+        <DisplayName>AddUgcDownloadQueueItem Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="AddUgcDownloadQueueItem400PerSecond">
+        <DisplayName>AddUgcDownloadQueueItem 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="AddUgcDownloadQueueItem500PerSecond">
+        <DisplayName>AddUgcDownloadQueueItem 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="AddUgcDownloadQueueItem404PerSecond">
+        <DisplayName>AddUgcDownloadQueueItem 404 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="AddUgcDownloadQueueItemErrorsPerSecond">
+        <DisplayName>AddUgcDownloadQueueItem Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="DeleteUgcDownloadQueueItemRequestsPerSecond">
+        <DisplayName>DeleteUgcDownloadQueueItem Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="DeleteUgcDownloadQueueItemResponseTime">
+        <DisplayName>DeleteUgcDownloadQueueItem Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="DeleteUgcDownloadQueueItem400PerSecond">
+        <DisplayName>DeleteUgcDownloadQueueItem 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="DeleteUgcDownloadQueueItem500PerSecond">
+        <DisplayName>DeleteUgcDownloadQueueItem 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="DeleteUgcDownloadQueueItem404PerSecond">
+        <DisplayName>DeleteUgcDownloadQueueItem 404 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="DeleteUgcDownloadQueueItemErrorsPerSecond">
+        <DisplayName>DeleteUgcDownloadQueueItem Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetUgcDownloadQueueItemsRequestsPerSecond">
+        <DisplayName>GetUgcDownloadQueueItems Requests Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetUgcDownloadQueueItemsResponseTime">
+        <DisplayName>GetUgcDownloadQueueItems Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="GetUgcDownloadQueueItems400PerSecond">
+        <DisplayName>GetUgcDownloadQueueItems 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetUgcDownloadQueueItems500PerSecond">
+        <DisplayName>GetUgcDownloadQueueItems 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetUgcDownloadQueueItems404PerSecond">
+        <DisplayName>GetUgcDownloadQueueItems 404 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetUgcDownloadQueueItemsErrorsPerSecond">
+        <DisplayName>GetUgcDownloadQueueItems Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-Bans" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: Ban APIs</DisplayName>
+    <Help>Halo Stats Service: Ban APIs</Help>
+    <Counters>
+      <!-- Dispatcher Counters -->
+      <Counter Name="SetPlayerBansResponseTime">
+        <DisplayName>Set Player Bans Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="SetPlayerBansRequestPerSecond">
+        <DisplayName>Set Player Bans Request per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="SetPlayerBans400PerSecond">
+        <DisplayName>Set Player Ban 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="SetPlayerBans500PerSecond">
+        <DisplayName>Set Player Ban 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="SetPlayerBansErrorsPerSecond">
+        <DisplayName>Set Player Ban Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetPlayerBansResponseTime">
+        <DisplayName>Get Player Bans Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="GetPlayerBansRequestPerSecond">
+        <DisplayName>Get Player Bans Request per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetPlayerBans400PerSecond">
+        <DisplayName>Get Player Ban 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetPlayerBans500PerSecond">
+        <DisplayName>Get Player Ban 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetPlayerBansErrorsPerSecond">
+        <DisplayName>Get Player Ban Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="SetMachineBansResponseTime">
+        <DisplayName>Set Machine Bans Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="SetMachineBansRequestPerSecond">
+        <DisplayName>Set Machine Bans Request per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="SetMachineBans400PerSecond">
+        <DisplayName>Set Machine Ban 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="SetMachineBans500PerSecond">
+        <DisplayName>Set Machine Ban 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="SetMachineBansErrorsPerSecond">
+        <DisplayName>Set Machine Ban Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetMachineBansResponseTime">
+        <DisplayName>Get Machine Bans Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="GetMachineBansRequestPerSecond">
+        <DisplayName>Get Machine Bans Request per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetMachineBans400PerSecond">
+        <DisplayName>Get Machine Ban 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetMachineBans500PerSecond">
+        <DisplayName>Get Machine Ban 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetMachineBansErrorsPerSecond">
+        <DisplayName>Get Machine Ban Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+
+  <Category Name="Halo-Service-DoubleXp" Namespace="Microsoft.Halo.PerformanceCounters.Stats">
+    <DisplayName>Halo Stats Service: Double Xp APIs</DisplayName>
+    <Help>Halo Stats Service: Double Xp APIs</Help>
+    <Counters>
+      <Counter Name="AddDoubleXpResponseTime">
+        <DisplayName>Add Double Xp Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="AddDoubleXpRequestPerSecond">
+        <DisplayName>Add Double Xp Request per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="AddDoubleXp400PerSecond">
+        <DisplayName>Add Double Xp 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="AddDoubleXp500PerSecond">
+        <DisplayName>Add Double Xp 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="AddDoubleXpErrorsPerSecond">
+        <DisplayName>Add Double Xp Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetDoubleXpResponseTime">
+        <DisplayName>Get Double Xp Response Time</DisplayName>
+        <Type>AverageTimer32</Type>
+      </Counter>
+      <Counter Name="GetDoubleXpRequestPerSecond">
+        <DisplayName>Get Double Xp Request per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetDoubleXp400PerSecond">
+        <DisplayName>Get Double Xp 400 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetDoubleXp500PerSecond">
+        <DisplayName>Get Double Xp 500 Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+      <Counter Name="GetDoubleXpErrorsPerSecond">
+        <DisplayName>Get Double Xp Errors Per Second</DisplayName>
+        <Type>RateOfCountsPerSecond32</Type>
+      </Counter>
+    </Counters>
+  </Category>
+</PerformanceCounters>

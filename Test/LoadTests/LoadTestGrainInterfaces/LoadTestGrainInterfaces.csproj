@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{539044BA-0C8D-41B7-B435-E836E9D7B7B2}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>LoadTestGrainInterfaces</RootNamespace>
+    <AssemblyName>LoadTestGrainInterfaces</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;LOADTEST</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;LOADTEST</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>Orleans.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OrleansReferenceBase>..\..\References\</OrleansReferenceBase>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Orleans">
+      <HintPath>..\..\References\Orleans.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansRuntime">
+      <HintPath>..\..\References\OrleansRuntime.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="IBarrierGrain.cs" />
+    <Compile Include="IExplicitConsumerGrain.cs" />
+    <Compile Include="IImplicitConsumerGrain.cs" />
+    <Compile Include="INewReminderTestGrain.cs" />
+    <Compile Include="IReminderLoadTestGrain.cs" />
+    <Compile Include="OrleansHostWrapper.cs" />
+    <Compile Include="ISteamSubscribeTestGrains.cs" />
+    <Compile Include="SharedMemoryCounterInterfaces.cs" />
+    <Compile Include="IPersistenceLoadTestGrain.cs" />
+    <Compile Include="IBenchmarkLoadGrain.cs" />
+    <Compile Include="IReminderGrain.cs" />
+    <Compile Include="IMockStreamProviderControlGrain.cs" />
+    <Compile Include="StreamingBenchmarkConsumer.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="IGuidPoolGrain.cs" />
+    <Compile Include="StreamingBenchmarkItem.cs" />
+    <Compile Include="StreamingBenchmarkProducer.cs" />
+    <Compile Include="LoggingFilter.cs" />
+    <Compile Include="StreamingLoadTestEvents.cs" />
+    <Compile Include="StreamItem.cs" />
+    <Compile Include="Utils.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Orleans.snk" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <OrleansProjectType>Client</OrleansProjectType>
+    <OrleansReferencesBase>$(SolutionDir)..\References</OrleansReferencesBase>
+  </PropertyGroup>
+  <Import Project="$(SolutionDir)..\..\Orleansv4\Orleans.SDK.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>mkdir "$(TargetDir)TestInput\LoadTests"
+mkdir "$(TargetDir)TestInput\LoadTests\Client"
+mkdir "$(TargetDir)TestInput\LoadTests\Grains"
+
+copy "$(TargetDir)LoadTestGrainInterfaces.*" "$(TargetDir)TestInput\LoadTests\Client\"
+copy "$(TargetDir)LoadTestGrainInterfaces.*" "$(TargetDir)TestInput\LoadTests\Grains\"</PostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

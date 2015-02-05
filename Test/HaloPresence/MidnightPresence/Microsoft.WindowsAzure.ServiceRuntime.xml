@@ -1,0 +1,602 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Microsoft.WindowsAzure.ServiceRuntime</name>
+    </assembly>
+    <members>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment">
+            <summary>
+            Represents the Windows Azure environment in which an instance of a role is running.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.GetConfigurationSettingValue(System.String)">
+            <summary>
+            Retrieves the value of a setting in the service configuration file.
+            </summary>
+            <param name="configurationSettingName">The name of the configuration setting.</param>
+            <returns>A String containing the value of the configuration setting.</returns>
+            <remarks>
+            A role's configuration settings are defined in the service definition file. Values for configuration settings 
+            are set in the service configuration file.
+            </remarks>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.DiscoverRoles">
+            <summary>
+            Populates the role information.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.ReadRoles(Microsoft.WindowsAzure.IntegrationComponents.Agent.DesiredConfiguration.IRoleConfigurationBaseline,System.String@)">
+            <summary>
+            Reads the static role data.
+            </summary>
+            <remarks>
+            Note that instance-level information is not populated.
+            </remarks>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.RequestRecycle">
+            <summary>
+            Requests that the current role instance be stopped and restarted.
+            </summary>
+            <remarks>
+            <para>
+            Before the role instance is recycled, the Windows Azure load balancer takes the role instance out of rotation.
+            This ensures that no new requests are routed to the instance while it is restarting.
+            </para>
+            <para>
+            A call to RequestRecycle initiates the normal operating system reboot.  The current execution context
+            must have 'SeShutdownPrivilege' privilege.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Initialize">
+            <summary>
+            Initializes the role runtime environment.
+            </summary>
+            <remarks>
+            Initializing the runtime is optional; it is initialized automatically as needed.
+            </remarks>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Initialize(System.TimeSpan)">
+            <summary>
+            Initializes the role runtime environment.
+            </summary>
+            <remarks>
+            Initializing the runtime is optional; it is initialized automatically as needed.
+            
+            Note that initialization blocks until the system is configured.
+            </remarks>
+            <param name="timeout">The amount of time to wait for initialization to complete.</param>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.GetLocalResource(System.String)">
+            <summary>
+            Retrieves a named local storage resource.
+            </summary>
+            <param name="localResourceName">The name of the local resource, as declared in the service definiton file.</param>
+            <returns>A <see cref="T:Microsoft.WindowsAzure.ServiceRuntime.LocalResource"/> object that represents the local storage resource.</returns>
+        </member>
+        <member name="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Changing">
+            <summary>
+            Occurs before a change to the service configuration is applied to the running instances of the role.
+            </summary>
+            <remarks>
+            <para>
+            Service configuration changes are applied on-the-fly to running role instances. Configuration changes include 
+            changes to the service configuration changes and changes to the number of instances in the service.
+            </para>
+            <para>
+            This event occurs after the new configuration file has been submitted to Windows Azure but 
+            before the changes have been applied to each running role instance. This event can be cancelled 
+            for a given instance to prevent the configuration change. 
+            </para>
+            <para>
+            Note that cancelling this event causes the instance to be automatically recycled. When the instance is recycled,
+            the configuration change is applied when it restarts.
+            </para>
+            </remarks>
+        </member>
+        <member name="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Changed">
+            <summary>
+            Occurs after a change to the service configuration has been applied to the running instances of the role.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Roles">
+            <summary>
+            Gets the set of <see cref="T:Microsoft.WindowsAzure.ServiceRuntime.Role"/> objects defined for your service.
+            </summary>
+            <remarks>
+            Roles are defined in the service definition file.
+            </remarks>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.CurrentRoleInstance">
+            <summary>
+            Gets a <see cref="T:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance"/> object representing the role instance in which this code is currently executing.
+            </summary>
+        </member>
+        <member name="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.StatusCheck">
+            <summary>
+            Indicates the status of the role instance.
+            </summary>
+            <remarks>
+            An instance may indicate that it is in one of two states: Ready or Busy.
+            If an instance's state is Ready, it is prepared to receive requests from the load balancer. If the instance's state is Busy,
+            it will not receive requests from the load balancer.
+            </remarks>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.IsAvailable">
+            <summary>
+            Indicates whether the role instance is running in the Windows Azure environment.
+            </summary>
+            <value>
+            <c>true</c> if this instance is running in the development fabric or in the
+            Windows Azure environment in the cloud; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.IsEmulated">
+            <summary>
+            Indicates whether the role instance is running in the Windows Azure Compute Emulator.
+            </summary>
+            <value>
+            <c>true</c> if this instance is running in the compute emulator; otherwise, <c>false</c>.
+            </value>
+        </member>
+        <member name="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.AvailabilityChanged">
+            <summary>
+            Occurs when the availability of the role environment has changed.
+            </summary>
+        </member>
+        <member name="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Stopping">
+            <summary>
+            Occurs when the role instance is about to be stopped.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.DeploymentId">
+            <summary>
+            Gets the deployment ID, a string value that uniquely identifies the deployment in which this role instance is running.
+            </summary>
+            <value>The deployment ID.</value>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.LocalResource">
+            <summary>
+            Represents a local storage resource reserved for a service.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.LocalResource.MaximumSizeInMegabytes">
+            <summary>
+            Gets the maximum size in megabytes allocated for the local storage resource, as defined in the service definition file.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.LocalResource.Name">
+            <summary>
+            Gets the name of the local store as declared in the service definition file. 
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.LocalResource.RootPath">
+            <summary>
+            Gets the full directory path to the local storage resource.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentChangingEventArgs">
+            <summary>
+            Arguments for the <see cref="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Changing"/> event, which occurs before a configuration change is applied to a role instance.
+            </summary>
+            <remarks>
+            Set the <c>Cancel</c> property to cancel the configuration change.
+            Cancellation causes the role instance to be immediately recycled. The configuration changes are applied when the instance restarts.
+            </remarks>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentChangingEventArgs.Changes">
+            <summary>
+            Gets a collection of the configuration changes that are about to be applied to the role instance.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentChangedEventArgs">
+            <summary>
+            Arguments for the <see cref="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Changed"/> event, which occurs after a configuration change has been applied to a role instance.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentChangedEventArgs.Changes">
+            <summary>
+            Gets a collection of the configuration changes that were applied to the role instance.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentChange">
+            <summary>
+            Represents a change to the service's configuration.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentTopologyChange">
+            <summary>
+            Represents a change to the topology of the service. The service's topology refers to the number of instances
+            deployed for each role that the service defines.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentTopologyChange.Equals(System.Object)">
+            <summary>
+            Indicates whether two environment changes are equivalent.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentTopologyChange.Equals(Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentTopologyChange)">
+            <summary>
+            Indicates whether two environment changes are equivalent.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentTopologyChange.GetHashCode">
+            <summary>
+            Gets the hash code corresponding to this object.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentTopologyChange.RoleName">
+            <summary>
+            Gets the name of the affected role.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentConfigurationSettingChange">
+            <summary>
+            Represents a change to a configuration setting.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentConfigurationSettingChange.Equals(System.Object)">
+            <summary>
+            Indicates whether two environment changes are equivalent.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentConfigurationSettingChange.Equals(Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentConfigurationSettingChange)">
+            <summary>
+            Determines whether two changes are equivalent.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentConfigurationSettingChange.GetHashCode">
+            <summary>
+            Gets the hash code corresponding to this object.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentConfigurationSettingChange.ConfigurationSettingName">
+            <summary>
+            Gets the name of the configuration setting that has been changed.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.Role">
+            <summary>
+            Represents a role that is defined as part of a hosted service.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.Role.Name">
+            <summary>
+            Gets the name of the role as it is declared in the service definition file.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.Role.Instances">
+            <summary>
+            Gets the collection of instances for the role.
+            </summary>
+            <remarks>
+            <para>
+            The number of instances of a role to be deployed to Windows Azure is specified in the service's configuration file.
+            </para>
+            <para>
+            A role must define at least one internal endpoint in order for its set of instances to be known at runtime. 
+            </para>
+            </remarks>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.IRoleEndpoint">
+            <summary>
+            Represents a logical endpoint on a role.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.IRoleEndpoint.Name">
+            <summary>
+            Gets the name of the role endpoint.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.IRoleEndpoint.InstanceEndpoints">
+            <summary>
+            Gets a list of all endpoints defined for a role instance.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint">
+            <summary>
+            Provides callbacks to initialize, run, and stop instances of the role. 
+            </summary>
+            <remarks>
+            <para>
+            All worker roles must extend RoleEntryPoint. 
+            </para>
+            <para>
+            Web roles can optionally extend RoleEntryPoint, or can use the ASP.NET lifecycle management 
+            methods to handle the role's startup and stopping sequences.
+            </para>
+            <para>
+            All exceptions that occur within the methods of the RoleEntryPoint class are unhandled exceptions. 
+            </para>
+            </remarks>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint.OnStart">
+            <summary>
+            Called by Windows Azure to initialize the role instance.
+            </summary>
+            <returns>True if initialization succeeds, False if it fails. The default implementation returns True.</returns>
+            <remarks>
+            <para>
+            Override the OnStart method to run initialization code for your role.
+            </para>
+            <para>
+            Before the OnStart method returns, the instance's status is set to Busy and the instance is not available
+            for requests via the load balancer. 
+            </para>
+            <para>
+            If the OnStart method returns false, the instance is immediately stopped. If the method
+            returns true, then Windows Azure starts the role by calling the <see cref="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint.Run"/> method.
+            </para>
+            <para>
+            A web role can include initialization code in the ASP.NET Application_Start method instead of the OnStart method.
+            Application_Start is called after the OnStart method.
+            </para>
+            <para>
+            Any exception that occurs within the OnStart method is an unhandled exception.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint.Run">
+            <summary>
+            Called by Windows Azure after the role instance has been initialized. This method serves as the 
+            main thread of execution for your role.
+            </summary>
+            <remarks>
+            <para>
+            Override the Run method to implement your own code to manage the role's execution. The Run method should implement 
+            a long-running thread that carries out operations for the role. The default implementation sleeps for an infinite 
+            period, blocking return indefinitely.
+            </para>
+            <para>
+            The role recycles when the Run method returns.
+            </para>
+            <para>
+            Any exception that occurs within the Run method is an unhandled exception.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint.OnStop">
+            <summary>
+            Called by Windows Azure when the role instance is to be stopped. 
+            </summary>
+            <remarks>
+            <para>
+            Override the OnStop method to implement any code your role requires to shut down in an orderly fashion.
+            </para>
+            <para>
+            This method must return within certain period of time. If it does not, Windows Azure
+            will stop the role instance.
+            </para>
+            <para>
+            A web role can include shutdown sequence code in the ASP.NET Application_End method instead of the OnStop method.
+            Application_End is called before the Stopping event is raised or the OnStop method is called.
+            </para>
+            <para>
+            Any exception that occurs within the OnStop method is an unhandled exception.
+            </para>
+            </remarks>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentStoppingEventArgs">
+            <summary>
+            Arguments for the <see cref="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.Stopping"/> event.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance">
+            <summary>
+            Represents an instance of a role.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance.Id">
+            <summary>
+            Gets the ID of this instance.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance.UpdateDomain">
+            <summary>
+            Gets an integer value that indicates the update domain in which this instance resides.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance.FaultDomain">
+            <summary>
+            Gets an integer value that indicates the fault domain in which this instance resides.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance.Role">
+            <summary>
+            Gets the <see cref="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance.Role"/> object associated with this instance.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstance.InstanceEndpoints">
+            <summary>
+            Gets the set of endpoints associated with this role instance.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceEndpoint">
+            <summary>
+            Represents an endpoint associated with a role instance.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceEndpoint.IPEndpoint">
+            <summary>
+            Gets an <see cref="T:System.Net.IPEndPoint"/> object for this role instance endpoint. The <see cref="T:System.Net.IPEndPoint"/> object
+            provides the IP address and port number for the endpoint.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceEndpoint.Protocol">
+            <summary>
+            Gets the protocol associated with the endpoint
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceEndpoint.RoleInstance">
+            <summary>
+            Gets the <see cref="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceEndpoint.RoleInstance"/> object associated with this endpoint.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleImpl">
+            <summary>
+            Represents a role.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceImpl">
+            <summary>
+            Represents a role instance.
+            </summary>
+            <remarks>
+            A role instance can represent either the current instance or some other instance discovered 
+            via an endpoint; a subclass exists for each purpose.
+            </remarks>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.CurrentRoleInstanceImpl.#ctor(Microsoft.WindowsAzure.IntegrationComponents.Agent.DesiredConfiguration.IRoleInstance,Microsoft.WindowsAzure.IntegrationComponents.Agent.DesiredConfiguration.RoleInstanceProperties,Microsoft.WindowsAzure.ServiceRuntime.RoleImpl)">
+            <summary>
+            Creates a role instance corresponding to the current instance.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.CurrentRoleInstanceImpl.DeploymentID">
+            <summary>
+            Gets or sets the deployment ID, a value which uniquely identifies the deployment in which the role instance is running.
+            </summary>
+            <value>The deployment ID.</value>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEndPointImpl">
+            <summary>
+            Represents a role endpoint.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceEndpointImpl">
+            <summary>
+            Represents a role instance endpoint.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceStatusCheckEventArgs">
+            <summary>
+            Arguments for the <see cref="E:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironment.StatusCheck"/> event.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceStatusCheckEventArgs.SetBusy">
+            <summary>
+            Specifies that the instance's status is Busy and that it should not receive requests from the load balancer at this time.
+            </summary>
+            <remarks>
+            When you call SetBusy, the instance's status remains Busy for a period of 10 seconds. To extend the Busy period, call SetBusy again
+            after this time interval has elapsed.
+            </remarks>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceStatusCheckEventArgs.Status">
+            <summary>
+            Gets a value indicating the status of the role instance.
+            </summary>
+            <remarks>
+            <para>
+            Event handlers can invoke the <c>SetBusy</c> method to change the status of a role instance.
+            </para>
+            <para>
+            If an instance's status is Ready, it is prepared to receive requests from the load balancer. If the instance's status is Busy,
+            it will not receive requests from the load balancer.
+            </para>
+            </remarks>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentUnavailableException">
+            <summary>
+            Indicates that the role runtime environment is not available.
+            </summary>
+            <remarks>
+            This exception indicates that either the the caller is running outside the Windows Azure
+            environment, or that the environment is unavailable due to a critical error.
+            </remarks>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleEnvironmentException">
+            <summary>
+            Exceptions 
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceStatus">
+            <summary>
+            Status of a given role instance
+            </summary>
+        </member>
+        <member name="F:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceStatus.Ready">
+            <summary>
+            The role instance is ready to accept requests.
+            </summary>
+        </member>
+        <member name="F:Microsoft.WindowsAzure.ServiceRuntime.RoleInstanceStatus.Busy">
+            <summary>
+            The role instance is unavailable for requests.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission">
+            <summary>
+            Represents access to the Windows Azure runtime environment.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.#ctor(System.Security.Permissions.PermissionState)">
+            <summary>
+            
+            </summary>
+            <param name="state"></param>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.Copy">
+            <summary>
+            
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.FromXml(System.Security.SecurityElement)">
+            <summary>
+            
+            </summary>
+            <param name="securityElement"></param>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.Intersect(System.Security.IPermission)">
+            <summary>
+            
+            </summary>
+            <param name="target"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.IsSubsetOf(System.Security.IPermission)">
+            <summary>
+            
+            </summary>
+            <param name="target"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.IsUnrestricted">
+            <summary>
+            
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.ToXml">
+            <summary>
+            
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermission.Union(System.Security.IPermission)">
+            <summary>
+            
+            </summary>
+            <param name="target"></param>
+            <returns></returns>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermissionAttribute">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermissionAttribute.#ctor(System.Security.Permissions.SecurityAction)">
+            <summary>
+            
+            </summary>
+            <param name="action"></param>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.ServiceRuntime.WindowsAzureHostingPermissionAttribute.CreatePermission">
+            <summary>
+            
+            </summary>
+            <returns></returns>
+        </member>
+    </members>
+</doc>

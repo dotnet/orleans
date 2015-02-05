@@ -1,0 +1,222 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<TestConfiguration xmlns="urn:orleans">
+  <Cluster Name="nightly_build_cluster" AllowMachineReuse="false">
+    <Servers Prefix="17xcg16" Start="1" End="30" Skip="4,20,25,30"/>
+    <Clients Prefix="17xcg16" Start="31" End="44" Skip="36,43,44"/>
+    <Networking Subnet="10.68" StartPort="11111" GatewayPort="30000"/>
+  </Cluster>
+  <Cluster Name="17xcg16_cluster" AllowMachineReuse="false">
+    <Servers Prefix="17xcg16" Start="1" End="30" Skip="4,20,25,30"/>
+    <Clients Prefix="17xcg16" Start="31" End="44" Skip="36,43,44"/>
+    <Networking Subnet="10.68" StartPort="11111" GatewayPort="30000"/>
+  </Cluster>
+  <Cluster Name="17xcg16_cluster_many_server" AllowMachineReuse="false">
+    <!-- ten clients -->
+    <Clients Prefix="17xcg16" Start="19" End="29" Skip="20"/>
+    <Servers Prefix="17xcg16" Start="30" End="44" Skip="44"/>
+    <Networking Subnet="10.68" StartPort="11111" GatewayPort="30000"/>
+  </Cluster>
+
+  <Cluster Name="ping_load_test_cluster_1" AllowMachineReuse="false">
+    <Servers Prefix="17xcg16" Start="1" End="5" Skip="1,4"/>
+    <Clients Prefix="17xcg16" Start="6" End="9"/>
+    <Networking Subnet="10.68" StartPort="11111" GatewayPort="30000"/>
+  </Cluster>
+  <Cluster Name="ping_load_test_cluster_2" AllowMachineReuse="false">
+    <Servers Prefix="17xcg16" Start="26" End="29" />
+    <!-- [mlr] 17xcg1630 doesn't respond (path not found). -->
+    <Clients Prefix="17xcg16" Start="31" End="35" />
+    <!-- [mlr] 17xcg1636 doesn't respond. -->
+    <Clients Prefix="17xcg16" Start="37" End="42" />
+    <!-- [mlr] 17xcg1643 disappeared 8/16/2013. -->
+    <Networking Subnet="10.68" StartPort="11111" GatewayPort="30000"/>
+  </Cluster>
+  <Cluster Name="17xcg10_cluster_1" AllowMachineReuse="false">
+    <Servers Prefix="17xcg10" Start="1" End="10" />
+    <Clients Prefix="17xcg10" Start="33" End="33"/>
+    <Networking Subnet="10.68" StartPort="11111" GatewayPort="30000"/>
+  </Cluster>
+  <Deployment Name="nightly_build">
+      <Packages Root="$(PathToSdkBinDirectory)">
+      <Package Name="SDK Drop" Path="Release" Type="SDK"/>
+      <Package Name="PersistenceLoadTest" Path="$(SolutionDir)\TestInput\LoadTests\Client\PersistenceLoadTest.exe" Type="ClientApp"/>
+      <Package Name="PresenceConsole" Path="$(SolutionDir)\TestInput\LoadTests\Client\PresenceConsoleTest.exe" Type="ClientApp"/>
+      <Package Name="UserLoadTest" Path="$(SolutionDir)\TestInput\LoadTests\Client\UserLoadTest.exe" Type="ClientApp"/>
+      <Package Name="Reach Presence" Path="$(SolutionDir)\TestInput\LoadTests\Grains" Type="Application"/> 
+      <Package Name="Load Test Grains" Path="$(SolutionDir)\TestInput\LoadTests\Grains" Type="Application"/>
+      <Package Name="GrainBenchmarkLoadTest" Path="$(SolutionDir)\TestInput\LoadTests\Client\GrainBenchmarkLoadTest.exe" Type="ClientApp"/>
+      <Package Name="SMSStreamingBenchmark" Path="$(SolutionDir)\TestInput\LoadTests\Client\SMSStreamingBenchmark.exe" Type="ClientApp"/>
+      <Package Name="StreamPullingAgentBenchmark" Path="$(SolutionDir)\TestInput\LoadTests\Client\StreamPullingAgentBenchmark.exe" Type="ClientApp"/>
+      <Package Name="NewReminderLoadTest" Path="$(SolutionDir)\TestInput\LoadTests\Client\NewReminderLoadTest.exe" Type="ClientApp"/>
+    </Packages>
+    <Packages Root="\\ORLEANS-BUILD-1\TestLogs\">
+      <Package Name="output" Path="TestResults\SavedLogs" Type="Logs"/> 
+    </Packages>
+  </Deployment>
+<!--
+  <Deployment Name="daily_build">
+    <Packages>
+      <Package Name="SDK Drop" Path="\\Msr-xcgbld-7\drops\Orleansv4\Orleans-DevMain_20111116.10\SDK-DROP" Type="SDK"/>
+      <Package Name="ClientApp" Path="C:\SDK-SDK\Client\PresenceConsoleTest.exe" Type="ClientApp"/>
+      <Package Name="OrleansConfiguration" Path="C:\SDK-SDK\Configs\OrleansConfigurationTemplate.xml" Type="SiloConfig"/>
+      <Package Name="ClientConfiguration" Path="C:\SDK-SDK\Configs\ClientConfiguration.xml" Type="ClientConfig"/>
+      <Package Name="Reach Presence" Path="C:\SDK-SDK\Grains" Type="Application"/>
+      <Package Name="output" Path="\\xcg-azure-01\C$\TestOutput" Type="Logs"/>
+    </Packages>
+  </Deployment>
+-->
+  <QuickParser Name="ClientLog">
+    <Transition Name="Rule1" From="Started" To="Printing" Pattern="Current TPS:" Count="1"/>
+    <Transition Name="Rule2" From="Printing" To="WarmedUp" Pattern="Current TPS:" Count="10"/>
+    <Transition Name="Rule3" From="WarmedUp" To="Stable" Pattern="Current TPS:" Count="40"/>
+    <!-- The last line printed by the client-->
+    <Transition Name="Rule4" From="Stable" To="Finished" Pattern="Average TPS" Count="1"/>
+    <!-- The angled brackets <> are replaced by {} in following pattern to avoid forcing to use entities-->
+    <Lexer Name="Pattern1" State="Stable" Pattern="Current TPS:(?{tps} \d+.\d+)">
+      <Variable Name="tps"/>
+    </Lexer>
+    <Lexer Name="Pattern2" State="Stable" Pattern="Failures:(?{Failures} \d+)">
+      <Variable Name="Failures"/>
+    </Lexer>
+    <Lexer Name="Pattern3" State="Stable" Pattern="Late:(?{Late} \d+)">
+      <Variable Name="Late"/>
+    </Lexer>
+    <Lexer Name="Pattern4" State="Stable" Pattern="Busy:(?{Busy} \d+)">
+      <Variable Name="Busy"/>
+    </Lexer>
+  </QuickParser>
+
+  <QuickParser Name="ClientGrammerForNoTPSTracking">
+    <Transition Name="Rule1" From="Started" To="Printing" Pattern="Current TPS:" Count="1"/>
+    <Transition Name="Rule2" From="Printing" To="WarmedUp" Pattern="Current TPS:" Count="1"/>
+    <Transition Name="Rule3" From="WarmedUp" To="Stable" Pattern="Current TPS:" Count="1"/>
+    <!-- The last line printed by the client-->
+    <Transition Name="Rule4" From="Stable" To="Finished" Pattern="Done the whole test" Count="1"/>
+    <!-- The angled brackets <> are replaced by {} in following pattern to avoid forcing to use entities-->
+    <Lexer Name="Pattern1" State="Stable" Pattern="Current TPS:(?{tps} \d+.\d+)">
+      <Variable Name="tps"/>
+    </Lexer>
+    <Lexer Name="Pattern2" State="Stable" Pattern="Average TPS :(?{AverageTPS} \d+.\d+)">
+      <Variable Name="AverageTPS"/>
+    </Lexer>
+  </QuickParser>
+  
+  <QuickParser Name="ClientLogForUserLoadTest">
+    <Transition Name="Rule1" From="Started" To="Printing" Pattern="Min:" Count="1"/>
+    <Transition Name="Rule2" From="Printing" To="WarmedUp" Pattern="Min:" Count="10"/>
+    <Transition Name="Rule3" From="WarmedUp" To="Stable" Pattern="Min:" Count="40"/>
+    <!-- The last line printed by the client-->
+    <Transition Name="Rule4" From="Stable" To="Finished" Pattern="Average TPS" Count="1"/>
+    <!-- The angled brackets <> are replaced by {} in following pattern to avoid forcing to use entities-->
+    <Lexer Name="Pattern1" State="Stable" Pattern="Current TPS:(?{tps} \d+.\d+)">
+      <Variable Name="tps"/>
+    </Lexer>
+    <Lexer Name="Pattern2" State="Stable" Pattern="Failures:(?{Failures} \d+)">
+      <Variable Name="Failures"/>
+    </Lexer>
+    <Lexer Name="Pattern3" State="Stable" Pattern="Late:(?{Late} \d+)">
+      <Variable Name="Late"/>
+    </Lexer>
+    <Lexer Name="Pattern4" State="Stable" Pattern="Busy:(?{Busy} \d+)">
+      <Variable Name="Busy"/>
+    </Lexer>
+    <Lexer Name="Pattern5" State="Stable" Pattern="Min: (?{min}\d+.\d+) ms, Max: (?{max}\d+.\d+) ms, Mean: (?{mean}\d+.\d+) ms, Std Dev: (?{std}\d+.\d+) ms">
+      <Variable Name="min"/>
+      <Variable Name="max"/>
+      <Variable Name="mean"/>
+      <Variable Name="std"/>
+    </Lexer>
+  </QuickParser>
+  
+  <QuickParser Name="ClientLogForReliability">
+    <Transition Name="Rule1" From="Started" To="Printing" Pattern="Current TPS:" Count="1"/>
+    <Transition Name="Rule4" From="Printing" To="Stable" Pattern="Current TPS:" Count="30" />
+    <!-- NOTE that the "unstable" state must be programatically forced-->
+    <Transition Name="Rule5" From="Unstable" To="Stable" Pattern="Current TPS:" Count="5" Consecutive="true"/>
+    <!-- The last line printed by the client-->
+    <Transition Name="Rule4" From="Stable" To="Finished" Pattern="Average TPS" Count="1"/>
+    <!-- The angled brackets <> are replaced by {} in following pattern to avoid forcing to use entities-->
+    <Lexer Name="Pattern1" State="Stable" Pattern="Current TPS:(?{tps} \d+.\d+)">
+      <Variable Name="tps"/>
+    </Lexer>
+    <Lexer Name="Pattern2" State="Stable" Pattern="Failures:(?{Failures} \d+)">
+      <Variable Name="Failures"/>
+    </Lexer>
+    <Lexer Name="Pattern3" State="Stable" Pattern="Late:(?{Late} \d+)">
+      <Variable Name="Late"/>
+    </Lexer>
+    <Lexer Name="Pattern4" State="Stable" Pattern="Busy:(?{Busy} \d+)">
+      <Variable Name="Busy"/>
+    </Lexer>
+  </QuickParser>
+  
+  <QuickParser Name="ClientLogFast">
+    <Transition Name="Rule1" From="Started" To="WarmedUp" Pattern="Current TPS:" Count="1"/>
+    <Transition Name="Rule2" From="WarmedUp" To="Stable" Pattern="Current TPS:" Count="20"/>
+    <Transition Name="Rule3" From="Stable" To="Finished" Pattern="Current TPS:" Count="20"/>
+    <!-- The angled brackets <> are replaced by {} in following pattern to avoid forcing to use entities-->
+    <Lexer Name="Pattern1" State="Stable" Pattern="Current TPS:(?{tps} \d+.\d+)">
+      <Variable Name="tps"/>
+    </Lexer>
+    <Lexer Name="Pattern2" State="Stable" Pattern="Failures:(?{Failures} \d+)">
+      <Variable Name="Failures"/>
+    </Lexer>
+    <Lexer Name="Pattern3" State="Stable" Pattern="Late:(?{Late} \d+)">
+      <Variable Name="Late"/>
+    </Lexer>
+    <Lexer Name="Pattern4" State="Stable" Pattern="Busy:(?{Busy} \d+)">
+      <Variable Name="Busy"/>
+    </Lexer>
+  </QuickParser>
+  <QuickParser Name="ServerLog">
+    <Transition Name="Rule1" From="Started" To="Running" Pattern="Opened a listening socket at address" Count="1"/>
+    <Transition Name="Rule2" From="Running" To="Exception" Pattern="NET Runtime Platform stalled" Count="5"/>
+  </QuickParser>
+  
+  <MetricCollector Name="MetricDefinition1">
+    <Metric Type="AverageMetric" Name="average_TPS" BasedOn="tps" WindowSize="10" Scope="Moving"/>
+    <MetricAssert Type="MetricWatermarkAssert" BasedOn="average_TPS" LowWatermark="200" HighWatermark="8000" WindowSize="5" IsGlobal="true" Strict="true"/>
+  </MetricCollector>
+
+  <MetricCollector Name="MetricDefinition2" ExitEarly="false">
+    <Metric Type="AverageMetric" Name="TPS Moving Average" BasedOn="tps" WindowSize="20" Scope="Moving"/>
+    <!--<Metric Type="AverageMetric" Name="TPS Avergae per period" BasedOn="tps" WindowSize="10" Scope="Period"/>-->
+    <Metric Type="AggregateMetric" Name="Aggregate of TPS" BasedOn="tps" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Aggregate of TPS Moving" BasedOn="TPS Moving Average" WindowSize="20" Scope="Global" Pass="1"/>
+    <Metric Type="AggregateMetric" Name="Failures" BasedOn="Failures" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Late" BasedOn="Late" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Busy" BasedOn="Busy" WindowSize="20" Scope="Global"/>
+    <!-- each client needs to see TPS above 2000 -->
+    <MetricAssert Type="MetricWatermarkAssert" BasedOn="tps" LowWatermark="0.5" HighWatermark="10" IsGlobal ="false" WindowSize="5" Strict="true" ScaleBy="ScaleFactorPerClient"/>
+    <MetricAssert Type="MetricWatermarkAssert" BasedOn="Aggregate of TPS" LowWatermark="0.5" HighWatermark="10" WindowSize="5" IsGlobal ="true" ScaleBy="ScaleFactor" Strict="true"/>
+    <MetricAssert Type="MetricWatermarkAssert" BasedOn="Aggregate of TPS Moving" LowWatermark="0.5" HighWatermark="10" WindowSize="5" IsGlobal ="true" ScaleBy="ScaleFactor" Strict="true"/>
+  </MetricCollector>
+
+  <MetricCollector Name="MetricDefinition3" ExitEarly="false">
+    <Metric Type="AverageMetric" Name="TPS Moving Average" BasedOn="tps" WindowSize="20" Scope="Moving"/>
+    <!--<Metric Type="AverageMetric" Name="TPS Avergae per period" BasedOn="tps" WindowSize="10" Scope="Period"/>-->
+    <Metric Type="AggregateMetric" Name="Aggregate of TPS" BasedOn="tps" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Aggregate of TPS Moving" BasedOn="TPS Moving Average" WindowSize="20" Scope="Global" Pass="1"/>
+    <Metric Type="AggregateMetric" Name="Failures" BasedOn="Failures" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Late" BasedOn="Late" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Busy" BasedOn="Busy" WindowSize="20" Scope="Global"/>
+  </MetricCollector>
+
+  <MetricCollector Name="MetricDefinitionForReliability">
+    <Metric Type="AverageMetric" Name="TPS Moving Average" BasedOn="tps" WindowSize="5" Scope="Moving"/>
+    <!--<Metric Type="AverageMetric" Name="TPS Avergae per period" BasedOn="tps" WindowSize="10" Scope="Period"/>-->
+    <Metric Type="AggregateMetric" Name="Aggregate of TPS" BasedOn="tps" WindowSize="5" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Aggregate of TPS Moving" BasedOn="TPS Moving Average" WindowSize="5" Scope="Global" Pass="1"/>
+    <Metric Type="AggregateMetric" Name="Failures" BasedOn="Failures" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Late" BasedOn="Late" WindowSize="20" Scope="Global"/>
+    <Metric Type="AggregateMetric" Name="Busy" BasedOn="Busy" WindowSize="20" Scope="Global"/>
+    <!-- each client needs to see TPS above 2000 -->
+    <!-- NO Asserts for now 
+    <MetricAssert Type="MetricWatermarkAssert" BasedOn="tps" LowWatermark="0.5" HighWatermark="10" IsGlobal ="false" WindowSize="5" Strict="true" ScaleBy="ScaleFactorPerClient"/>
+    <MetricAssert Type="MetricWatermarkAssert" BasedOn="Aggregate of TPS" LowWatermark="0.5" HighWatermark="10" WindowSize="5" IsGlobal ="true" ScaleBy="ScaleFactor" Strict="true"/>
+    <MetricAssert Type="MetricWatermarkAssert" BasedOn="Aggregate of TPS Moving" LowWatermark="0.5" HighWatermark="10" WindowSize="5" IsGlobal ="true" ScaleBy="ScaleFactor" Strict="true"/>
+    -->
+  </MetricCollector>
+
+ 
+</TestConfiguration>

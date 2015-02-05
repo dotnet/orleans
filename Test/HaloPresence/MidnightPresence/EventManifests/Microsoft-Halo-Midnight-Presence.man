@@ -1,0 +1,544 @@
+<instrumentationManifest xmlns="http://schemas.microsoft.com/win/2004/08/events">
+ <instrumentation xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events">
+  <events xmlns="http://schemas.microsoft.com/win/2004/08/events">
+<provider name="Microsoft-Halo-Midnight-Presence" guid="{bae582ea-bc0f-43f1-9776-6bed4daf9c1e}" resourceFileName="F:\343\Services\Main\Products\Presence\Microsoft.Halo.Grains\MidnightPresence.Grains\bin\Release\MidnightPresence.Grains.dll" messageFileName="F:\343\Services\Main\Products\Presence\Microsoft.Halo.Grains\MidnightPresence.Grains\bin\Release\MidnightPresence.Grains.dll" symbol="MicrosoftHaloMidnightPresence">
+ <tasks>
+  <task name="CalculatingGlobalHopperTotals" value="1"/>
+  <task name="SessionHopperCompilingAggregates" value="2"/>
+  <task name="HeartbeatRequestFailed" value="65332"/>
+  <task name="QueryRequestFailed" value="65333"/>
+  <task name="GlobalPopulationCountsGenerated" value="65334"/>
+  <task name="SendHopperInfoToBiFailed" value="65458"/>
+  <task name="SendFallbackHopperInfoToBiFailed" value="65459"/>
+  <task name="SessionSendingFallbackHopperDataToBi" value="65460"/>
+  <task name="TestMethodIsBeingCalledForEntity" value="65463"/>
+  <task name="SessionQueryingPlayerForWaypoint" value="65464"/>
+  <task name="SessionQueryingPlayer" value="65465"/>
+  <task name="SessionProcessingLocalAbortJoin" value="65466"/>
+  <task name="SessionAbortingJoinDueToPlayerBackout" value="65467"/>
+  <task name="SessionJoinedAnotherSessionSuccessfully" value="65468"/>
+  <task name="SessionAttemptingToJoinSession" value="65469"/>
+  <task name="SessionProcessingQueuedJoins" value="65470"/>
+  <task name="SessionAttemptJoinAborted" value="65471"/>
+  <task name="SessionAttemptJoinPermitted" value="65472"/>
+  <task name="SessionJoinAlreadyComplete" value="65473"/>
+  <task name="SessionJoinFailedDueToInsufficientCapacity" value="65474"/>
+  <task name="SessionMigratingAttemptJoin" value="65475"/>
+  <task name="SessionAttemptJoinPlayerHasBadSessionInfo" value="65476"/>
+  <task name="SessionAttemptJoinPlayerDoesntExist" value="65477"/>
+  <task name="SessionReceivedAttemptJoinRequest" value="65478"/>
+  <task name="SessionRemovingDeadXBLPlayer" value="65479"/>
+  <task name="SessionCheckingForDeadUsers" value="65480"/>
+  <task name="SessionAddingNewLocalPlayer" value="65481"/>
+  <task name="SessionUpdatingExistingLocalPlayer" value="65482"/>
+  <task name="SessionRemovingDeadLocalPlayer" value="65483"/>
+  <task name="SessionShouldForceOwnershipGrab" value="65484"/>
+  <task name="SessionUpdatingMachineAndPlayerData" value="65485"/>
+  <task name="SessionUpdatingHopperCounts" value="65486"/>
+  <task name="SessionShouldUpdateHopperCheck" value="65487"/>
+  <task name="SessionUpdatingMembershipForGroup" value="65488"/>
+  <task name="SessionProcessedGameDataFromHeartbeat" value="65489"/>
+  <task name="SessionAbortingJoinOnHostRequest" value="65490"/>
+  <task name="SessionAbortingPendingJoins" value="65491"/>
+  <task name="SessionPlayerCountUpdated" value="65492"/>
+  <task name="PlayersReceivedInHeartbeat" value="65493"/>
+  <task name="PlayerCountMismatchInHeartbeat" value="65494"/>
+  <task name="NoValidPlayersReceivedInHeartbeat" value="65495"/>
+  <task name="CreatingLocalPlayersListForHeartbeatProcessing" value="65496"/>
+  <task name="HostDataUpdatedForSession" value="65497"/>
+  <task name="InvalidCapacityInHeartbeatToSession" value="65498"/>
+  <task name="ProcessingHeartbeatForSession" value="65499"/>
+  <task name="UnsubscribingViewerForGameData" value="65500"/>
+  <task name="SubscribingViewerForGameData" value="65501"/>
+  <task name="UnsubscribingViewerForSession" value="65502"/>
+  <task name="SessionActivated" value="65503"/>
+  <task name="HeartbeatBlfDeserializationFailed" value="65504"/>
+  <task name="HeartbeatRequestProcessed" value="65505"/>
+  <task name="FailedToDeserializeHeartbeatChunk" value="65506"/>
+  <task name="QueryRequestProcessed" value="65507"/>
+  <task name="UnexpectedRequestCountForClanAbbreviated" value="65508"/>
+  <task name="UnexpectedRequestCountForClans" value="65509"/>
+  <task name="FailedToDeserializeQueryChunk" value="65510"/>
+  <task name="WaypointQueryRequestExecutedSuccessfully" value="65511"/>
+  <task name="RequestRouterStatistics" value="65512"/>
+  <task name="PlayerUpdatingMembershipForGroup" value="65513"/>
+  <task name="MissingMachineIdWhileProcessingHeartbeatForSession" value="65515"/>
+  <task name="ProcessingHeartbeatForPlayer" value="65516"/>
+  <task name="UnsubscribingViewerForClient" value="65517"/>
+  <task name="SubscribingViewerForClient" value="65518"/>
+  <task name="ResettingViewerForClient" value="65519"/>
+  <task name="DeclaringSessionOwnershipClaim" value="65520"/>
+  <task name="RevokingSessionOwnershipClaim" value="65521"/>
+  <task name="NotifyingViewersOfNewSession" value="65522"/>
+  <task name="ExpiringViewerForPlayer" value="65523"/>
+  <task name="SessionIdChangingForPlayer" value="65524"/>
+  <task name="ActivatedMidnightPlayerPresenceGrainForPlayer" value="65525"/>
+  <task name="ErrorRefreshingMidnightHopperCounterTimer" value="65527"/>
+  <task name="ErrorWritingHopperCountsToStorage" value="65528"/>
+  <task name="FailedToSerializeChunkDynamicHopperStatistics" value="65530"/>
+  <task name="TooManyItemsInAggregateCountsByteStream" value="65531"/>
+  <task name="HopperCountsHasInvalidSize" value="65532"/>
+  <task name="ErrorActivatingTimerForReachHopperCounterGrain" value="65533"/>
+ </tasks>
+ <opcodes>
+ </opcodes>
+ <events>
+  <event value="200" version="0" level="win:Informational" message="$(string.event_GlobalPopulationCountsGenerated)" task="GlobalPopulationCountsGenerated" template="GlobalPopulationCountsGeneratedArgs"/>
+  <event value="201" version="0" level="win:Error" message="$(string.event_QueryRequestFailed)" task="QueryRequestFailed" template="QueryRequestFailedArgs"/>
+  <event value="202" version="0" level="win:Error" message="$(string.event_HeartbeatRequestFailed)" task="HeartbeatRequestFailed" template="HeartbeatRequestFailedArgs"/>
+  <event value="1" version="0" level="win:Error" message="$(string.event_ErrorActivatingTimerForReachHopperCounterGrain)" task="ErrorActivatingTimerForReachHopperCounterGrain" template="ErrorActivatingTimerForReachHopperCounterGrainArgs"/>
+  <event value="2" version="0" level="win:Warning" message="$(string.event_HopperCountsHasInvalidSize)" task="HopperCountsHasInvalidSize" template="HopperCountsHasInvalidSizeArgs"/>
+  <event value="3" version="0" level="win:Warning" message="$(string.event_TooManyItemsInAggregateCountsByteStream)" task="TooManyItemsInAggregateCountsByteStream" template="TooManyItemsInAggregateCountsByteStreamArgs"/>
+  <event value="4" version="0" level="win:Error" message="$(string.event_FailedToSerializeChunkDynamicHopperStatistics)" task="FailedToSerializeChunkDynamicHopperStatistics" template="FailedToSerializeChunkDynamicHopperStatisticsArgs"/>
+  <event value="5" version="0" level="win:Informational" message="$(string.event_CalculatingGlobalHopperTotals)" opcode="win:Start" task="CalculatingGlobalHopperTotals"/>
+  <event value="6" version="0" level="win:Error" message="$(string.event_ErrorWritingHopperCountsToStorage)" task="ErrorWritingHopperCountsToStorage" template="ErrorWritingHopperCountsToStorageArgs"/>
+  <event value="7" version="0" level="win:Error" message="$(string.event_ErrorRefreshingMidnightHopperCounterTimer)" task="ErrorRefreshingMidnightHopperCounterTimer" template="ErrorRefreshingMidnightHopperCounterTimerArgs"/>
+  <event value="8" version="0" level="win:Informational" message="$(string.event_FinishedCalculatingGlobalHopperTotals)" opcode="win:Stop" task="CalculatingGlobalHopperTotals"/>
+  <event value="9" version="0" level="win:Verbose" message="$(string.event_ActivatedMidnightPlayerPresenceGrainForPlayer)" task="ActivatedMidnightPlayerPresenceGrainForPlayer" template="ActivatedMidnightPlayerPresenceGrainForPlayerArgs"/>
+  <event value="10" version="0" level="win:Verbose" message="$(string.event_SessionIdChangingForPlayer)" task="SessionIdChangingForPlayer" template="SessionIdChangingForPlayerArgs"/>
+  <event value="11" version="0" level="win:Verbose" message="$(string.event_ExpiringViewerForPlayer)" task="ExpiringViewerForPlayer" template="ExpiringViewerForPlayerArgs"/>
+  <event value="12" version="0" level="win:Verbose" message="$(string.event_NotifyingViewersOfNewSession)" task="NotifyingViewersOfNewSession" template="NotifyingViewersOfNewSessionArgs"/>
+  <event value="13" version="0" level="win:Verbose" message="$(string.event_RevokingSessionOwnershipClaim)" task="RevokingSessionOwnershipClaim" template="RevokingSessionOwnershipClaimArgs"/>
+  <event value="14" version="0" level="win:Verbose" message="$(string.event_DeclaringSessionOwnershipClaim)" task="DeclaringSessionOwnershipClaim" template="DeclaringSessionOwnershipClaimArgs"/>
+  <event value="15" version="0" level="win:Verbose" message="$(string.event_ResettingViewerForClient)" task="ResettingViewerForClient" template="ResettingViewerForClientArgs"/>
+  <event value="16" version="0" level="win:Verbose" message="$(string.event_SubscribingViewerForClient)" task="SubscribingViewerForClient" template="SubscribingViewerForClientArgs"/>
+  <event value="17" version="0" level="win:Verbose" message="$(string.event_UnsubscribingViewerForClient)" task="UnsubscribingViewerForClient" template="UnsubscribingViewerForClientArgs"/>
+  <event value="18" version="0" level="win:Verbose" message="$(string.event_ProcessingHeartbeatForPlayer)" task="ProcessingHeartbeatForPlayer" template="ProcessingHeartbeatForPlayerArgs"/>
+  <event value="19" version="0" level="win:Informational" message="$(string.event_MissingMachineIdWhileProcessingHeartbeatForSession)" task="MissingMachineIdWhileProcessingHeartbeatForSession" template="MissingMachineIdWhileProcessingHeartbeatForSessionArgs"/>
+  <event value="21" version="0" level="win:Verbose" message="$(string.event_PlayerUpdatingMembershipForGroup)" task="PlayerUpdatingMembershipForGroup" template="PlayerUpdatingMembershipForGroupArgs"/>
+  <event value="22" version="0" level="win:Informational" message="$(string.event_RequestRouterStatistics)" task="RequestRouterStatistics" template="RequestRouterStatisticsArgs"/>
+  <event value="23" version="0" level="win:Verbose" message="$(string.event_WaypointQueryRequestExecutedSuccessfully)" task="WaypointQueryRequestExecutedSuccessfully"/>
+  <event value="24" version="0" level="win:Warning" message="$(string.event_FailedToDeserializeQueryChunk)" task="FailedToDeserializeQueryChunk" template="FailedToDeserializeQueryChunkArgs"/>
+  <event value="25" version="0" level="win:Warning" message="$(string.event_UnexpectedRequestCountForClans)" task="UnexpectedRequestCountForClans" template="UnexpectedRequestCountForClansArgs"/>
+  <event value="26" version="0" level="win:Warning" message="$(string.event_UnexpectedRequestCountForClanAbbreviated)" task="UnexpectedRequestCountForClanAbbreviated" template="UnexpectedRequestCountForClanAbbreviatedArgs"/>
+  <event value="27" version="0" level="win:Verbose" message="$(string.event_QueryRequestProcessed)" task="QueryRequestProcessed"/>
+  <event value="28" version="0" level="win:Error" message="$(string.event_FailedToDeserializeHeartbeatChunk)" task="FailedToDeserializeHeartbeatChunk" template="FailedToDeserializeHeartbeatChunkArgs"/>
+  <event value="29" version="0" level="win:Verbose" message="$(string.event_HeartbeatRequestProcessed)" task="HeartbeatRequestProcessed"/>
+  <event value="30" version="0" level="win:Error" message="$(string.event_HeartbeatBlfDeserializationFailed)" task="HeartbeatBlfDeserializationFailed" template="HeartbeatBlfDeserializationFailedArgs"/>
+  <event value="31" version="0" level="win:Verbose" message="$(string.event_SessionActivated)" task="SessionActivated" template="SessionActivatedArgs"/>
+  <event value="32" version="0" level="win:Verbose" message="$(string.event_UnsubscribingViewerForSession)" task="UnsubscribingViewerForSession" template="UnsubscribingViewerForSessionArgs"/>
+  <event value="33" version="0" level="win:Verbose" message="$(string.event_SubscribingViewerForGameData)" task="SubscribingViewerForGameData" template="SubscribingViewerForGameDataArgs"/>
+  <event value="34" version="0" level="win:Verbose" message="$(string.event_UnsubscribingViewerForGameData)" task="UnsubscribingViewerForGameData" template="UnsubscribingViewerForGameDataArgs"/>
+  <event value="35" version="0" level="win:Verbose" message="$(string.event_ProcessingHeartbeatForSession)" task="ProcessingHeartbeatForSession" template="ProcessingHeartbeatForSessionArgs"/>
+  <event value="36" version="0" level="win:Error" message="$(string.event_InvalidCapacityInHeartbeatToSession)" task="InvalidCapacityInHeartbeatToSession" template="InvalidCapacityInHeartbeatToSessionArgs"/>
+  <event value="37" version="0" level="win:Verbose" message="$(string.event_HostDataUpdatedForSession)" task="HostDataUpdatedForSession" template="HostDataUpdatedForSessionArgs"/>
+  <event value="38" version="0" level="win:Verbose" message="$(string.event_CreatingLocalPlayersListForHeartbeatProcessing)" task="CreatingLocalPlayersListForHeartbeatProcessing" template="CreatingLocalPlayersListForHeartbeatProcessingArgs"/>
+  <event value="39" version="0" level="win:Warning" message="$(string.event_NoValidPlayersReceivedInHeartbeat)" task="NoValidPlayersReceivedInHeartbeat" template="NoValidPlayersReceivedInHeartbeatArgs"/>
+  <event value="40" version="0" level="win:Informational" message="$(string.event_PlayerCountMismatchInHeartbeat)" task="PlayerCountMismatchInHeartbeat" template="PlayerCountMismatchInHeartbeatArgs"/>
+  <event value="41" version="0" level="win:Verbose" message="$(string.event_PlayersReceivedInHeartbeat)" task="PlayersReceivedInHeartbeat" template="PlayersReceivedInHeartbeatArgs"/>
+  <event value="42" version="0" level="win:Verbose" message="$(string.event_SessionPlayerCountUpdated)" task="SessionPlayerCountUpdated" template="SessionPlayerCountUpdatedArgs"/>
+  <event value="43" version="0" level="win:Verbose" message="$(string.event_SessionAbortingPendingJoins)" task="SessionAbortingPendingJoins" template="SessionAbortingPendingJoinsArgs"/>
+  <event value="44" version="0" level="win:Verbose" message="$(string.event_SessionAbortingJoinOnHostRequest)" task="SessionAbortingJoinOnHostRequest" template="SessionAbortingJoinOnHostRequestArgs"/>
+  <event value="45" version="0" level="win:Verbose" message="$(string.event_SessionProcessedGameDataFromHeartbeat)" task="SessionProcessedGameDataFromHeartbeat" template="SessionProcessedGameDataFromHeartbeatArgs"/>
+  <event value="46" version="0" level="win:Verbose" message="$(string.event_SessionUpdatingMembershipForGroup)" task="SessionUpdatingMembershipForGroup" template="SessionUpdatingMembershipForGroupArgs"/>
+  <event value="47" version="0" level="win:Verbose" message="$(string.event_SessionShouldUpdateHopperCheck)" task="SessionShouldUpdateHopperCheck" template="SessionShouldUpdateHopperCheckArgs"/>
+  <event value="48" version="0" level="win:Verbose" message="$(string.event_SessionUpdatingHopperCounts)" task="SessionUpdatingHopperCounts" template="SessionUpdatingHopperCountsArgs"/>
+  <event value="49" version="0" level="win:Verbose" message="$(string.event_SessionUpdatingMachineAndPlayerData)" task="SessionUpdatingMachineAndPlayerData"/>
+  <event value="50" version="0" level="win:Verbose" message="$(string.event_SessionShouldForceOwnershipGrab)" task="SessionShouldForceOwnershipGrab" template="SessionShouldForceOwnershipGrabArgs"/>
+  <event value="51" version="0" level="win:Verbose" message="$(string.event_SessionRemovingDeadLocalPlayer)" task="SessionRemovingDeadLocalPlayer" template="SessionRemovingDeadLocalPlayerArgs"/>
+  <event value="52" version="0" level="win:Verbose" message="$(string.event_SessionUpdatingExistingLocalPlayer)" task="SessionUpdatingExistingLocalPlayer" template="SessionUpdatingExistingLocalPlayerArgs"/>
+  <event value="53" version="0" level="win:Verbose" message="$(string.event_SessionAddingNewLocalPlayer)" task="SessionAddingNewLocalPlayer" template="SessionAddingNewLocalPlayerArgs"/>
+  <event value="54" version="0" level="win:Verbose" message="$(string.event_SessionCheckingForDeadUsers)" task="SessionCheckingForDeadUsers"/>
+  <event value="55" version="0" level="win:Verbose" message="$(string.event_SessionRemovingDeadXBLPlayer)" task="SessionRemovingDeadXBLPlayer" template="SessionRemovingDeadXBLPlayerArgs"/>
+  <event value="56" version="0" level="win:Verbose" message="$(string.event_SessionReceivedAttemptJoinRequest)" task="SessionReceivedAttemptJoinRequest" template="SessionReceivedAttemptJoinRequestArgs"/>
+  <event value="57" version="0" level="win:Verbose" message="$(string.event_SessionAttemptJoinPlayerDoesntExist)" task="SessionAttemptJoinPlayerDoesntExist" template="SessionAttemptJoinPlayerDoesntExistArgs"/>
+  <event value="58" version="0" level="win:Verbose" message="$(string.event_SessionAttemptJoinPlayerHasBadSessionInfo)" task="SessionAttemptJoinPlayerHasBadSessionInfo" template="SessionAttemptJoinPlayerHasBadSessionInfoArgs"/>
+  <event value="59" version="0" level="win:Verbose" message="$(string.event_SessionMigratingAttemptJoin)" task="SessionMigratingAttemptJoin" template="SessionMigratingAttemptJoinArgs"/>
+  <event value="60" version="0" level="win:Verbose" message="$(string.event_SessionJoinFailedDueToInsufficientCapacity)" task="SessionJoinFailedDueToInsufficientCapacity" template="SessionJoinFailedDueToInsufficientCapacityArgs"/>
+  <event value="61" version="0" level="win:Verbose" message="$(string.event_SessionJoinAlreadyComplete)" task="SessionJoinAlreadyComplete" template="SessionJoinAlreadyCompleteArgs"/>
+  <event value="62" version="0" level="win:Verbose" message="$(string.event_SessionAttemptJoinPermitted)" task="SessionAttemptJoinPermitted" template="SessionAttemptJoinPermittedArgs"/>
+  <event value="63" version="0" level="win:Verbose" message="$(string.event_SessionAttemptJoinAborted)" task="SessionAttemptJoinAborted" template="SessionAttemptJoinAbortedArgs"/>
+  <event value="64" version="0" level="win:Verbose" message="$(string.event_SessionProcessingQueuedJoins)" task="SessionProcessingQueuedJoins" template="SessionProcessingQueuedJoinsArgs"/>
+  <event value="65" version="0" level="win:Verbose" message="$(string.event_SessionAttemptingToJoinSession)" task="SessionAttemptingToJoinSession" template="SessionAttemptingToJoinSessionArgs"/>
+  <event value="66" version="0" level="win:Verbose" message="$(string.event_SessionJoinedAnotherSessionSuccessfully)" task="SessionJoinedAnotherSessionSuccessfully" template="SessionJoinedAnotherSessionSuccessfullyArgs"/>
+  <event value="67" version="0" level="win:Verbose" message="$(string.event_SessionAbortingJoinDueToPlayerBackout)" task="SessionAbortingJoinDueToPlayerBackout" template="SessionAbortingJoinDueToPlayerBackoutArgs"/>
+  <event value="68" version="0" level="win:Verbose" message="$(string.event_SessionProcessingLocalAbortJoin)" task="SessionProcessingLocalAbortJoin" template="SessionProcessingLocalAbortJoinArgs"/>
+  <event value="69" version="0" level="win:Verbose" message="$(string.event_SessionQueryingPlayer)" task="SessionQueryingPlayer" template="SessionQueryingPlayerArgs"/>
+  <event value="70" version="0" level="win:Verbose" message="$(string.event_SessionQueryingPlayerForWaypoint)" task="SessionQueryingPlayerForWaypoint" template="SessionQueryingPlayerForWaypointArgs"/>
+  <event value="71" version="0" level="win:Informational" message="$(string.event_TestMethodIsBeingCalledForEntity)" task="TestMethodIsBeingCalledForEntity" template="TestMethodIsBeingCalledForEntityArgs"/>
+  <event value="72" version="0" level="win:Verbose" message="$(string.event_SessionHopperCompilingAggregates)" opcode="win:Start" task="SessionHopperCompilingAggregates" template="SessionHopperCompilingAggregatesArgs"/>
+  <event value="73" version="0" level="win:Verbose" message="$(string.event_SessionHopperFinishedCompilingAggregates)" opcode="win:Stop" task="SessionHopperCompilingAggregates" template="SessionHopperFinishedCompilingAggregatesArgs"/>
+  <event value="74" version="0" level="win:Informational" message="$(string.event_SessionSendingFallbackHopperDataToBi)" task="SessionSendingFallbackHopperDataToBi" template="SessionSendingFallbackHopperDataToBiArgs"/>
+  <event value="75" version="0" level="win:Warning" message="$(string.event_SendFallbackHopperInfoToBiFailed)" task="SendFallbackHopperInfoToBiFailed" template="SendFallbackHopperInfoToBiFailedArgs"/>
+  <event value="76" version="0" level="win:Warning" message="$(string.event_SendHopperInfoToBiFailed)" task="SendHopperInfoToBiFailed" template="SendHopperInfoToBiFailedArgs"/>
+ </events>
+ <templates>
+  <template tid="GlobalPopulationCountsGeneratedArgs">
+   <data name="players_Int64" inType="win:Int64"/>
+   <data name="sessions_Int64" inType="win:Int64"/>
+   <data name="machines_Int64" inType="win:Int64"/>
+   <data name="fallback_Int64" inType="win:Int64"/>
+   <data name="fallbackPercent_Double" inType="win:Double"/>
+  </template>
+  <template tid="QueryRequestFailedArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="HeartbeatRequestFailedArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ErrorActivatingTimerForReachHopperCounterGrainArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="HopperCountsHasInvalidSizeArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="TooManyItemsInAggregateCountsByteStreamArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="FailedToSerializeChunkDynamicHopperStatisticsArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ErrorWritingHopperCountsToStorageArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ErrorRefreshingMidnightHopperCounterTimerArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ActivatedMidnightPlayerPresenceGrainForPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="SessionIdChangingForPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="oldSessionId_Int64" inType="win:Int64"/>
+   <data name="newSessionId_Int64" inType="win:Int64"/>
+   <data name="viewerCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="ExpiringViewerForPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="viewerId_GUID" inType="win:GUID"/>
+   <data name="viewerDescription_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="NotifyingViewersOfNewSessionArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="newSessionId_Int64" inType="win:Int64"/>
+   <data name="viewerId_GUID" inType="win:GUID"/>
+   <data name="viewerDescription_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="RevokingSessionOwnershipClaimArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="currentSessionId_Int64" inType="win:Int64"/>
+   <data name="newSessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="DeclaringSessionOwnershipClaimArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="currentSessionId_Int64" inType="win:Int64"/>
+   <data name="newSessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="ResettingViewerForClientArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="clientId_GUID" inType="win:GUID"/>
+  </template>
+  <template tid="SubscribingViewerForClientArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="clientId_GUID" inType="win:GUID"/>
+   <data name="expirationInMilliseconds_Int64" inType="win:Int64"/>
+   <data name="viewerDescription_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="UnsubscribingViewerForClientArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="clientId_GUID" inType="win:GUID"/>
+   <data name="viewerDescription_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ProcessingHeartbeatForPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="MissingMachineIdWhileProcessingHeartbeatForSessionArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="PlayerUpdatingMembershipForGroupArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="clanId_Int64" inType="win:Int64"/>
+   <data name="clanName_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="RequestRouterStatisticsArgs">
+   <data name="statistics_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="FailedToDeserializeQueryChunkArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="UnexpectedRequestCountForClansArgs">
+   <data name="requestCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="UnexpectedRequestCountForClanAbbreviatedArgs">
+   <data name="requestCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="FailedToDeserializeHeartbeatChunkArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="HeartbeatBlfDeserializationFailedArgs">
+   <data name="chunkIndex_Int32" inType="win:Int32"/>
+   <data name="requestLength_Int32" inType="win:Int32"/>
+   <data name="startingPosition_Int64" inType="win:Int64"/>
+   <data name="currentPosition_Int64" inType="win:Int64"/>
+   <data name="encodedBlf_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="SessionActivatedArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="UnsubscribingViewerForSessionArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="clientId_GUID" inType="win:GUID"/>
+   <data name="viewerCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="SubscribingViewerForGameDataArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="clientId_GUID" inType="win:GUID"/>
+   <data name="expirationInMilliseconds_Int64" inType="win:Int64"/>
+   <data name="viewerDescription_UnicodeString" inType="win:UnicodeString"/>
+   <data name="viewerCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="UnsubscribingViewerForGameDataArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="clientId_GUID" inType="win:GUID"/>
+   <data name="viewerDescription_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ProcessingHeartbeatForSessionArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="machineId_Int64" inType="win:Int64"/>
+   <data name="heartbeatDescription_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="InvalidCapacityInHeartbeatToSessionArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="capacity_UInt8" inType="win:UInt8"/>
+  </template>
+  <template tid="HostDataUpdatedForSessionArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="when_UnicodeString" inType="win:UnicodeString"/>
+   <data name="hostDataDescription_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="CreatingLocalPlayersListForHeartbeatProcessingArgs">
+   <data name="playerCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="NoValidPlayersReceivedInHeartbeatArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="PlayerCountMismatchInHeartbeatArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="receivedPlayerCount_Int32" inType="win:Int32"/>
+   <data name="expectedPlayerCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="PlayersReceivedInHeartbeatArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="playersInHeartbeat_Int32" inType="win:Int32"/>
+   <data name="playersInSession_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="SessionPlayerCountUpdatedArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="playerCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="SessionAbortingPendingJoinsArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionAbortingJoinOnHostRequestArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionProcessedGameDataFromHeartbeatArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="joinCode_UInt8" inType="win:UInt8"/>
+   <data name="sessionIdToJoin_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionUpdatingMembershipForGroupArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="clanId_Int64" inType="win:Int64"/>
+   <data name="clanName_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="SessionShouldUpdateHopperCheckArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionUpdatingHopperCountsArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="hopperSessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionShouldForceOwnershipGrabArgs">
+   <data name="shouldForceGrab_Boolean" inType="win:Boolean"/>
+  </template>
+  <template tid="SessionRemovingDeadLocalPlayerArgs">
+   <data name="deadPlayerId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionUpdatingExistingLocalPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="SessionAddingNewLocalPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="SessionRemovingDeadXBLPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="SessionReceivedAttemptJoinRequestArgs">
+   <data name="currentSessionId_Int64" inType="win:Int64"/>
+   <data name="incomingSessionId_Int64" inType="win:Int64"/>
+   <data name="playerCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="SessionAttemptJoinPlayerDoesntExistArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="SessionAttemptJoinPlayerHasBadSessionInfoArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="targetPlayerId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionMigratingAttemptJoinArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="targetSessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionJoinFailedDueToInsufficientCapacityArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="incomingSessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionJoinAlreadyCompleteArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="incomingSession_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionAttemptJoinPermittedArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="incomingSession_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionAttemptJoinAbortedArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionProcessingQueuedJoinsArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionAttemptingToJoinSessionArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="targetSessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionJoinedAnotherSessionSuccessfullyArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="targetSessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionAbortingJoinDueToPlayerBackoutArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionProcessingLocalAbortJoinArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionQueryingPlayerArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionQueryingPlayerForWaypointArgs">
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="TestMethodIsBeingCalledForEntityArgs">
+   <data name="methodInfo_UnicodeString" inType="win:UnicodeString"/>
+   <data name="entityName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="sessionId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionHopperCompilingAggregatesArgs">
+   <data name="hopperId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionHopperFinishedCompilingAggregatesArgs">
+   <data name="hopperId_Int64" inType="win:Int64"/>
+  </template>
+  <template tid="SessionSendingFallbackHopperDataToBiArgs">
+   <data name="sessionId_Int64" inType="win:Int64"/>
+   <data name="hopperId_Int64" inType="win:Int64"/>
+   <data name="playersInSession_Int32" inType="win:Int32"/>
+   <data name="biEnabled_Boolean" inType="win:Boolean"/>
+  </template>
+  <template tid="SendFallbackHopperInfoToBiFailedArgs">
+   <data name="hopperId_Int16" inType="win:Int16"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="SendHopperInfoToBiFailedArgs">
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+ </templates>
+</provider>
+</events>
+</instrumentation>
+<localization>
+ <resources culture="en-US">
+  <stringTable>
+   <string id="event_ActivatedMidnightPlayerPresenceGrainForPlayer" value="Activated MidnightPlayerPresenceGrain, PlayerId:%1"/>
+   <string id="event_CalculatingGlobalHopperTotals" value="Calculating global hopper totals."/>
+   <string id="event_CreatingLocalPlayersListForHeartbeatProcessing" value="Creating a list of %1 player objects for local players"/>
+   <string id="event_DeclaringSessionOwnershipClaim" value="PlayerGrainId:%1 DeclareOwnership, CurrentSessionId:%2 NewSessionId:%3"/>
+   <string id="event_ErrorActivatingTimerForReachHopperCounterGrain" value="Activating Timer for ReachHopperCounterGrain failed with Error %1"/>
+   <string id="event_ErrorRefreshingMidnightHopperCounterTimer" value="Refreshing MidnightHopperCounter Timer Failed with Error %1"/>
+   <string id="event_ErrorWritingHopperCountsToStorage" value="Writing Hopper Counts to Storage Failed with error %1"/>
+   <string id="event_ExpiringViewerForPlayer" value="PlayerGrainId:%1 expiring Viewer.ClientId:%2 ViewerRef:%3"/>
+   <string id="event_FailedToDeserializeHeartbeatChunk" value="Failed to deserialize Heartbeat Chunk. Details: %1"/>
+   <string id="event_FailedToDeserializeQueryChunk" value="Failed to deserialize query chunk. Details: %1"/>
+   <string id="event_FailedToSerializeChunkDynamicHopperStatistics" value="Failed to Serialize ChunkDynamicHopperStatistics in Hopper Counter. Details: %1"/>
+   <string id="event_FinishedCalculatingGlobalHopperTotals" value="Finished calculating global hopper totals."/>
+   <string id="event_GlobalPopulationCountsGenerated" value="Global Population Totals:
+ Players: %1
+ Sessions: %2
+ Machines: %3
+ Players in Fallback: %4
+ Fallback Ratio: %5."/>
+   <string id="event_HeartbeatBlfDeserializationFailed" value="BlfFile.DeserializeChunk failed on chunkIndex %1, request length %2, starting position %3, current position %4. Base 64 Encoded Blf (whole blf) after colon:%5"/>
+   <string id="event_HeartbeatRequestFailed" value="Heartbeat request failed:
+ Details: %1"/>
+   <string id="event_HeartbeatRequestProcessed" value="Heartbeat request executed successfully"/>
+   <string id="event_HopperCountsHasInvalidSize" value="In UpdateAggregate: The hopper counts byte array had an invalid size. Details: %1"/>
+   <string id="event_HostDataUpdatedForSession" value="Session %1 updated HostData at %2 to: %3"/>
+   <string id="event_InvalidCapacityInHeartbeatToSession" value="Heartbeat to session %1 had an invalid capacity of %2."/>
+   <string id="event_MissingMachineIdWhileProcessingHeartbeatForSession" value="Heartbeat to session %1 did not contain a machine id"/>
+   <string id="event_NotifyingViewersOfNewSession" value="PlayerGrainId:%1 new SessionId:%2 notification to Viewer.ClientId:%3 ViewerRef:%4"/>
+   <string id="event_NoValidPlayersReceivedInHeartbeat" value="Session %1 received 0 valid players in heartbeat."/>
+   <string id="event_PlayerCountMismatchInHeartbeat" value="Session %1 received %2 valid players in heartbeat, but heartbeat indicated there should be %3 instead."/>
+   <string id="event_PlayersReceivedInHeartbeat" value="Session %1 received %2 valid players in heartbeat, currently has %3 in Players list."/>
+   <string id="event_PlayerUpdatingMembershipForGroup" value="Player %1 is updating group membership for Group %2:%3."/>
+   <string id="event_ProcessingHeartbeatForPlayer" value="Player Grain %1 is processing a heartbeat"/>
+   <string id="event_ProcessingHeartbeatForSession" value="ProcessingHeartbeatForSession Session id %1 machineId %2 heartbeatDescription %3"/>
+   <string id="event_QueryRequestFailed" value="Query request failed:
+ Details: %1"/>
+   <string id="event_QueryRequestProcessed" value="Query Request executed Successfully"/>
+   <string id="event_RequestRouterStatistics" value="MidnightRequestRouter statistics: %1"/>
+   <string id="event_ResettingViewerForClient" value="PlayerGrainId:%1 Resetting Viewer for ClientId:%2"/>
+   <string id="event_RevokingSessionOwnershipClaim" value="PlayerGrainId:%1 RevokeOwnership, CurrentSessionId:%2 NewSessionId:%3"/>
+   <string id="event_SendFallbackHopperInfoToBiFailed" value="FireAndForget call to BI Grain failed for HopperId: %1 failed with exception %2"/>
+   <string id="event_SendHopperInfoToBiFailed" value="FireAndForget call to BI Grain failed with exception %1"/>
+   <string id="event_SessionAbortingJoinDueToPlayerBackout" value="Session %1 is aborting a join, because the user backed out of it."/>
+   <string id="event_SessionAbortingJoinOnHostRequest" value="Session %1 is aborting its join, because the target hosted asked it to."/>
+   <string id="event_SessionAbortingPendingJoins" value="Session %1 is aborting pending incoming queued joins."/>
+   <string id="event_SessionActivated" value="Session %1 Activated."/>
+   <string id="event_SessionAddingNewLocalPlayer" value="Updating Player Record for New Local Player %1."/>
+   <string id="event_SessionAttemptingToJoinSession" value="Session %1 is attempting to join session %2."/>
+   <string id="event_SessionAttemptJoinAborted" value="Session %1 is no longer attempting to join the same session."/>
+   <string id="event_SessionAttemptJoinPermitted" value="Session %1 is allowing Session %2 to join it."/>
+   <string id="event_SessionAttemptJoinPlayerDoesntExist" value="Session %1 did not contain player %2, and the player grain had no session reference in it, so returning PlayerNotFound."/>
+   <string id="event_SessionAttemptJoinPlayerHasBadSessionInfo" value="Session %1 did not contain player %2, and the player grain pointed back at this session, so revoking ownership and returning PlayerNotFound."/>
+   <string id="event_SessionCheckingForDeadUsers" value="Host is checking for dead users to remove."/>
+   <string id="event_SessionHopperCompilingAggregates" value="Session Hopper %1 is beginning to compile aggregates"/>
+   <string id="event_SessionHopperFinishedCompilingAggregates" value="Session Hopper %1 is has finished compiling aggregates"/>
+   <string id="event_SessionIdChangingForPlayer" value="PlayerGrainId:%1 SessionId changing from:%2 to:%3, processing:%4 viewers"/>
+   <string id="event_SessionJoinAlreadyComplete" value="Session %1 believes that Session %2 has already joined it."/>
+   <string id="event_SessionJoinedAnotherSessionSuccessfully" value="Session %1 successfully joined session %2."/>
+   <string id="event_SessionJoinFailedDueToInsufficientCapacity" value="Session %2 cannot join Session %1 because there is not enough capacity."/>
+   <string id="event_SessionMigratingAttemptJoin" value="Session %1 did not contain player %2, but the player grain pointed at session %3, so attempting to migrate the join."/>
+   <string id="event_SessionPlayerCountUpdated" value="Session %1 has %2 players."/>
+   <string id="event_SessionProcessedGameDataFromHeartbeat" value="Session %1 finished processing game data from heartbeat.  Join Code: %2, Session to Join: %3"/>
+   <string id="event_SessionProcessingLocalAbortJoin" value="Session %1 is now processing a local abort join request."/>
+   <string id="event_SessionProcessingQueuedJoins" value="Session %1 is processing queued joins."/>
+   <string id="event_SessionQueryingPlayer" value="Calling Query Player for Player %1 in Session %2"/>
+   <string id="event_SessionQueryingPlayerForWaypoint" value="Calling Waypoint Query Player for Player %1 in Session %2"/>
+   <string id="event_SessionReceivedAttemptJoinRequest" value="Session %1 has received an AttemptJoin request from Session %2 containing %3 players."/>
+   <string id="event_SessionRemovingDeadLocalPlayer" value="Removing Dead Local Player %1."/>
+   <string id="event_SessionRemovingDeadXBLPlayer" value="Host considers Player %1 to be dead and is removing it."/>
+   <string id="event_SessionSendingFallbackHopperDataToBi" value="Session %1 is telling BI that it has %3 players in Hopper %2. Fallback BI Enabled: %4. "/>
+   <string id="event_SessionShouldForceOwnershipGrab" value="Updating Machine and Player Data.  Forced Ownership Grab is %1"/>
+   <string id="event_SessionShouldUpdateHopperCheck" value="Session %1 is checking to see if it should update hopper counts."/>
+   <string id="event_SessionUpdatingExistingLocalPlayer" value="Updating Player Record for Existing Local Player %1."/>
+   <string id="event_SessionUpdatingHopperCounts" value="Session %1 is updating counts for HopperSession %2."/>
+   <string id="event_SessionUpdatingMachineAndPlayerData" value="Updating Machine and Player Data."/>
+   <string id="event_SessionUpdatingMembershipForGroup" value="Session %1 is updating group membership for Group %2:%3."/>
+   <string id="event_SubscribingViewerForClient" value="PlayerGrainId:%1 Subscribing Viewer for ClientId:%2 Expiration:%3 ViewerRef:%4"/>
+   <string id="event_SubscribingViewerForGameData" value="SessionGrainId:%1 Subscribed Viewer for ClientId:%2 Expiration:%3 ViewerRef:%4 Viewers.Count:%5"/>
+   <string id="event_TestMethodIsBeingCalledForEntity" value="Test method - %1 is being called on %2 - %3"/>
+   <string id="event_TooManyItemsInAggregateCountsByteStream" value="In UpdateAggregate: There are too many items in the byte stream. Details: %1"/>
+   <string id="event_UnexpectedRequestCountForClanAbbreviated" value="Received query request for clan abbreviated but Request Count was unexpected. (Expected 1, Actual %1"/>
+   <string id="event_UnexpectedRequestCountForClans" value="Received query request for clans but Request Count was unexpected. (Expected 1, Actual %1"/>
+   <string id="event_UnsubscribingViewerForClient" value="PlayerGrainId:%1 Unsubscribing Viewer for ClientId:%2 ViewerRef:%3"/>
+   <string id="event_UnsubscribingViewerForGameData" value="SessionGrainId:%1 Unsubscribing Viewer for ClientId:%2 ViewerRef:%3"/>
+   <string id="event_UnsubscribingViewerForSession" value="SessionGrainId:%1 Removed Viewer for ClientId:%2 Viewers.Count:%3"/>
+   <string id="event_WaypointQueryRequestExecutedSuccessfully" value="Waypoint query request executed successfully."/>
+  </stringTable>
+ </resources>
+</localization>
+</instrumentationManifest>

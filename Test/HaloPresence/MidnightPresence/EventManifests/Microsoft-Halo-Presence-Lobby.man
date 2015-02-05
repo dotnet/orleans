@@ -1,0 +1,637 @@
+<instrumentationManifest xmlns="http://schemas.microsoft.com/win/2004/08/events">
+ <instrumentation xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events">
+  <events xmlns="http://schemas.microsoft.com/win/2004/08/events">
+<provider name="Microsoft-Halo-Presence-Lobby" guid="{3e4d5376-29b4-43e7-8c5f-b40d9832ae9a}" resourceFileName="F:\343\Services\Main\Products\Presence\Microsoft.Halo.Grains\MidnightPresence.Grains\bin\Debug\MidnightPresence.Grains.dll" messageFileName="F:\343\Services\Main\Products\Presence\Microsoft.Halo.Grains\MidnightPresence.Grains\bin\Debug\MidnightPresence.Grains.dll" symbol="MicrosoftHaloPresenceLobby">
+ <tasks>
+  <task name="MaxClientsOnSingleDeviceExceeded" value="65460"/>
+  <task name="NoRemainingUsersToRollback" value="65461"/>
+  <task name="RollbackRequestTimedOut" value="65462"/>
+  <task name="RollbackCompletedReceived" value="65463"/>
+  <task name="RollbackRequestSent" value="65464"/>
+  <task name="StartingRollback" value="65465"/>
+  <task name="ClientProxyActionSnapshotCreated" value="65466"/>
+  <task name="RosterUpdateProcessed" value="65467"/>
+  <task name="StartRequestProcessed" value="65468"/>
+  <task name="ResettingLobbyToReady" value="65469"/>
+  <task name="RequestedUserToRegisterMpsdForParty" value="65470"/>
+  <task name="OldStartRequestProcessed" value="65471"/>
+  <task name="UnsupportedLobbyMessage" value="65472"/>
+  <task name="DebugMsg" value="65473"/>
+  <task name="ErrorCreatingSessionDocument" value="65474"/>
+  <task name="OldRequestedUserToRegisterMpsdForParty2" value="65475"/>
+  <task name="ClientSetThunderheadHostname" value="65476"/>
+  <task name="BroadcastMessages" value="65477"/>
+  <task name="NoGameServerPlatformSettingsOverride" value="65478"/>
+  <task name="UsingGameServerPlatformSettingsOverride" value="65479"/>
+  <task name="GameServerPlatformSettingsSelected" value="65480"/>
+  <task name="UserSubscribedWithoutUpdatingRoster" value="65481"/>
+  <task name="TimerCallbackException" value="65482"/>
+  <task name="ClientMatchmakingFailed" value="65483"/>
+  <task name="ClientMatchTicketCreationFailed" value="65484"/>
+  <task name="ClientThunderheadRegistrationFailed" value="65485"/>
+  <task name="MessageRejected" value="65486"/>
+  <task name="MessageProcessingFailed" value="65487"/>
+  <task name="LobbyStartInvalidActivity" value="65488"/>
+  <task name="LobbyMatchmakingInvalidRegistrationMessageReceived" value="65489"/>
+  <task name="LobbyMatchmakingUnexpectedRegistrationMessageReceived" value="65490"/>
+  <task name="LobbyMatchmakingRegistrationFailed" value="65491"/>
+  <task name="SessionDocumentCreationFailedInvalidActivity" value="65492"/>
+  <task name="LocalMachineInfoReceived" value="65493"/>
+  <task name="LocalMachineInfoForUnknownUser" value="65494"/>
+  <task name="LobbySessionParametersReceived" value="65495"/>
+  <task name="LocalPlayerInfoReceived" value="65496"/>
+  <task name="LocalPlayerInfoForUnknownUser" value="65497"/>
+  <task name="RegisterMpsdFailed" value="65498"/>
+  <task name="NoRemainingUsersToRegisterMpsd" value="65499"/>
+  <task name="RequestedUserTimedOutWhileRegisteringMpsd" value="65500"/>
+  <task name="OldRequestedUserToRegisterMpsdForParty" value="65501"/>
+  <task name="PartyRegisteredMpsd" value="65502"/>
+  <task name="MissingXuidClaim" value="65503"/>
+  <task name="InvalidXuidInClaim" value="65504"/>
+  <task name="MpsdCallTimedOut" value="65505"/>
+  <task name="OldErrorCreatingSessionDocument" value="65506"/>
+  <task name="MpsdRetriesFailed" value="65507"/>
+  <task name="MpsdCallFailed" value="65508"/>
+  <task name="OldUnsupportedLobbyMessage" value="65509"/>
+  <task name="CancelCountdownFailed" value="65510"/>
+  <task name="GameStartFailedGameStartError" value="65511"/>
+  <task name="GameStartFailedInvalidState" value="65512"/>
+  <task name="GameStartFailedInvalidActivity" value="65513"/>
+  <task name="LobbyStateChanged" value="65516"/>
+  <task name="StateUpdateError" value="65518"/>
+  <task name="StateUpdateReceived" value="65519"/>
+  <task name="ErrorProcessingSessionParameters" value="65520"/>
+  <task name="BroadcastMessageException" value="65521"/>
+  <task name="UnSubscribeReceived" value="65522"/>
+  <task name="SubscribeReceived" value="65523"/>
+  <task name="MessageReceived" value="65524"/>
+  <task name="MessageDeserializationError" value="65525"/>
+  <task name="SessionParametersValidationError" value="65526"/>
+  <task name="LobbyGetStateError" value="65527"/>
+  <task name="PlatformPartySizeExceeded" value="65528"/>
+  <task name="RosterUpdateErrorDuplicate" value="65529"/>
+  <task name="FailedToGetContentValue" value="65530"/>
+  <task name="RosterUpdateError" value="65531"/>
+  <task name="OldRosterUpdateProcessed" value="65532"/>
+  <task name="RosterUpdateReceived" value="65533"/>
+ </tasks>
+ <maps>
+  <valueMap name="LobbyError">
+   <map value="0x0" message="$(string.map_LobbyError.SessionDocCreationFailed)"/>
+   <map value="0x1" message="$(string.map_LobbyError.PartyRegistrationFailed)"/>
+   <map value="0x2" message="$(string.map_LobbyError.ThunderheadStartupFailed)"/>
+   <map value="0x3" message="$(string.map_LobbyError.LobbyServiceInternalError)"/>
+   <map value="0x4" message="$(string.map_LobbyError.LobbyRollbackFailed)"/>
+   <map value="0x5" message="$(string.map_LobbyError.LobbyRosterUpdateFailed)"/>
+  </valueMap>
+  <valueMap name="LobbyMenuActivity">
+   <map value="0x0" message="$(string.map_LobbyMenuActivity.CustomGame)"/>
+   <map value="0x1" message="$(string.map_LobbyMenuActivity.Forge)"/>
+   <map value="0x2" message="$(string.map_LobbyMenuActivity.MatchmakingSkirmish)"/>
+   <map value="0xffffffff" message="$(string.map_LobbyMenuActivity.None)"/>
+  </valueMap>
+  <valueMap name="SessionGameStartStatus">
+   <map value="0xffffffff" message="$(string.map_SessionGameStartStatus.None)"/>
+   <map value="0x2" message="$(string.map_SessionGameStartStatus.Ready)"/>
+   <map value="0x3" message="$(string.map_SessionGameStartStatus.Countdown)"/>
+   <map value="0x4" message="$(string.map_SessionGameStartStatus.Aborting)"/>
+   <map value="0x5" message="$(string.map_SessionGameStartStatus.Starting)"/>
+   <map value="0x6" message="$(string.map_SessionGameStartStatus.InGame)"/>
+  </valueMap>
+ </maps>
+ <opcodes>
+ </opcodes>
+ <events>
+  <event value="1" version="0" level="win:Verbose" message="$(string.event_RosterUpdateReceived)" task="RosterUpdateReceived" template="RosterUpdateReceivedArgs"/>
+  <event value="2" version="0" level="win:Informational" message="$(string.event_OldRosterUpdateProcessed)" task="OldRosterUpdateProcessed" template="OldRosterUpdateProcessedArgs"/>
+  <event value="3" version="0" level="win:Error" message="$(string.event_RosterUpdateError)" task="RosterUpdateError" template="RosterUpdateErrorArgs"/>
+  <event value="4" version="0" level="win:Error" message="$(string.event_FailedToGetContentValue)" task="FailedToGetContentValue" template="FailedToGetContentValueArgs"/>
+  <event value="5" version="0" level="win:Error" message="$(string.event_RosterUpdateErrorDuplicate)" task="RosterUpdateErrorDuplicate" template="RosterUpdateErrorDuplicateArgs"/>
+  <event value="6" version="0" level="win:Error" message="$(string.event_PlatformPartySizeExceeded)" task="PlatformPartySizeExceeded" template="PlatformPartySizeExceededArgs"/>
+  <event value="7" version="0" level="win:Error" message="$(string.event_LobbyGetStateError)" task="LobbyGetStateError" template="LobbyGetStateErrorArgs"/>
+  <event value="8" version="0" level="win:Error" message="$(string.event_SessionParametersValidationError)" task="SessionParametersValidationError" template="SessionParametersValidationErrorArgs"/>
+  <event value="9" version="0" level="win:Error" message="$(string.event_MessageDeserializationError)" task="MessageDeserializationError" template="MessageDeserializationErrorArgs"/>
+  <event value="10" version="0" level="win:Verbose" message="$(string.event_MessageReceived)" task="MessageReceived" template="MessageReceivedArgs"/>
+  <event value="11" version="0" level="win:Informational" message="$(string.event_SubscribeReceived)" task="SubscribeReceived" template="SubscribeReceivedArgs"/>
+  <event value="12" version="0" level="win:Informational" message="$(string.event_UnSubscribeReceived)" task="UnSubscribeReceived" template="UnSubscribeReceivedArgs"/>
+  <event value="13" version="0" level="win:Error" message="$(string.event_BroadcastMessageException)" task="BroadcastMessageException" template="BroadcastMessageExceptionArgs"/>
+  <event value="14" version="0" level="win:Error" message="$(string.event_ErrorProcessingSessionParameters)" task="ErrorProcessingSessionParameters" template="ErrorProcessingSessionParametersArgs"/>
+  <event value="15" version="0" level="win:Verbose" message="$(string.event_StateUpdateReceived)" task="StateUpdateReceived" template="StateUpdateReceivedArgs"/>
+  <event value="16" version="0" level="win:Error" message="$(string.event_StateUpdateError)" task="StateUpdateError" template="StateUpdateErrorArgs"/>
+  <event value="18" version="0" level="win:Informational" message="$(string.event_LobbyStateChanged)" task="LobbyStateChanged" template="LobbyStateChangedArgs"/>
+  <event value="21" version="0" level="win:Informational" message="$(string.event_GameStartFailedInvalidActivity)" task="GameStartFailedInvalidActivity" template="GameStartFailedInvalidActivityArgs"/>
+  <event value="22" version="0" level="win:Informational" message="$(string.event_GameStartFailedInvalidState)" task="GameStartFailedInvalidState" template="GameStartFailedInvalidStateArgs"/>
+  <event value="23" version="0" level="win:Informational" message="$(string.event_GameStartFailedGameStartError)" task="GameStartFailedGameStartError" template="GameStartFailedGameStartErrorArgs"/>
+  <event value="24" version="0" level="win:Informational" message="$(string.event_CancelCountdownFailed)" task="CancelCountdownFailed" template="CancelCountdownFailedArgs"/>
+  <event value="25" version="0" level="win:Error" message="$(string.event_OldUnsupportedLobbyMessage)" task="OldUnsupportedLobbyMessage" template="OldUnsupportedLobbyMessageArgs"/>
+  <event value="26" version="0" level="win:Warning" message="$(string.event_MpsdCallFailed)" task="MpsdCallFailed" template="MpsdCallFailedArgs"/>
+  <event value="27" version="0" level="win:Error" message="$(string.event_MpsdRetriesFailed)" task="MpsdRetriesFailed" template="MpsdRetriesFailedArgs"/>
+  <event value="28" version="0" level="win:Error" message="$(string.event_OldErrorCreatingSessionDocument)" task="OldErrorCreatingSessionDocument" template="OldErrorCreatingSessionDocumentArgs"/>
+  <event value="29" version="0" level="win:Error" message="$(string.event_MpsdCallTimedOut)" task="MpsdCallTimedOut" template="MpsdCallTimedOutArgs"/>
+  <event value="30" version="0" level="win:Informational" message="$(string.event_InvalidXuidInClaim)" task="InvalidXuidInClaim" template="InvalidXuidInClaimArgs"/>
+  <event value="31" version="0" level="win:Informational" message="$(string.event_MissingXuidClaim)" task="MissingXuidClaim" template="MissingXuidClaimArgs"/>
+  <event value="32" version="0" level="win:Informational" message="$(string.event_PartyRegisteredMpsd)" task="PartyRegisteredMpsd" template="PartyRegisteredMpsdArgs"/>
+  <event value="33" version="0" level="win:Informational" message="$(string.event_OldRequestedUserToRegisterMpsdForParty)" task="OldRequestedUserToRegisterMpsdForParty" template="OldRequestedUserToRegisterMpsdForPartyArgs"/>
+  <event value="34" version="0" level="win:Warning" message="$(string.event_RequestedUserTimedOutWhileRegisteringMpsd)" task="RequestedUserTimedOutWhileRegisteringMpsd" template="RequestedUserTimedOutWhileRegisteringMpsdArgs"/>
+  <event value="35" version="0" level="win:Error" message="$(string.event_NoRemainingUsersToRegisterMpsd)" task="NoRemainingUsersToRegisterMpsd" template="NoRemainingUsersToRegisterMpsdArgs"/>
+  <event value="36" version="0" level="win:Error" message="$(string.event_RegisterMpsdFailed)" task="RegisterMpsdFailed" template="RegisterMpsdFailedArgs"/>
+  <event value="37" version="0" level="win:Warning" message="$(string.event_LocalPlayerInfoForUnknownUser)" task="LocalPlayerInfoForUnknownUser" template="LocalPlayerInfoForUnknownUserArgs"/>
+  <event value="38" version="0" level="win:Informational" message="$(string.event_LocalPlayerInfoReceived)" task="LocalPlayerInfoReceived" template="LocalPlayerInfoReceivedArgs"/>
+  <event value="39" version="0" level="win:Informational" message="$(string.event_LobbySessionParametersReceived)" task="LobbySessionParametersReceived" template="LobbySessionParametersReceivedArgs"/>
+  <event value="40" version="0" level="win:Warning" message="$(string.event_LocalMachineInfoForUnknownUser)" task="LocalMachineInfoForUnknownUser" template="LocalMachineInfoForUnknownUserArgs"/>
+  <event value="41" version="0" level="win:Informational" message="$(string.event_LocalMachineInfoReceived)" task="LocalMachineInfoReceived" template="LocalMachineInfoReceivedArgs"/>
+  <event value="42" version="0" level="win:Informational" message="$(string.event_SessionDocumentCreationFailedInvalidActivity)" task="SessionDocumentCreationFailedInvalidActivity" template="SessionDocumentCreationFailedInvalidActivityArgs"/>
+  <event value="43" version="0" level="win:Informational" message="$(string.event_LobbyMatchmakingRegistrationFailed)" task="LobbyMatchmakingRegistrationFailed" template="LobbyMatchmakingRegistrationFailedArgs"/>
+  <event value="44" version="0" level="win:Informational" message="$(string.event_LobbyMatchmakingUnexpectedRegistrationMessageReceived)" task="LobbyMatchmakingUnexpectedRegistrationMessageReceived" template="LobbyMatchmakingUnexpectedRegistrationMessageReceivedArgs"/>
+  <event value="45" version="0" level="win:Informational" message="$(string.event_LobbyMatchmakingInvalidRegistrationMessageReceived)" task="LobbyMatchmakingInvalidRegistrationMessageReceived" template="LobbyMatchmakingInvalidRegistrationMessageReceivedArgs"/>
+  <event value="46" version="0" level="win:Error" message="$(string.event_LobbyStartInvalidActivity)" task="LobbyStartInvalidActivity" template="LobbyStartInvalidActivityArgs"/>
+  <event value="47" version="0" level="win:Informational" message="$(string.event_MessageProcessingFailed)" task="MessageProcessingFailed" template="MessageProcessingFailedArgs"/>
+  <event value="48" version="0" level="win:Informational" message="$(string.event_MessageRejected)" task="MessageRejected" template="MessageRejectedArgs"/>
+  <event value="49" version="0" level="win:Warning" message="$(string.event_ClientThunderheadRegistrationFailed)" task="ClientThunderheadRegistrationFailed" template="ClientThunderheadRegistrationFailedArgs"/>
+  <event value="50" version="0" level="win:Warning" message="$(string.event_ClientMatchTicketCreationFailed)" task="ClientMatchTicketCreationFailed" template="ClientMatchTicketCreationFailedArgs"/>
+  <event value="51" version="0" level="win:Warning" message="$(string.event_ClientMatchmakingFailed)" task="ClientMatchmakingFailed" template="ClientMatchmakingFailedArgs"/>
+  <event value="52" version="0" level="win:Error" message="$(string.event_TimerCallbackException)" task="TimerCallbackException" template="TimerCallbackExceptionArgs"/>
+  <event value="53" version="0" level="win:Error" message="$(string.event_UserSubscribedWithoutUpdatingRoster)" task="UserSubscribedWithoutUpdatingRoster" template="UserSubscribedWithoutUpdatingRosterArgs"/>
+  <event value="54" version="0" level="win:Informational" message="$(string.event_GameServerPlatformSettingsSelected)" task="GameServerPlatformSettingsSelected" template="GameServerPlatformSettingsSelectedArgs"/>
+  <event value="55" version="0" level="win:Informational" message="$(string.event_UsingGameServerPlatformSettingsOverride)" task="UsingGameServerPlatformSettingsOverride" template="UsingGameServerPlatformSettingsOverrideArgs"/>
+  <event value="56" version="0" level="win:Warning" message="$(string.event_NoGameServerPlatformSettingsOverride)" task="NoGameServerPlatformSettingsOverride" template="NoGameServerPlatformSettingsOverrideArgs"/>
+  <event value="57" version="0" level="win:Verbose" message="$(string.event_BroadcastMessages)" task="BroadcastMessages" template="BroadcastMessagesArgs"/>
+  <event value="58" version="0" level="win:Warning" message="$(string.event_ClientSetThunderheadHostname)" task="ClientSetThunderheadHostname" template="ClientSetThunderheadHostnameArgs"/>
+  <event value="59" version="0" level="win:Informational" message="$(string.event_OldRequestedUserToRegisterMpsdForParty2)" task="OldRequestedUserToRegisterMpsdForParty2" template="OldRequestedUserToRegisterMpsdForParty2Args"/>
+  <event value="60" version="0" level="win:Error" message="$(string.event_ErrorCreatingSessionDocument)" task="ErrorCreatingSessionDocument" template="ErrorCreatingSessionDocumentArgs"/>
+  <event value="61" version="0" level="win:Informational" message="$(string.event_DebugMsg)" task="DebugMsg" template="DebugMsgArgs"/>
+  <event value="62" version="0" level="win:Error" message="$(string.event_UnsupportedLobbyMessage)" task="UnsupportedLobbyMessage" template="UnsupportedLobbyMessageArgs"/>
+  <event value="63" version="0" level="win:Informational" message="$(string.event_OldStartRequestProcessed)" task="OldStartRequestProcessed" template="OldStartRequestProcessedArgs"/>
+  <event value="64" version="0" level="win:Informational" message="$(string.event_RequestedUserToRegisterMpsdForParty)" task="RequestedUserToRegisterMpsdForParty" template="RequestedUserToRegisterMpsdForPartyArgs"/>
+  <event value="65" version="0" level="win:Informational" message="$(string.event_ResettingLobbyToReady)" task="ResettingLobbyToReady" template="ResettingLobbyToReadyArgs"/>
+  <event value="66" version="0" level="win:Informational" message="$(string.event_StartRequestProcessed)" task="StartRequestProcessed" template="StartRequestProcessedArgs"/>
+  <event value="67" version="0" level="win:Informational" message="$(string.event_RosterUpdateProcessed)" task="RosterUpdateProcessed" template="RosterUpdateProcessedArgs"/>
+  <event value="68" version="0" level="win:Verbose" message="$(string.event_ClientProxyActionSnapshotCreated)" task="ClientProxyActionSnapshotCreated" template="ClientProxyActionSnapshotCreatedArgs"/>
+  <event value="69" version="0" level="win:Informational" message="$(string.event_StartingRollback)" task="StartingRollback" template="StartingRollbackArgs"/>
+  <event value="70" version="0" level="win:Verbose" message="$(string.event_RollbackRequestSent)" task="RollbackRequestSent" template="RollbackRequestSentArgs"/>
+  <event value="71" version="0" level="win:Verbose" message="$(string.event_RollbackCompletedReceived)" task="RollbackCompletedReceived" template="RollbackCompletedReceivedArgs"/>
+  <event value="72" version="0" level="win:Error" message="$(string.event_RollbackRequestTimedOut)" task="RollbackRequestTimedOut" template="RollbackRequestTimedOutArgs"/>
+  <event value="73" version="0" level="win:Error" message="$(string.event_NoRemainingUsersToRollback)" task="NoRemainingUsersToRollback" template="NoRemainingUsersToRollbackArgs"/>
+  <event value="74" version="0" level="win:Error" message="$(string.event_MaxClientsOnSingleDeviceExceeded)" task="MaxClientsOnSingleDeviceExceeded" template="MaxClientsOnSingleDeviceExceededArgs"/>
+ </events>
+ <templates>
+  <template tid="RosterUpdateReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="OldRosterUpdateProcessedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+   <data name="request_UnicodeString" inType="win:UnicodeString"/>
+   <data name="added_UnicodeString" inType="win:UnicodeString"/>
+   <data name="removed_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="RosterUpdateErrorArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="FailedToGetContentValueArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+   <data name="typeName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="RosterUpdateErrorDuplicateArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+   <data name="updateRequest_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="PlatformPartySizeExceededArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+   <data name="maxCount_Int32" inType="win:Int32"/>
+   <data name="updateRequest_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="LobbyGetStateErrorArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="SessionParametersValidationErrorArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="message_UnicodeString" inType="win:UnicodeString"/>
+   <data name="validationError_UnicodeString" inType="win:UnicodeString"/>
+   <data name="currentParams_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="MessageDeserializationErrorArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="dataCount_Int32" inType="win:Int32"/>
+   <data name="typeName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="MessageReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="dataCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="SubscribeReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="UnSubscribeReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="BroadcastMessageExceptionArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="dataSize_Int32" inType="win:Int32"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ErrorProcessingSessionParametersArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="error_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="StateUpdateReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="StateUpdateErrorArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="LobbyStateChangedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="fromState_UnicodeString" inType="win:UnicodeString"/>
+   <data name="toState_UnicodeString" inType="win:UnicodeString"/>
+   <data name="activity_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="GameStartFailedInvalidActivityArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="activity_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="GameStartFailedInvalidStateArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="state_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="GameStartFailedGameStartErrorArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="activity_UnicodeString" inType="win:UnicodeString"/>
+   <data name="gameStartError_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="CancelCountdownFailedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="state_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="OldUnsupportedLobbyMessageArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="typeName_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="MpsdCallFailedArgs">
+   <data name="sessionName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="statusCode_UnicodeString" inType="win:UnicodeString"/>
+   <data name="content_UnicodeString" inType="win:UnicodeString"/>
+   <data name="sessionTemplateName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+  </template>
+  <template tid="MpsdRetriesFailedArgs">
+   <data name="sessionName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="statusCode_UnicodeString" inType="win:UnicodeString"/>
+   <data name="content_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="OldErrorCreatingSessionDocumentArgs">
+   <data name="sessionName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="sessionTemplateName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+  </template>
+  <template tid="MpsdCallTimedOutArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="sessionDocumentTemplateName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="timeoutMs_Double" inType="win:Double"/>
+  </template>
+  <template tid="InvalidXuidInClaimArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="xuidClaim_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="MissingXuidClaimArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+  </template>
+  <template tid="PartyRegisteredMpsdArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="OldRequestedUserToRegisterMpsdForPartyArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="RequestedUserTimedOutWhileRegisteringMpsdArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="timeoutMs_Double" inType="win:Double"/>
+  </template>
+  <template tid="NoRemainingUsersToRegisterMpsdArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="clientsCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="RegisterMpsdFailedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="failureCode_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="LocalPlayerInfoForUnknownUserArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="LocalPlayerInfoReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="LobbySessionParametersReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="LocalMachineInfoForUnknownUserArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="LocalMachineInfoReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="SessionDocumentCreationFailedInvalidActivityArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="activity_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="LobbyMatchmakingRegistrationFailedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="error_Int32" inType="win:UInt32" map="LobbyError"/>
+  </template>
+  <template tid="LobbyMatchmakingUnexpectedRegistrationMessageReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="LobbyMatchmakingInvalidRegistrationMessageReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="pendingMatchSessionRegistration_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="LobbyStartInvalidActivityArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="lobbyMenuActivity_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="MessageProcessingFailedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="error_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="MessageRejectedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="rejectionReason_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ClientThunderheadRegistrationFailedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="failureCode_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="ClientMatchTicketCreationFailedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="failureCode_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="ClientMatchmakingFailedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="failureCode_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="TimerCallbackExceptionArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="timerId_GUID" inType="win:GUID"/>
+   <data name="timerDescription_UnicodeString" inType="win:UnicodeString"/>
+   <data name="exception_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="UserSubscribedWithoutUpdatingRosterArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="GameServerPlatformSettingsSelectedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="gameServerPlatformSettings_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="UsingGameServerPlatformSettingsOverrideArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+  </template>
+  <template tid="NoGameServerPlatformSettingsOverrideArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+  </template>
+  <template tid="BroadcastMessagesArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+  </template>
+  <template tid="ClientSetThunderheadHostnameArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="hostname_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="OldRequestedUserToRegisterMpsdForParty2Args">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="sessionDocReference_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ErrorCreatingSessionDocumentArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="sessionName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="sessionTemplateName_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="DebugMsgArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="msg_UnicodeString" inType="win:UnicodeString"/>
+   <data name="info_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="UnsupportedLobbyMessageArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="connectionId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="typeName_UnicodeString" inType="win:UnicodeString"/>
+   <data name="msgSize_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="OldStartRequestProcessedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="startActivity_Int32" inType="win:UInt32" map="LobbyMenuActivity"/>
+  </template>
+  <template tid="RequestedUserToRegisterMpsdForPartyArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="sessionDocReference_UnicodeString" inType="win:UnicodeString"/>
+   <data name="lobbySnapshot_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ResettingLobbyToReadyArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="lobbyError_Int32" inType="win:UInt32" map="LobbyError"/>
+   <data name="contextMsg_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="StartRequestProcessedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="startActivity_Int32" inType="win:UInt32" map="LobbyMenuActivity"/>
+  </template>
+  <template tid="RosterUpdateProcessedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="membersByDevice_UnicodeString" inType="win:UnicodeString"/>
+   <data name="added_UnicodeString" inType="win:UnicodeString"/>
+   <data name="removed_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="ClientProxyActionSnapshotCreatedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="snapshotString_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="StartingRollbackArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="state_Int32" inType="win:UInt32" map="SessionGameStartStatus"/>
+   <data name="activity_Int32" inType="win:UInt32" map="LobbyMenuActivity"/>
+   <data name="reason_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="RollbackRequestSentArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="snapshot_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="RollbackCompletedReceivedArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="data_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+  <template tid="RollbackRequestTimedOutArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="playerId_UInt64" inType="win:UInt64"/>
+   <data name="timeoutMs_Double" inType="win:Double"/>
+  </template>
+  <template tid="NoRemainingUsersToRollbackArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="clientsCount_Int32" inType="win:Int32"/>
+  </template>
+  <template tid="MaxClientsOnSingleDeviceExceededArgs">
+   <data name="lobbyId_GUID" inType="win:GUID"/>
+   <data name="callingXuid_UInt64" inType="win:UInt64"/>
+   <data name="maxCount_Int32" inType="win:Int32"/>
+   <data name="updateRequest_UnicodeString" inType="win:UnicodeString"/>
+  </template>
+ </templates>
+</provider>
+</events>
+</instrumentation>
+<localization>
+ <resources culture="en-US">
+  <stringTable>
+   <string id="event_BroadcastMessageException" value="Broadcast Message error. Lobby %1, data size %2, exception %3"/>
+   <string id="event_BroadcastMessages" value="LobbyId: %1 - Broadcasting message to connected clients"/>
+   <string id="event_CancelCountdownFailed" value="Lobby %1 - cannot cancel Countdown state because we are not there. Message from player id %2, current state %3"/>
+   <string id="event_ClientMatchmakingFailed" value="LobbyId %1 - A request for player %2 to find matchmaking partners failed with errror code: %3"/>
+   <string id="event_ClientMatchTicketCreationFailed" value="LobbyId %1 - A request for player %2 to create the match ticket failed with errror code: %3"/>
+   <string id="event_ClientProxyActionSnapshotCreated" value="LobbyId: %1 - connection snapshot taken for client proxy actions: %2"/>
+   <string id="event_ClientSetThunderheadHostname" value="LobbyId %1 - player: %2 set the Thunderhead hostname: %3"/>
+   <string id="event_ClientThunderheadRegistrationFailed" value="LobbyId %1 - A request for player %2 to request Thunderhead registration failed with errror code: %3"/>
+   <string id="event_DebugMsg" value="Lobby %1 - debug msg %2, info: %3"/>
+   <string id="event_ErrorCreatingSessionDocument" value="LobbyId %1 - All calls to create MPSD document with sessionName: %2, sessionTemplateName: %3 failed (giving up)..."/>
+   <string id="event_ErrorProcessingSessionParameters" value="Error processing Session Parameters. LobbyId: %1, connectionId: %2, PlayerId: %3, exception: %4"/>
+   <string id="event_FailedToGetContentValue" value="Failed GetContentValue{T}() call. LobbyId: %1, PlayerId: %2, type of T: %3, exception: %4"/>
+   <string id="event_GameServerPlatformSettingsSelected" value="LobbyId: %1 - Selected GameServerPlatform Settings gameServerPlatformSettings: %2"/>
+   <string id="event_GameStartFailedGameStartError" value="Lobby %1 - cannot switch to Countdown state due to game start error. Message from player id %2, activity %3, error %4"/>
+   <string id="event_GameStartFailedInvalidActivity" value="Lobby %1 - cannot switch to Countdown state due to invalid Activity. Message from player id %2, activity %3"/>
+   <string id="event_GameStartFailedInvalidState" value="Lobby %1 - cannot switch to Countdown state due to invalid state (not Ready). Message from player id %2, state %3"/>
+   <string id="event_InvalidXuidInClaim" value="Failure parsing xuid for lobby %1. Xuid used: %2"/>
+   <string id="event_LobbyGetStateError" value="Lobby %1 - admin GetLobbyState threw exception: %2"/>
+   <string id="event_LobbyMatchmakingInvalidRegistrationMessageReceived" value="LobbyId %1 - Invalid PendingMatchSessionRegistration message received from xuid %2. Message: %3"/>
+   <string id="event_LobbyMatchmakingRegistrationFailed" value="LobbyId %1 - Matchmaking client registration attempt failed with LobbyError: %2"/>
+   <string id="event_LobbyMatchmakingUnexpectedRegistrationMessageReceived" value="LobbyId %1 - Unexpected PendingMatchSessionRegistration message received from xuid %2."/>
+   <string id="event_LobbySessionParametersReceived" value="LobbyId %1 - LobbySessionParameters reported for xuid '%3'. Connection Id: '%2'"/>
+   <string id="event_LobbyStartInvalidActivity" value="LobbyId %1 - Attempted to start with an invalid activity: %2"/>
+   <string id="event_LobbyStateChanged" value="Lobby %1 - has changed from state %2 to state %3 for activity %4"/>
+   <string id="event_LocalMachineInfoForUnknownUser" value="LobbyId %1 - LocalMachineInfo reported for xuid '%3' which is not in the lobby. Connection Id: '%2'"/>
+   <string id="event_LocalMachineInfoReceived" value="LobbyId %1 - LocalMachineInfo received for xuid '%3'. Connection Id: '%2'"/>
+   <string id="event_LocalPlayerInfoForUnknownUser" value="LobbyId %1 - LocalPlayerInfo reported for xuid '%3' which is not in the lobby. Connection Id: '%2'"/>
+   <string id="event_LocalPlayerInfoReceived" value="LobbyId %1 - LocalPlayerInfo reported for xuid '%3'. Connection Id: '%2'"/>
+   <string id="event_MaxClientsOnSingleDeviceExceeded" value="Maximum clients on a single device exceeded. LobbyId: %1, PlayerId: %2, Max number of clients on a device: %3, request: %4"/>
+   <string id="event_MessageDeserializationError" value="Message deserialization error. lobby Id: %1, connection Id: %2, xuid: %3, data size: %4, expected message type: %5, exception: %6"/>
+   <string id="event_MessageProcessingFailed" value="Lobby %1 - Failed processing a websocket message from Player: '%2', ConnectionId: '%3', Error: %4"/>
+   <string id="event_MessageReceived" value="Lobby %1 - message received, connection Id: %2, xuid: %3, data size: %4"/>
+   <string id="event_MessageRejected" value="Lobby %1 - Rejected a websocket message from Player: '%2', ConnectionId: '%3', Reason: %4"/>
+   <string id="event_MissingXuidClaim" value="Connection lacks a xuid claim for lobby %1. Connection: %2."/>
+   <string id="event_MpsdCallFailed" value="Call to create MPSD Document %1 on Xbl service failed. SessionTemplate: %4, LobbyID: %5. Http response had code %2 and body %3"/>
+   <string id="event_MpsdCallTimedOut" value="LobbyId %1 - call to MPSD to create session doc with template %2 timed out after %3 ms"/>
+   <string id="event_MpsdRetriesFailed" value="All calls to create MPSD Document %1 on Xbl service failed. Final Http response had code %2 and body %3"/>
+   <string id="event_NoGameServerPlatformSettingsOverride" value="LobbyId: %1 - No clients supplied a GameServerPlatform override; falling back to configured values (which are likely wrong/outdated)..."/>
+   <string id="event_NoRemainingUsersToRegisterMpsd" value="LobbyId %1 - No client was able to register the mpsd doc with the party. Number of clients used: %2"/>
+   <string id="event_NoRemainingUsersToRollback" value="LobbyId: %1 - Rollback Request has failed or timed out for all connected users. Number of clients used: %2. Returning to Ready State after setting LobbyError."/>
+   <string id="event_OldErrorCreatingSessionDocument" value="All calls to create MPSD Document %1 with session template %2 on Xbl service failed for lobbyId %3"/>
+   <string id="event_OldRequestedUserToRegisterMpsdForParty" value="LobbyId %1 - Requesting party session registration by xuid: %2"/>
+   <string id="event_OldRequestedUserToRegisterMpsdForParty2" value="LobbyId %1 - Requesting party session registration by PlayerId: %2, SessionDocRef: %3"/>
+   <string id="event_OldRosterUpdateProcessed" value="Lobby %1 - roster update from Player %2 processed successfully. Request: %3. Added: %4. Removed: %5"/>
+   <string id="event_OldStartRequestProcessed" value="LobbyId: %1 - StartRequestProcessed - PlayerId: %2 requested that we start lobby activity %3"/>
+   <string id="event_OldUnsupportedLobbyMessage" value="Unsupported Lobby Message. LobbyId: %1, connectionId: %2, PlayerId: %3, message type: %4"/>
+   <string id="event_PartyRegisteredMpsd" value="LobbyId %1 - Received notification that party session was registered by xuid: %2"/>
+   <string id="event_PlatformPartySizeExceeded" value="Platform Party size exceeded. LobbyId: %1, PlayerId: %2, Max Party size: %3, request: %4"/>
+   <string id="event_RegisterMpsdFailed" value="LobbyId %1 - A request for player %2 to register MPSD failed with errror code: %3"/>
+   <string id="event_RequestedUserTimedOutWhileRegisteringMpsd" value="LobbyId %1 - timed out while waiting for requested player %2 to register the MPSD after %3 ms."/>
+   <string id="event_RequestedUserToRegisterMpsdForParty" value="LobbyId %1 - Requesting party session registration by PlayerId: %2, SessionDocRef: %3, LobbySnapshot: %4"/>
+   <string id="event_ResettingLobbyToReady" value="LobbyId: %1 - LobbyError: %2 encountered, clearing state and resetting to Ready. contextMsg %3"/>
+   <string id="event_RollbackCompletedReceived" value="LobbyId: %1 - In rollback state, MpsdProxyActionCompleted object received from user %2 with data: %3"/>
+   <string id="event_RollbackRequestSent" value="LobbyId: %1 - rollback request sent to user %2. Lobby snapshot: %3"/>
+   <string id="event_RollbackRequestTimedOut" value="LobbyId: %1 - Rollback Request timed out for user %2 after %3 ms"/>
+   <string id="event_RosterUpdateError" value="Lobby %1 - roster update from Player %2 threw exception: %3"/>
+   <string id="event_RosterUpdateErrorDuplicate" value="Lobby %1 - duplicate member(s) roster update error from Player %2, request: %3"/>
+   <string id="event_RosterUpdateProcessed" value="LobbyId: %1 - roster update from PlayerId %2 processed successfully. Request includes membersByDevice: %3, Added: %4, Removed: %5"/>
+   <string id="event_RosterUpdateReceived" value="Lobby %1 - roster update received from Player %2"/>
+   <string id="event_SessionDocumentCreationFailedInvalidActivity" value="LobbyId %1 - Attempted to generate a Session Document with invalid activity : %2"/>
+   <string id="event_SessionParametersValidationError" value="Lobby %1 - message error, connection Id: %2, xuid: %3, deserialized post-validated data %4, validation error %5, current params %6"/>
+   <string id="event_StartingRollback" value="LobbyId: %1 - rolling back from state %2 and activity %3 due to reason : %4"/>
+   <string id="event_StartRequestProcessed" value="LobbyId: %1 - StartRequestProcessed - PlayerId: %2 requested that we start lobby activity %3"/>
+   <string id="event_StateUpdateError" value="Lobby %1 - state update from Player %2 threw exception: %3"/>
+   <string id="event_StateUpdateReceived" value="Lobby %1 - lobby state update received from Player %2"/>
+   <string id="event_SubscribeReceived" value="Lobby %1 - subscribe, connection Id: %2, xuid: %3"/>
+   <string id="event_TimerCallbackException" value="Lobby timer's callback action threw an exception: LobbyId: %1, timerId: %2, timerDescription: %3, exception: %4"/>
+   <string id="event_UnSubscribeReceived" value="Lobby %1 - unsubscribe, connection Id: %2, xuid: %3"/>
+   <string id="event_UnsupportedLobbyMessage" value="Unsupported Lobby Message. LobbyId: %1, connectionId: %2, PlayerId: %3, message type: %4, messageSize: %5"/>
+   <string id="event_UserSubscribedWithoutUpdatingRoster" value="LobbyId %1 - User on with connectionID %2 and Xuid %3 subscribed without being a member of the lobby roster. The websocket connection was closed."/>
+   <string id="event_UsingGameServerPlatformSettingsOverride" value="LobbyId: %1 - Using GameServerPlatform override from client playerId: %2"/>
+   <string id="map_LobbyError.LobbyRollbackFailed" value="LobbyRollbackFailed"/>
+   <string id="map_LobbyError.LobbyRosterUpdateFailed" value="LobbyRosterUpdateFailed"/>
+   <string id="map_LobbyError.LobbyServiceInternalError" value="LobbyServiceInternalError"/>
+   <string id="map_LobbyError.PartyRegistrationFailed" value="PartyRegistrationFailed"/>
+   <string id="map_LobbyError.SessionDocCreationFailed" value="SessionDocCreationFailed"/>
+   <string id="map_LobbyError.ThunderheadStartupFailed" value="ThunderheadStartupFailed"/>
+   <string id="map_LobbyMenuActivity.CustomGame" value="CustomGame"/>
+   <string id="map_LobbyMenuActivity.Forge" value="Forge"/>
+   <string id="map_LobbyMenuActivity.MatchmakingSkirmish" value="MatchmakingSkirmish"/>
+   <string id="map_LobbyMenuActivity.None" value="None"/>
+   <string id="map_SessionGameStartStatus.Aborting" value="Aborting"/>
+   <string id="map_SessionGameStartStatus.Countdown" value="Countdown"/>
+   <string id="map_SessionGameStartStatus.InGame" value="InGame"/>
+   <string id="map_SessionGameStartStatus.None" value="None"/>
+   <string id="map_SessionGameStartStatus.Ready" value="Ready"/>
+   <string id="map_SessionGameStartStatus.Starting" value="Starting"/>
+  </stringTable>
+ </resources>
+</localization>
+</instrumentationManifest>

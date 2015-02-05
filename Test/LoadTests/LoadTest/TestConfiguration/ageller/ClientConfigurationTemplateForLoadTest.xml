@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ClientConfiguration xmlns="urn:orleans">
+  <Gateway Address="" Port="30000" />
+  <Azure DeploymentId="alansloadtests" DataConnectionString="DefaultEndpointsProtocol=https;AccountName=orleanstestdata;AccountKey=qFJFT+YAikJPCE8V5yPlWZWBRGns4oti9tqG6/oYAYFGI4kFAnT91HeiWMa6pddUzDcG5OAmri/gk7owTOQZ+A=="/>
+  <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{2}-{1}.log" WriteMessagingTraces="false">
+    <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+  </Tracing>
+  <Messaging UseStandardSerializer="false" MessageEncoding="Binary" SenderQueues="8192" />
+</ClientConfiguration>

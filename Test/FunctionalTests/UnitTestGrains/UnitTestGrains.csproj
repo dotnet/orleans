@@ -1,0 +1,190 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>10.0.20506</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{02C113B1-7FF7-4EEE-8E90-F4F817B30D09}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>UnitTestGrains</RootNamespace>
+    <AssemblyName>UnitTestGrains</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <PlatformTarget>x86</PlatformTarget>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\..\OrleansV4\Orleans.snk</AssemblyOriginatorKeyFile>
+    <TargetFrameworkProfile />
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="ClientGenerator">
+      <HintPath>..\..\References\ClientGenerator.exe</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework" />
+    <Reference Include="Microsoft.WindowsAzure.Configuration">
+      <HintPath>..\..\LoadTests\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.WindowsAzure.StorageClient">
+      <HintPath>..\..\LoadTests\packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll</HintPath>
+    </Reference>
+    <Reference Include="Orleans">
+      <HintPath>..\..\References\Orleans.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansManager">
+      <HintPath>..\..\References\OrleansManager.exe</HintPath>
+    </Reference>
+    <Reference Include="OrleansProviders">
+      <HintPath>..\..\References\OrleansProviders.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansRuntime">
+      <HintPath>..\..\References\OrleansRuntime.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.Services.Client" />
+    <Reference Include="System.Runtime.Remoting" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="TestGrainInterfaces">
+      <HintPath>..\..\References\TestGrainInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="TestGrains">
+      <HintPath>..\..\References\TestGrains.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ActivateDeactivateTestGrain.cs" />
+    <Compile Include="ActivateDeactivateWatcherGrain.cs" />
+    <Compile Include="ActivationGCTestGrains.cs" />
+    <Compile Include="AsyncGrain.cs" />
+    <Compile Include="BenchmarkGrain.cs" />
+    <Compile Include="CatalogTestGrain.cs" />
+    <Compile Include="ChainedGrain.cs" />
+    <Compile Include="ClientAddressableTestConsumerGrain.cs" />
+    <Compile Include="ClientAddressableTestRendezvousGrain.cs" />
+    <Compile Include="ClientAddressableTestGrain.cs" />
+    <Compile Include="GenericGrains2.cs" />
+    <Compile Include="GetGrainGrains.cs" />
+    <Compile Include="Halo\Streaming\ConsumerEventCountingGrain.cs" />
+    <Compile Include="Halo\Streaming\ProducerEventCountingGrain.cs" />
+    <Compile Include="StreamingGrain.cs" />
+    <Compile Include="CollectionTestGrain.cs" />
+    <Compile Include="ConcurrentGrain.cs" />
+    <Compile Include="AzureStorageAccessSMGrain.cs" />
+    <Compile Include="DeadlockGrain.cs" />
+    <Compile Include="EchoTaskGrain.cs" />
+    <Compile Include="EnumResultGrain.cs" />
+    <Compile Include="ExtensionTestGrain.cs" />
+    <Compile Include="KeyExtensionTestGrain.cs" />
+    <Compile Include="NewReminderTestGrain.cs" />
+    <Compile Include="PlacementTestGrain.cs" />
+    <Compile Include="GenericGrain.cs" />
+    <Compile Include="GetPropertiesTestGrains.cs" />
+    <Compile Include="MasterWorkersGrains.cs" />
+    <Compile Include="ErrorGrainObserving.cs" />
+    <Compile Include="ErrorGrainWithAsyncMethods.cs" />
+    <Compile Include="GrainContextTestGrain.cs" />
+    <Compile Include="MultifacetFactoryTestGrain.cs" />
+    <Compile Include="MultifacetTestGrain.cs" />
+    <Compile Include="PersistenceTestGrains.cs" />
+    <Compile Include="PolymorphicTestGrain.cs" />
+    <Compile Include="PromiseForwardGrain.cs" />
+    <Compile Include="ProxyErrorGrain.cs" />
+    <Compile Include="ReentrantGrain.cs" />
+    <Compile Include="ReliabilityTestGrain.cs" />
+    <Compile Include="ReminderTestGrain.cs" />
+    <Compile Include="RequestContextTestGrain.cs" />
+    <Compile Include="SimpleGrainWithAsyncMethods.cs" />
+    <Compile Include="SimpleMainGrain.cs" />
+    <Compile Include="SimpleSelfManagedGrain.cs" />
+    <Compile Include="StatelessWorkerGrain.cs" />
+    <Compile Include="StreamLifecycleTestGrains.cs" />
+    <Compile Include="StreamReliabilityTestGrains.cs" />
+    <Compile Include="TestExtension.cs" />
+    <Compile Include="TimerGrain.cs" />
+    <Compile Include="ErrorPersistentGrain.cs" />
+    <Compile Include="DirectoryServiceTestGrain.cs" />
+    <Compile Include="ErrorGrain.cs" />
+    <Compile Include="GeneratorTestDerivedDerivedGrain.cs" />
+    <Compile Include="GeneratorTestDerivedGrain1.cs" />
+    <Compile Include="GeneratorTestDerivedGrain2.cs" />
+    <Compile Include="GeneratorTestGrain.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UnitTestGrainInterfaces.cs" />
+    <Compile Include="ValueTypeTestGrain.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\OrleansV4\Orleans.snk">
+      <Link>Orleans.snk</Link>
+    </None>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\UnitTestGrainInterfaces\UnitTestGrainInterfaces.csproj">
+      <Project>{86f6f267-417a-405c-bc91-8e9efbc40488}</Project>
+      <Name>UnitTestGrainInterfaces</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <PropertyGroup>
+    <OrleansProjectType>Server</OrleansProjectType>
+  </PropertyGroup>
+  <!-- Set path to ClientGenerator.exe -->
+  <Choose>
+    <When Condition="'$(BuildingInsideVisualStudio)' == 'true' or '$(BuildUri)' == '' ">
+      <PropertyGroup>
+        <OrleansReferencesBase>$(SolutionDir)..\References</OrleansReferencesBase>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Import Project="$(ProjectDir)..\..\..\OrleansV4\Orleans.SDK.targets" />
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
+  </Target>
+  <!--End Orleans -->
+</Project>

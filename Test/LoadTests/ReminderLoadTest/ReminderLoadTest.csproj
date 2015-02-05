@@ -1,0 +1,105 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{3439B4E2-B439-467F-AE24-47900C438488}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ReminderLoadTest</RootNamespace>
+    <AssemblyName>ReminderLoadTest</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OrleansReferenceBase>..\..\..\Samples\References\</OrleansReferenceBase>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Orleans">
+      <HintPath>..\..\References\Orleans.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansAzureUtils">
+      <HintPath>..\..\References\OrleansAzureUtils.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ReminderLoadTestDriver.cs" />
+    <Compile Include="ReminderLoadTestWorker.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ClientConfiguration.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\HaloPresence\LoadTestBase\LoadTestBase.csproj">
+      <Project>{2e672034-b0c2-4ee7-9a58-5fc490f8d785}</Project>
+      <Name>LoadTestBase</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LoadTestGrainInterfaces\LoadTestGrainInterfaces.csproj">
+      <Project>{539044ba-0c8d-41b7-b435-e836e9d7b7b2}</Project>
+      <Name>LoadTestGrainInterfaces</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>mkdir "$(TargetDir)TestInput\LoadTests"
+mkdir "$(TargetDir)TestInput\LoadTests\Client"
+mkdir "$(TargetDir)TestInput\LoadTests\Grains"
+
+copy "$(TargetDir)ClientConfiguration.xml" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(TargetDir)EntityFramework.*" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(ProjectDir)..\..\..\OrleansV4\Dependencies\Windows-Azure-SDK\v1.8\ref\Microsoft.WindowsAzure.*" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(ProjectDir)..\..\..\OrleansV4\Dependencies\Windows-Azure-SDK\v1.8\bin\runtimes\base\x64\msshrtmi.*" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(TargetDir)Orleans.*" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(TargetDir)OrleansAzureUtils.*" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(TargetDir)OrleansRuntime.*" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(TargetDir)OrleansRuntimeGrainInterfaces.*" "$(TargetDir)TestInput\LoadTests\Client"
+copy "$(TargetDir)ReminderLoadTest.*" "$(TargetDir)TestInput\LoadTests\Client"
+
+</PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

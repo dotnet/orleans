@@ -1,0 +1,183 @@
+<Deployment Name="Deployment1" DeploymentGroup="F219832A-1EE1-45DA-B35D-0BB3060C9FDA" xmlns="urn:xcg-deployment">
+  <TargetLocation Path="C:\Orleans" />
+  <Packages>
+    <Package Name="ChirperClient" StartScript=".\Start-ChirperClient.ps1" PostScript=".\Post-ChirperClient.ps1" SourcePath="..\Binaries\ChirperClient" TargetPath="ChirperClient" >
+        <CopyFiles FileFilter="*.graphml" />
+        <CopyFiles FileFilter="Client-*.log" />
+        <CopyFiles FileFilter="ClientOutput-*.txt" />
+        <CopyFiles FileFilter="GeneratorOutput-*.txt" />
+        <TaskToKill Filename="ChirperNetworkGenerator" />
+        <TaskToKill Filename="ChirperNetworkDriver" />
+    </Package>
+    <Package Name="ChirperManual" StartScript=".\Start-ManualClient.ps1" PostScript=".\Post-ManualClient.ps1" SourcePath="..\Binaries\ChirperClient" TargetPath="ChirperManual" >
+        <CopyFiles FileFilter="*.graphml" />
+        <CopyFiles FileFilter="Client-*.log" />
+        <CopyFiles FileFilter="ClientOutput-*.txt" />
+        <TaskToKill Filename="ManualTest" />
+    </Package>
+  </Packages>
+  <RuntimeConfiguration Path=".\OrleansConfiguration.xml" />
+  <ClientConfiguration Path=".\ClientConfiguration.xml" />
+  
+  <Clients>
+    <Client HostName="17xcg1044" />
+<!--
+    <Client HostName="XCG-Azure-30" />
+    <Client HostName="XCG-Azure-31" />
+    <Client HostName="XCG-Azure-32" />
+-->    
+    
+  </Clients>
+  
+  <TestSettings>
+    <TestSetting TestSettingName="Network100" Nodes="100" Edges="2700" />
+    <TestSetting TestSettingName="Network1000" Nodes="1000" Edges="27000" />
+    <TestSetting TestSettingName="Network10000" Nodes="10000" Edges="270000" />
+    <TestSetting TestSettingName="Network100000" Nodes="100000" Edges="2700000" />
+    <TestSetting TestSettingName="Network1000000" Nodes="1000000" Edges="27000000" />
+
+    <TestSetting TestSettingName="ShortGenerationTime" GenerationTime="10" />
+    <TestSetting TestSettingName="MediumGenerationTime" GenerationTime="100" />
+    <TestSetting TestSettingName="LongGenerationTime" GenerationTime="600" />
+  </TestSettings>
+  
+  <ServerOverrides DefaultNamespace="urn:orleans">
+
+    <Override Name="TasksEnabled">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Globals/namespace:Tasks" />
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Globals/namespace:Persistence" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Globals">
+            <Persistence Type="File" Path=".\OrleansData" />
+            <Tasks Disabled="false" /> 
+        </AddNode>
+    </Override>
+    <Override Name="TasksDisabled">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Globals/namespace:Tasks" />
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Globals/namespace:Persistence" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Globals">
+            <Tasks Disabled="true" /> 
+        </AddNode>
+    </Override>
+
+    <Override Name="Standard">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Globals/namespace:Messaging" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Globals">
+            <Messaging ResponseTimeout="6000" UseStandardSerializer="true" MessageEncoding="Binary" SenderQueues="4" /> 
+        </AddNode>
+    </Override>
+    <Override Name="Nonstandard">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Globals/namespace:Messaging" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Globals">
+            <Messaging ResponseTimeout="6000" UseStandardSerializer="false" MessageEncoding="Mixed" SenderQueues="4" /> 
+        </AddNode>
+    </Override>
+
+    <Override Name="MaxActiveThreads5">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Defaults/namespace:Scheduler" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Defaults">
+            <Scheduler MaxActiveThreads="5" />
+        </AddNode>
+    </Override>
+    <Override Name="MaxActiveThreads6">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Defaults/namespace:Scheduler" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Defaults">
+            <Scheduler MaxActiveThreads="6" />
+        </AddNode>
+    </Override>
+    <Override Name="MaxActiveThreads7">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Defaults/namespace:Scheduler" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Defaults">
+            <Scheduler MaxActiveThreads="7" />
+        </AddNode>
+    </Override>
+    <Override Name="MaxActiveThreads8">
+        <Delete XPath="/namespace:OrleansConfiguration/namespace:Defaults/namespace:Scheduler" />
+        <AddNode XPath="/namespace:OrleansConfiguration/namespace:Defaults">
+            <Scheduler MaxActiveThreads="8" />
+        </AddNode>
+    </Override>
+
+  </ServerOverrides>
+  
+  <ClientOverrides DefaultNamespace="urn:orleans">
+    <Override Name="Standard">
+        <Delete XPath="/namespace:ClientConfiguration/namespace:Messaging" />
+        <AddNode XPath="/namespace:ClientConfiguration">
+            <Messaging ResponseTimeout="6000" UseStandardSerializer="true" MessageEncoding="Binary" SenderQueues="4" /> 
+        </AddNode>
+    </Override>
+    <Override Name="Nonstandard">
+        <Delete XPath="/namespace:ClientConfiguration/namespace:Messaging" />
+        <AddNode XPath="/namespace:ClientConfiguration">
+            <Messaging ResponseTimeout="6000" UseStandardSerializer="false" MessageEncoding="Mixed" SenderQueues="4" /> 
+        </AddNode>
+    </Override>
+  </ClientOverrides>
+  
+  <Tests>
+
+    <Test Name="MediumFirst" Package="ChirperClient" Silos="5" Clients="1" Time="1800">
+        <ServerOverride name="Standard" />
+        <ServerOverride name="TasksDisabled" />
+        <ServerOverride name="MaxActiveThreads6" />
+        <ClientOverride name="Standard" /> 
+        <TestSetting Name="Network10000" />
+        <TestSetting Name="ShortGenerationTime" />
+    </Test>
+    <Test Name="MediumSecond" Package="ChirperClient" Silos="5" Clients="1" Time="1800">
+        <ServerOverride name="Standard" />
+        <ServerOverride name="TasksDisabled" />
+        <ServerOverride name="MaxActiveThreads6" />
+        <ClientOverride name="Standard" />
+        <TestSetting Name="Network10000" />
+        <TestSetting Name="ShortGenerationTime" />
+    </Test>
+
+
+
+<!--
+    <Test Name="ManualFirst" Package="ChirperManual" Silos="5" Clients="1" Time="120">
+        <ServerOverride name="Standard" />
+        <ServerOverride name="TasksDisabled" />
+        <ServerOverride name="MaxActiveThreads6" />
+        <ClientOverride name="Standard" /> 
+        <TestSetting Name="Network100" />
+        <TestSetting Name="ShortGenerationTime" />
+    </Test>
+-->
+<!--
+    <Test Name="SmallFirst" Package="ChirperClient" Silos="5" Clients="1" Time="100">
+        <ServerOverride name="Standard" />
+        <ServerOverride name="TasksDisabled" />
+        <ServerOverride name="MaxActiveThreads6" />
+        <ClientOverride name="Standard" /> 
+        <TestSetting Name="Network100" />
+        <TestSetting Name="ShortGenerationTime" />
+    </Test>
+    <Test Name="SmallSecond" Package="ChirperClient" Silos="5" Clients="1" Time="100">
+        <ServerOverride name="Standard" />
+        <ServerOverride name="TasksDisabled" />
+        <ServerOverride name="MaxActiveThreads6" />
+        <ClientOverride name="Standard" />
+        <TestSetting Name="Network100" />
+        <TestSetting Name="ShortGenerationTime" />
+    </Test>
+    <Test Name="LargeFirst" Package="ChirperClient" Silos="5" Clients="3" Time="300">
+        <ServerOverride name="Standard" />
+        <ServerOverride name="TasksDisabled" />
+        <ServerOverride name="MaxActiveThreads6" />
+        <ClientOverride name="Standard" />
+        <TestSetting Name="Network10000" />
+        <TestSetting Name="ShortGenerationTime" />
+    </Test>
+    <Test Name="LargeSecond" Package="ChirperClient" Silos="5" Clients="3" Time="900">
+        <ServerOverride name="Standard" />
+        <ServerOverride name="TasksDisabled" />
+        <ServerOverride name="MaxActiveThreads6" />
+        <ClientOverride name="Standard" />
+        <TestSetting Name="Network10000" />
+        <TestSetting Name="ShortGenerationTime" />
+    </Test>    
+-->
+  </Tests>
+</Deployment>

@@ -1,0 +1,203 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>
+    </ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{3924BD12-A39B-45B9-BB86-C155423655E9}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>LoadTest</RootNamespace>
+    <AssemblyName>LoadTest</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OrleansReferenceBase>..\..\..\Samples\References\</OrleansReferenceBase>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework" />
+    <Reference Include="Orleans">
+      <HintPath>..\..\References\Orleans.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansRuntime">
+      <HintPath>..\..\References\OrleansRuntime.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.XML" />
+    <Reference Include="System.Management.Automation" />
+  </ItemGroup>
+  <ItemGroup>
+    <CodeAnalysisDependentAssemblyPaths Condition=" '$(VS100COMNTOOLS)' != '' " Include="$(VS100COMNTOOLS)..\IDE\PrivateAssemblies">
+      <Visible>False</Visible>
+    </CodeAnalysisDependentAssemblyPaths>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ElasticityConfigHelpers.cs" />
+    <Compile Include="LoadTest_Jacobs.cs" />
+    <Compile Include="LoadTest_Jbragg.cs" />
+    <Compile Include="LoadTest_Ping.cs" />
+    <Compile Include="LoadTest_Reliability.cs" />
+    <Compile Include="LoadTest_Elasticity.cs" />
+    <Compile Include="LoadTest_Streaming.cs" />
+    <Compile Include="LoadTestBase.cs" />
+    <Compile Include="LoadTest.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SelfTest\FileObserverTests.cs" />
+    <Compile Include="SelfTest\QuickParserTests.cs" />
+    <Compile Include="SelfTest\TimeSeriesAnalysisTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="TestConfiguration\a-anewel\TestConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\ageller\ClientConfigurationTemplateForLoadTest.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\ageller\OrleansConfigurationTemplateForLoadTest.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\ageller\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\BuildVariables.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\cjwill\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\ClientConfigurationTemplateForLoadTest.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="TestConfiguration\gkliot\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\jacobs\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\jbragg\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\jthelin\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\mirobert\TestConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="TestConfiguration\OrleansConfigurationTemplateForLoadTest.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="TestConfiguration\sbykov\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\t-gerze\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestConfiguration\t-sakiya\TestConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="TestConfiguration\Template_TestConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="TestConfiguration\xcgbuild\TestConfiguration.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TestFramework\TestFramework.csproj">
+      <Project>{7E24102C-4FEA-4D4A-8E22-E06CFEEB7A43}</Project>
+      <Name>TestFramework</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.-->
+  <Target Name="BeforeBuild">
+    <PropertyGroup>
+      <BuildTimeFileTemplate>
+        <BuildVariables>
+          <var name="Configuration" value="$(Configuration)" />
+          <var name="BuildNumber" value="$(BuildNumber)" />
+          <var name="SolutionDir" value="$(SolutionDir)" />
+        </BuildVariables>
+      </BuildTimeFileTemplate>
+    </PropertyGroup>
+    <Exec Command="&quot;attrib&quot; -R &quot;$(ProjectDir)TestConfiguration\BuildVariables.xml&quot;" />
+    <WriteLinesToFile File="TestConfiguration\BuildVariables.xml" Lines="$(BuildTimeFileTemplate)" Overwrite="true" Encoding="Unicode" />
+  </Target>
+  <PropertyGroup>
+    <PreBuildEvent>set TEST_SILO_DIR=$(TargetDir)TestSilo
+
+if "$(BuildingInsideVisualStudio)" == "true" (
+set IN_DIR=$(SolutionDir)..\..\OrleansV4\Tester\$(OutDir)
+) else (
+set IN_DIR=$(OutDir)
+)
+
+set D=%25TEST_SILO_DIR%25
+if not exist "%25D%25" (md "%25D%25") else (del /s/q "%25D%25\*")
+
+@ECHO Copying references from build - $(SolutionDir)..\SampleReferenceFiles.txt
+for /f "usebackq tokens=1,2" %25%25i in ("$(SolutionDir)..\SampleReferenceFiles.txt") do (
+  @ECHO "%25IN_DIR%25%25%25i"
+  copy /y "%25IN_DIR%25%25%25i" "%25TEST_SILO_DIR%25%25%25j"
+)</PreBuildEvent>
+  </PropertyGroup>
+  <!--
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
