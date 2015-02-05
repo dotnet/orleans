@@ -144,14 +144,18 @@ namespace Orleans.Runtime.Configuration
                 child.SetProviderManager(manager);
         }
 
-        internal bool AddProperty(string key, string val)
+        internal void SetProperty(string key, string val)
         {
             if (!properties.ContainsKey(key))
             {
                 properties.Add(key, val);
-                return true;
             }
-            return false;
+            else
+            {
+                // reset the property.
+                properties.Remove(key);
+                properties.Add(key, val);
+            }
         }
 
         public override string ToString()
@@ -210,11 +214,11 @@ namespace Orleans.Runtime.Configuration
             ProviderConfiguration.LoadProviderConfigurations(child, nsManager, Providers, c => Providers.Add(c.Name, c));
         }
 
-        internal void AddToConfiguration(string key, string val)
+        internal void SetConfiguration(string key, string val)
         {
             foreach (IProviderConfiguration config in Providers.Values)
             {
-                ((ProviderConfiguration)config).AddProperty(key, val);
+                ((ProviderConfiguration)config).SetProperty(key, val);
             }
         }
 

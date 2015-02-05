@@ -225,9 +225,6 @@ namespace Orleans.Runtime.Configuration
             XmlElement root = xml.DocumentElement;
 
             LoadFromXml(root);
-
-            // Fix up any deployment specific values [eg DeploymentId] in [stream] provider configs.
-            AdjustConfiguration(); 
         }
 
         internal void LoadFromXml(XmlElement root)
@@ -342,6 +339,10 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
+        /// <summary>
+        /// This method may be called by the client host or test host to tweak a provider configuration after it has been already loaded.
+        /// Its is optional and should NOT be automaticaly called by the runtime.
+        /// </summary>
         internal void AdjustConfiguration()
         {
             GlobalConfiguration.AdjustConfiguration(ProviderConfigurations, DeploymentId);
