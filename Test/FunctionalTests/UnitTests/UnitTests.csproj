@@ -52,7 +52,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\..\..\OrleansV4\Orleans.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>..\..\..\src\Orleans.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="ClientGenerator">
@@ -372,7 +372,7 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\OrleansV4\Orleans.snk">
+    <None Include="..\..\..\src\Orleans.snk">
       <Link>Orleans.snk</Link>
     </None>
     <None Include="App.config">

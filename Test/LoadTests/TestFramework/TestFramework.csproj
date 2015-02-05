@@ -65,9 +65,7 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\Graphs\DistributedGraph-Orleans-V2\GraphInterfaces\Utils.cs">
-      <Link>Utils.cs</Link>
-    </Compile>
+    <Compile Include="Utils.cs"/>
     <Compile Include="Deployment\ConfigManager.cs" />
     <Compile Include="Deployment\DeploymentConfig.cs" />
     <Compile Include="Deployment\DeploymentManager.cs" />

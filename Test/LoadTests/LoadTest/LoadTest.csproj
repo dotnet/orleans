@@ -182,11 +182,11 @@
     <PreBuildEvent>set TEST_SILO_DIR=$(TargetDir)TestSilo
 
 if "$(BuildingInsideVisualStudio)" == "true" (
-set IN_DIR=$(SolutionDir)..\..\OrleansV4\Tester\$(OutDir)
+set IN_DIR=$(SolutionDir)..\..\src\Tester\$(OutDir)
 ) else (
 set IN_DIR=$(OutDir)
 )
-
+ 
 set D=%25TEST_SILO_DIR%25
 if not exist "%25D%25" (md "%25D%25") else (del /s/q "%25D%25\*")
 

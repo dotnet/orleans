@@ -1,0 +1,3150 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Wintellect.Threading</name>
+    </assembly>
+    <members>
+        <member name="T:Wintellect.OperationTimer">
+            <summary>
+            This class is useful for timing the duration of an algorithm
+            </summary>
+        </member>
+        <member name="M:Wintellect.OperationTimer.#ctor">
+            <summary>
+            Constructs an OperationTimer with an empty text string
+            </summary>
+        </member>
+        <member name="M:Wintellect.OperationTimer.#ctor(System.String)">
+            <summary>
+            Constructs an OperationTimer with text identifying the operation
+            </summary>
+            <param name="text">Text describing the operation.</param>
+        </member>
+        <member name="M:Wintellect.OperationTimer.Dispose">
+            <summary>
+            Call this when the operation is done to see how long it took and how many GCs occurred.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.SyncGateMode">
+            <summary>
+            Indicates if the SyncGate should be acquired for exclusive or shared access.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.AsyncProgModel.SyncGateMode.Exclusive">
+            <summary>
+            Indicates that exclusive access is required.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.AsyncProgModel.SyncGateMode.Shared">
+            <summary>
+            Indicates that shared access is required.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.SyncGate">
+            <summary>
+            This class implements a reader/writer lock that never blocks any threads. 
+            This class integrates very well with the AsyncEnumerator class.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.SyncGate.#ctor">
+            <summary>Constructs a SyncGate object.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.SyncGate.#ctor(System.Boolean)">
+            <summary>Constructs a SyncGate object</summary>
+            <param name="blockReadersUntilFirstWriteCompletes">Pass true to have readers block until the first writer has created the data that is being protected by the SyncGate.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.SyncGate.BeginRegion(Wintellect.Threading.AsyncProgModel.SyncGateMode,System.AsyncCallback)">
+            <summary>
+            Allows the caller to notify the SyncGate that it wants exclusive or shared access to a resource. 
+            </summary>
+            <param name="mode">Indicates if exclusive or shared access is desired.</param>
+            <param name="asyncCallback">The callback method to invoke once access can be granted.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.SyncGate.BeginRegion(Wintellect.Threading.AsyncProgModel.SyncGateMode,System.AsyncCallback,System.Object)">
+            <summary>
+            Allows the caller to notify the SyncGate that it wants exclusive or shared access to a resource. 
+            </summary>
+            <param name="mode">Indicates if exclusive or shared access is desired.</param>
+            <param name="asyncCallback">The callback method to invoke once access can be granted.</param>
+            <param name="asyncState">Additional state to pass to the callback method.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.SyncGate.EndRegion(System.IAsyncResult)">
+            <summary>
+            Call this method after accessing the resource to notify the SyncGate that it can grant access to other code.
+            </summary>
+            <param name="result">The IAsyncResult object given to the callback method when access was granted.</param>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncResult">
+            <summary>
+            Represents the status of an asynchronous operation that has no return type.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult.#ctor(System.AsyncCallback,System.Object)">
+            <summary>
+            Constructs an object that identifies an asynchronous operation.
+            </summary>
+            <param name="asyncCallback">The method that should be executed when the operation completes.</param>
+            <param name="state">The object that can be obtained via the AsyncState property.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult.#ctor(System.AsyncCallback,System.Object,System.Object)">
+            <summary>
+            Constructs an object that identifies an asynchronous operation.
+            </summary>
+            <param name="asyncCallback">The method that should be executed when the operation completes.</param>
+            <param name="state">The object that can be obtained via the AsyncState property.</param>
+            <param name="initiatingObject">Identifies the object that is initiating the asynchronous operation. This object is obtainable via the InitiatingObject property.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult.SetAsCompleted(System.Exception,System.Boolean)">
+            <summary>
+            Call this method to indicate that the asynchronous operation has completed.
+            </summary>
+            <param name="exception">If non-null, this argument identifies the exception that occurring while processing the asynchronous operation.</param>
+            <param name="completedSynchronously">Indicates whether the operation completed synchronously or asynchronously.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult.EndInvoke">
+            <summary>
+            Frees up resources used by the asynchronous operation represented by the IAsyncResult passed.
+            If the asynchronous operation failed, this method throws the exception.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult.GetAsyncCallbackHelper">
+            <summary>
+            Returns a single static delegate to a static method that will invoke the desired AsyncCallback
+            </summary>
+            <returns>The single static delegate.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult.BeginInvokeOnWorkerThread">
+            <summary>
+            Returns an IAsyncResult for an operations that was queued to the thread pool.
+            </summary>
+            <returns>The IAsyncResult.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult.OnCompleteOperation(System.IAsyncResult)">
+            <summary>
+            Invokes the callback method when the asynchronous operations completes.
+            </summary>
+            <param name="result">The IAsyncResult object identifying the asynchronous operation that has completed.</param>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncResult.InitiatingObject">
+            <summary>
+            Gets the object passed to the constructor to initiate the asynchronous operation.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncResult.AsyncState">
+            <summary>
+            Gets a user-defined object that qualifies or contains information about an asynchronous operation.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncResult.CompletedSynchronously">
+            <summary>
+            Gets an indication of whether the asynchronous operation completed synchronously.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncResult.AsyncWaitHandle">
+            <summary>
+            Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncResult.IsCompleted">
+            <summary>
+            Gets an indication whether the asynchronous operation has completed.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Disposer">
+            <summary>
+            Puts an IDisposable wrapper around a callback method allowing any 
+            method to be used with the C# using statement. 
+            </summary>
+        </member>
+        <member name="F:Wintellect.Disposer.m_disposeMethod">
+            <summary>
+            A delegate that matches the signature of IDisposable's Dispose method.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Disposer.#ctor(System.Threading.ThreadStart)">
+            <summary>
+            Constructs a Dispose object around the specified method.
+            </summary>
+            <param name="disposeMethod">The method that should be called via Dispose.</param>
+        </member>
+        <member name="M:Wintellect.Disposer.Dispose">
+            <summary>
+            Invokes the desired method via this method.
+            </summary>
+        </member>
+        <member name="T:Wintellect.CommandArgumentParser.CmdArgParser">
+            <summary>
+            A class that parses a command-line string into its individual arguments.
+            </summary>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.CmdArgParser.Usage(System.Type)">
+            <summary>
+            Returns a string indicating the valid command-line arguments.
+            </summary>
+            <param name="optionType">The type adorned with custom 
+            attributes that indicate the valid command-line arguments.</param>
+            <returns>A string indicating the valid command-line arguments.</returns>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.CmdArgParser.Parse(Wintellect.CommandArgumentParser.ICmdArgs,System.String[])">
+            <summary>
+            Parses a set of command-line arguments populating the fields/properties of an ICmdArgs class object.
+            </summary>
+            <param name="cmdArgObj">Identifies the object whose fields/properties 
+            should be set based on the command-line arguments.</param>
+            <param name="args">Identifies the command-line arguments.</param>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.CmdArgParser.BreakStringIntoLinesOfSpecifiedWidth(System.String,System.Int32)">
+            <summary>
+            Breaks a string into lines where no line is more than the specified width.
+            </summary>
+            <param name="message">The string to break into lines.</param>
+            <param name="width">The maximum number of characters per line.</param>
+            <returns></returns>
+        </member>
+        <member name="T:Wintellect.CommandArgumentParser.ICmdArgs">
+            <summary>
+            A type containing fields/properties to be populated from 
+            command-line arguments must implements this interface.
+            </summary>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.ICmdArgs.Usage(System.String)">
+            <summary>
+            This method is called when a command-line argument fails to parse correctly.
+            </summary>
+            <param name="errorInfo">Indicates the command--line argument that failed to parse.</param>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.ICmdArgs.Validate">
+            <summary>
+            This method is called after all the command-line arguments have been parsed.
+            </summary>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.ICmdArgs.ProcessStandAloneArgument(System.String)">
+            <summary>
+            This method is called as stand-alone arguments are parsed.
+            </summary>
+            <param name="arg">Indicates the value of the stand-alone argument.</param>
+        </member>
+        <member name="T:Wintellect.IO.DeviceControlCode">
+            <summary>
+            A value type representing a single device control code.
+            </summary>
+        </member>
+        <member name="M:Wintellect.IO.DeviceControlCode.#ctor(Wintellect.IO.DeviceType,System.Int32,Wintellect.IO.DeviceMethod,Wintellect.IO.DeviceAccess)">
+            <summary>
+            Constructs a device control code.
+            </summary>
+            <param name="type">Identifies the type of device.</param>
+            <param name="function">Identifies the device's function.</param>
+            <param name="method">Identifies the buffering method.</param>
+            <param name="access">Identifies what access to the device is required.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceControlCode.ToString">
+            <summary>
+            Returns the device code number as a string.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceControlCode.GetHashCode">
+            <summary>
+            Returns the hash code for the device code.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceControlCode.Equals(System.Object)">
+            <summary>
+            Determines whether the specified Object is equal to the current DeviceControlCode.
+            </summary>
+            <param name="obj"></param>
+            <returns>true if the objects are equal.</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceControlCode.op_Equality(Wintellect.IO.DeviceControlCode,Wintellect.IO.DeviceControlCode)">
+            <summary>
+            Determines whether two DeviceControlCode objects have the same value.
+            </summary>
+            <param name="code1">The first DeviceControlCode to compare.</param>
+            <param name="code2">The second DeviceControlCode to compare.</param>
+            <returns>true if code1 and code2 have the same value; otherwise, false</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceControlCode.op_Inequality(Wintellect.IO.DeviceControlCode,Wintellect.IO.DeviceControlCode)">
+            <summary>
+            Determines whether two DeviceControlCode objects have different values.
+            </summary>
+            <param name="code1">The first DeviceControlCode to compare.</param>
+            <param name="code2">The second DeviceControlCode to compare.</param>
+            <returns>true if code1 and code2 have different values; otherwise, false</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceControlCode.Equals(Wintellect.IO.DeviceControlCode)">
+            <summary>
+            Determines whether the specified DeviceControlCode is equal to the current DeviceControlCode.
+            </summary>
+            <param name="other">The other DeviceControlCode.</param>
+            <returns>true if the DeviceControlCode are equal.</returns>
+        </member>
+        <member name="T:Wintellect.IO.DeviceType">
+            <summary>
+            The various types of devices.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.None">
+            <summary>
+            None.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Beep">
+            <summary>
+            The Beep device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.CDRom">
+            <summary>
+            The CDRom device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.CDRomFileSystem">
+            <summary>
+            The CDRom File System device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Controller">
+            <summary>
+            The Controller device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.DataLink">
+            <summary>
+            The DataLink device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Dfs">
+            <summary>
+            The DFS device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Disk">
+            <summary>
+            The disk device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.DiskFileSystem">
+            <summary>
+             The Disk file system device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.FileSystem">
+            <summary>
+             The file system device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.InportPort">
+            <summary>
+            The inport port device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Keyboard">
+            <summary>
+             The keyboard device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Mailslot">
+            <summary>
+            The mailslot device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.MidiIn">
+            <summary>
+            THe MIDI in device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.MidiOut">
+            <summary>
+             The MIDI out device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Mouse">
+            <summary>
+             The mouse device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.MultiUncProvider">
+            <summary>
+            The multi UNC provider device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.NamedPipe">
+            <summary>
+             The named-pipe device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Network">
+            <summary>
+            The network device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.NetworkBrowser">
+            <summary>
+            The network browser device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.NetworkFileSystem">
+            <summary>
+             The network file system device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Null">
+            <summary>
+            The null device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.ParallelPort">
+            <summary>
+            The parallel port device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.PhysicalNetcard">
+            <summary>
+            The physical net card device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Printer">
+            <summary>
+            The printer device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Scanner">
+            <summary>
+            The scanner device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.SerialMousePort">
+            <summary>
+            The serial mouse port device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.SerialPort">
+            <summary>
+            The serial port device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Screen">
+            <summary>
+            The screen device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Sound">
+            <summary>
+            The sound device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Streams">
+            <summary>
+            The streams device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Tape">
+            <summary>
+            The tape device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.TapeFileSystem">
+            <summary>
+            The tape file system device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Transport">
+            <summary>
+            The transport device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Unknown">
+            <summary>
+            The unknown device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Video">
+            <summary>
+            The video device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.VirtualDisk">
+            <summary>
+            The virtual disk device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.WaveIn">
+            <summary>
+            The wave in device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.WaveOut">
+            <summary>
+            The wave out device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Port8042">
+            <summary>
+            The port 8042 device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.NetworkRedirector">
+            <summary>
+            The network redirector device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Battery">
+            <summary>
+            The battery device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.BusExtender">
+            <summary>
+            The bus extender device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Modem">
+            <summary>
+            The modem device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Vdm">
+            <summary>
+            The VDM device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.MassStorage">
+            <summary>
+            The mass storage device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Smb">
+            <summary>
+            The SMB device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.KS">
+            <summary>
+            The KS device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Changer">
+            <summary>
+            The changer device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Smartcard">
+            <summary>
+            The smartcard device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Acpi">
+            <summary>
+            The ACPI device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Dvd">
+            <summary>
+            The DVD device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.FullscreenVideo">
+            <summary>
+            The full screen video device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.DfsFileSystem">
+            <summary>
+            The DFS file system device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.DfsVolume">
+            <summary>
+            The DFS volume device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Serenum">
+            <summary>
+            The serenum device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.TermSrv">
+            <summary>
+            The terminal server device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Ksec">
+            <summary>
+            The KSEC device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Fips">
+            <summary>
+            The FIPS device.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceType.Infiniband">
+            <summary>
+            The Infiniband device.
+            </summary>
+        </member>
+        <member name="T:Wintellect.IO.DeviceMethod">
+            <summary>
+            Describes how the buffer is used by the device driver.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceMethod.Buffered">
+            <summary>
+            This buffer represents both the input buffer and the output buffer that are specified in calls to DeviceIoControl. 
+            The driver transfers data out of, and then into, this buffer. 
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceMethod.InDirect">
+            <summary>
+            This represents the input buffer that is specified in calls to DeviceIoControl.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceMethod.OutDirect">
+            <summary>
+            This represents the output buffer that is specified in calls to DeviceIoControl.
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceMethod.Neither">
+            <summary>
+            The IRP supplies the user-mode virtual addresses of the input and output buffers 
+            that were specified to DeviceIoControl.
+            </summary>
+        </member>
+        <member name="T:Wintellect.IO.DeviceAccess">
+            <summary>
+            Indicates the type of access that a caller must request when opening the file object 
+            that represents the device. The I/O manager will create IRPs and call the driver with a 
+            particular I/O control code only if the caller has requested the specified access rights
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceAccess.Any">
+            <summary>
+            The I/O manager sends the IRP for any caller that has a handle to the 
+            file object that represents the target device object. 
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceAccess.Special">
+            <summary>
+            The I/O manager sends the IRP for any caller that has a handle to the 
+            file object that represents the target device object. 
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceAccess.Read">
+            <summary>
+            The I/O manager sends the IRP only for a caller with read access rights, 
+            allowing the underlying device driver to transfer data from the device to system memory. 
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceAccess.Write">
+            <summary>
+            The I/O manager sends the IRP only for a caller with write access rights, 
+            allowing the underlying device driver to transfer data from system memory to its device. 
+            </summary>
+        </member>
+        <member name="F:Wintellect.IO.DeviceAccess.ReadWrite">
+            <summary>
+            The I/O manager sends the IRP only for a caller with read and write access rights, 
+            allowing the underlying device driver to transfer data from the device to system memory and
+            allowing the underlying device driver to transfer data from system memory to its device. 
+            </summary>
+        </member>
+        <member name="T:Wintellect.IO.DeviceIO">
+            <summary>This class allows you to perform low-level device I/O operations with a device driver.</summary>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.#ctor(System.String,System.IO.FileAccess,System.IO.FileShare,System.Boolean)">
+            <summary>
+            Opens the specified device driver using the desired access and sharing. You can also indicate whether you wish to work with the device synchronously or asynchronously.</summary>
+            <param name="deviceName">A string identifying the device driver.</param>
+            <param name="access">What kind of access you wish to have to the device.</param>
+            <param name="share">Indicates how you are willing to share access ot the device.</param>
+            <param name="useAsync">If true, allows you to perform asynchronous operations to the device.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.#ctor(Microsoft.Win32.SafeHandles.SafeFileHandle,System.Boolean)">
+            <summary>Creates a DeviceIO opjects that allows you to communicate with a device driver that has already been opened.</summary>
+            <param name="device">Identifies an already-open handle to a device driver.</param>
+            <param name="openedAsync">Specify true if the device was opened for asynchronous operations.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.Dispose">
+            <summary>Releases all resources used by the DeviceIO class.</summary>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.Dispose(System.Boolean)">
+            <summary>Releases the unmanaged resources used by the DeviceIO class specifying whether to perform a normal dispose operation.</summary>
+            <param name="disposing">true for a normal dispose operation; false to finalize the handle.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.Control(Wintellect.IO.DeviceControlCode)">
+            <summary>Sends a control code to the device driver synchronously.</summary>
+            <param name="deviceControlCode">The control code to send to the driver.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.Control(Wintellect.IO.DeviceControlCode,System.Object)">
+            <summary>Sends a control code to the device driver synchronously along with an input buffer.</summary>
+            <param name="deviceControlCode">The control code to send to the driver.</param>
+            <param name="inBuffer">The input buffer to send to the driver.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.BeginControl(Wintellect.IO.DeviceControlCode,System.Object,System.AsyncCallback,System.Object)">
+            <summary>Sends a control code to the device driver asynchronously along with an input buffer.</summary>
+            <param name="deviceControlCode">The control code to send to the driver.</param>
+            <param name="inBuffer">The input buffer to send to the driver.</param>
+            <param name="asyncCallback">The method to be called when the asynchronous operation completes.</param>
+            <param name="state">A user-provided object that distinguishes this particular asynchronous operation from other operations.</param>
+            <returns>An IAsyncResult that references the asynchronous operation.</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.EndControl(System.IAsyncResult)">
+            <summary>Waits for the pending asynchronous operation to complete.</summary>
+            <param name="result">The reference to the pending asynchronous request to wait for.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.GetObject``1(Wintellect.IO.DeviceControlCode)">
+            <summary>
+            Synchronously sends a control code to a device.
+            </summary>
+            <typeparam name="TResult">The type of the result.</typeparam>
+            <param name="deviceControlCode">The control code.</param>
+            <returns>The result of the operation.</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.GetObject``1(Wintellect.IO.DeviceControlCode,System.Object)">
+            <summary>
+            Synchronously sends a control code and an input buffer to a device.
+            </summary>
+            <typeparam name="TResult">The type of the result.</typeparam>
+            <param name="deviceControlCode">The control code.</param>
+            <returns>The result of the operation.</returns>
+            <param name="inBuffer">The input data.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.BeginGetObject``1(Wintellect.IO.DeviceControlCode,System.Object,System.AsyncCallback,System.Object)">
+            <summary>
+            Asynchronously sends a control code and an input buffer to a device.
+            </summary>
+            <typeparam name="TResult">The type of the result.</typeparam>
+            <param name="deviceControlCode">The control code.</param>
+            <param name="inBuffer">The input data.</param>
+            <param name="asyncCallback">The method that should be called when the operation completes.</param>
+            <param name="state">Data that should be passed to the callback method.</param>
+            <returns>An IAsyncResult identifying the started operation.</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.EndGetObject``1(System.IAsyncResult)">
+            <summary>
+            Returns the result of a completed asynchronous operation.
+            </summary>
+            <typeparam name="TResult">The type of the result.</typeparam>
+            <param name="result">The IAsyncResult passed into the callback method.</param>
+            <returns>The result of the operation.</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.GetArray``1(Wintellect.IO.DeviceControlCode,System.Object,System.Int32)">
+            <summary>
+            Synchronously sends a control code and an input buffer to a device.
+            </summary>
+            <param name="deviceControlCode">The control code.</param>
+            <returns>The array of elements returned by the device.</returns>
+            <param name="inBuffer">The input data.</param>
+            <typeparam name="TElement">The type of elements that are returned from the device.</typeparam>
+            <param name="maxElements">The maximum number of elements that you expect the device to return.</param>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.BeginGetArray``1(Wintellect.IO.DeviceControlCode,System.Object,System.Int32,System.AsyncCallback,System.Object)">
+            <summary>
+            Asynchronously sends a control code and an input buffer to a device.
+            </summary>
+            <param name="deviceControlCode">The control code.</param>
+            <param name="inBuffer">The input data.</param>
+            <typeparam name="TElement">The type of eleemnts that are returned from teh device.</typeparam>
+            <param name="maxElements">The maximum number of elements that you expect the device to return.</param>
+            <param name="asyncCallback">The method that should be called when the operation completes.</param>
+            <param name="state">Data that should be passed to the callback method.</param>
+            <returns>An IAsyncResult identifying the started operation.</returns>
+        </member>
+        <member name="M:Wintellect.IO.DeviceIO.EndGetArray``1(System.IAsyncResult)">
+            <summary>
+            Returns the result of a completed asynchronous operation.
+            </summary>
+            <typeparam name="TElement">The type of elements that are returned from the device.</typeparam>
+            <param name="result">The IAsyncResult passed into the callback method.</param>
+            <returns>The array of elements returned by the device.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncResult`1">
+            <summary>
+            Represents the status of an asynchronous operation that has a return type of type <typeparamref name="TResult"/>.
+            </summary>
+            <typeparam name="TResult">The type of the return value</typeparam>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult`1.#ctor(System.AsyncCallback,System.Object)">
+            <summary>
+            Constructs an object that identifies an asynchronous operation.
+            </summary>
+            <param name="asyncCallback">The method that should be executed wehen the operation completes.</param>
+            <param name="state">The object that can be obtained via the AsyncState property.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult`1.#ctor(System.AsyncCallback,System.Object,System.Object)">
+            <summary>
+            Constructs an object that identifies an asynchronous operation.
+            </summary>
+            <param name="asyncCallback">The method that should be executed wehen the operation completes.</param>
+            <param name="state">The object that can be obtained via the AsyncState property.</param>
+            <param name="initiatingObject">Identifies the object that is initiating the asynchronous operation. This object is obtainable via the InitiatingObject property.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult`1.SetAsCompleted(`0,System.Boolean)">
+            <summary>
+            Call this method to indicate that the asynchronous operation has completed.
+            </summary>
+            <param name="result">Indicates the value calculated by the asynchronous operation.</param>
+            <param name="completedSynchronously">Indicates whether the operation completed synchronously or asynchronously.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult`1.EndInvoke">
+            <summary>
+            Frees up resources used by the asynchronous operation represented by the IAsyncResult passed.
+            If the asynchronous operation failed, this method throws the exception. If the operation suceeded,
+            this method returns the value calculated by the asynchronous operation.
+            </summary>
+            <returns>The value calculated by the asynchronous operation.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult`1.GetAsyncCallbackHelper">
+            <summary>
+            Returns a single static delegate to a static method that will invoke the desired AsyncCallback
+            </summary>
+            <returns>The single static delegate.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult`1.BeginInvokeOnWorkerThread">
+            <summary>
+            Returns an IAsyncResult for an operations that was queued to the thread pool.
+            </summary>
+            <returns>The IAsyncResult.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncResult`1.OnCompleteOperation(System.IAsyncResult)">
+            <summary>
+            Invokes the callback method when the asynchronous operations completes.
+            </summary>
+            <param name="result">The IAsyncResult object identifying the asynchronous operation that has completed.</param>
+            <returns>The value computed by the asynchronous operation.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator">
+            <summary>
+            An abstract class that delegates a lot of ResourceLock behavior to an inner ResourceLock.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.ResourceLock">
+            <summary>A base class allowing all locks to have the same programming model.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.#ctor(Wintellect.Threading.ResourceLocks.ResourceLockOptions)">
+            <summary>Initializes a new instance of a reader/writer lock indicating whether the lock is really a mutual-exclusive lock 
+            and whether the lock requires that any thread that enters it must be the same thread to exit it.</summary>
+            <param name="resourceLockOptions">true if this lock really only allows one thread at a time into it; otherwise false.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.Dispose">
+            <summary>Releases all resources used by the reader/writer lock.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.Dispose(System.Boolean)">
+            <summary>Releases all resources used by the lock.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.CurrentReaderCount">
+            <summary>Returns the number of reader threads currently owning the lock.</summary>
+            <returns>The number of reader threads in the lock.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.CurrentWriterCount">
+            <summary>Returns the number of writer threads currently owning the lock.</summary>
+            <returns>The number of writer threads in the lock.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.CurrentlyFree">
+            <summary>Returns true if no thread currently owns the lock.</summary>
+            <returns>true if no thread currently own the lock.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.Enter(System.Boolean)">
+            <summary>Allows the calling thread to acquire the lock for writing or reading.</summary>
+             <param name="exclusive">true if the thread wishes to acquire the lock for exclusive access.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.OnEnter(System.Boolean)">
+            <summary>Derived class overrides <c>OnEnter</c> to provide specific lock-acquire semantics.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.OnLeave(System.Boolean)">
+            <summary>Derived class overrides <c>OnLeave</c> to provide specific lock-release semantics.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.Leave">
+            <summary>Allows the calling thread to release the lock.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.StressPause">
+            <summary>If<c>Stress</c> is defined during compilation, calls to this method cause the calling thread to sleep.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.StallThread">
+            <summary>Allows calling thread to yield CPU time to another thread.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.IfThen(System.Int32@,System.Int32,System.Int32)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.IfThen(System.Int32@,System.Int32,System.Int32,System.Int32@)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <remarks>The previous value in <paramref name="value"/> is returned in <paramref name="previousValue"/>.</remarks>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+            <param name="previousValue">The previous value that was in <paramref name="value"/> prior to calling this method.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.ToString(System.String)">
+            <summary>Returns the object's string representation.</summary>
+            <return>A <c>String</c> containing the object's string representation.</return>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.ToString(System.IFormatProvider)">
+            <summary>Returns the object's string representation.</summary>
+            <return>A <c>String</c> containing the object's string representation.</return>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.ToString(System.String,System.IFormatProvider)">
+            <summary>Returns the object's string representation.</summary>
+            <param name="format">If <c>null</c> or <c>"extra"</c> is allowed.</param>
+            <param name="formatProvider">Not used.</param>
+            <return>A <c>String</c> containing the object's string representation.</return>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.ToString">
+            <summary>
+            Returns a System.String that represents the current System.Object.
+            </summary>
+            <returns>Returns a System.String that represents the current System.Object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.Equals(System.Object)">
+            <summary>
+            Determines whether the specified System.Object is equal to the current System.Object.
+            </summary>
+            <param name="obj">The System.Object to compare with the current System.Object.</param>
+            <returns>true if the specified System.Object is equal to the current System.Object; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.ResourceLock.GetHashCode">
+            <summary>
+            Serves as a hash function for a particular type.
+            </summary>
+            <returns>A hash code for the current System.Object.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.ResourceLock.ResourceLockOptions">
+            <summary>Returns options that describe the behavior of this lock.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.ResourceLock.IsMutualExclusive">
+            <summary>Indicates whether the lock treats all requests as mutual-exclusive.</summary>
+            <returns>True if the lock class allows just one thread at a time.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.ResourceLock.SupportsRecursion">
+            <summary>Indicates whether the lock supports recursion.</summary>
+            <returns>True if the lock supports recursion.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.ResourceLock.AcquiringThreadMustRelease">
+            <summary>Indicates whether the thread that acquires the lock must also release the lock.</summary>
+            <returns>True if the thread that requires the lock must also release it.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.ResourceLock.Name">
+            <summary>
+            The name associated with this lock for debugging purposes.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock)">
+            <summary>Constructs a ResourceLockDelegator over the specified ResourceLock.</summary>
+            <param name="resLock">The inner ResourceLock.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock,Wintellect.Threading.ResourceLocks.ResourceLockOptions)">
+            <summary>Constructs a ResourceLockDelegator over the specified ResourceLock.</summary>
+            <param name="resLock">The inner ResourceLock.</param>
+            <param name="resourceLockOptions">Indicates the flags to use with this specified lock.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.Equals(System.Object)">
+            <summary>Determines whether the specified Object is equal to the current Object.</summary>
+            <param name="obj">The Object to compare with the current Object.</param>
+            <returns>true if the specified Object is equal to the current Object; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.GetHashCode">
+            <summary>Serves as a hash function for a particular type.</summary>
+            <returns>A hash code for the current Object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.Dispose(System.Boolean)">
+            <summary>Allows the object to clean itself up.</summary>
+            <param name="disposing">true if Dispose is being called; false if the object is being finalized.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.OnEnter(System.Boolean)">
+            <summary>Implements the ResourceLock's Enter behavior.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.OnLeave(System.Boolean)">
+            <summary>Implements the ResourceLock's Leave behavior.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockDelegator.InnerLock">
+            <summary>Returns a reference to the inner ResourceLock object.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockObserver">
+            <summary>
+            An abstract class that all ResourceLockObserver classes derive from.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockObserver.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock)">
+            <summary>
+            Constructs a ResourceLockObserver.
+            </summary>
+            <param name="resLock"></param>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockModifier">
+            <summary>An abstract class that all ResourceLockModifier classes derive from.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ResourceLockModifier.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock,Wintellect.Threading.ResourceLocks.ResourceLockOptions)">
+            <summary>Constructs a ResourceLockModifier object.</summary>
+            <param name="resLock">Identifies the inner ResourceLock object.</param>
+            <param name="resourceLockOptions">Identifies the flags associted with the innter ResourceLock object.</param>
+        </member>
+        <member name="T:Wintellect.Threading.InterlockedEx">
+            <summary>Provides atomic operations for variables that are shared by multiple threads.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Morph``2(System.Int32@,``1,Wintellect.Threading.InterlockedEx.Morpher{``0,``1})">
+            <summary>Atomically modifies an Int32 value using an algorithm identified by <paramref name="morpher"/>.</summary>
+            <typeparam name="TResult">The type of the return value.</typeparam>
+            <typeparam name="TArgument">The type of the argument passed to the <paramref name="morpher"/> callback method.</typeparam>
+            <param name="target">A reference to the Int32 value that is to be modified atomically.</param>
+            <param name="argument">A value of type <typeparamref name="TArgument"/> that will be passed on to the <paramref name="morpher"/> callback method.</param>
+            <param name="morpher">The algorithm that modifies the Int32 returning a new Int32 value and another return value to be returned to the caller.</param>
+            <returns>The desired Int32 value.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.IfThen(System.Int32@,System.Int32,System.Int32)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.IfThen(System.UInt32@,System.UInt32,System.UInt32)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.IfThen(System.Int32@,System.Int32,System.Int32,System.Int32@)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <remarks>The previous value in <paramref name="value"/> is returned in <paramref name="previousValue"/>.</remarks>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+            <param name="previousValue">The previous value that was in <paramref name="value"/> prior to calling this method.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.IfThen(System.UInt32@,System.UInt32,System.UInt32,System.UInt32@)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <remarks>The previous value in <paramref name="value"/> is returned in <paramref name="previousValue"/>.</remarks>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+            <param name="previousValue">The previous value that was in <paramref name="value"/> prior to calling this method.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.IfThen``1(``0@,``0,``0)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <typeparam name="T">The type to be used for value, if, and then. This type must be a reference type.</typeparam>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.IfThen``1(``0@,``0,``0,``0@)">
+            <summary>Compares two values for equality and, if they are equal, replaces one of the values.</summary>
+            <remarks>The previous value in <paramref name="value"/> is returned in <paramref name="previousValue"/>.</remarks>
+            <return>Returns true if the value in <paramref name="value"/> was equal the the value of <paramref name="if"/>.</return>
+            <typeparam name="T">The type to be used for value, if, and then. This type must be a reference type.</typeparam>
+            <param name="value">The destination, whose value is compared with <paramref name="if"/> and possibly replaced with <paramref name="then"/>.</param>
+            <param name="if">The value that is compared to the value at <paramref name="value"/>.</param>
+            <param name="then">The value that might get placed into <paramref name="value"/>.</param>
+            <param name="previousValue">The previous value that was in <paramref name="value"/> prior to calling this method.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.CompareExchange(System.UInt32@,System.UInt32,System.UInt32)">
+            <summary>Compares two 32-bit unsigned integers for equality and, if they are equal, replaces one of the values.</summary>
+            <remarks>If comparand and the value in location are equal, then value is stored in location. Otherwise, no operation is performed. The compare and exchange operations are performed as an atomic operation. The return value of CompareExchange is the original value in location, whether or not the exchange takes place.</remarks>
+            <param name="location">The destination, whose value is compared with comparand and possibly replaced.</param>
+            <param name="value">The value that replaces the destination value if the comparison results in equality.</param>
+            <param name="comparand">The value that is compared to the value at <paramref name="location"/>.</param>
+            <returns>The original value in location.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Exchange(System.UInt32@,System.UInt32)">
+            <summary>Sets a 32-bit unsigned integer to a specified value and returns the original value, as an atomic operation.</summary>
+            <param name="location">The variable to set to the specified value.</param>
+            <param name="value">The value to which the <paramref name="location"/> parameter is set.</param>
+            <returns>The original value of <paramref name="location"/>.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Add(System.UInt32@,System.Int32)">
+            <summary>Adds a 32-bit signed integer to a 32-bit unsigned integer and replaces the first integer with the sum, as an atomic operation.</summary>
+            <param name="location">A variable containing the first value to be added. The sum of the two values is stored in <paramref name="location"/>.</param>
+            <param name="value">The value to be added to the integer at <paramref name="location"/>.</param>
+            <returns>The new value stored at <paramref name="location"/>.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Increment(System.UInt32@)">
+            <summary>Increments a specified variable and stores the result, as an atomic operation.</summary>
+            <param name="location">The variable whose value is to be incremented.</param>
+            <returns>The incremented value.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Decrement(System.UInt32@)">
+            <summary>Decrements a specified variable and stores the result, as an atomic operation.</summary>
+            <param name="location">The variable whose value is to be decremented.</param>
+            <returns>The decremented value.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Max(System.Int32@,System.Int32)">
+            <summary>Increases a value to a new value if the new value is larger.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the value that might be increased to a new maximum.</param>
+            <param name="value">The value that if larger than <paramref name="target"/> will be placed in <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Max(System.Int64@,System.Int64)">
+            <summary>Increases a value to a new value if the new value is larger.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the value that might be increased to a new maximum.</param>
+            <param name="value">The value that if larger than <paramref name="target"/> will be placed in <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Min(System.Int32@,System.Int32)">
+            <summary>Decreases a value to a new value if the new value is smaller.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the value that might be decreased to a new minimum.</param>
+            <param name="value">The value that if smaller than <paramref name="target"/> will be placed in <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Min(System.Int64@,System.Int64)">
+            <summary>Decreases a value to a new value if the new value is smaller.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the value that might be decreased to a new minimum.</param>
+            <param name="value">The value that if smaller than <paramref name="target"/> will be placed in <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.DecrementIfGreaterThan(System.Int32@,System.Int32)">
+            <summary>Decrements a value by 1 if the value is greater than the specified value (usually 0).</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the value that might be decremented.</param>
+            <param name="lowValue">The value that target must be greater than in order for the decrement to occur.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.AddModulo(System.Int32@,System.Int32,System.Int32)">
+            <summary>Decrements a value by 1 if the value is greater than 0.</summary>
+            <param name="target">A variable containing the value that might be decremented.</param>
+            <param name="value">The value to add to target before calculating the modulo specified in <paramref name="modulo"/>.</param>
+            <param name="modulo">The value to use for the modulo operation.</param>
+            <returns>Returns the previous value of <paramref name="target"/>.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.And(System.Int32@,System.Int32)">
+            <summary>Bitwise ANDs two 32-bit integers and replaces the first integer with the ANDed value, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the first value to be ANDed. The bitwise AND of the two values is stored in <paramref name="target"/>.</param>
+            <param name="with">The value to AND with <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Or(System.Int32@,System.Int32)">
+            <summary>Bitwise ORs two 32-bit integers and replaces the first integer with the ORed value, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the first value to be ORed. The bitwise OR of the two values is stored in <paramref name="target"/>.</param>
+            <param name="with">The value to OR with <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Or(System.Int64@,System.Int64)">
+            <summary>Bitwise ORs two 64-bit signed integers and replaces the first integer with the ORed value, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the first value to be ORed. The bitwise OR of the two values is stored in <paramref name="target"/>.</param>
+            <param name="with">The value to OR with <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.Xor(System.Int32@,System.Int32)">
+            <summary>Bitwise XORs two 32-bit integers and replaces the first integer with the XORed value, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the first value to be XORed. The bitwise XOR of the two values is stored in <paramref name="target"/>.</param>
+            <param name="with">The value to XOR with <paramref name="target"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.BitTestAndSet(System.Int32@,System.Int32)">
+            <summary>Turns a bit on and returns whether or not it was on.</summary>
+            <return>Returns whether the bit was on prior to calling this method.</return>
+            <param name="target">A variable containing the value that is to have a bit turned on.</param>
+            <param name="bitNumber">The bit (0-31) in <paramref name="target"/> that should be turned on.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.BitTestAndReset(System.Int32@,System.Int32)">
+            <summary>Turns a bit off and returns whether or not it was on.</summary>
+            <return>Returns whether the bit was on prior to calling this method.</return>
+            <param name="target">A variable containing the value that is to have a bit turned off.</param>
+            <param name="bitNumber">The bit (0-31) in <paramref name="target"/> that should be turned off.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.BitTestAndCompliment(System.Int32@,System.Int32)">
+            <summary>Flips an on bit off or and off bit on.</summary>
+            <return>Returns whether the bit was on prior to calling this method.</return>
+            <param name="target">A variable containing the value that is to have a bit flipped.</param>
+            <param name="bitNumber">The bit (0-31) in <paramref name="target"/> that should be flipped.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.MaskedAnd(System.Int32@,System.Int32,System.Int32)">
+            <summary>Bitwise ANDs two 32-bit integers with a mask replacing the first integer with the ANDed value, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the first value to be ANDed. The bitwise AND of the two values is stored in <paramref name="target"/>.</param>
+            <param name="with">The value to AND with <paramref name="target"/>.</param>
+            <param name="mask">The value to AND with <paramref name="target"/> prior to ANDing with <paramref name="with"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.MaskedOr(System.Int32@,System.Int32,System.Int32)">
+            <summary>Bitwise ORs two 32-bit integers with a mask replacing the first integer with the ORed value, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the first value to be ORed. The bitwise OR of the two values is stored in <paramref name="target"/>.</param>
+            <param name="with">The value to OR with <paramref name="target"/>.</param>
+            <param name="mask">The value to AND with <paramref name="target"/> prior to ORing with <paramref name="with"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.MaskedXor(System.Int32@,System.Int32,System.Int32)">
+            <summary>Bitwise XORs two 32-bit integers with a mask replacing the first integer with the XORed value, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the first value to be XORed. The bitwise XOR of the two values is stored in <paramref name="target"/>.</param>
+            <param name="with">The value to XOR with <paramref name="target"/>.</param>
+            <param name="mask">The value to AND with <paramref name="target"/> prior to XORing with <paramref name="with"/>.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.MaskedExchange(System.Int32@,System.Int32,System.Int32)">
+            <summary>Sets a variable to a specified value as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the value to be replaced.</param>
+            <param name="mask">The bits to leave unaffected in <paramref name="target"/> prior to ORing with <paramref name="value"/>.</param>
+            <param name="value">The value to replace <paramref name="target"/> with.</param>
+        </member>
+        <member name="M:Wintellect.Threading.InterlockedEx.MaskedAdd(System.Int32@,System.Int32,System.Int32)">
+            <summary>Adds two integers and replaces the first integer with the sum, as an atomic operation.</summary>
+            <return>Returns the previous value of <paramref name="target"/>.</return>
+            <param name="target">A variable containing the value to be replaced.</param>
+            <param name="value">The value to add to <paramref name="target"/>.</param>
+            <param name="mask">The bits in <paramref name="target"/> that should not be affected by adding.</param>
+        </member>
+        <member name="T:Wintellect.Threading.InterlockedEx.Morpher`2">
+            <summary>Identifies a method that morphs the Int32 startValue into a new value, returning it.</summary>
+            <typeparam name="TResult">The return type returned by the Morph method.</typeparam>
+            <typeparam name="TArgument">The argument type passed to the Morph method.</typeparam>
+            <param name="startValue">The initial Int32 value.</param>
+            <param name="argument">The argument passed to the method.</param>
+            <param name="morphResult">The value returned from Morph when the morpher callback method is successful.</param>
+            <returns>The value that the morpher method desires to set the <paramref name="startValue"/> to.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.Progress">
+            <summary>
+            A thread-safe class for managing the progress of an operation.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.#ctor">
+            <summary>
+            Constructs a Progress object with a low and high value of zero.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.#ctor(System.Int64)">
+            <summary>
+            Constructs a Progress object with a low value of zero.
+            </summary>
+            <param name="high">The value indicating the completion of the operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.#ctor(System.Int64,System.Int64)">
+            <summary>
+            Constructs a Progress object with the specified low and high values.
+            </summary>
+            <param name="low">The value indicating the start of the operation.</param>
+            <param name="high">The value indicating the completion of the operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.Reset(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Sets all the values associated with maintaining progress of an operation.
+            </summary>
+            <param name="low">The value indicating the start of the operation.</param>
+            <param name="high">The value indicating the completion of the operation.</param>
+            <param name="current">The value indicating the current completion state of the operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.Dispose">
+            <summary>
+            Call this to indicate that Progress tracking for this operation is complete.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.SetTimer(System.Int32,System.Int64)">
+            <summary>
+            Allows Progress to automatically update periodically.
+            </summary>
+            <param name="millisecondsBetweenUpdates">Indicates how long to wait before each update to Progress.</param>
+            <param name="timerUpdateAmount">How much to add to the current status.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.StopTimer">
+            <summary>
+            Stops the timer from continuing to update progress status.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.SetLow(System.Int64)">
+            <summary>
+            Sets the value indicating the start of the operation.
+            </summary>
+            <param name="value">The value indicating the start of the operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.AddToLow(System.Int64)">
+            <summary>
+            Adds the specified value to the value that indicates the start of the operation.
+            </summary>
+            <param name="addend">How much to add.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.SetHigh(System.Int64)">
+            <summary>
+            Sets the value indicating the end of the operation.
+            </summary>
+            <param name="value">The value indicating the end of the operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.AddToHigh(System.Int64)">
+            <summary>
+            Adds the specified value to the value that indicates the end of the operation.
+            </summary>
+            <param name="addend">How much to add.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.SetCurrent(System.Int64)">
+            <summary>
+            Sets the value indicating the current state of the operation.
+            </summary>
+            <param name="value">The value indicating the current state of the operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.Progress.AddToCurrent(System.Int64)">
+            <summary>
+            Adds the specified value to the value that indicates the current state of the operation.
+            </summary>
+            <param name="addend">How much to add.</param>
+        </member>
+        <member name="P:Wintellect.Threading.Progress.Low">
+            <summary>
+            Returns the value indicating the start of the operation.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.Progress.High">
+            <summary>
+            Returns the value indicating the end of the operation.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.Progress.Current">
+            <summary>
+            Returns the value indicating the current state of the operation.
+            </summary>
+        </member>
+        <member name="E:Wintellect.Threading.Progress.ProgressUpdated">
+            <summary>
+            An event which is raised whenever the operation's low, current, or high value changes.
+            This event is raised using the SynchronizationContext that was in place on 
+            the thread that constructed this Progress object.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ProgressUpdateEventArgs">
+            <summary>
+            Indicates the current progress of an operation.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ProgressUpdateEventArgs.ToString">
+            <summary>
+            Returns a string representing the state of this object.
+            </summary>
+            <returns>The string representing the state of the object.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.ProgressUpdateEventArgs.Low">
+            <summary>
+            Returns the value representing the start of the operation.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.ProgressUpdateEventArgs.High">
+            <summary>
+            Returns the value representing the end of the operation.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.ProgressUpdateEventArgs.Current">
+            <summary>
+            Returns a value representing the current state of the operation.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.ProgressUpdateEventArgs.Percentage">
+            <summary>
+            Returns a percentage of how much of the operation has completed thus far.
+            </summary>
+        </member>
+        <member name="T:Wintellect.IO.StreamExtensions">
+            <summary>Provides a set of static methods for manipulating System.IO.Stream.</summary>
+        </member>
+        <member name="M:Wintellect.IO.StreamExtensions.BeginCopyStream(System.IO.Stream,System.IO.Stream,System.Int32,System.Action{System.Int64},System.AsyncCallback,System.Object)">
+            <summary>
+            Asynchronously copies the contents of the source stream to the destination stream.
+            </summary>
+            <param name="source">The stream containing the data to be copied.</param>
+            <param name="destination">The stream that will receive the copied data.</param>
+            <param name="bufferSize">The size of the internal buffer that should be used to copy the data in chunks.</param>
+            <param name="reportProgress">A callback method that is called after each chunk is copied to the destination stream.</param>
+            <param name="callback">An optional asynchronous callback, to be called when copy completes.</param>
+            <param name="state">A user-provided object that distinguishes this particular asynchronous operation from other operations.</param>
+            <returns></returns>
+        </member>
+        <member name="M:Wintellect.IO.StreamExtensions.EndCopyStream(System.IO.Stream,System.IAsyncResult)">
+            <summary>Gets the results of the stream copy operation.</summary>
+            <param name="source">The stream used to initiate the stream copy operation.</param>
+            <param name="result">Identifies the asynchronous operation.</param>
+            <returns>The number of bytes copied to the destination stream.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.OneManyResourceLock">
+            <summary>
+            Implements a ResourceLock by way of a high-speed reader/writer lock.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.OneManyResourceLock.ToString">
+            <summary>
+            Returns a string representing the state of the object.
+            </summary>
+            <returns>The string representing the state of the object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.OneManyResourceLock.#ctor">
+            <summary>Constructs a OneManyLock object.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.OneManyResourceLock.Dispose(System.Boolean)">
+            <summary>Releases any resources used by the OneManyResourceLock object.</summary>
+            <param name="disposing">true if Dispose is being called; false if the object is being finalized</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.OneManyResourceLock.OnEnter(System.Boolean)">
+            <summary>Acquires the lock.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.OneManyResourceLock.OnLeave(System.Boolean)">
+            <summary>Releases the lock.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.LogicalProcessor.NumaInformation">
+            <summary>
+            This class returns NUMA information about the host machine.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.NumaInformation.NoPreferredNode">
+            <summary>
+            A constant indicating that there is no preferred node.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.NumaInformation.GetNodeFromProcessor(System.Int32)">
+            <summary>
+            Retrieves the node number for the specified processor.
+            </summary>
+            <param name="processor">The processor number.</param>
+            <returns>The node number.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.NumaInformation.GetProcessorsFromNode(System.Int32)">
+            <summary>
+            Retrieves the processor mask for the specified node.
+            </summary>
+            <param name="node">The node number.</param>
+            <returns>The processor mask for the node. A processor mask is 
+            a bit vector in which each bit represents a processor and 
+            whether it is in the node.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.NumaInformation.GetAvailableMemoryOnNode(System.Int32)">
+            <summary>
+            Retrieves the amount of memory available in the specified node.
+            </summary>
+            <param name="node">The numa node.</param>
+            <returns>The amount of available memory for the node, in bytes.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.NumaInformation.ProximityNode(System.Int32)">
+            <summary>
+            Retrieves the node number for the specified proximity identifier.
+            </summary>
+            <param name="proximityId">The proximity identifier of the node.</param>
+            <returns>The node number.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.NumaInformation.HighestNode">
+            <summary>
+            Retrieves the node that currently has the highest number.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.MonitorResourceLock">
+            <summary>
+            A ResourceLock implemented using System.Threading.Monitor
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.MonitorResourceLock.#ctor">
+            <summary>
+            Constructs an instance on the MonitorResourceLock.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.MonitorResourceLock.#ctor(System.Object)">
+            <summary>
+            Constructs an instance of the MonitorResourceLock using the specified object as the lock itself.
+            </summary>
+            <param name="obj"></param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.MonitorResourceLock.OnEnter(System.Boolean)">
+            <summary>
+            Implements the ResourceLock's WaitToWrite behavior.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.MonitorResourceLock.OnLeave(System.Boolean)">
+            <summary>
+            Implements the ResourceLock's DoneWriting behavior.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.EventApmOperation`1">
+            <summary>
+            This class represents an asynchronous operation that will be initiated
+            by some method and the operations completes by way of raising an event.
+            </summary>
+            <typeparam name="TEventArgs">The object passed as the event's second argument. 
+            This object is usually of an EventArgs-derived type.</typeparam>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmOperation`1.EventHandler(System.Object,`0)">
+            <summary>
+            The event handler that completes the APM operation when invoked.
+            </summary>
+            <param name="sender">The source of the event.</param>
+            <param name="e">An object (usually derived from EventArgs) that contains the event data.</param>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.EventApmFactory`1">
+            <summary>
+            This class converts a raised event to an IAsyncResult-based APM completion.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmFactory`1.PrepareOperation(System.AsyncCallback,System.Object)">
+            <summary>
+            Prepares to initiate an asynchronous operation by setting the desired callback 
+            method and state that will be used to completed the operation when the 
+            event handler method is invoked.
+            </summary>
+            <param name="callback">The method to be called when the event is raised.</param>
+            <param name="state">The state obtained via IAsyncResult's AsyncState property.</param>
+            <returns>The prepared operation which exposes the event handler method to be registered with the desired event.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmFactory`1.PrepareOperation(System.AsyncCallback)">
+            <summary>
+            Prepares to initiate an asynchronous operation by setting the desired callback 
+            method that will be used to completed the operation when the 
+            event handler method is invoked.
+            </summary>
+            <param name="callback">The method to be called when the event is raised.</param>
+            <returns>The prepared operation which exposes the event handler method to be registered with the desired event.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmFactory`1.EndInvoke(System.IAsyncResult)">
+            <summary>
+            Returns the object passed as the second argument to the event handler. 
+            This is usually an object whose type is derived from System.EventArgs.
+            Note that you can use any instance of this type to call EndInvoke; you do not 
+            have to use the same instance that you used to call PrepareOperation.
+            </summary>
+            <param name="result">An IAsyncResult that references the pending operation.</param>
+            <returns>The object passed to the event handler.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmFactory`1.Equals(System.Object)">
+            <summary>Indicates whether this instance and a specified object are equal.</summary>
+            <param name="obj">Another object to compare to.</param>
+            <returns>true if obj and this instance are the same type and represent the same value; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmFactory`1.op_Equality(Wintellect.Threading.AsyncProgModel.EventApmFactory{`0},Wintellect.Threading.AsyncProgModel.EventApmFactory{`0})">
+            <summary>Returns a value indicating whether two instances of EventApmFactory are equal.</summary>
+            <param name="factory1">A reference to an EventApmFactory object.</param>
+            <param name="factory2">A reference to an EventApmFactory object.</param>
+            <returns>true if factory1 and factory2 are equal; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmFactory`1.op_Inequality(Wintellect.Threading.AsyncProgModel.EventApmFactory{`0},Wintellect.Threading.AsyncProgModel.EventApmFactory{`0})">
+            <summary>Returns a value indicating whether two instances of EventApmFactory are not equal.</summary>
+            <param name="factory1">A reference to an EventApmFactory object.</param>
+            <param name="factory2">A reference to an EventApmFactory object.</param>
+            <returns>true if factory1 and factory2 are not equal; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.EventApmFactory`1.GetHashCode">
+            <summary>Returns the hash code for this instance.</summary>
+            <returns>A 32-bit signed integer that is the hash code for this instance.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.NullResourceLock">
+            <summary>
+            A ResourceLock that actually performs no locking at all.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.NullResourceLock.#ctor">
+            <summary>
+            Constructs an instance of the NullResourceLock.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.NullResourceLock.OnEnter(System.Boolean)">
+            <summary>
+            Implements the ResourceLock's WaitToWrite behavior.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.NullResourceLock.OnLeave(System.Boolean)">
+            <summary>
+            Implements the ResourceLock's DoneWriting behavior.
+            </summary>
+        </member>
+        <member name="T:Wintellect.CommandArgumentParser.CmdArgumentTypeExceptionArgs">
+            <summary>
+            This represents a CmdArgumentType exception.
+            </summary>
+        </member>
+        <member name="T:Wintellect.ExceptionArgs">
+            <summary>
+            A base class that a custom exception would derive from in order to add its own exception arguments.
+            </summary>
+        </member>
+        <member name="P:Wintellect.ExceptionArgs.Message">
+            <summary>
+            The string message associated with this exception.
+            </summary>
+        </member>
+        <member name="T:Wintellect.CommandArgumentParser.InvalidCmdArgumentExceptionArgs">
+            <summary>
+            The exception argument indicating that an invalid command-line argument has been found.
+            </summary>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.InvalidCmdArgumentExceptionArgs.#ctor(System.String)">
+            <summary>
+            Constructs an InvalidCmdArgumentExceptionArgs with the specified invalid command argument.
+            </summary>
+            <param name="invalidCmdArg"></param>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.InvalidCmdArgumentExceptionArgs.ToString">
+            <summary>
+            Returns a string that contains the invalid argument.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:Wintellect.CommandArgumentParser.InvalidCmdArgumentExceptionArgs.InvalidCmdArg">
+            <summary>
+            Returns the invalid argument.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.TimeoutNotifierResourceLockObserver">
+            <summary>
+            A ResourceLock-wrapper class that throws an exception if a thread waits 
+            too long on the inner lock.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.TimeoutNotifierResourceLockObserver.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock,System.Int64)">
+            <summary>Constructs a TimeoutNotifierResourceLockObserver object.</summary>
+            <param name="resLock">Indicates the inner ResourceLock.</param>
+            <param name="timeout">Indicates how long any thread should wait on the inner lock before throwing an exception. This value is in milliseconds.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.TimeoutNotifierResourceLockObserver.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock,System.TimeSpan)">
+            <summary>Constructs a TimeoutNotifierResourceLockObserver object.</summary>
+            <param name="resLock">Indicates the inner ResourceLock.</param>
+            <param name="timeout">Indicates how long any thread should wait on the inner lock before throwing an exception.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.TimeoutNotifierResourceLockObserver.OnTimeout(System.Diagnostics.StackTrace)">
+            <summary>This method is invoked when a thread has waited too long on a ResourceLock. The default behavior, throws a TimeoutException.</summary>
+            <param name="stackTrace">The stack trace at the point where the thread waited on the ResourceLock.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.TimeoutNotifierResourceLockObserver.OnEnter(System.Boolean)">
+            <summary>Implements the ResourceLock's Enter behavior.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.TimeoutNotifierResourceLockObserver.OnLeave(System.Boolean)">
+            <summary>Implements the ResourceLock's Leave behavior.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.ArbitraryWaitHandle">
+            <summary>
+            Converts various handles to waitable handle for synchronization.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ArbitraryWaitHandle.FromHandle(System.IntPtr)">
+            <summary>
+            A factory method that converts a Win32 handle to an ArbitraryWaitHandle.
+            </summary>
+            <param name="handle">Identifies a handle to a synchronizable Win32 object.</param>
+            <returns>An ArbitraryWaitHandle object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ArbitraryWaitHandle.op_Implicit(System.IntPtr)~Wintellect.Threading.ArbitraryWaitHandle">
+            <summary>
+            Implicitly casts a Win32 handle to an ArbitraryWaitHandle.
+            </summary>
+            <param name="handle">Identifies a handle to a synchronizable Win32 object.</param>
+            <returns>An ArbitraryWaitHandle object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ArbitraryWaitHandle.FromSafeHandle(System.Runtime.InteropServices.SafeHandle)">
+            <summary>
+            Converts a SafeHandle-derived object to an ArbitraryWaitHandle object.
+            </summary>
+            <param name="safeHandle">Identifies a SafeHandle to a synchronizable Win32 object.</param>
+            <returns>An ArbitraryWaitHandle object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ArbitraryWaitHandle.op_Implicit(System.Runtime.InteropServices.SafeHandle)~Wintellect.Threading.ArbitraryWaitHandle">
+            <summary>
+            Implicitly casts a SafeHandle-derived object to an ArbitraryWaitHandle.
+            </summary>
+            <param name="safeHandle">Identifies a SafeHandle to a synchronizable Win32 object.</param>
+            <returns>An ArbitraryWaitHandle object.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.SyncContextEventRaiser">
+            <summary>
+            This class raises an event using a specific SynchronizationContext object.
+            </summary> 
+        </member>
+        <member name="M:Wintellect.Threading.SyncContextEventRaiser.#ctor">
+            <summary>
+            Constructs a SyncContextEventRaiser using the current thread's SynchronizationContext.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.SyncContextEventRaiser.#ctor(System.Threading.SynchronizationContext)">
+            <summary>
+            Constructs a SyncContextEventRaiser using the specified SynchronizationContext.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.SyncContextEventRaiser.PostEvent``1(Wintellect.Threading.SyncContextEventRaiser.EventRaiser{``0},``0)">
+            <summary>A method that asynchronously raises an event on the application's desired thread.</summary>
+            <typeparam name="T">The <see cref="T:System.EventArgs"/> type identifying the type of object that gets raised with the event"/></typeparam>
+            <param name="callback">The protected virtual method that will raise the event.</param>
+            <param name="e">The <see cref="T:System.EventArgs"/> object that should be passed to the protected virtual method raising the event.</param>
+        </member>
+        <member name="M:Wintellect.Threading.SyncContextEventRaiser.SendEvent``1(Wintellect.Threading.SyncContextEventRaiser.EventRaiser{``0},``0)">
+            <summary>A method that synchronously raises an event on the application's desired thread.</summary>
+            <typeparam name="T">The <see cref="T:System.EventArgs"/> type identifying the type of object that gets raised with the event"/></typeparam>
+            <param name="callback">The protected virtual method that will raise the event.</param>
+            <param name="e">The <see cref="T:System.EventArgs"/> object that should be passed to the protected virtual method raising the event.</param>
+        </member>
+        <member name="T:Wintellect.Threading.SyncContextEventRaiser.EventRaiser`1">
+            <summary>Represents a callback to a protected virtual method that raises an event.</summary>
+            <typeparam name="T">The <see cref="T:System.EventArgs"/> type identifying the type of object that gets raised with the event"/></typeparam>
+            <param name="e">The <see cref="T:System.EventArgs"/> object that should be passed to a protected virtual method that raises the event.</param>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver">
+            <summary>A compositional resource lock providing statics for another lock.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock)">
+            <summary>Initializes a new instance of the <c>StatisticsGatheringResourceLock</c> class that wraps another <c>ResouceLock</c>-derived type.</summary>
+            <param name="resLock">The <c>ResourceLock</c>-derived type to wrap.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ToString(System.String,System.IFormatProvider)">
+            <summary>Returns the object's string representation.</summary>
+            <param name="format">If <c>null</c> or <c>"extra"</c> is allowed.</param>
+            <param name="formatProvider">Not used.</param>
+            <return>A <c>String</c> containing the object's string representation.</return>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.OnEnter(System.Boolean)">
+            <summary>Derived class overrides <c>OnEnter</c> to provide specific reader locking semantics.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.OnLeave(System.Boolean)">
+            <summary>Derived class overrides <c>OnDoneReading</c> to provide specific reader unlocking semantics.</summary>
+            <remarks>You do not need to override this method if the specific lock provides mutual-exclusive locking semantics.</remarks>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ReadRequests">
+            <summary>Returns the number of read requests against a lock.</summary>
+            <return>The number of read requests.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.WriteRequests">
+            <summary>Returns the number of write requests against a lock.</summary>
+            <return>The number of write requests.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ReadersReading">
+            <summary>Returns the current number of readers reading.</summary>
+            <return>The current number of reads.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.WritersWriting">
+            <summary>Returns the current number of writers writing.</summary>
+            <return>The current number of writers.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ReadersDone">
+            <summary>Returns the number of readers done reading.</summary>
+            <return>The number of done readers.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.WritersDone">
+            <summary>Returns the number of writers done writing.</summary>
+            <return>The number of done writers.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ReadersWaiting">
+            <summary>Returns the current number of readers waiting.</summary>
+            <return>The number of waiting readers.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.WritersWaiting">
+            <summary>Returns the current number of writers waiting.</summary>
+            <return>The number of waiting writers.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ReaderMaxWaitTime">
+            <summary>Returns the maximum time that a reader waited to acquire the lock.</summary>
+            <return>Maximum time a reader waited to acquire the lock.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.WriterMaxWaitTime">
+            <summary>Returns the maximum time that a writer waited to acquire the lock.</summary>
+            <return>Maximum time a writer waited to acquire the lock.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ReaderMinHoldTime">
+            <summary>Returns the minimum time that a reader held the lock.</summary>
+            <return>Minimum time a reader held the lock.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.ReaderMaxHoldTime">
+            <summary>Returns the maximum time that a reader held the lock.</summary>
+            <return>Maximum time a reader held the lock.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.WriterMinHoldTime">
+            <summary>Returns the minimum time that a writer held the lock.</summary>
+            <return>Minimum time a writer held the lock.</return>
+        </member>
+        <member name="P:Wintellect.Threading.ResourceLocks.Diagnostics.StatisticsGatheringResourceLockObserver.WriterMaxHoldTime">
+            <summary>Returns the maximum time that a writer held the lock.</summary>
+            <return>Maximum time a writer held the lock.</return>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncEnumerator">
+            <summary>
+            A class that can drive an iterator asynchronously allowing for scalable and responsive applications and components.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.MaxDiscardGroup">
+            <summary>
+            A discard group can be any number from 0 to MaxDiscardGroup.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.FromAsyncResult(System.IAsyncResult)">
+            <summary>
+            Returns the AsyncEnumerator object used to obtain this IAsyncResult object.
+            </summary>
+            <param name="result">An IAsyncResult object previously returned 
+            by calling BeginExecute.</param>
+            <returns>A reference to the AsyncEnumerator object that was used to call BeginExecute.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.ThrowOnMissingDiscardGroup(System.Boolean)">
+            <summary>
+            Sets a flag indicating whether the AsyncEnumerator should throw an exception
+            if you call a BeginXxx method without calling the End or EndVoid method passing a discard group.
+            This method exists to allow some runtime checks to help ensure that you are writing your code correctly. 
+            </summary>
+            <param name="throw">Pass true to turn checking on; false to turn it off.</param>
+        </member>
+        <member name="F:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.m_asyncResult">
+            <summary>
+            The IAsyncResult object that allows the iteration to execute asynchronously
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.#ctor">
+            <summary>
+            Initializes a new instance of the AsyncEnumerator class.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the AsyncEnumerator class identified with a debug tag.
+            </summary>
+            <param name="debugTag">The desired debug tag name for this AsyncEnumerator object.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.BeginExecute(System.Collections.Generic.IEnumerator{System.Int32},System.AsyncCallback,System.Object)">
+            <summary>
+            Begins executing an iterator and returns after the iterator's first yield return statement executes.
+            </summary>
+            <param name="enumerator">Identifies the iterator method to be driven by the AsyncEnumerator,</param>
+            <param name="callback">An optional asynchronous callback, to be called when the iterator completes.</param>
+            <param name="state">A user-provided object that distinguishes this particular asynchronous operation from other operations.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EndExecute(System.IAsyncResult)">
+            <summary>Waits for the pending asynchronous operation to complete.</summary>
+            <param name="result">The reference to the pending asynchronous operation to finish.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.OnConstructAsyncResult(System.AsyncCallback,System.Object)">
+            <summary>
+            Called to construct an AsyncResult object with the specified callback function and state.
+            </summary>
+            <param name="callback">An optional asynchronous callback, to be called when the iterator completes.</param>
+            <param name="state">A user-provided object that distinguishes this particular asynchronous operation from other operations.</param>
+            <returns>The AsyncResult object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.OnCompleteAsyncResult">
+            <summary>
+            Called when the asynchronous operation completes.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.End">
+            <summary>
+            Pass this to a BegixXxx method's AsyncCallback argument to have the operation
+            complete to advance the enumerator. The operation is implicitly part of discard group 0.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EnqueueCompletedOpToInbox(System.Object)">
+            <summary>
+            Called internally when an asynchronous operation completes
+            </summary>
+            <param name="asyncResultOrDiscardableAsyncResult">The IAsyncResult (for a non-discardable) or the DiscardableAsyncResult (for a discardable) operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.TryEnqueueCompletedOpToInbox(Wintellect.Threading.AsyncProgModel.AsyncEnumerator.AsyncResultWrapper)">
+            <summary>
+            Rejects a completed DiscardableAsyncResult if its group has been discarded; if not rejected, 
+            the DiscardableAsyncResult is added to the inbox.
+            </summary>
+            <param name="asyncResultWrapper">The completed AsyncResultWrapper</param>
+            <returns>True if the AsyncResultWrapper was added to the inbox; false if it was rejected.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.DequeueAsyncResult">
+            <summary>
+            Dequeues a completed AsyncResultWrapper's IAsyncResult object from the inbox.
+            </summary>
+            <returns>The completed DiscardableAsyncResult's IAsyncResult object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.DiscardAsyncResultsBelongingToDiscardedGroups">
+            <summary>
+            Discards previously-completed DiscardableAsyncResult objects from the inbox if their discard group has been discarded
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.IsDebuggingEnabled">
+            <summary>
+            Returns true if the EnableDebugging method has ever been called.
+            </summary>
+            <returns>true if EnableDebugging has ever been called.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EnableDebugSupport">
+            <summary>
+            Call this method to enable operation debugging support. When enabled, call 
+            stacks are captured and recorded when End methods are invoked. As operations
+            complete, the call stacks are discarded. Calling ToString on an AsyncEnumerator
+            object will shows its tag, the time stamp of the last 'yield return' statement 
+            executed and the collection of its outstanding operations (tags and line/file 
+            where the End method was called for it). 
+            Typically, you'd examine this information in a debugger. Because capturing call 
+            stacks hurts performance, you should only enable debugging support to help you 
+            solve a problem related to operations that do not complete.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.GetInProgressList">
+            <summary>
+            Returns the AsyncEnumerator objects are are in progress of executing an iterator.
+            The list returned is sorted. Element 0 identifies the AsyncEnumerator that has been 
+            waiting the longest for its operations to complete. The last element has been waiting
+            the shortest amount of time. 
+            </summary>
+            <returns>The sorted list of in-progress AsyncEnumerator objects.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.SetOperationTag(System.String)">
+            <summary>
+            Sets the debug tag name of the next operation that you are initiating as 
+            indicated by the next call to an End method. This method is marked with 
+            the [Conditional("AsyncEnumeratorDebug")] attribute.
+            </summary>
+            <param name="debugOperationTag">The debug tag name for the next operation you are initiating.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.ToString">
+            <summary>
+            Returns debug information about the AsyncEnumerator object. The information includes
+            the Name (passed in the constructor). If EnableDebugging has been called, then the
+            last yield timestamp and source code line/file is also displayed.
+            </summary>
+            <returns>String containing helpful debugging information.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.DiscardGroup(System.Int32)">
+            <summary>
+            Discards all operations that are part of the specified discard group from the Inbox.
+            </summary>
+            <param name="group">The discard group number (0-MaxDiscardGroup).</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.End(System.Int32,Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EndObjectXxx)">
+            <summary>
+            Pass the result of this method to a BegixXxx method's AsyncCallback argument to have a cancelable operation
+            complete to advance the enumerator.
+            </summary>
+            <param name="group">Identifies an operation sequence number used for cancelation. The number passed must be between 0 and MaxDiscardGroup.</param>
+            <param name="callback">The EndXxx method that must be called when this canceled operation eventually completes.</param>
+            <returns>The value that should be passed to a BeginXxx method's AsyncCallback argument.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EndVoid(System.Int32,Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EndVoidXxx)">
+            <summary>
+            Pass the result of this method to a BegixXxx method's AsyncCallback argument to have a cancelable operation
+            complete to advance the enumerator.
+            </summary>
+            <param name="group">Identifies an operation sequence number used for cancelation. The number passed must be between 0 and 63.</param>
+            <param name="callback">The EndXxx method that must be called when this canceled operation eventually completes.</param>
+            <returns>The value that should be passed to a BeginXxx method's AsyncCallback argument.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.SetCancelTimeout(System.Int32,System.Object)">
+            <summary>
+            Causes a timer to automatically call Cancel.
+            </summary>
+            <param name="milliseconds">How long to wait before Cancel is called.</param>
+            <param name="cancelValue">Identifies the cancelValue to be passed to Cancel.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.Cancel(System.Object)">
+            <summary>
+            Tells the iterator to Cancel all of its remaining operations.
+            </summary>
+            <param name="cancelValue">An arbitrary value that can be examined by the iterator. 
+            This value is returned by IsCanceled.</param>
+            <returns>Returns True if the calling thread is the first thread to call Cancel (and sets the cancelValue).</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.IsCanceled">
+            <summary>
+            An iterator calls this to determine if Cancel has been called (possibly by a timer set by a call to SetCancelTimer).
+            </summary>
+            <returns>Returns True if Cancel has been called.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.IsCanceled(System.Object@)">
+            <summary>
+            An iterator calls this to determine if Cancel has been called (possibly by a timer set by a call to SetCancelTimer).
+            </summary>
+            <param name="cancelValue">Returns the cancelValue passed to Cancel.</param>
+            <returns>Returns True if Cancel has been called.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.SyncContext">
+            <summary>
+            Gets or sets the SynchronizationContext object that the AsyncEnumerator uses when resuming your iterator.
+            All value of null (the default), means that your iterator will execute via various thread pool threads. 
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.LastYieldReturnTimestamp">
+            <summary>
+            Returns the timestamp at the last 'yield return' statement.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.SuspendCallback">
+            <summary>
+            Gets or sets a callback method that will be invoked every time the iterator suspends itself by calling "yield return"
+            If null, then no callback is invoked. The callback is invoked on the thread that executes the iterator's "yield return" statement.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.ResumeCallback">
+            <summary>
+            Gets or sets a callback method that will be invoked every time the AsyncEnumerator object resumes executing the iterator.
+            If null, then no callback is invoked. The callback is invoked on the thread that will execute the code after the iterator's "yield return" statement.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EndObjectXxx">
+            <summary>
+            Identifies an EndXxx method that takes an IAsyncResult and returns some result
+            </summary>
+            <param name="result">The IAsyncResult of the completion operation.</param>
+            <returns>The EndXxx method's return value.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.EndVoidXxx">
+            <summary>
+            Identifies an EndXxx method that takes an IAsyncResult and doesn't return a value
+            </summary>
+            <param name="result">The IAsyncResult of the completion operation.</param>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.DiscardableAsyncResult">
+            <summary>
+            Class that wraps an asynchronous operation and its AsyncCallback method.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.DiscardableAsyncResult.SelfComplete">
+            <summary>
+            Called when an DiscardableAsyncResult is being rejected/discarded to ensure that its EndXxx method is invoked
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.AsyncResultWrapper">
+            <summary>
+            A ValueType that abstracts an IAsyncResult (used for non-discard group operations) 
+            from a DiscardableAsyncResult (used for discard group operation).
+            This type makes an IAsyncResult look like a DiscardableAsyncResult object without construction of another object
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts">
+            <summary>
+            This struct contains a single Int32 member that encapsulates the  
+            number of items the enumerator is waiting for and the number of 
+            completed asynchronous operations in the inbox. All members of this type
+            manipulate the counters atomically.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.c_MaxWait">
+            <summary>
+            Sentinel value used to indicate that a thread determined that 
+            it should call MoveNext again to advance the iterator 
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.m_waitAndInboxCounts">
+            <summary>
+            High 16 bits=number of inbox items to wait for before calling MoveNext
+            Low 16 bits=number of items in inbox 
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.#ctor(System.Int32)">
+            <summary>
+            Constructs a WaitAndInboxCounts instance from an Int32
+            </summary>
+            <param name="waic">The Int32 instance.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.ToInt32">
+            <summary>
+            Converts a WaitAndInboxCounts instance to an Int32
+            </summary>
+            <returns>The WaitAndInboxCounts object as an Int32.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.Initialize">
+            <summary>
+            Initializes the Wait to the sentinel value because we don't want
+            a thread to MoveNext until the iterator has returned a Wait at least once
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.AtomicSetWait(System.UInt16)">
+            <summary>
+            Atomically updates the number of inbox items the enumerator 
+            wants to wait for and returns the new value.
+            </summary>
+            <param name="numberOpsToWaitFor">The number of asynchronous operations that must complete before the enumerator advances.</param>
+            <returns>Returns true if the calling thread met the requirements necessary to call the enumerator's MoveNext method.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.AtomicIncrementInbox">
+            <summary>
+            Atomically updates the number of inbox items the enumerator 
+            wants to wait for and returns the new value. 
+            </summary>
+            <returns>Returns true if the calling thread met the requirements necessary to call the enumerator's MoveNext method.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.AtomicDecrementInbox(System.Int32)">
+            <summary>
+            Atomically subtracts the number of discarded items from the inbox.
+            </summary>
+            <param name="numRemoved">The number of asynchronous operations that were discarded from the inbox.</param>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.Wait">
+            <summary>
+            Gets/Sets the number of items the enumerator is waiting for 
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncEnumerator.WaitAndInboxCounts.Inbox">
+            <summary>
+            Gets/Sets the number of items in the inbox
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.SuspendResumeArgs">
+            <summary>
+            This class contains data useful when suspending/resuming an iterator.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.SuspendResumeArgs.AsyncEnumerator">
+            <summary>Returns the AsyncEnumerator object that is being suspended/resumed.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.SuspendResumeArgs.State">
+            <summary>Arbitrary data that can be set when the AsyncEnumerator is suspending and retrieved when it is resuming.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.NoEndMethodCalled">
+            <summary>
+            This class is used when throwing an Exception to indicate 
+            that an operation is being discarded but no EndXxx method 
+            was specified and so resources are being leaked.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.NoEndMethodCalled.AsyncEnumerator">
+            <summary>Returns the AsyncEnumerator object associated with this exception.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.NoEndMethodCalled.AsyncResult">
+            <summary>Returns the IAsyncResult object associated with this exception.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1">
+            <summary>
+            A class that can drive an iterator asynchronously allowing for 
+            scalable and responsive applications and components.
+            </summary>
+            <typeparam name="TResult">The type of result that the iterator method will return.</typeparam>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1.FromAsyncResult(System.IAsyncResult)">
+            <summary>
+            Returns the AsyncEnumerator object used to obtain this IAsyncResult object.
+            </summary>
+            <param name="result">An IAsyncResult object previously returned 
+            by calling BeginExecute.</param>
+            <returns>A reference to the AsyncEnumerator object that was used to call BeginExecute.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1.#ctor">
+            <summary>
+            Initializes a new instance of the AsyncEnumerator class.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the AsyncEnumerator class identified with a debug tag.
+            </summary>
+            <param name="debugTag">The desired debug tag name for this AsyncEnumerator object.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1.EndExecute(System.IAsyncResult)">
+            <summary>
+            Waits for the pending asynchronous operation to complete.
+            </summary>
+            <param name="result">The reference to the pending asynchronous operation to finish.</param>
+            <returns>The value set in the Result property by the iterator.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1.OnConstructAsyncResult(System.AsyncCallback,System.Object)">
+            <summary>
+            Called to construct an AsyncResult object with the specified callback function and state.
+            </summary>
+            <param name="callback">An optional asynchronous callback, to be called when the iterator completes.</param>
+            <param name="state">A user-provided object that distinguishes this particular asynchronous operation from other operations.</param>
+            <returns>The AsyncResult object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1.OnCompleteAsyncResult">
+            <summary>
+            Called when the asynchronous operation completes.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.AsyncEnumerator`1.Result">
+            <summary>
+            An iterator sets this property to return the value back to code that executed the iterator.
+            Code that executed the iterator usually gets this value as the return value from Execute or EndExecute. 
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.FrozenUIExceptionArgs">
+            <summary>
+            Indicates that a deadlock would occur because a the UI thread is waiting for an AsyncEnumerator 
+            to complete running but it can't since the UI thread is blocked.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.FrozenUIExceptionArgs.AsyncEnumerator">
+            <summary>
+            Returns a reference to the AsyncEnumerator that the UI thread is waiting for.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.FrozenUIExceptionArgs.Message">
+            <summary>Gets a message that describes the current exception.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate">
+            <summary>
+            This class implements a reader/writer lock that never blocks any threads.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.Dispose">
+            <summary>
+            Releases all resources associated with the ReaderWriterGate
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.#ctor">
+            <summary>
+            Constructs a ReaderWriterGate object.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.#ctor(System.Boolean)">
+            <summary>
+            Constructs a ReaderWriterGate object
+            </summary>
+            <param name="blockReadersUntilFirstWriteCompletes">Pass true to have readers block until the first writer has created the data that is being protected by the ReaderWriterGate.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.BeginWrite(Wintellect.Threading.ReaderWriterGate.ReaderWriterGateCallback,System.AsyncCallback)">
+            <summary>Initiates an asynchronous write operation.</summary>
+            <param name="callback">The method that will perform the write operation.</param>
+            <param name="asyncCallback">An optional asynchronous callback, to be called when the operation completes.</param>
+            <returns>A System.IAsyncResult that represents the asynchronous operation, which could still be pending.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.BeginWrite(Wintellect.Threading.ReaderWriterGate.ReaderWriterGateCallback,System.Object,System.AsyncCallback,System.Object)">
+            <summary>Initiates an asynchronous write operation.</summary>
+            <param name="callback">The method that will perform the write operation.</param>
+            <param name="state">A value passed to the callback method.</param>
+            <param name="asyncCallback">An optional asynchronous callback, to be called when the operation completes.</param>
+            <param name="asyncState">A user-provided object that distinguishes this particular asynchronous operation request from other requests.</param>
+            <returns>A System.IAsyncResult that represents the asynchronous operation, which could still be pending.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.EndWrite(System.IAsyncResult)">
+            <summary>Returns the result of the asynchronous operation.</summary>
+            <param name="result">The reference to the pending asynchronous operation to finish.</param>
+            <returns>Whatever the write callback method returns.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.BeginRead(Wintellect.Threading.ReaderWriterGate.ReaderWriterGateCallback,System.AsyncCallback)">
+            <summary>Initiates an asynchronous read operation.</summary>
+            <param name="callback">The method that will perform the read operation.</param>
+            <param name="asyncCallback">An optional asynchronous callback, to be called when the operation completes.</param>
+            <returns>A System.IAsyncResult that represents the asynchronous operation, which could still be pending.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.BeginRead(Wintellect.Threading.ReaderWriterGate.ReaderWriterGateCallback,System.Object,System.AsyncCallback,System.Object)">
+            <summary>Initiates an asynchronous read operation.</summary>
+            <param name="callback">The method that will perform the read operation.</param>
+            <param name="state">A value passed to the callback method.</param>
+            <param name="asyncCallback">An optional asynchronous callback, to be called when the operation completes.</param>
+            <param name="asyncState">A user-provided object that distinguishes this particular asynchronous operation request from other requests.</param>
+            <returns>A System.IAsyncResult that represents the asynchronous operation, which could still be pending.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGate.EndRead(System.IAsyncResult)">
+            <summary>Returns the result of the asynchronous read operation.</summary>
+            <param name="result">The reference to the pending asynchronous operation to finish.</param>
+            <returns>Whatever the read callback method returns.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.ReaderWriterGate.ReaderWriterGateReleaser">
+            <summary>An object passed to a read/write callback method that encapsulates the state of the operation.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGateReleaser.Release(System.Boolean)">
+            <summary>Releases the ReaderWriterGate to that other read/write operations may start.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ReaderWriterGate.ReaderWriterGateReleaser.Dispose">
+            <summary>Releases the ReaderWriterGate to that other read/write operations may start.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.ReaderWriterGate.ReaderWriterGateReleaser.Gate">
+            <summary>Returns the ReaderWriterGate used to initiate the read/write operation.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.ReaderWriterGate.ReaderWriterGateReleaser.State">
+            <summary>Returns the state that was passed with the read/write operation request.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.ReaderWriterGate.ReaderWriterGateReleaser.ResultValue">
+            <summary>Allows the read/write callback method to return a value from EndRead/EndWrite.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.ReaderWriterGate.ReaderWriterGateCallback">
+            <summary>Identifies the prototype of the method that will do the reading or writing.</summary>
+            <param name="releaser">An object encapsulating the state of the read/write operation.</param>
+            <returns>The value to be returned from EndRead/EndWrite.</returns>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.ResourceLockOptions">
+            <summary>
+            Flags representing features of the ResourceLock.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ResourceLocks.ResourceLockOptions.None">
+            <summary>
+            None.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ResourceLocks.ResourceLockOptions.AcquiringThreadMustRelease">
+            <summary>
+            If specified, then the thread that acquires the lock must also 
+            release the lock. No other thread can release the lock.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ResourceLocks.ResourceLockOptions.SupportsRecursion">
+            <summary>
+            If specified, then this lock supports recursion.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ResourceLocks.ResourceLockOptions.IsMutualExclusive">
+            <summary>
+            Indicates that this lock is really a mutual-exclusive lock allowing only one thread to enter into it at a time.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.ResourceLockState">
+            <summary>
+            Indicates the current state of the lock.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ResourceLocks.ResourceLockState.NotLocked">
+            <summary>
+            The lock is current not locked by any thread.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ResourceLocks.ResourceLockState.LockedForSharedAccess">
+            <summary>
+            The lock is current locked for shared access.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ResourceLocks.ResourceLockState.LockedForExclusiveAccess">
+            <summary>
+            The lock is currently locked for exclusive access.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.ExclusiveOwnerResourceLockModifier">
+            <summary>
+            Modifies a ResourceLock enforcing that whatever thread acquires the lock must also release the lock.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ExclusiveOwnerResourceLockModifier.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock)">
+            <summary>
+            Constructs an ExclusiveOwnerResourceLockModifier over the specified ResourceLock.
+            </summary>
+            <param name="resLock"></param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ExclusiveOwnerResourceLockModifier.OnEnter(System.Boolean)">
+            <summary>
+            Implements the ResourceLock's WaitToWrite behavior.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ExclusiveOwnerResourceLockModifier.OnLeave(System.Boolean)">
+            <summary>
+            Implements the ResourceLock's DoneWriting behavior.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.ThreadSafeCheckerResourceLockObserver">
+            <summary>
+            This class performs various sanity checks on a ResourceLock-derived type 
+            making sure that the lock is performing correctly 
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ThreadSafeCheckerResourceLockObserver.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock)">
+            <summary>Constructs a ThreadSafeCheckerResourceLockObserver wrapping the desired ResourceLock.</summary>
+            <param name="resLock"></param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ThreadSafeCheckerResourceLockObserver.Dispose(System.Boolean)">
+            <summary>Performs any desired cleanup for this object.</summary>
+            <param name="disposing">true if Dispose is being called; false if the object is being finalized.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ThreadSafeCheckerResourceLockObserver.OnEnter(System.Boolean)">
+            <summary>Allows the calling thread to acquire the lock for reading.</summary>
+            <returns>A object that can be used to release the reader lock.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.ThreadSafeCheckerResourceLockObserver.OnLeave(System.Boolean)">
+            <summary>Allows the calling thread to release the reader lock.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.ResourceLocks.Diagnostics.RecursionResourceLockModifier">
+            <summary>
+            A ResourceLock modifier that adds recursion support to the inner lock.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.RecursionResourceLockModifier.#ctor(Wintellect.Threading.ResourceLocks.ResourceLock,System.Int32)">
+            <summary>
+            Constructs a RecursionResourceLockModifier object.
+            </summary>
+            <param name="resLock">A reference to a ResourceLock object that will not support recursion.</param>
+            <param name="maxReaders">The maximum number of concurrent reader threads that this 
+            RecursionResourceLockModifier object should support.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.RecursionResourceLockModifier.OnEnter(System.Boolean)">
+            <summary>Implements the ResourceLock's WaitToWrite behavior.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.ResourceLocks.Diagnostics.RecursionResourceLockModifier.OnLeave(System.Boolean)">
+            <summary>Implements the ResourceLock's Leave behavior.</summary>
+        </member>
+        <member name="T:Wintellect.CommandArgumentParser.CmdArgRequiredValue">
+            <summary>
+            Indicates whether the command-line argument is required, not-required, or is optional.
+            </summary>
+        </member>
+        <member name="F:Wintellect.CommandArgumentParser.CmdArgRequiredValue.Yes">
+            <summary>
+            Indicates that the argument is required.
+            </summary>
+        </member>
+        <member name="F:Wintellect.CommandArgumentParser.CmdArgRequiredValue.No">
+            <summary>
+            Indicates that the argument is not required.
+            </summary>
+        </member>
+        <member name="F:Wintellect.CommandArgumentParser.CmdArgRequiredValue.Optional">
+            <summary>
+            Indicates that the argument is optional.
+            </summary>
+        </member>
+        <member name="T:Wintellect.CommandArgumentParser.CmdArgAttribute">
+            <summary>
+            An attribute that can be applied to a field or property indicating 
+            that the member maps to a command line argument.
+            </summary>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.CmdArgAttribute.#ctor">
+            <summary>
+            The attribute has no mandatory arguments.
+            </summary>
+        </member>
+        <member name="P:Wintellect.CommandArgumentParser.CmdArgAttribute.ArgName">
+            <summary>
+            Identifies the argument name that maps to the associated field or property.
+            If not specified, the argument name is identical to the field or property name.
+            </summary>
+        </member>
+        <member name="P:Wintellect.CommandArgumentParser.CmdArgAttribute.RequiredArg">
+            <summary>
+            Indicates whether this argument must be specified.
+            </summary>
+        </member>
+        <member name="P:Wintellect.CommandArgumentParser.CmdArgAttribute.RequiredValue">
+            <summary>
+            Indicates whether the command-line argument's value is required, not-required, or is optional.
+            </summary>
+        </member>
+        <member name="P:Wintellect.CommandArgumentParser.CmdArgAttribute.Description">
+            <summary>
+            Indicates the Usage text for this command-line argument.
+            </summary>
+        </member>
+        <member name="T:Wintellect.CommandArgumentParser.CmdArgEnumValueDescriptionAttribute">
+            <summary>Attribute describing how the target field maps to a command-line argument.</summary>
+        </member>
+        <member name="M:Wintellect.CommandArgumentParser.CmdArgEnumValueDescriptionAttribute.#ctor(System.String)">
+            <summary>Constructs an attribute using the specified command-line argument description.</summary>
+            <param name="description"></param>
+        </member>
+        <member name="P:Wintellect.CommandArgumentParser.CmdArgEnumValueDescriptionAttribute.Description">
+            <summary>Returns the description passed in the constructor.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.ThreadRights">
+            <summary>
+            Flags indicating how you intend to manipulate the thread after you open it.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.Terminate">
+            <summary>
+            Required to terminate a thread using TerminateThread.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.SuspendResume">
+            <summary>
+            Required to suspend or resume a thread (see SuspendThread and ResumeThread).
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.GetContext">
+            <summary>
+            Required to read the context of a thread using GetThreadContext.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.SetContext">
+            <summary>
+            Required to write the context of a thread using SetThreadContext.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.SetInformation">
+            <summary>
+            Required to set certain information in the thread object.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.SetLimitedInformation">
+            <summary>
+            Required to set certain information in the thread object. 
+            A handle that has the THREAD_SET_INFORMATION access right is 
+            automatically granted THREAD_SET_LIMITED_INFORMATION.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.QueryInformation">
+            <summary>
+            Required to read certain information from the thread object, 
+            such as the exit code (see GetExitCodeThread).
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.QueryLimitedInformation">
+            <summary>
+            Required to read certain information from the thread objects (see GetProcessIdOfThread). 
+            A handle that has the THREAD_QUERY_INFORMATION access right is automatically 
+            granted THREAD_QUERY_LIMITED_INFORMATION.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.SetThreadToken">
+            <summary>
+            Required to set the impersonation token for a thread using SetThreadToken.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.Impersonate">
+            <summary>
+            Required to use a thread's security information directly without calling
+            it by using a communication mechanism that provides impersonation services.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.DirectImpersonation">
+            <summary>
+            Required for a server thread that impersonates a client.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.Delete">
+            <summary>
+            Required to delete the object.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.ReadPermissions">
+            <summary>
+            Required to read information in the security descriptor for the object, 
+            not including the information in the SACL. To read or write the SACL, 
+            you must request the ACCESS_SYSTEM_SECURITY access right.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.ChangePermissions">
+            <summary>
+            Required to modify the DACL in the security descriptor for the object.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.TakeOwnership">
+            <summary>
+            Required to change the owner in the security descriptor for the object.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.Synchronize">
+            <summary>
+            The right to use the object for synchronization. This enables a 
+            thread to wait until the object is in the signaled state.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.StandardRightsRequired">
+            <summary>
+            
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadRights.FullControl">
+            <summary>
+            Same as StandardRightsRequired | Synchronize | 0x3FF
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.ThreadUtility">
+            <summary>
+            This static class contains a bunch of useful thread methods.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.NameFinalizerThreadForDebugging(System.String)">
+            <summary>
+            This method sets the name of the Finalizer thread for viewing in the debugger
+            </summary>
+            <param name="name">The string to name the Finalizer thread.</param>
+        </member>
+        <member name="F:Wintellect.Threading.ThreadUtility.IsSingleCpuMachine">
+            <summary>
+            Returns true if the host machine has just one CPU.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.Block(System.Int32,System.Boolean)">
+            <summary>
+            Blocks the calling thread for the specified time.
+            </summary>
+            <param name="milliseconds">The number of milliseconds that this method should wait before returning.</param>
+            <param name="computeBound">true if this method should spin in a compute bound loop; false if 
+            Windows should not schedule for the specified amount of time.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.GetProcessThreadFromWin32ThreadId(System.Int32)">
+            <summary>
+            Returns a ProcessThread object for a specified Win32 thread Id.
+            </summary>
+            <param name="threadId">The Win32 thread Id value.</param>
+            <returns>A ProcessThread object matching the specified thread Id.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.GetWindowThreadId(System.IntPtr)">
+            <summary>
+            Returns the Win32 thread Id matching the thread that created the specified window handle.
+            </summary>
+            <param name="hwnd">Identifies a window handle.</param>
+            <returns>The thread that created the window.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.GetWindowProcessId(System.IntPtr)">
+            <summary>
+            Returns the Win32 process Id containing the thread that created the specified window handle.
+            </summary>
+            <param name="hwnd">Identifies a window handle.</param>
+            <returns>The process owning the thread that created the window.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.OpenThread(Wintellect.Threading.ThreadRights,System.Boolean,System.Int32)">
+            <summary>
+            Opens a thread in the system identified via its Win32 thread Id.
+            </summary>
+            <param name="rights">Indicates how you intend to manipulate the thread.</param>
+            <param name="inheritHandle">true if the returned handle should be inherited by child processes.</param>
+            <param name="threadId">The Win32 Id identifying a thread.</param>
+            <returns>A SafeWaitHandle matching the opened thread. This method throws a WaitHandleCannotBeOpenedException if the thread cannot be opened.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.GetCurrentProcessorNumber">
+            <summary>
+            Retrieves the number of the processor the current thread was running on during the call to this function.
+            </summary>
+            <returns>The current processor number.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.GetCurrentWin32ThreadId">
+            <summary>
+            Retrieves the Win32 Id of the calling thread.
+            </summary>
+            <returns>The Win32 thread Id of the calling thread.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.GetCurrentWin32ThreadHandle">
+            <summary>
+            Retrieves a pseudo handle for the calling thread.
+            </summary>
+            <returns>The pseudo handle for the current thread.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.GetCurrentWin32ProcessHandle">
+            <summary>
+            Retrieves a pseudo handle for the calling thread's process.
+            </summary>
+            <returns>The pseudo handle for the current process.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.SwitchToThread">
+            <summary>
+            Causes the calling thread to yield execution to another thread 
+            that is ready to run on the current processor. The operating 
+            system selects the next thread to be executed.
+            </summary>
+            <returns>true if the operating system switches execution to another thread; 
+            false if there are no other threads ready to execute and the OS doesn't switch 
+            execution to another thread.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.SkipSignalOfDeviceOnIOCompletion(Microsoft.Win32.SafeHandles.SafeFileHandle)">
+            <summary>
+            Tells the I/O Manager to not signal the file/device 
+            handle when an I/O operation completes.
+            </summary>
+            <param name="device">Identifies the file or device that should not be signaled.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.SkipCompletionPortOnSynchronousIOCompletion(Microsoft.Win32.SafeHandles.SafeFileHandle)">
+            <summary>
+            Tells the I/O Manager to not queue a completion entry to the specified 
+            device's I/O completion port if the I/O operation completes synchronously.
+            </summary>
+            <param name="device">Identifies the file or device whose 
+            synchronously-executed operation should not be placed in an 
+            I/O completion port.</param>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.StallThread">
+            <summary>
+            Causes the calling thread to allow another thread to run.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.QueryThreadCycleTime(Microsoft.Win32.SafeHandles.SafeWaitHandle)">
+            <summary>
+            Retrieves the cycle time for the specified thread.
+            </summary>
+            <param name="threadHandle">Identifies the thread whose cycle time you'd like to obtain.</param>
+            <returns>The thread's cycle time.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.QueryProcessCycleTime(Microsoft.Win32.SafeHandles.SafeWaitHandle)">
+            <summary>
+            Retrieves the sum of the cycle time of all threads of the specified process.
+            </summary>
+            <param name="processHandle">Identifies the process whose threads' cycles times you'd like to obtain.</param>
+            <returns>The process' cycle time.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.QueryIdleProcessorCycleTimes">
+            <summary>
+            Retrieves the cycle time for the idle thread of each processor in the system.
+            </summary>
+            <returns>The number of CPU clock cycles used by each idle thread.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.CancelSynchronousIO(Microsoft.Win32.SafeHandles.SafeWaitHandle)">
+            <summary>
+            Marks pending synchronous I/O operations that are issued by the specified thread as canceled.
+            </summary>
+            <param name="thread">Identifies the thread whose synchronous I/O you want to cancel.</param>
+            <returns>true if an operation is cancelled; false if the thread was not waiting for I/O</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.BeginBackgroundProcessingMode">
+            <summary>
+            The system lowers the resource scheduling priorities of the thread 
+            so that it can perform background work without significantly 
+            affecting activity in the foreground.
+            </summary>
+            <returns>An IDisposable object that can be used to end 
+            background processing mode for the thread.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.ThreadUtility.EndBackgroundProcessingMode">
+            <summary>
+            The system restores the resource scheduling priorities of the thread 
+            as they were before the thread entered background processing mode.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.ApmWrap">
+            <summary>
+            This class contains utility methods to help with the APM.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap.SyncContextCallback(System.AsyncCallback)">
+            <summary>
+            Wraps an AsyncCallback with the calling thread's SynchronizationContext so that the
+            callback method is invoked via posting to the calling thread's SynchronizationContext. 
+            </summary>
+            <param name="callback">The callback method to be invoked via the calling thread's SynchronizationContext</param>
+            <returns>The wrapped callback method</returns>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.ApmWrap`1">
+            <summary>
+            This light-weight struct has the ability to associate an arbitrary piece 
+            of data (of type T) with any IAsyncResult object. When the asynchronous 
+            operation completes, the associated piece of data can be retrieved to 
+            complete processing. This struct is typically used when you are 
+            implementing code that wraps an asynchronous operation and you wish to 
+            add some context or state of your own to complete the wrapping.
+            </summary>
+            <typeparam name="T">The type of the data you wish to embed in 
+            the IAsyncResult object.</typeparam>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.Equals(Wintellect.Threading.AsyncProgModel.ApmWrap{`0})">
+            <summary>
+            Returns a value indicating whether this instance and a specified ApmWrap object represent the same value.
+            </summary>
+            <param name="value">An ApmWrap object to compare to this instance.</param>
+            <returns>true if value is equal to this instance; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.Equals(System.Object)">
+            <summary>
+            Returns a value indicating whether this instance and a specified ApmWrap object represent the same value.
+            </summary>
+            <param name="obj">An ApmWrap object to compare to this instance.</param>
+            <returns>true if value is equal to this instance; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.GetHashCode">
+            <summary>
+            Returns the hash code for this instance.
+            </summary>
+            <returns>A 32-bit signed integer hash code.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.op_Equality(Wintellect.Threading.AsyncProgModel.ApmWrap{`0},Wintellect.Threading.AsyncProgModel.ApmWrap{`0})">
+            <summary>
+            /// Returns a value indicating whether two instances of ApmWrap are equal.
+            </summary>
+            <param name="obj1">An ApmWrap.</param>
+            <param name="obj2">An ApmWrap.</param>
+            <returns>true if obj1 and obj2 are equal; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.op_Inequality(Wintellect.Threading.AsyncProgModel.ApmWrap{`0},Wintellect.Threading.AsyncProgModel.ApmWrap{`0})">
+            <summary>
+            /// Returns a value indicating whether two instances of ApmWrap are not equal.
+            </summary>
+            <param name="obj1">An ApmWrap.</param>
+            <param name="obj2">An ApmWrap.</param>
+            <returns>true if obj1 and obj2 are not equal; otherwise, true.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.Callback(`0,System.AsyncCallback)">
+            <summary>
+            Call this method to create an ApmWrap object around an asynchronous operation.
+            </summary>
+            <param name="data">The data to embed in the ApmWrap object.</param>
+            <param name="callback">The callback method that should be invoked when the operation completes.</param>
+            <returns>An ApmWrap object's completion method.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.Return(`0,System.IAsyncResult)">
+            <summary>
+            Call this method to create an ApmWrap object around an asynchronous operation.
+            </summary>
+            <param name="data">The data to embed in the ApmWrap object.</param>
+            <param name="result">The original IAsyncResult object returned from the BeginXxx method.</param>
+            <returns>An ApmWrap object that contains the originally-returned IAsyncResult object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.ApmWrap`1.Unwrap(System.IAsyncResult@)">
+            <summary>
+            Call this method to unwrap an ApmWrap object to get its embedded data and IAsyncResult.
+            </summary>
+            <param name="result">A variable that will receive a reference to the wrapped IAsyncResult object.</param>
+            <returns>The embedded piece of data passed to the Callback/Return methods.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.AsyncProgModel.ApmWrap`1.SyncContext">
+            <summary>
+            If non-null when creating an ApmWrap object, the ApmWrap object will 
+            force the operation to complete using the specified SynchronizationContext. 
+            /// </summary>
+        </member>
+        <member name="T:Wintellect.SafePinnedObject">
+            <summary>
+            This class encapsulates pinning a buffer. 
+            </summary>
+        </member>
+        <member name="M:Wintellect.SafePinnedObject.FromObject(System.Object)">
+            <summary>
+            This factory method wraps a SafePinnedObject around the specified object.
+            </summary>
+            <param name="value">The object that you want to pin.</param>
+            <returns>The SafePinnedObject wrapping the desired object.</returns>
+        </member>
+        <member name="M:Wintellect.SafePinnedObject.FromArray(System.Array,System.Int32,System.Int32)">
+            <summary>
+            This factory method wraps a SafePinnedObject around the specified array.
+            </summary>
+            <param name="array">The array that you want to pin.</param>
+            <param name="startOffset">The first element in the array whose address you want to pass to native code.</param>
+            <param name="numberOfElements">The number of elements in the array you wish to pass to native code.</param>
+            <returns>The SafePinnedObject wrapping the desired array elements.</returns>
+        </member>
+        <member name="M:Wintellect.SafePinnedObject.FromType(System.Type)">
+            <summary>
+            This factory method wraps a SafePinnedObject around an instance of the specified type.
+            </summary>
+            <param name="type">The type, an instance of which you want to pass to native code.</param>
+            <returns>The SafePinnedObject wrapping the desired type's instance.</returns>
+        </member>
+        <member name="M:Wintellect.SafePinnedObject.FromPointer(System.IntPtr,System.Int32)">
+            <summary>
+            This factory method wraps a SafePinnedObject around a native block of memory.
+            </summary>
+            <param name="address">The starting address of the native block of memory.</param>
+            <param name="numberOfBytes">The number of bytes in the native block of memory.</param>
+            <returns>The SafePinnedObject wrapping the desired native block of memory.</returns>
+        </member>
+        <member name="M:Wintellect.SafePinnedObject.ReleaseHandle">
+            <summary>This method is called when it is time to release the native resource.</summary>
+            <returns>true if the native resource is released successfully.</returns>
+        </member>
+        <member name="P:Wintellect.SafePinnedObject.Target">
+            <summary>
+            Returns the object of a pinned buffer or null if not specified 
+            </summary>
+        </member>
+        <member name="P:Wintellect.SafePinnedObject.Size">
+            <summary>
+            Returns the number of bytes in a pinned object or 0 if not specified 
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.AsyncProgModel.CountdownTimer">
+            <summary>
+            This class offers a timer that implements the asynchronous programming model (APM).
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.CountdownTimer.#ctor">
+            <summary>Constructs a new CountdownTimer object.</summary>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.CountdownTimer.BeginCountdown(System.Int32,System.AsyncCallback,System.Object)">
+            <summary>Initiates an asynchronous countdown timer operation.</summary>
+            <param name="ms">How many milliseconds the countdown timer should wait before firing.</param>
+            <param name="callback">An optional asynchronous callback, to be called when the timer fires.</param>
+            <param name="state">A user-provided object that distinguishes this particular asynchronous operation from other operations.</param>
+            <returns>An IAsyncResult that references the asynchronous countdown operation.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.CountdownTimer.EndCountdown(System.IAsyncResult)">
+            <summary>Returns the result of the asynchronous countdown operation.</summary>
+            <param name="result">The reference to the pending asynchronous countdown operation.</param>
+        </member>
+        <member name="M:Wintellect.Threading.AsyncProgModel.CountdownTimer.Dispose">
+            <summary>Releases all resources used by the countdown timer.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.SingletonRaceLoser">
+            <summary>
+            Indicates whether singleton should be created using a double-check 
+            locking technique or via an interlocked-compare-exchange technique.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.SingletonRaceLoser.Block">
+            <summary>
+            If there is a race to create the singleton, the race is 
+            resolved by blocking all but one thread.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.SingletonRaceLoser.GC">
+            <summary>
+            If there is a race to create the singleton, the race is resolved
+            by having all threads create the singleton but, when done, only one 
+            thread will win and the losing threads will have their singleton GC'd
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.Singleton`1">
+            <summary>
+            This class ensures that only one singleton object is used if mutliple 
+            threads race to create one simultaneously.
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:Wintellect.Threading.Singleton`1.#ctor(Wintellect.Threading.SingletonRaceLoser,Wintellect.Threading.Singleton{`0}.Creator)">
+            <summary>
+            Constructs a Singleton object that knows how to create a singleton object.
+            </summary>
+            <param name="raceLoser">Indicates how to arbitrate a race between multiple thread attempting to create the singleton object.</param>
+            <param name="creator">Refers to the method that knows how to create the singleton object.</param>
+        </member>
+        <member name="P:Wintellect.Threading.Singleton`1.Value">
+            <summary>
+            Returns the singleton object.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.Singleton`1.Creator">
+            <summary>
+            A delegate that refers to a method that creates a singleton object.
+            </summary>
+            <returns>The singleton object.</returns>
+        </member>
+        <member name="T:Wintellect.Exception`1">
+            <summary>
+            Represents errors that occur during application execution.
+            </summary>
+            <typeparam name="T">The type of exception and any additional arguments associated with it.</typeparam>
+        </member>
+        <member name="M:Wintellect.Exception`1.#ctor">
+            <summary>
+            Initializes a new instance of the Exception class
+            </summary>
+        </member>
+        <member name="M:Wintellect.Exception`1.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the Exception class with a specified error message.
+            </summary>
+            <param name="message">The error message that explains the reason for the exception.</param>
+        </member>
+        <member name="M:Wintellect.Exception`1.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the Exception class with a specified error message 
+            and a reference to the inner exception that is the cause of this exception. 
+            </summary>
+            <param name="message">The error message that explains the reason for the exception.</param>
+            <param name="innerException">The exception that is the cause of the current exception, 
+            or a null reference if no inner exception is specified.</param>
+        </member>
+        <member name="M:Wintellect.Exception`1.#ctor(`0,System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the Exception class with additional arguments, 
+            a specified error message, and a reference to the inner exception 
+            that is the cause of this exception. 
+            </summary>
+            <param name="args">The exception's additional arguments.</param>
+            <param name="message">The error message that explains the reason for the exception.</param>
+            <param name="innerException">The exception that is the cause of the current exception, 
+            or a null reference if no inner exception is specified.</param>
+        </member>
+        <member name="M:Wintellect.Exception`1.#ctor(`0,System.String)">
+            <summary>
+            Initializes a new instance of the Exception class with additional arguments and 
+            a specified error message. 
+            </summary>
+            <param name="args">The exception's additional arguments.</param>
+            <param name="message">The error message that explains the reason for the exception.</param>
+        </member>
+        <member name="M:Wintellect.Exception`1.GetObjectData(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
+            <summary>
+            When overridden in a derived class, sets the SerializationInfo with information about the exception.
+            </summary>
+            <param name="info">The SerializationInfo that holds the serialized object data about the exception being thrown.</param>
+            <param name="context">The StreamingContext that contains contextual information about the source or destination.</param>
+        </member>
+        <member name="M:Wintellect.Exception`1.ToString">
+            <summary>
+            Creates and returns a string representation of the current exception.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Wintellect.Exception`1.GetHashCode">
+            <summary>
+            Serves as a hash function for a particular type.
+            </summary>
+            <returns>A hash code for the current Object.</returns>
+        </member>
+        <member name="M:Wintellect.Exception`1.Equals(System.Object)">
+            <summary>
+            Determines whether the specified Object is equal to the current Object.
+            </summary>
+            <param name="obj">The Object to compare with the current Object. </param>
+            <returns>true if the specified Object is equal to the current Object; otherwise, false.</returns>
+        </member>
+        <member name="P:Wintellect.Exception`1.Args">
+            <summary>
+            Returns a reference to this exception's additional arguments.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Exception`1.Message">
+            <summary>
+            Gets a message that describes the current exception.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation">
+            <summary>
+            This class exposes logical processor information about the host machine.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation.GetLogicalProcessorInformation">
+            <summary>
+            Retrieves all of the logical processor information about the host machine.
+            </summary>
+            <returns>An array of LogicalProcessorInformation objects.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation.ToString">
+            <summary>
+            Returns a string representing the state of the object.
+            </summary>
+            <returns>The string representing the state of the object.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation.ProcessorMask">
+            <summary>
+            Returns a bitmask indicating the logical processors associated with this physical processor.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation.Relationship">
+            <summary>
+            Returns the 
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation.ProcessorCore">
+            <summary>
+            This structure contains valid data only if the Relationship member is RelationProcessorCore.
+            If the value of this member is 1, the logical processors identified by the value of the ProcessorMask member share functional units, as in hyper-threading or SMT. 
+            Otherwise, the identified logical processors do not share functional units. 
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation.NumaNode">
+            <summary>
+            This structure contains valid data only if the Relationship member is RelationNumaNode.
+            Identifies the NUMA node. The valid values of this parameter are 0 to the highest NUMA node number inclusive. 
+            A non-NUMA multiprocessor system will report that all processors belong to one NUMA node.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.LogicalProcessorInformation.CacheDescriptor">
+            <summary>
+            This property contains valid data only if the Relationship member is RelationCache.
+            There is one record returned for each cache reported. Some or all caches may not be reported. 
+            Therefore, do not assume the absence of any particular caches. Caches are not necessarily shared among logical processors.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.LogicalProcessor.CacheDescriptor">
+            <summary>
+            Describes the processor's cache characteristics.
+            </summary>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.CacheDescriptor.ToString">
+            <summary>
+            Returns a string representing the state of the object.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.CacheDescriptor.Equals(System.Object)">
+            <summary>
+            Determines whether the specified Object is equal to the current Object. 
+            </summary>
+            <param name="obj">The Object to compare with the current Object.</param>
+            <returns>true if the specified Object is equal to the current Object; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.CacheDescriptor.GetHashCode">
+            <summary>
+            Serves as a hash function for a particular type.
+            </summary>
+            <returns>A hash code for the current Object.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.CacheDescriptor.Equals(Wintellect.Threading.LogicalProcessor.CacheDescriptor)">
+            <summary>
+            Determines whether the specified CacheDescriptor is equal to the current CacheDescriptor. 
+            </summary>
+            <param name="other">The CacheDescriptor to compare with the current CacheDescriptor.</param>
+            <returns>true if the specified CacheDescriptor is equal to the current CacheDescriptor; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.CacheDescriptor.op_Equality(Wintellect.Threading.LogicalProcessor.CacheDescriptor,Wintellect.Threading.LogicalProcessor.CacheDescriptor)">
+            <summary>
+            Determines if two CacheDescriptors are equal to each other. 
+            </summary>
+            <param name="cd1">The first CacheDescriptor to compare.</param>
+            <param name="cd2">The second CacheDescriptor to compare.</param>
+            <returns>true if the two CacheDescriptors are equal; otherwise, false.</returns>
+        </member>
+        <member name="M:Wintellect.Threading.LogicalProcessor.CacheDescriptor.op_Inequality(Wintellect.Threading.LogicalProcessor.CacheDescriptor,Wintellect.Threading.LogicalProcessor.CacheDescriptor)">
+            <summary>
+            Determines if two CacheDescriptors are not equal to each other. 
+            </summary>
+            <param name="cd1">The first CacheDescriptor to compare.</param>
+            <param name="cd2">The second CacheDescriptor to compare.</param>
+            <returns>true if the two CacheDescriptors are not equal; otherwise, false.</returns>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.CacheDescriptor.Level">
+            <summary>
+            The cache level. This member can currently be one of the following values; other values may be supported in the future.Value Meaning 1=L1, 2=L2, 3=L3 
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.CacheDescriptor.Associativity">
+            <summary>
+            The cache associativity. If this member is CACHE_FULLY_ASSOCIATIVE (0xFF), the cache is fully associative.
+            </summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.CacheDescriptor.LineSize">
+            <summary>The cache line size, in bytes.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.CacheDescriptor.Size">
+            <summary>The cache size, in bytes.</summary>
+        </member>
+        <member name="P:Wintellect.Threading.LogicalProcessor.CacheDescriptor.Type">
+            <summary>The cache type.</summary>
+        </member>
+        <member name="T:Wintellect.Threading.LogicalProcessor.CacheAssociativity">
+            <summary>
+            Indicates the cache associativity.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.CacheAssociativity.None">
+            <summary>
+            The cache is not associative.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.CacheAssociativity.CacheFullyAssociative">
+            <summary>
+            The is fully associative.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.LogicalProcessor.LogicalProcessorRelationship">
+            <summary>
+            Flags indicating what a set of logical processors share with each other.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.LogicalProcessorRelationship.ProcessorCore">
+            <summary>
+            The specified logical processors share a single processor core. The ProcessorCore member contains additional information.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.LogicalProcessorRelationship.NumaNode">
+            <summary>
+            The specified logical processors are part of the same NUMA node. The NumaNode member contains additional information.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.LogicalProcessorRelationship.Cache">
+            <summary>
+            The specified logical processors share a cache. The Cache member contains additional information.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.LogicalProcessorRelationship.ProcessorPackage">
+            <summary>
+            The specified logical processors share a physical package. There is no additional information available.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.LogicalProcessorRelationship.Group">
+            <summary>
+            The specified logical processors share a procesor group. There is no additional information available.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.LogicalProcessor.CacheLevel">
+            <summary>
+            Indicates the cache level.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.CacheLevel.None">
+            <summary>
+            None.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.CacheLevel.L1">
+            <summary>
+            Level 1 cache.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.CacheLevel.L2">
+            <summary>
+            Level 2 cache.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.CacheLevel.L3">
+            <summary>
+            Level 3 cache.
+            </summary>
+        </member>
+        <member name="T:Wintellect.Threading.LogicalProcessor.ProcessorCacheType">
+            <summary>
+            Indicates the processor cache type.
+            </summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.ProcessorCacheType.Unified">
+            <summary>The cache is unified.</summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.ProcessorCacheType.Instruction">
+            <summary>The cache is for processor instructions.</summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.ProcessorCacheType.Data">
+            <summary>The cache is for data.</summary>
+        </member>
+        <member name="F:Wintellect.Threading.LogicalProcessor.ProcessorCacheType.Trace">
+            <summary>The cache is for traces.</summary>
+        </member>
+    </members>
+</doc>
