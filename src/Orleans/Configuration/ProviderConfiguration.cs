@@ -146,7 +146,10 @@ namespace Orleans.Runtime.Configuration
 
         internal void AddProperty(string key, string val)
         {
-            properties.Add(key, val);
+            if (!properties.ContainsKey(key))
+            {
+                properties.Add(key, val);
+            }
         }
 
         public override string ToString()
