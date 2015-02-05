@@ -104,7 +104,7 @@
     <OrleansProjectType>Server</OrleansProjectType>
     <OrleansReferencesBase>$(SolutionDir)..\References</OrleansReferencesBase>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)..\..\OrleansV4\Orleans.SDK.targets" />
+  <Import Project="$(SolutionDir)..\..\src\Orleans.SDK.targets" />
   <PropertyGroup>
     <PostBuildEvent>mkdir "$(SolutionDir)TestInput\LoadTests"
 mkdir "$(SolutionDir)TestInput\LoadTests\Grains"

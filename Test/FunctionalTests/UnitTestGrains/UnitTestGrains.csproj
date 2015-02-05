@@ -178,7 +178,7 @@
       </PropertyGroup>
     </Otherwise>
   </Choose>
-  <Import Project="$(ProjectDir)..\..\..\OrleansV4\Orleans.SDK.targets" />
+  <Import Project="$(ProjectDir)..\..\..\src\Orleans.SDK.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

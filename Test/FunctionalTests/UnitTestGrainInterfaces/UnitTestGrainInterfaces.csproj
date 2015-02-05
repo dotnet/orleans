@@ -165,7 +165,7 @@
       </PropertyGroup>
     </Otherwise>
   </Choose>
-  <Import Project="$(ProjectDir)..\..\..\OrleansV4\Orleans.SDK.targets" />
+  <Import Project="$(ProjectDir)..\..\..\src\Orleans.SDK.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -177,7 +177,7 @@
     <PreBuildEvent>set REF_DIR=$(SolutionDir)..\References
 
 if "$(BuildingInsideVisualStudio)" == "true" (
-set IN_DIR=$(SolutionDir)..\..\OrleansV4\Tester\$(OutDir)
+set IN_DIR=$(SolutionDir)..\..\src\Tester\$(OutDir)
 ) else (
 set IN_DIR=$(OutDir)
 )

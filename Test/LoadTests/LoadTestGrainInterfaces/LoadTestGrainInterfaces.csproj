@@ -90,7 +90,7 @@
     <OrleansProjectType>Client</OrleansProjectType>
     <OrleansReferencesBase>$(SolutionDir)..\References</OrleansReferencesBase>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)..\..\Orleansv4\Orleans.SDK.targets" />
+  <Import Project="$(SolutionDir)..\..\src\Orleans.SDK.targets" />
   <PropertyGroup>
     <PostBuildEvent>mkdir "$(TargetDir)TestInput\LoadTests"
 mkdir "$(TargetDir)TestInput\LoadTests\Client"
