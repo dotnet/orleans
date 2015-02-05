@@ -144,12 +144,14 @@ namespace Orleans.Runtime.Configuration
                 child.SetProviderManager(manager);
         }
 
-        internal void AddProperty(string key, string val)
+        internal bool AddProperty(string key, string val)
         {
             if (!properties.ContainsKey(key))
             {
                 properties.Add(key, val);
+                return true;
             }
+            return false;
         }
 
         public override string ToString()
