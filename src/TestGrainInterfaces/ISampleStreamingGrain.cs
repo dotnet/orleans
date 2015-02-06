@@ -46,4 +46,8 @@ namespace UnitTests.SampleStreaming
 
         Task<int> GetNumberConsumed();
     }
-}
+
+    public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
+    {
+    }
+}

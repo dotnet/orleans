@@ -78,11 +78,21 @@ namespace Orleans.CodeGeneration
             return builder.ToString();
         }
 
+        /// <summary>
+        /// Returns the C# name for the provided <paramref name="parameter"/>.
+        /// </summary>
+        /// <param name="parameter">The parameter.</param>
+        /// <returns>The C# name for the provided <paramref name="parameter"/>.</returns>
+        protected override string GetParameterName(ParameterInfo parameter)
+        {
+            return "@" + GrainInterfaceData.GetParameterName(parameter);
+        }
+
         #region Grain State Classes
         protected override void GenerateStateClassProperty(CodeTypeDeclaration stateClass, PropertyInfo propInfo, string name, string type)
         {
             var text = string.Format(@"
-            public {1} {0} {{ get; set; }}",
+            public {1} @{0} {{ get; set; }}",
                     name, type);
             stateClass.Members.Add(new CodeSnippetTypeMember(text));
         }
@@ -94,7 +104,7 @@ namespace Orleans.CodeGeneration
             public override System.String ToString()
             {{
                 return System.String.Format(""{0}( {1})""{2});
-            }}", stateClassName, properties.Keys.ToStrings(p => p + "={" + i++ + "} ", ""), properties.Keys.ToStrings(p => p, ", "));
+            }}", stateClassName, properties.Keys.ToStrings(p => p + "={" + i++ + "} ", ""), properties.Keys.ToStrings(p => "@" + p, ", "));
 
             stateClass.Members.Add(new CodeSnippetTypeMember(text));
         }
@@ -114,20 +124,20 @@ namespace Orleans.CodeGeneration
                     || "int64".Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
                 {
                     setAllBody += string.Format(
-@"if (values.TryGetValue(""{0}"", out value)) {0} = value is Int32 ? (Int32)value : (Int64)value;",
+@"if (values.TryGetValue(""{0}"", out value)) @{0} = value is Int32 ? (Int32)value : (Int64)value;",
                                      pair.Key);
                 }
                 else if ("int".Equals(pair.Value, StringComparison.OrdinalIgnoreCase)
                     || "int32".Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
                 {
                     setAllBody += string.Format(
-@"if (values.TryGetValue(""{0}"", out value)) {0} = value is Int64 ? (Int32)(Int64)value : (Int32)value;",
+@"if (values.TryGetValue(""{0}"", out value)) @{0} = value is Int64 ? (Int32)(Int64)value : (Int32)value;",
                                      pair.Key);
                 }
                 else
                 {
                     setAllBody += string.Format(
-@"if (values.TryGetValue(""{0}"", out value)) {0} = ({1}) value;",
+@"if (values.TryGetValue(""{0}"", out value)) @{0} = ({1}) value;",
                                      pair.Key, pair.Value);
                 }
             }
@@ -512,11 +522,11 @@ namespace Orleans.CodeGeneration
             {
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("{0} is global::Orleans.Grain ? {2}.{1}.Cast({0}.AsReference()) : {0}",
-                        GrainInterfaceData.GetParameterName(paramInfo),
+                        GetParameterName(paramInfo),
                         GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType),
                         paramInfo.ParameterType.Namespace);
                 else
-                    invokeArguments += GrainInterfaceData.GetParameterName(paramInfo);
+                    invokeArguments += GetParameterName(paramInfo);
 
                 if (count++ < parameters.Length)
                     invokeArguments += ", ";
@@ -597,7 +607,7 @@ namespace Orleans.CodeGeneration
                 if (typeof (IGrainObserver).IsAssignableFrom(parameterInfo.ParameterType))
                     paramGuardStatements.AppendLine( string.Format(
                         @"global::Orleans.CodeGeneration.GrainFactoryBase.CheckGrainObserverParamInternal({0});",
-                        GrainInterfaceData.GetParameterName(parameterInfo)));
+                        GetParameterName(parameterInfo)));
             }
             return paramGuardStatements.ToString();
         }

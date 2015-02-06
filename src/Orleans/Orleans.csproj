@@ -16,10 +16,14 @@
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <PlatformTarget>x86</PlatformTarget>
-    <SccProjectName></SccProjectName>
-    <SccLocalPath></SccLocalPath>
-    <SccAuxPath></SccAuxPath>
-    <SccProvider></SccProvider>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
@@ -142,6 +146,8 @@
     <Compile Include="IDs\TypeCodeMapper.cs" />
     <Compile Include="Messaging\SqlMembershipTable.cs" />
     <Compile Include="Providers\ILocalDataStore.cs" />
+    <Compile Include="Streams\Core\AsyncObservableExtensions.cs" />
+    <Compile Include="Streams\Internal\GenericAsyncObserver.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
     <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />
     <Compile Include="Streams\Predicates\FilterPredicateWrapperData.cs" />

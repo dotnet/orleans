@@ -217,13 +217,18 @@ namespace Orleans.Runtime.Configuration
             return limit;
         }
 
-        internal void Load(TextReader input)
+        public void Load(TextReader input)
         {
             var xml = new XmlDocument();
             var xmlReader = XmlReader.Create(input);
             xml.Load(xmlReader);
-            var root = xml.DocumentElement;
+            XmlElement root = xml.DocumentElement;
 
+            LoadFromXml(root);
+        }
+
+        internal void LoadFromXml(XmlElement root)
+        {
             foreach (XmlNode node in root.ChildNodes)
             {
                 var child = node as XmlElement;
@@ -334,6 +339,10 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
+        /// <summary>
+        /// This method may be called by the client host or test host to tweak a provider configuration after it has been already loaded.
+        /// Its is optional and should NOT be automaticaly called by the runtime.
+        /// </summary>
         internal void AdjustConfiguration()
         {
             GlobalConfiguration.AdjustConfiguration(ProviderConfigurations, DeploymentId);
