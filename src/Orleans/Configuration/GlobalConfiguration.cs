@@ -673,7 +673,7 @@ namespace Orleans.Runtime.Configuration
 
                 foreach (ProviderCategoryConfiguration providerConfig in providerConfigurations.Where(kv => kv.Key.Equals("Stream")).Select(kv => kv.Value))
                 {
-                    providerConfig.AddToConfiguration("DeploymentId", deploymentId);
+                    providerConfig.SetConfiguration("DeploymentId", deploymentId);
                 }
             }
 
