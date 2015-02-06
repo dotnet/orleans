@@ -149,7 +149,7 @@ namespace Orleans.AzureUtils
             var timeStr = time.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
 
             // number of ticks remaining until the year 9683
-            var ticks = DateTime.MaxValue.Ticks - DateTime.UtcNow.Ticks;
+            var ticks = DateTime.MaxValue.Ticks - time.Ticks;
 
             // partition the table according to the deployment id and hour
             entry.PartitionKey = string.Join("$", deploymentId, string.Format("{0:d19}", ticks - ticks % TimeSpan.TicksPerHour));
