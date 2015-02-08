@@ -23,8 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Diagnostics;
-using Microsoft.WindowsAzure.StorageClient;
 using Orleans.Runtime;
+using Microsoft.WindowsAzure.Storage.RetryPolicies;
 
 namespace Orleans.AzureUtils
 {
@@ -48,8 +48,8 @@ namespace Orleans.AzureUtils
         public static TimeSpan TableOperationTimeout { get; private set; }
         public static TimeSpan BusyRetriesTimeout { get; private set; }
 
-        public static RetryPolicy TableCreationRetryPolicy { get; private set; }
-        public static RetryPolicy TableOperationRetryPolicy { get; private set; }
+        public static IRetryPolicy TableCreationRetryPolicy { get; private set; }
+        public static IRetryPolicy TableOperationRetryPolicy { get; private set; }
 
         public const int MAX_BULK_UPDATE_ROWS = 100;
 
@@ -71,10 +71,10 @@ namespace Orleans.AzureUtils
                 PauseBetweenBusyRetries = PauseBetweenBusyRetries.Multiply(10);
             }
 #endif
-            TableCreationRetryPolicy = RetryPolicies.Retry(MaxTableCreationRetries, PauseBetweenTableCreationRetries); // 60 x 1s
+            TableCreationRetryPolicy = new LinearRetry(PauseBetweenTableCreationRetries, MaxTableCreationRetries); // 60 x 1s
             TableCreationTimeout = PauseBetweenTableCreationRetries.Multiply(MaxTableCreationRetries).Multiply(3);    // 3 min
 
-            TableOperationRetryPolicy = RetryPolicies.Retry(MaxTableOperationRetries, PauseBetweenTableOperationRetries); // 5 x 100ms
+            TableOperationRetryPolicy = new LinearRetry(PauseBetweenTableOperationRetries, MaxTableOperationRetries); // 5 x 100ms
             TableOperationTimeout = PauseBetweenTableOperationRetries.Multiply(MaxTableOperationRetries).Multiply(6);    // 3 sec
 
             BusyRetriesTimeout = PauseBetweenBusyRetries.Multiply(MaxBusyRetries);  // 1 minute

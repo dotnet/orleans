@@ -71,13 +71,35 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.WindowsAzure.StorageClient, Version=1.7.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll</HintPath>
+    <Reference Include="Microsoft.Data.Edm, Version=5.6.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.Data.Edm.5.6.2\lib\net40\Microsoft.Data.Edm.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Data.OData, Version=5.6.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.Data.OData.5.6.2\lib\net40\Microsoft.Data.OData.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Data.Services.Client, Version=5.6.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.2\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.WindowsAzure.Configuration, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.3\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.WindowsAzure.Storage, Version=4.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\WindowsAzure.Storage.4.3.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Data.Services.Client" />
     <Reference Include="System.Management" />
+    <Reference Include="System.Spatial, Version=5.6.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\System.Spatial.5.6.2\lib\net40\System.Spatial.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -103,7 +125,6 @@
     <Compile Include="Core\Exceptions.cs" />
     <Compile Include="Core\IGrainState.cs" />
     <Compile Include="GlobalSuppressions.cs" />
-    <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
@@ -146,7 +167,6 @@
     <Compile Include="Streams\Core\IAsyncObservable.cs" />
     <Compile Include="Streams\Internal\IStreamControl.cs" />
     <Compile Include="Streams\Core\IStreamIdentity.cs" />
-    <Compile Include="Streams\Providers\StreamProviderDirection.cs" />
     <Compile Include="Streams\Providers\IStreamProviderImpl.cs" />
     <Compile Include="Streams\Providers\IStreamProviderManager.cs" />
     <Compile Include="Streams\Providers\IStreamProviderRuntime.cs" />
@@ -334,11 +354,13 @@
       <SubType>Designer</SubType>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <None Include="packages.config" />
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <CodeGenToolReferences>System.Data.dll;System.Data.Services.Client.dll;System.Management.dll</CodeGenToolReferences>
+    <ClientGenReferences>System.Data.dll;$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.2\lib\net40\Microsoft.Data.Services.Client.dll;</ClientGenReferences>
   </PropertyGroup>
   <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" 
           Condition="'$(BuildingInsideVisualStudio)' != 'true'" 
@@ -354,53 +376,46 @@
     <!-- Show values of some useful properties -->
     <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
   </Target>
-  <Target Name="OrleansDllBootstrapUsingCodeGen"
+  <Target Name="OrleansDllBootstrapUsingClientGen" 
           AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" 
           Inputs="@(Compile);@(ReferencePath)" 
           Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Bootstrapping the Orleans.dll" Importance="high" />
     <!-- Clean Generated directory -->
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
     <MakeDir Directories="$(IntermediateOutputPath)Generated" />
     <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
-    <!-- Extract the sources for Orleans codegen tool -->
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Searching for Orleans CodeGen tool sources" Importance="high" />
+    <!-- Extract the sources for clientgen -->
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Searching for ClientGen sources" Importance="high" />
     <ItemGroup>
       <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*.cs" />
       <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*\*.cs" />
     </ItemGroup>
     <PropertyGroup>
-      <CodeGenToolSources>@(CodeGenSrcFiles->'%(Identity)')</CodeGenToolSources>
+      <ClientGenSources>@(CodeGenSrcFiles->'%(Identity)')</ClientGenSources>
     </PropertyGroup>
-    <Message Text="CodeGenToolSources extracted: $(CodeGenToolSources)" Importance="high" />
+    <Message Text="ClientGenSources extracted: $(ClientGenSources)" Importance="high" />
     <!-- Compile orleans dll -->
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for boot strap" Importance="high" />
-    <csc Sources="@(Compile)" 
-         OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
-         EmitDebugInformation="true" 
-         PdbFile="$(PdbFile)" 
-         Platform="$(PlatformTarget)" 
-         References="$(CodeGenToolReferences);$(SolutionDir)packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll" 
-         DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN" 
-         KeyFile="$(AssemblyOriginatorKeyFile)" 
-         TargetType="$(OutputType)" />
-    <!-- Compile codegen tool exe -->
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans codegen tool for BootStrap" Importance="high" />
-    <csc Sources="$(CodeGenToolSources)"
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Compiling Orleans.dll for boot strap" Importance="high" />
+    <csc Sources="@(Compile)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(ClientGenReferences);Microsoft.VisualBasic.dll;$(SolutionDir)packages\WindowsAzure.Storage.4.3.0\lib\net40\Microsoft.WindowsAzure.Storage.dll" DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN;" KeyFile="$(AssemblyOriginatorKeyFile)" TargetType="$(OutputType)" />
+    <!-- $(SolutionDir)Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.StorageClient.dll; -->
+    <!-- Compile clientgen-->
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Compiling ClientGenerator for BootStrap" Importance="high" />
+    <csc Sources="$(ClientGenSources)" 
          OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" 
          EmitDebugInformation="true" 
          PdbFile="$(PdbFile)" 
          Platform="$(PlatformTarget)" 
-         References="$(CodeGenToolReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
+         References="$(ClientGenReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
          DefineConstants="$(DefineConstants);CLIENTGEN_PROJECT" 
          KeyFile="$(AssemblyOriginatorKeyFile)" />
     <!-- Finally invoke ClientGenerator.exe on the recently built Orleans.dll -->
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
-      <CodeGenToolExecCmd>"$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" /nomerge /bootstrap "/in:$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</CodeGenToolExecCmd>
+      <ClientGenCmd>"$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" /nomerge /bootstrap "/in:$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</ClientGenCmd>
     </PropertyGroup>
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - CodeGen Cmd = $(CodeGenToolExecCmd)" />
-    <Exec Command="$(CodeGenToolExecCmd)" />
+    <Message Text="[OrleansDllBootstrapUsingClientGen] - CodeGen Cmd = $(ClientGenCmd)" />
+    <Exec Command="$(ClientGenCmd)" />
   </Target>
   <Target Name="WriteArgsToFileForDebugging" 
           AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" 
