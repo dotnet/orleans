@@ -27,16 +27,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Data.Services.Common;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
 
-
 namespace UnitTests.StorageTests
 {
-    [Serializable]
-    [DataServiceKey("PartitionKey", "RowKey")]
-    public class UnitTestAzureTableData : TableServiceEntity
+    [Serializable]    
+    public class UnitTestAzureTableData : TableEntity
     {
         public byte[] Data { get; set; }
         public string StringData { get; set; }

@@ -27,8 +27,7 @@ using System.Data.Services.Common;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
-
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -353,9 +352,8 @@ namespace Orleans.Storage
         }
 
 
-        [Serializable]
-        [DataServiceKey("PartitionKey", "RowKey")]
-        internal class GrainStateEntity : TableServiceEntity
+        [Serializable]        
+        internal class GrainStateEntity : TableEntity
         {
             public byte[] Data { get; set; }
             public string StringData { get; set; }

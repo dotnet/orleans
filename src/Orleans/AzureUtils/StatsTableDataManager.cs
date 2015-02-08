@@ -28,14 +28,13 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
 using Orleans.Runtime;
+using Microsoft.WindowsAzure.Storage.Table;
 
 namespace Orleans.AzureUtils
 {
     [Serializable]
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class StatsTableData : TableServiceEntity
+    internal class StatsTableData: TableEntity
     {
         public string DeploymentId { get; set; }
         public string Time { get; set; }

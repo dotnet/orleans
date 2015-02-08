@@ -23,16 +23,18 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Services.Client;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Xml;
 using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.StorageClient;
-
 using Orleans.Runtime;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using System.Data.Services.Client;
 
 
 namespace Orleans.AzureUtils
@@ -238,7 +240,7 @@ namespace Orleans.AzureUtils
 
         internal static CloudQueueClient GetCloudQueueClient(
             string storageConnectionString,
-            RetryPolicy retryPolicy,
+            IRetryPolicy retryPolicy,
             TimeSpan timeout,
             TraceLogger logger)
         {
@@ -246,8 +248,8 @@ namespace Orleans.AzureUtils
             {
                 var storageAccount = GetCloudStorageAccount(storageConnectionString);
                 CloudQueueClient operationsClient = storageAccount.CreateCloudQueueClient();
-                operationsClient.RetryPolicy = retryPolicy;
-                operationsClient.Timeout = timeout;
+                operationsClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
+                operationsClient.DefaultRequestOptions.ServerTimeout = timeout;
                 return operationsClient;
             }
             catch (Exception exc)
@@ -324,7 +326,7 @@ namespace Orleans.AzureUtils
         {
             return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
                     message.Id,
-                    message.NextVisibleTime.HasValue ? TraceLogger.PrintDate(message.NextVisibleTime.Value) : "",
+                    message.NextVisibleTime.HasValue ? TraceLogger.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
                     message.DequeueCount,
                     message.PopReceipt,
                     message.AsString);
