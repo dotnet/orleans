@@ -29,14 +29,13 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
 using Orleans.AzureUtils;
-
+using Microsoft.WindowsAzure.Storage.Table;
+                                     
 
 namespace Orleans.Runtime.ReminderService
-{
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class ReminderTableEntry : TableServiceEntity
+{    
+    internal class ReminderTableEntry : TableEntity
     {
         public string GrainReference        { get; set; }    // Part of RowKey
         public string ReminderName          { get; set; }    // Part of RowKey
@@ -45,8 +44,7 @@ namespace Orleans.Runtime.ReminderService
         public string StartAt               { get; set; }    
         public string Period                { get; set; }    
         public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
-        public string ETag                  { get; set; }    
-        
+                
 
         public static string ConstructRowKey(GrainReference grainRef, string reminderName)
         {

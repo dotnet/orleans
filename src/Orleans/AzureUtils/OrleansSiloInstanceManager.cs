@@ -31,13 +31,12 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
 using Orleans.Runtime;
+using Microsoft.WindowsAzure.Storage.Table;
 
 namespace Orleans.AzureUtils
 {
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class SiloInstanceTableEntry : TableServiceEntity
+    internal class SiloInstanceTableEntry : TableEntity
     {
         public string DeploymentId { get; set; }    // PartitionKey
         public string Address { get; set; }         // RowKey

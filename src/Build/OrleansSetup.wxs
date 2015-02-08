@@ -65,7 +65,7 @@
                 <File Id="File_CL_ClientGenerator.exe" Name="ClientGenerator.exe" Source="$(var.SDK_binaries_clnt_src)\ClientGenerator.exe" />
                 <File Id="File_CL_ClientGenerator.exe.config" Name="ClientGenerator.exe.config" Source="$(var.SDK_binaries_clnt_src)\ClientGenerator.exe.config" />
                 <File Id="File_CL_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.WindowsAzure.Configuration.dll" />
-                <File Id="File_CL_Microsoft.WindowsAzure.StorageClient.dll" Name="Microsoft.WindowsAzure.StorageClient.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.WindowsAzure.StorageClient.dll" />
+                <File Id="File_CL_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.WindowsAzure.Storage.dll" />
                 <File Id="File_CL_Orleans.dll" Name="Orleans.dll" Source="$(var.SDK_binaries_clnt_src)\Orleans.dll" />
                 <File Id="File_CL_Orleans.SDK.targets" Name="Orleans.SDK.targets" Source="$(var.SDK_binaries_clnt_src)\Orleans.SDK.targets" />
                 <File Id="File_CL_Orleans.xml" Name="Orleans.xml" Source="$(var.SDK_binaries_clnt_src)\Orleans.xml" />
@@ -86,7 +86,7 @@
                 <File Id="File_SE_CounterControl.exe.config" Name="CounterControl.exe.config" Source="$(var.SDK_binaries_server_src)\CounterControl.exe.config" />
                 <File Id="File_SE_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
                 <File Id="File_SE_Microsoft.WindowsAzure.ServiceRuntime.dll" Name="Microsoft.WindowsAzure.ServiceRuntime.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.ServiceRuntime.dll" />
-                <File Id="File_SE_Microsoft.WindowsAzure.StorageClient.dll" Name="Microsoft.WindowsAzure.StorageClient.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.StorageClient.dll" />
+                <File Id="File_SE_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Storage.dll" />
                 <File Id="File_SE_Orleans.dll" Name="Orleans.dll" Source="$(var.SDK_binaries_server_src)\Orleans.dll" />
                 <File Id="File_SE_Orleans.SDK.targets" Name="Orleans.SDK.targets" Source="$(var.SDK_binaries_server_src)\Orleans.SDK.targets" />
                 <File Id="File_SE_Orleans.xml" Name="Orleans.xml" Source="$(var.SDK_binaries_server_src)\Orleans.xml" />
@@ -130,7 +130,7 @@
             <Component Id="Comp_LocalSilo" DiskId="1" Guid="3a1adaef-360a-4dfa-9924-3451201688c6">
               <File Id="File_LS_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
               <File Id="File_LS_Microsoft.WindowsAzure.ServiceRuntime.dll" Name="Microsoft.WindowsAzure.ServiceRuntime.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.ServiceRuntime.dll" />
-              <File Id="File_LS_Microsoft.WindowsAzure.StorageClient.dll" Name="Microsoft.WindowsAzure.StorageClient.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.StorageClient.dll" />
+              <File Id="File_LS_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Storage.dll" />
               <File Id="File_LS_Orleans.dll" Name="Orleans.dll" Source="$(var.SDK_binaries_server_src)\Orleans.dll" />
               <File Id="File_LS_Orleans.SDK.targets" Name="Orleans.SDK.targets" Source="$(var.SDK_binaries_server_src)\Orleans.SDK.targets" />
               <File Id="File_LS_Orleans.xml" Name="Orleans.xml" Source="$(var.SDK_binaries_server_src)\Orleans.xml" />
