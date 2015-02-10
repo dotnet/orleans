@@ -147,16 +147,16 @@ namespace Orleans.AzureUtils
             counter++;
             var time = DateTime.UtcNow;
             var timeStr = time.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
-            entry.PartitionKey = deploymentId + ":" + timeStr;
+
+            // number of ticks remaining until the year 9683
+            var ticks = DateTime.MaxValue.Ticks - time.Ticks;
+
+            // partition the table according to the deployment id and hour
+            entry.PartitionKey = string.Join("$", deploymentId, string.Format("{0:d19}", ticks - ticks % TimeSpan.TicksPerHour));
             var counterStr = String.Format("{0:000000}", counter);
-            if (isSilo)
-            {
-                entry.RowKey = name + ":" + counterStr;
-            }
-            else
-            {
-                entry.RowKey = name + ":" + clientEpoch + ":" + counterStr;
-            }
+            
+            // order the rows latest-first in the table 
+            entry.RowKey = string.Join("$", string.Format("{0:d19}", ticks), name, counterStr);
             entry.DeploymentId = deploymentId;
             entry.Time = time;
             entry.Address = address;
