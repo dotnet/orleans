@@ -134,7 +134,7 @@ namespace Orleans.Runtime.Messaging
             if (expectProxiedConnection)
             {
                 // Proxied Gateway Connection - must have sender id
-                if (client.Equals(SocketManager.SiloDirectConnectionId))
+                if (client.Equals(Constants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_NotAProxiedConnection, string.Format("Gateway received unexpected non-proxied connection from {0} at source address {1}", client, sock.RemoteEndPoint));
                     return false;
@@ -143,7 +143,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Direct connection - should not have sender id
-                if (!client.Equals(SocketManager.SiloDirectConnectionId))
+                if (!client.Equals(Constants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_UnexpectedProxiedConnection, string.Format("Silo received unexpected proxied connection from {0} at source address {1}", client, sock.RemoteEndPoint));
                     return false;
@@ -178,7 +178,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exc)
             {
-                Log.Warn(ErrorCode.GatewayFailedToParse,
+                Log.Error(ErrorCode.GatewayFailedToParse,
                             String.Format("Failed to convert the data that read from the socket. buffer = {0}, from endpoint {1}.", 
                             Utils.EnumerableToString(buffer), socket.RemoteEndPoint), exc);
                 return false;
