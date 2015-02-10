@@ -61,7 +61,7 @@ namespace Orleans
         private readonly StatisticsProviderManager statisticsProviderManager;
 
         internal ClientStatisticsManager ClientStatistics;
-        private readonly Guid clientId;
+        private readonly GrainId clientId;
         private GrainInterfaceMap grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
@@ -126,7 +126,7 @@ namespace Orleans
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
         {
-            this.clientId = Guid.NewGuid();
+            this.clientId = GrainId.NewClientGrainId();
 
             if (cfg == null)
             {
@@ -184,7 +184,7 @@ namespace Orleans
 
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
-                    "{0} Initializing OutsideRuntimeClient on {1} at {2} Client GUID Id = {3} {0}",
+                    "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
                     BARS, config.DNSHostName, localAddress, clientId));
                 string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}'", BARS, RuntimeVersion.Current);
                 startMsg = string.Format("{0} Config= \n {1}", startMsg, config);
@@ -280,7 +280,7 @@ namespace Orleans
             }
             StartInternal();
 
-            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client Grain ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + clientId);
+            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + clientId);
               
         }
 
@@ -289,7 +289,7 @@ namespace Orleans
         {
             transport.Start();
             TraceLogger.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
-            CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, GrainId.NewClientGrainId());
+            CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, clientId);
 
             ClientStatistics = new ClientStatisticsManager(config);
             ClientStatistics.Start(config, statisticsProviderManager, transport, clientId)
@@ -714,7 +714,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.Reset(): client GUID Id " + clientId);
+                    logger.Info("OutsideRuntimeClient.Reset(): client Id " + clientId);
                 }
             });
 
@@ -764,7 +764,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client GUID Id " + clientId);
+                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
                 }
             });
             

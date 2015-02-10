@@ -111,51 +111,30 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual bool RecordOpenedSocket(Socket sock)
         {
-            Guid client;
+            GrainId client;
             if (!ReceiveSocketPreample(sock, false, out client)) return false;
 
             NetworkingStatisticsGroup.OnOpenedReceiveSocket();
             return true;
         }
 
-        protected bool ReceiveSocketPreample(Socket sock, bool expectProxiedConnection, out Guid client)
+        protected bool ReceiveSocketPreample(Socket sock, bool expectProxiedConnection, out GrainId client)
         {
-            client = default(Guid);
+            client = null;
 
-            if (Cts.IsCancellationRequested) return false; 
+            if (Cts.IsCancellationRequested) return false;
 
-            // Receive the client ID
-            var buffer = new byte[16];
-            int offset = 0;
-
-            while (offset < buffer.Length)
+            if (!ReadConnectionPreemble(sock, out client))
             {
-                try
-                {
-                    int bytesRead = sock.Receive(buffer, offset, buffer.Length - offset, SocketFlags.None);
-                    if (bytesRead == 0)
-                    {
-                        Log.Warn(ErrorCode.GatewayAcceptor_SocketClosed, 
-                            "Remote socket closed while receiving client ID from endpoint {0}.", sock.RemoteEndPoint);
-                        return false;
-                    }
-                    offset += bytesRead;
-                }
-                catch (Exception ex)
-                {
-                    Log.Warn(ErrorCode.GatewayAcceptor_ExceptionReceiving, "Exception receiving client ID from endpoint " + sock.RemoteEndPoint, ex);
-                    return false;
-                }
+                return false;
             }
-
-            client = new Guid(buffer);
 
             if (Log.IsVerbose2) Log.Verbose2(ErrorCode.MessageAcceptor_Connection, "Received connection from {0} at source address {1}", client, sock.RemoteEndPoint.ToString());
 
             if (expectProxiedConnection)
             {
                 // Proxied Gateway Connection - must have sender id
-                if (client == SocketManager.SiloDirectConnectionId)
+                if (client.Equals(Constants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_NotAProxiedConnection, string.Format("Gateway received unexpected non-proxied connection from {0} at source address {1}", client, sock.RemoteEndPoint));
                     return false;
@@ -164,7 +143,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Direct connection - should not have sender id
-                if (client != SocketManager.SiloDirectConnectionId)
+                if (!client.Equals(Constants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_UnexpectedProxiedConnection, string.Format("Silo received unexpected proxied connection from {0} at source address {1}", client, sock.RemoteEndPoint));
                     return false;
@@ -178,6 +157,61 @@ namespace Orleans.Runtime.Messaging
 
             return true;
         }
+
+        private bool ReadConnectionPreemble(Socket socket, out GrainId grainId)
+        {
+            grainId = null;
+            byte[] buffer = null;
+            try
+            {
+                buffer = ReadFromSocket(socket, sizeof(int)); // Read the size 
+                if (buffer == null) return false;
+                Int32 size = BitConverter.ToInt32(buffer, 0);
+
+                if (size > 0)
+                {
+                    buffer = ReadFromSocket(socket, size); // Receive the client ID
+                    if (buffer == null) return false;
+                    grainId = GrainId.FromByteArray(buffer);
+                }
+                return true;
+            }
+            catch (Exception exc)
+            {
+                Log.Error(ErrorCode.GatewayFailedToParse,
+                            String.Format("Failed to convert the data that read from the socket. buffer = {0}, from endpoint {1}.", 
+                            Utils.EnumerableToString(buffer), socket.RemoteEndPoint), exc);
+                return false;
+            }
+        }
+
+        private byte[] ReadFromSocket(Socket sock, int expected)
+        {
+            var buffer = new byte[expected];
+            int offset = 0;
+            while (offset < buffer.Length)
+            {
+                try
+                {
+                    int bytesRead = sock.Receive(buffer, offset, buffer.Length - offset, SocketFlags.None);
+                    if (bytesRead == 0)
+                    {
+                        Log.Warn(ErrorCode.GatewayAcceptor_SocketClosed,
+                            "Remote socket closed while receiving connection preemble data from endpoint {0}.", sock.RemoteEndPoint);
+                        return null;
+                    }
+                    offset += bytesRead;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn(ErrorCode.GatewayAcceptor_ExceptionReceiving,
+                        "Exception receiving connection preemble data from endpoint " + sock.RemoteEndPoint, ex);
+                    return null;
+                }
+            }
+            return buffer;
+        }
+
         protected virtual void RecordClosedSocket(Socket sock)
         {
             if (TryRemoveClosedSocket(sock))
