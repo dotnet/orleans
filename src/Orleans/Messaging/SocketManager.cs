@@ -34,8 +34,6 @@ namespace Orleans.Runtime
 
         private const int MAX_SOCKETS = 200;
 
-        public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
-
         internal SocketManager(IMessagingConfiguration config)
         {
             cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
@@ -88,7 +86,7 @@ namespace Orleans.Runtime
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
                 s.NoDelay = true;
-                WriteConnectionPreemble(s, SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
+                WriteConnectionPreemble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
                 // Start an asynch receive off of the socket to detect closure
                 var foo = new byte[4];
                 s.BeginReceive(foo, 0, 1, SocketFlags.None, ReceiveCallback,
