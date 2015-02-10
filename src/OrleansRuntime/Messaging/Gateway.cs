@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Messaging
         // Any client currently in the system appears in this collection. 
         // In addition, we use clientSockets and proxiedGrains collections for fast retrival of ClientState. 
         // Anything that appears in those 2 collections should also appear in the main clients collection.
-        private readonly ConcurrentDictionary<Guid, ClientState> clients;
+        private readonly ConcurrentDictionary<GrainId, ClientState> clients;
         private readonly ConcurrentDictionary<Socket, ClientState> clientSockets;
         private readonly ConcurrentDictionary<GrainId, ClientState> proxiedGrains;
         private readonly SiloAddress gatewayAddress;
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Messaging
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this);
-            clients = new ConcurrentDictionary<Guid, ClientState>();
+            clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
             proxiedGrains = new ConcurrentDictionary<GrainId, ClientState>();
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messageCenter.MessagingConfiguration);
@@ -100,7 +100,7 @@ namespace Orleans.Runtime.Messaging
             acceptor.Stop();
         }
 
-        internal void RecordOpenedSocket(Socket sock, Guid clientId)
+        internal void RecordOpenedSocket(Socket sock, GrainId clientId)
         {
             lock (lockable)
             {
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-        internal void RecordProxiedGrain(GrainId grainId, Guid clientId)
+        internal void RecordProxiedGrain(GrainId grainId, GrainId clientId)
         {
             lock (lockable)
             {
@@ -310,12 +310,12 @@ namespace Orleans.Runtime.Messaging
             internal Queue<List<Message>> PendingBatchesToSend { get; private set; }
             internal Socket Socket { get; private set; }
             internal DateTime DisconnectedSince { get; private set; }
-            internal Guid Id { get; private set; }
+            internal GrainId Id { get; private set; }
             internal int GatewaySenderNumber { get; private set; }
 
             internal bool IsConnected { get { return Socket != null; } }
 
-            internal ClientState(Guid id, int gatewaySenderNumber)
+            internal ClientState(GrainId id, int gatewaySenderNumber)
             {
                 Id = id;
                 GatewaySenderNumber = gatewaySenderNumber;

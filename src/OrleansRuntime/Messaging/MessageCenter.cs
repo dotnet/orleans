@@ -91,7 +91,7 @@ namespace Orleans.Runtime.Messaging
             Gateway = new Gateway(this, gatewayAddress);
         }
 
-        public void RecordProxiedGrain(GrainId grainId, Guid clientId)
+        public void RecordProxiedGrain(GrainId grainId, GrainId clientId)
         {
             if (Gateway != null)
                 Gateway.RecordProxiedGrain(grainId, clientId);

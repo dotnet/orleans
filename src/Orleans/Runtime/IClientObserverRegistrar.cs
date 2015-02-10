@@ -38,7 +38,7 @@ namespace Orleans.Runtime
        /// <summary>
         /// Registers a client observer object on this gateway.
         /// </summary>
-        Task<ActivationAddress> RegisterClientObserver(GrainId grainId, Guid clientId);
+        Task<ActivationAddress> RegisterClientObserver(GrainId grainId, GrainId clientId);
 
         /// <summary>
         /// Unregisters client observer object from all gateways.

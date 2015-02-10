@@ -41,7 +41,7 @@ namespace Orleans.Runtime
             logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false);
         }
 
-        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, Guid clientId)
+        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
         {
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);

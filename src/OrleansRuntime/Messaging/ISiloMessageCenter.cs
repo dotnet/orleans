@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Messaging
 
         bool IsProxying { get; }
 
-        void RecordProxiedGrain(GrainId id, Guid client);
+        void RecordProxiedGrain(GrainId id, GrainId client);
 
         void RecordUnproxiedGrain(GrainId id);
 
