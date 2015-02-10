@@ -748,6 +748,7 @@ namespace Orleans
         MessageAcceptor_UnexpectedProxiedConnection = GatewayBase + 12,
         GatewayManager_NoGateways               = GatewayBase + 13,
         GatewayNetworkError                     = GatewayBase + 14,
+        GatewayFailedToParse                    = GatewayBase + 15,
 
         TimerBase                               = Runtime + 1400,
         TimerChangeError                        = PerfCounterTimerError, // Backward compatability

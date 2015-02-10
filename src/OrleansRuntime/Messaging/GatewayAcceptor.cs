@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Messaging
         protected override bool RecordOpenedSocket(Socket sock)
         {
             ThreadTrackingStatistic.FirstClientConnectedStartTracking();
-            Guid client;
+            GrainId client;
             if (!ReceiveSocketPreample(sock, true, out client)) return false;
 
             gateway.RecordOpenedSocket(sock, client);

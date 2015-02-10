@@ -35,9 +35,10 @@ namespace Orleans.Runtime
     }
 
     // Used for gateway -> Client messaging
-    internal class OutgoingClientMessage : Tuple<Guid, Message>, IOutgoingMessage
+    internal class OutgoingClientMessage : Tuple<GrainId, Message>, IOutgoingMessage
     {
-        public OutgoingClientMessage(Guid clientGuid, Message message) : base(clientGuid, message)
+        public OutgoingClientMessage(GrainId clientId, Message message)
+            : base(clientId, message)
         {
         }
 

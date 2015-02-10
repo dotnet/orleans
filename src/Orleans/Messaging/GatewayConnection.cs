@@ -183,7 +183,7 @@ namespace Orleans.Messaging
                         Socket = new Socket(Silo.Endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                         Socket.Connect(Silo.Endpoint);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
-                        Socket.Send(MsgCenter.ClientId.ToByteArray()); // Identifies this client
+                        SocketManager.WriteConnectionPreemble(Socket, MsgCenter.ClientId);  // Identifies this client
                         Log.Info(ErrorCode.ProxyClient_Connected, "Connected to gateway at address {0} on trial {1}.", Address, i);
                         return;
                     }

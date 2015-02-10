@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Registers a client object on this gateway.
         /// </summary>
-        public async Task<ActivationAddress> RegisterClientObserver(GrainId grainId, Guid clientId)
+        public async Task<ActivationAddress> RegisterClientObserver(GrainId grainId, GrainId clientId)
         {
             localMessageCenter.RecordProxiedGrain(grainId, clientId);
             var addr = ActivationAddress.NewActivationAddress(myAddress, grainId);

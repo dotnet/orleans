@@ -87,8 +87,7 @@ namespace Orleans.Messaging
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
 
         #endregion
-
-        internal Guid ClientId { get; private set; }
+        internal GrainId ClientId { get; private set; }
         internal bool Running { get; private set; }
 
         internal readonly GatewayManager GatewayManager;
@@ -110,7 +109,7 @@ namespace Orleans.Messaging
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
         private readonly QueueTrackingStatistic queueTracking;
 
-        public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, Guid clientId, IGatewayListProvider gatewayListProvider)
+        public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
         {
             lockable = new object();
             MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
