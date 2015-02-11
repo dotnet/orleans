@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30723.0
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -54,6 +54,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{856B8F
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F-3112-4AF6-927E-8C88F3EA556A}"
 	ProjectSection(SolutionItems) = preProject
+		NuGet\ClientInstall.ps1 = NuGet\ClientInstall.ps1
 		NuGet\CreateOrleansPackages.bat = NuGet\CreateOrleansPackages.bat
 		NuGet\EmptyFile.cs = NuGet\EmptyFile.cs
 		NuGet\Microsoft.Orleans.Client.nuspec = NuGet\Microsoft.Orleans.Client.nuspec
@@ -71,6 +72,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec = NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec
 		BuildDefinitions\NuGet\Orleans.Grains.props = BuildDefinitions\NuGet\Orleans.Grains.props
 		BuildDefinitions\NuGet\Orleans.Interfaces.props = BuildDefinitions\NuGet\Orleans.Interfaces.props
+		NuGet\ServerInstall.ps1 = NuGet\ServerInstall.ps1
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{80801A64-30AD-4B07-801C-2479A87AC527}"

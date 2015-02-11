@@ -1,7 +1,7 @@
 @echo Begin Post-Build script
 
 if "%BuildingInsideVisualStudio%" == "true" (
-	set PKG_DIR=%SolutionDir%\NuGet.Packages
+    set PKG_DIR=%SolutionDir%\NuGet.Packages
 ) else (
     set PKG_DIR=%TargetDir%\..\NuGet.Packages
 )
@@ -18,6 +18,7 @@ del /q *.nupkg
 
 copy /y "%SolutionDir%NuGet\*.props" "%TargetDir%\"
 copy /y "%SolutionDir%NuGet\EmptyFile.cs" "%TargetDir%\"
+copy /y "%SolutionDir%NuGet\*Install.ps1" "%TargetDir%\"
 
 @echo Build Orleans NuGet packages from %TargetDir%
 call "%SolutionDir%NuGet\CreateOrleansPackages.bat" . .\Version.txt

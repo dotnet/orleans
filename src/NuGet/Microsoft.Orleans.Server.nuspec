@@ -27,7 +27,8 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansConfiguration.xml" target="lib\net45" />
-    <file src="Configuration\OrleansConfiguration.xsd" target="lib\net45" />
+    <file src="OrleansConfiguration.xml" target="content" />
+    <file src="Configuration\OrleansConfiguration.xsd" target="content" />
+    <file src="ServerInstall.ps1" target="tools\install.ps1" />
   </files>
 </package>
