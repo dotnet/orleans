@@ -14,6 +14,6 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
 cd "%CMDHOME%"
 
-"%MSTESTEXE%"  /testcontainer:%OutDir%\TesterInternal.dll /category:"BVT"
+set TEST_ARGS= /testcontainer:%OutDir%\Tester.dll /testcontainer:%OutDir%\TesterInternal.dll 
 
-"%MSTESTEXE%"  /testcontainer:%OutDir%\Tester.dll /category:"BVT"
+"%MSTESTEXE%" %TEST_ARGS% /category:"BVT"
