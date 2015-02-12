@@ -297,7 +297,7 @@ namespace Orleans.AzureUtils
             }
         }
 
-        internal static void ValidateTableName(string tableName)
+        public static void ValidateTableName(string tableName)
         {
             // Table Name Rules: http://msdn.microsoft.com/en-us/library/dd179338.aspx
 
