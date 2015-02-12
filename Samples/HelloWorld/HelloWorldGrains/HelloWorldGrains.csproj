@@ -8,8 +8,8 @@
     <ProjectGuid>{98D4DB83-175E-44D5-A14B-9C66EE89F037}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>HelloWordGrains</RootNamespace>
-    <AssemblyName>HelloWordGrains</AssemblyName>
+    <RootNamespace>HelloWorldGrains</RootNamespace>
+    <AssemblyName>HelloWorldGrains</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
