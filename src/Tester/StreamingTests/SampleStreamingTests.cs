@@ -65,7 +65,7 @@ namespace UnitTests.SampleStreaming
             if (streamProvider != null && streamProvider.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
                 string dataConnectionString = "";
-                AzureQueueStreamProvider.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, UnitTestSiloHost.DeploymentId, dataConnectionString, logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, UnitTestSiloHost.DeploymentId, dataConnectionString, logger).Wait();
             }
         }
 

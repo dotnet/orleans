@@ -81,7 +81,28 @@ namespace Orleans.AzureUtils
         /// Constructor.
         /// </summary>
         /// <param name="queueName">Name of the queue to be connected to.</param>
-        /// <param name="deploymentId">The deployment id pf the Azure service hosting this silo.</param>
+        /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
+        public AzureQueueDataManager(string queueName, string storageConnectionString)
+        {
+            AzureStorageUtils.ValidateQueueName(queueName);
+
+            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            QueueName = queueName;
+            AzureStorageUtils.ValidateQueueName(QueueName);
+            ConnectionString = storageConnectionString;
+
+            queueOperationsClient = AzureStorageUtils.GetCloudQueueClient(
+                ConnectionString,
+                AzureQueueDefaultPolicies.QueueOperationRetryPolicy,
+                AzureQueueDefaultPolicies.QueueOperationTimeout,
+                logger);
+        }
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="queueName">Name of the queue to be connected to.</param>
+        /// <param name="deploymentId">The deployment id of the Azure service hosting this silo. It will be concatenated to the queueName.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         public AzureQueueDataManager(string queueName, string deploymentId, string storageConnectionString)
         {

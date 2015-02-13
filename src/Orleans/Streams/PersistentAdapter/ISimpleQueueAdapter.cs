@@ -21,21 +21,36 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using Orleans.AzureUtils;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.Streams;
-
-namespace Orleans.Providers.Streams.AzureQueue
+namespace Orleans.Streams
 {
     /// <summary>
-    /// Persistent stream provider that uses azure queue for persistence
+    /// Stream queue storage adapter.  This is an abstraction layer that hides the implementation details of the underlying queuing system.
     /// </summary>
-    public class AzureQueueStreamProvider : PersistentStreamProvider<AzureQueueAdapterFactory>
+    public interface ISimpleQueueAdapter
     {
+        /// <summary>
+        /// Name of the adapter. Primarily for logging purposes
+        /// </summary>
+        string Name { get; }
+
+        /// <summary>
+        /// Writes a set of events to the queue as a single batch associated with the provided streamId.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="streamId"></param>
+        /// <param name="events"></param>
+        /// <returns></returns>
+        Task QueueMessageAsync(byte[] rawData);
+
+
+        /// <summary>
+        /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
+        /// </summary>
+        /// <returns>True if this is a rewindable stream adapter, false otherwise.</returns>
+        bool IsRewindable { get; }
     }
 }
