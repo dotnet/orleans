@@ -12,10 +12,14 @@
     <AssemblyName>OrleansProviders</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SccProjectName></SccProjectName>
-    <SccLocalPath></SccLocalPath>
-    <SccAuxPath></SccAuxPath>
-    <SccProvider></SccProvider>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <TargetFrameworkProfile />
@@ -69,9 +73,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Streams\AzureQueue\SimpleAzureQueueAdapterFactory.cs" />
+    <Compile Include="Streams\AzureQueue\SimpleAzureQueueAdapter.cs" />
     <Compile Include="Streams\AzureQueue\AzureQueueAdapter.cs" />
     <Compile Include="Streams\AzureQueue\AzureQueueAdapterFactory.cs" />
     <Compile Include="Streams\AzureQueue\AzureQueueAdapterReceiver.cs" />
+    <Compile Include="Streams\AzureQueue\SimpleAzureQueueStreamProvider.cs" />
+    <Compile Include="Streams\AzureQueue\AzureQueueStreamProviderUtils.cs" />
     <Compile Include="Streams\Common\IQueueAdapterCache.cs" />
     <Compile Include="Streams\Common\SimpleQueueAdapterCacheCursor.cs" />
     <Compile Include="Streams\Common\QueueAdapterCacheMissException .cs" />
