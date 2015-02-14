@@ -31,39 +31,27 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     public class SimpleAzureQueueAdapterFactory : IQueueAdapterFactory
     {
-        private const string CACHE_SIZE = "CacheSizeKB";
-        private const int DEFAULT_CACHE_SIZE = 4;
-        private const int KB = 1 << 10;
-        
-        private string deploymentId;
         private string dataConnectionString;
+        private string queueName;
         private string providerName;
-        private int cacheSize;
 
         public const string DATA_CONNECTION_STRING = "DataConnectionString";
-        public const string DEPLOYMENT_ID = "DeploymentId";
+        public const string QUEUE_NAME_STRING = "QueueName";
         
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger)
         {
             if (config == null) throw new ArgumentNullException("config");
             if (!config.Properties.TryGetValue(DATA_CONNECTION_STRING, out dataConnectionString))
                 throw new ArgumentException(String.Format("{0} property not set", DATA_CONNECTION_STRING));
-            if (!config.Properties.TryGetValue(DEPLOYMENT_ID, out deploymentId))
-                throw new ArgumentException(String.Format("{0} property not set", DEPLOYMENT_ID));
-            
-            string cacheSizeString;
-            cacheSize = DEFAULT_CACHE_SIZE;
-            if (config.Properties.TryGetValue(CACHE_SIZE, out cacheSizeString))
-            {
-                if (!int.TryParse(cacheSizeString, out cacheSize))
-                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", CACHE_SIZE));
-            }
+            if (!config.Properties.TryGetValue(QUEUE_NAME_STRING, out queueName))
+                throw new ArgumentException(String.Format("{0} property not set", QUEUE_NAME_STRING));
+
             this.providerName = providerName;
         }
 
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter(dataConnectionString, deploymentId, providerName, cacheSize * KB);
+            var adapter = new SimpleAzureQueueAdapter(dataConnectionString, providerName, queueName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
     }

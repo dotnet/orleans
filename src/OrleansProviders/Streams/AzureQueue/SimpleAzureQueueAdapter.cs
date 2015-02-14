@@ -24,7 +24,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Linq;
+﻿using System.Threading.Tasks;
 using Microsoft.WindowsAzure.StorageClient;
 using Orleans.AzureUtils;
 ﻿using Orleans.Runtime;
@@ -40,6 +41,8 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public string Name { get ; private set; }
         public bool IsRewindable { get { return false; } }
+
+        public StreamProviderDirection Direction { get { return StreamProviderDirection.WriteOnly; } }
 
         public SimpleAzureQueueAdapter(string dataConnectionString, string providerName, string queueName)
         {
@@ -58,11 +61,32 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public IStreamQueueMapper GetStreamQueueMapper()
         {
-            throw new OrleansException("SimpleAzureQueueAdapter does not support multipel queues, it only writes to one queue.");
+            throw new OrleansException("SimpleAzureQueueAdapter does not support multiple queues, it only writes to one queue.");
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events)
         {
+            if (events == null)
+            {
+                throw new ArgumentNullException("Trying to QueueMessageBatchAsync null data.");
+            }
+            int count = events.Count();
+            if (count != 1)
+            {
+                throw new OrleansException("Trying to QueueMessageBatchAsync a batch of more than one event. " +
+                                           "SimpleAzureQueueAdapter does not support batching. Instead, you can batch in your application code.");
+            }
+            object data = events.First();
+            bool isBytes = data is byte[];
+            bool isString = data is string;
+            if (data != null && !isBytes && !isString)
+            {
+                throw new OrleansException(
+                    string.Format(
+                        "Trying to QueueMessageBatchAsync a type {0} which is not a byte[] and not string. " +
+                        "SimpleAzureQueueAdapter only supports byte[] or string.", data.GetType()));
+            }
+
             if (Queue == null)
             {
                 var tmpQueue = new AzureQueueDataManager(QueueName, DataConnectionString);
@@ -72,8 +96,18 @@ namespace Orleans.Providers.Streams.AzureQueue
                     Queue = tmpQueue;
                 }
             }
-            byte[] rawBytes = null; //(byte[])events;
-            var cloudMsg = new CloudQueueMessage(rawBytes);
+            CloudQueueMessage cloudMsg = null;
+            if (isBytes)
+            {
+                cloudMsg = new CloudQueueMessage(data as byte[]);
+            }else if (isString)
+            {
+                cloudMsg = new CloudQueueMessage(data as string);
+            }else if (data == null)
+            {
+                // It's OK to pass null data. why should I care?
+                cloudMsg = new CloudQueueMessage(null as byte[]);
+            }
             await Queue.AddQueueMessage(cloudMsg);
         }
     }
