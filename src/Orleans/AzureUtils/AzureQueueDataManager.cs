@@ -88,7 +88,6 @@ namespace Orleans.AzureUtils
 
             logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
             QueueName = queueName;
-            AzureStorageUtils.ValidateQueueName(QueueName);
             ConnectionString = storageConnectionString;
 
             queueOperationsClient = AzureStorageUtils.GetCloudQueueClient(
