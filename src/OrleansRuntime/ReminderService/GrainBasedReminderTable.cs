@@ -40,6 +40,7 @@ namespace Orleans.Runtime.ReminderService
             logger = TraceLogger.GetLogger(String.Format("GrainBasedReminderTable_{0}", Data.Address.ToString()), TraceLogger.LoggerType.Runtime);
             logger.Info("GrainBasedReminderTable {0} Activated. Full identity: {1}", Identity, Data.Address.ToFullString());
             remTable = new InMemoryRemindersTable();
+            base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for GrainBasedReminderTable virtually indefinitely.
             return TaskDone.Done;
         }
 
