@@ -74,7 +74,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=\n{1}", key.ToLongString(), data.ToString());
+                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=" + Environment.NewLine + "{1}", key.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -91,7 +91,7 @@ namespace Orleans.Runtime.MembershipService
              {
                 var entries = await tableManager.FindAllSiloEntries();   
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=\n{0}", data.ToString());
+                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data; 
             }

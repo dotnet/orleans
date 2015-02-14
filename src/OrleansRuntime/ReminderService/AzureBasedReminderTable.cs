@@ -142,7 +142,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var entries = await remTableManager.FindReminderEntries(key);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read for grain {0} Table=\n{1}", key, data.ToString());
+                if (logger.IsVerbose2) logger.Verbose2("Read for grain {0} Table=" + Environment.NewLine + "{1}", key, data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -159,7 +159,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var entries = await remTableManager.FindReminderEntries(begin, end);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read in {0} Table=\n{1}", RangeFactory.CreateRange(begin, end), data);
+                if (logger.IsVerbose2) logger.Verbose2("Read in {0} Table=" + Environment.NewLine + "{1}", RangeFactory.CreateRange(begin, end), data);
                 return data;
             }
             catch (Exception exc)

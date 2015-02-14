@@ -284,7 +284,7 @@ namespace Orleans.Runtime
             }
             catch (Exception e)
             {
-                return e.ToString() + "\n" + e.StackTrace;
+                return e + Environment.NewLine + e.StackTrace;
             }
         }
 

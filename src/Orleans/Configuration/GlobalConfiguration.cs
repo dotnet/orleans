@@ -685,8 +685,10 @@ namespace Orleans.Runtime.Configuration
                 foreach (string provType in providerConfigurations.Keys)
                 {
                     ProviderCategoryConfiguration provTypeConfigs = providerConfigurations[provType];
-                    sb.AppendFormat("       {0}Providers:\n{1}", provType, provTypeConfigs.ToString())
-                      .AppendLine();
+                    sb.AppendFormat("       {0}Providers:", provType)
+                        .AppendLine();
+                    sb.AppendFormat(provTypeConfigs.ToString())
+                        .AppendLine();
                 }
             }
             else

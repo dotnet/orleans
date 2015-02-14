@@ -380,9 +380,10 @@ namespace Orleans.Runtime.Scheduler
         {
             if (!logger.IsInfo) return;
 
-            var stats = Utils.EnumerableToString(workgroupDirectory.Values.OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), "\r\n");
+            var stats = Utils.EnumerableToString(workgroupDirectory.Values.OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), Environment.NewLine);
             if (stats.Length > 0)
-                logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.SchedulerStatistics, "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:\n{2}",
+                logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.SchedulerStatistics, 
+                    "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
                     RunQueue.Length, WorkItemGroupCount, stats);
         }
 

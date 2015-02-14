@@ -384,7 +384,7 @@ namespace Orleans.Runtime.Host
 
             try
             {
-                File.AppendAllText(startupLog, dateString + "Z" + "\r\n" + errMsg);
+                File.AppendAllText(startupLog, dateString + "Z" + Environment.NewLine + errMsg);
             }
             catch (Exception exc2)
             {
