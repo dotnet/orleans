@@ -34,7 +34,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
   </Choose>
 
   <Choose>
-    <When Condition="HasTrailingSlash($(ClientGenExeDir))">
+    <When Condition="HasTrailingSlash('$(ClientGenExeDir)')">
       <PropertyGroup>
         <ClientGenExe>$(ClientGenExeDir)ClientGenerator.exe</ClientGenExe>
       </PropertyGroup>
@@ -64,7 +64,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
           AfterTargets="BeforeCompile"
           BeforeTargets="CoreCompile"
           Condition="'$(OrleansProjectType)'=='Client'"
-          Inputs="@(Compile);@(ReferencePath);"
+          Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
     <Message Text="[OrleansClientPreprocessing] - Project=$(ProjectName)" Importance="high"/>
     <Message Text="[OrleansClientPreprocessing] 
@@ -73,7 +73,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 - OrleansSDK=$(OrleansSDK)
 - Using ClientGenExe location=$(ClientGenExe)
 " />
-    <MakeDir Directories="$(IntermediateOutputPath)Generated;"/>
+    <MakeDir Directories="$(IntermediateOutputPath)Generated"/>
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
     </PropertyGroup>
