@@ -341,7 +341,9 @@ namespace Orleans.AzureUtils
 
         private void ReportErrorAndRethrow(Exception exc, string operation, ErrorCode errorCode)
         {
-            var errMsg = String.Format("Error doing {0} for Azure storage queue {1} \n Exception = \n {2}", operation, QueueName, exc);
+            var errMsg = String.Format(
+                "Error doing {0} for Azure storage queue {1} " + Environment.NewLine 
+                + "Exception = {2}", operation, QueueName, exc);
             logger.Error(errorCode, errMsg, exc);
             throw new AggregateException(errMsg, exc);
         }

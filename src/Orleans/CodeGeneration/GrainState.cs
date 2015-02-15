@@ -265,7 +265,7 @@ namespace Orleans.CodeGeneration
         private string MakeErrorMsg(string what, GrainReference grainReference, Exception exc)
         {
             string errorCode = AzureStorageUtils.ExtractRestErrorCode(exc);
-            return string.Format("Error from storage provider during {0} for grain Type={1} Pk={2} Id={3} Error={4}\n {5}",
+            return string.Format("Error from storage provider during {0} for grain Type={1} Pk={2} Id={3} Error={4}"  + Environment.NewLine + " {5}",
                 what, grainTypeName, grainReference.GrainId.ToDetailedString(), grainReference, errorCode, TraceLogger.PrintException(exc));
         }
 

@@ -312,7 +312,7 @@ namespace Orleans.Runtime
             var distinctComplaints = complaints.Distinct();
             // generate feedback so that the operator can determine why her DLL didn't load.
             var msg = new StringBuilder();
-            const string bullet = "\n\t* ";
+            string bullet = Environment.NewLine + "\t* ";
             msg.Append(String.Format("User assembly ignored: {0}", pathName));
             int count = 0;
             foreach (var i in distinctComplaints)

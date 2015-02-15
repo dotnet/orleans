@@ -193,15 +193,19 @@ namespace Orleans.Runtime.Configuration
         public override string ToString()
         {
             var result = new StringBuilder();
-            result.AppendFormat("   Application:\n");
-            result.AppendFormat("      Defaults:\n");
-            result.AppendFormat("         Deactivate if idle for: {0}\n", DefaultCollectionAgeLimit);
+            result.AppendFormat("   Application:").AppendLine();
+            result.AppendFormat("      Defaults:").AppendLine();
+            result.AppendFormat("         Deactivate if idle for: {0}", DefaultCollectionAgeLimit)
+                .AppendLine();
+
             foreach (GrainTypeConfiguration config in classSpecific.Values)
             {
                 if (!config.CollectionAgeLimit.HasValue) continue;
 
-                result.AppendFormat("      GrainType Type=\"{0}\":\n", config.Type.FullName);
-                result.AppendFormat("         Deactivate if idle for: {0} sec\n", (long)config.CollectionAgeLimit.Value.TotalSeconds);
+                result.AppendFormat("      GrainType Type=\"{0}\":", config.Type.FullName)
+                    .AppendLine();
+                result.AppendFormat("         Deactivate if idle for: {0} seconds", (long)config.CollectionAgeLimit.Value.TotalSeconds)
+                    .AppendLine();
             }
             return result.ToString();
         }

@@ -707,7 +707,14 @@ namespace Orleans.Runtime
         public string CaptureRuntimeEnvironment()
         {
             var callStack = new System.Diagnostics.StackTrace(1); // Don't include this method in stack trace
-            return String.Format("   TaskScheduler={0}\n   RuntimeContext={1}\n   WorkerPoolThread={2}\n   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}\n   Thread.CurrentThread.ManagedThreadId={4}\n   StackTrace=\n{5}",
+            return String.Format(
+                  "   TaskScheduler={0}" + Environment.NewLine 
+                + "   RuntimeContext={1}" + Environment.NewLine
+                + "   WorkerPoolThread={2}" + Environment.NewLine
+                + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
+                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
+                + "   StackTrace=" + Environment.NewLine 
+                + "   {5}",
                     TaskScheduler.Current,
                     RuntimeContext.Current,
                     WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,

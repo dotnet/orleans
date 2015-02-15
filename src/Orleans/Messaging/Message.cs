@@ -534,7 +534,7 @@ namespace Orleans.Runtime
             response.Result = ResponseTypes.Rejection;
             response.RejectionType = type;
             response.RejectionInfo = info;
-            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:\r\n{3}", type, info, this, new System.Diagnostics.StackTrace(true));
+            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, new System.Diagnostics.StackTrace(true));
             return response;
         }
 

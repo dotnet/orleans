@@ -938,9 +938,9 @@ namespace Orleans.Runtime
             string stack = String.Empty;
             if (includeStackTrace && exception.StackTrace != null)
             {
-                stack = String.Format("\n{0} \n ", exception.StackTrace);
+                stack = String.Format(Environment.NewLine + exception.StackTrace);
             }
-            return String.Format("\nExc level {0}: {1}: {2}{3}",
+            return String.Format(Environment.NewLine + "Exc level {0}: {1}: {2}{3}",
                 level,
                 exception.GetType(),
                 exception.Message,
@@ -971,7 +971,7 @@ namespace Orleans.Runtime
                 errorCode = ErrorCode.Runtime;
             }
 
-            Error(errorCode, "INTERNAL FAILURE! About to crash! Fail message is: " + message + "\n" + Environment.StackTrace);
+            Error(errorCode, "INTERNAL FAILURE! About to crash! Fail message is: " + message + Environment.NewLine + Environment.StackTrace);
 
             // Create mini-dump of this failure, for later diagnosis
             var dumpFile = CreateMiniDump();
