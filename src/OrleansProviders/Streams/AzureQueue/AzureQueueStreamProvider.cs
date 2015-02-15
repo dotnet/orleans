@@ -52,7 +52,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 var queueMapper = new AzureQueueStreamQueueMapper(providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
-                if (logger != null) logger.Info("About to delete all {0} Stream Queues\n", allQueues.Count);
+                if (logger != null) logger.Info("About to delete all {0} Stream Queues", allQueues.Count);
                 foreach (var queueId in allQueues)
                 {
                     var manager = new AzureQueueDataManager(queueId.ToString(), deploymentId, storageConnectionString);

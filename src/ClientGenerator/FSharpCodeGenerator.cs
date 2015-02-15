@@ -44,7 +44,7 @@ namespace Orleans.CodeGeneration
 
         void StartNewLine()
         {
-            generatedCode.Append('\n');
+            generatedCode.Append(Environment.NewLine);
             generatedCode.Append(' ', indentLevel);
         }
 

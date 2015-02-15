@@ -254,7 +254,7 @@ namespace Orleans.Runtime.MembershipService
             int version = 0;
             string versionETag = null;
 
-            using (var results = await command.ExecuteReaderAsync())
+            using (SqlDataReader results = await command.ExecuteReaderAsync())
             {
                 while (await results.ReadAsync())
                 {

@@ -91,11 +91,15 @@ namespace Orleans.Runtime
         /// Each key-value pair is represented as the string description of the key followed by
         /// the string description of the value,
         /// separated by " -> ", and enclosed in curly brackets.</returns>
-        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string> toString = null, string separator = "\n")
+        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string> toString = null, string separator = null)
         {
             if (dict == null || dict.Count == 0)
             {
                 return "[]";
+            }
+            if (separator == null)
+            {
+                separator = Environment.NewLine;
             }
             var sb = new StringBuilder("[");
             var enumerator = dict.GetEnumerator();

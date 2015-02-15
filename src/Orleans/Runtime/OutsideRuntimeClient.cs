@@ -187,7 +187,7 @@ namespace Orleans
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
                     BARS, config.DNSHostName, localAddress, clientId));
                 string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}'", BARS, RuntimeVersion.Current);
-                startMsg = string.Format("{0} Config= \n {1}", startMsg, config);
+                startMsg = string.Format("{0} Config= "  + Environment.NewLine + " {1}", startMsg, config);
                 logger.Info(ErrorCode.ClientStarting, startMsg);
 
                 if (TestOnlyThrowExceptionDuringInit)

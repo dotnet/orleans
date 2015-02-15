@@ -27,7 +27,7 @@ using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Streams;
 
-namespace TesterInternal.OrleansRuntime.Streams
+namespace UnitTests.OrleansRuntime.Streams
 {
     [TestClass]
     public class BestFitBalancerTests

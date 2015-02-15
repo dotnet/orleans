@@ -137,7 +137,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\HelloWorld\HelloWordGrains\HelloWordGrains.csproj">
+    <ProjectReference Include="..\..\HelloWorld\HelloWorldGrains\HelloWorldGrains.csproj">
       <Project>{98d4db83-175e-44d5-a14b-9c66ee89f037}</Project>
       <Name>HelloWordGrains</Name>
     </ProjectReference>

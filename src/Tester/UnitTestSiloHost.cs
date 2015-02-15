@@ -185,7 +185,7 @@ namespace UnitTests.Tester
             {
                 stabilizationTime += UnitTestUtils.Multiply(globalConfig.TableRefreshTimeout, 2);
             }
-            WriteLog("\n\nWaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             Thread.Sleep(stabilizationTime);
             WriteLog("WaitForLivenessToStabilize is done sleeping");
         }

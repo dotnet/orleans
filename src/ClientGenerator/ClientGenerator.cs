@@ -165,7 +165,7 @@ namespace Orleans.CodeGeneration
 
             if (namespaceDictionary.Keys.Count == 0)
             {
-                ConsoleText.WriteStatus("This {0} does not contain any public and non-abstract grain class\n", options.InputLib);
+                ConsoleText.WriteStatus("This {0} does not contain any public and non-abstract grain class" + Environment.NewLine, options.InputLib);
                 return true;
             }
             // Create sources directory
@@ -478,9 +478,9 @@ namespace Orleans.CodeGeneration
             unit.Namespaces.Add(referenceNameSpace);
         }
 
-        private const string CodeGenFileRelativePathCSharp = "Properties\\orleans.codegen.cs";
-        private const string CodeGenFileRelativePathFSharp = "GeneratedFiles\\orleans.codegen.fs";
-        private const string CodeGenFileRelativePathVB = "GeneratedFiles\\orleans.codegen.vb";
+        private static readonly string CodeGenFileRelativePathCSharp = Path.Combine("Properties", "orleans.codegen.cs");
+        private static readonly string CodeGenFileRelativePathFSharp =  Path.Combine("GeneratedFiles", "orleans.codegen.fs");
+        private static readonly string CodeGenFileRelativePathVB =  Path.Combine("GeneratedFiles", "orleans.codegen.vb");
 
         internal static void BuildInputAssembly(CodeGenOptions options)
         {
@@ -567,7 +567,7 @@ namespace Orleans.CodeGeneration
                 // There is no CodeDom provider for F#, so we have to take an entirely different approach
                 // to code generation for that language.
                 var cmdLine = newArgs.ToString();
-                ConsoleText.WriteStatus(string.Format("{0} {1}", options.FSharpCompilerPath, cmdLine));
+                ConsoleText.WriteStatus("{0} {1}", options.FSharpCompilerPath, cmdLine);
 
                 if (!options.InputLib.Directory.Exists)
                     options.InputLib.Directory.Create();
@@ -624,10 +624,10 @@ namespace Orleans.CodeGeneration
                 foreach (CompilerError error in results.Errors)
                 {
                     Console.WriteLine(error.ToString());
-                    errorString += error.ErrorText + "\n";
+                    errorString += error.ErrorText + Environment.NewLine;
                 }
 
-                throw new Exception(String.Format("Could not compile and generate {0}\n", errorString));
+                throw new Exception(String.Format("Could not compile and generate {0}", errorString));
             }
         }
 
@@ -808,8 +808,9 @@ namespace Orleans.CodeGeneration
                 if (string.IsNullOrEmpty(options.CodeGenFile))
                 {
                     ConsoleText.WriteError(string.Format("Error: no codegen file. Add a file '{0}' to your project",
-                        (options.TargetLanguage == Language.CSharp) ? "Properties\\orleans.codegen.cs" :
-                        (options.TargetLanguage == Language.FSharp) ? "GeneratedFiles\\orleans.codegen.fs" : "GeneratedFiles\\orleans.codegen.vb"));
+                        (options.TargetLanguage == Language.CSharp) ? Path.Combine("Properties", "orleans.codegen.cs") :
+                        (options.TargetLanguage == Language.FSharp) ? Path.Combine("GeneratedFiles", "orleans.codegen.fs") 
+                                                                    : Path.Combine("GeneratedFiles", "orleans.codegen.vb")));
                     return 2;
                 }
 
@@ -823,7 +824,11 @@ namespace Orleans.CodeGeneration
                 options.SourcesDir = Path.Combine(options.InputLib.DirectoryName, "Generated");
 
                 // STEP 4 : Dump useful info for debugging
-                Console.WriteLine("Orleans-CodeGen - Options \n\tInputLib={0} \n\tSigningKey={1} \n\tServerGen={2} \n\tCodeGenFile={3}",
+                Console.WriteLine("Orleans-CodeGen - Options "  + Environment.NewLine 
+                    + "\tInputLib={0} " + Environment.NewLine 
+                    + "\tSigningKey={1} " + Environment.NewLine 
+                    + "\tServerGen={2} "  + Environment.NewLine 
+                    + "\tCodeGenFile={3}",
                     options.InputLib.FullName,
                     options.SigningKey != null ? options.SigningKey.FullName : "",
                     options.ServerGen,
@@ -1010,7 +1015,7 @@ namespace Orleans.CodeGeneration
                     if (!loaded.ContainsKey(assemblyName))
                         loaded.Add(assemblyName, assembly.Location);
                     else
-                        throw new Exception(string.Format("Assembly already loaded.Possible internal error !!!. \n\t{0}\n\t{1}",
+                        throw new Exception(string.Format("Assembly already loaded.Possible internal error !!!. " + Environment.NewLine + "\t{0}"  + Environment.NewLine + "\t{1}",
                             assembly.Location, loaded[assemblyName]));
                 }
             }

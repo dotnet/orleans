@@ -72,7 +72,7 @@ namespace UnitTests.SampleStreaming
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_1()
         {
-            logger.Info("\n\n************************ SampleStreamingTests_1 ********************************* \n\n");
+            logger.Info("************************ SampleStreamingTests_1 *********************************");
             streamId = Guid.NewGuid();
             streamProvider = SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
@@ -81,7 +81,7 @@ namespace UnitTests.SampleStreaming
         [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_2()
         {
-            logger.Info("\n\n************************ SampleStreamingTests_2 ********************************* \n\n");
+            logger.Info("************************ SampleStreamingTests_2 *********************************");
             streamId = Guid.NewGuid();
             streamProvider = SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
@@ -90,7 +90,7 @@ namespace UnitTests.SampleStreaming
         [TestMethod, TestCategory( "Nightly" ), TestCategory( "Streaming" )]
         public async Task SampleStreamingTests_3()
         {
-            logger.Info( "\n\n************************ SampleStreamingTests_3 ********************************* \n\n" );
+            logger.Info("************************ SampleStreamingTests_3 *********************************" );
             streamId = Guid.NewGuid();
             streamProvider = SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Producer_InlineConsumer( streamId, streamProvider );
@@ -105,7 +105,7 @@ namespace UnitTests.SampleStreaming
         //[TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
         //public async Task SampleStreamingTests_3()
         //{
-        //    logger.Info("\n\n************************ SampleStreamingTests_3 ********************************* \n\n");
+        //    logger.Info("************************ SampleStreamingTests_3 *********************************");
         //    streamId = Guid.NewGuid();
         //    streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
         //    await StreamingTests_Consumer_Producer(streamId, streamProvider);
@@ -114,7 +114,7 @@ namespace UnitTests.SampleStreaming
         //[TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
         //public async Task SampleStreamingTests_4()
         //{
-        //    logger.Info("\n\n************************ SampleStreamingTests_4 ********************************* \n\n");
+        //    logger.Info("************************ SampleStreamingTests_4 *********************************");
         //    streamId = Guid.NewGuid();
         //    streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
         //    await StreamingTests_Producer_Consumer(streamId, streamProvider);

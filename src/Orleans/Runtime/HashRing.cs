@@ -129,12 +129,12 @@ namespace Orleans.Runtime
         {
             lock (lockable)
             {
-                return String.Format("All {0}:\n{1}",
+                return String.Format("All {0}:" + Environment.NewLine + "{1}",
                     typeof(T).Name,
                     Utils.EnumerableToString(
                         sortedRingList, 
                         elem => String.Format("{0}/x{1,8:X8}", elem, elem.GetUniformHashCode()),
-                        "\n",
+                        Environment.NewLine,
                         false));
             }
         }

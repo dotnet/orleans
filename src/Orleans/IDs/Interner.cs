@@ -109,7 +109,7 @@ namespace Orleans
                 cacheCleanupTimer = new SafeTimer(InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
             }
 #if DEBUG_INTERNER
-            StringValueStatistic.FindOrCreate(internCacheName, () => String.Format("Size={0}, Content=\n{1}", internCache.Count, PrintInternerContent()));
+            StringValueStatistic.FindOrCreate(internCacheName, () => String.Format("Size={0}, Content=" + Environment.NewLine + "{1}", internCache.Count, PrintInternerContent()));
 #endif
         }
 

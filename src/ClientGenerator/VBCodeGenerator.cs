@@ -171,7 +171,7 @@ End If", pair.Key, pair.Value);
             factoryClass.Members.Add(createObjectReferenceMethod);
 
             methodImpl = String.Format(@"
-        Public Shared Sub DeleteObjectReference(reference As {0}) As System.Threading.Tasks.Task
+        Public Shared Function DeleteObjectReference(reference As {0}) As System.Threading.Tasks.Task
             Return Global.Orleans.Runtime.GrainReference.DeleteObjectReference(reference)
         End Sub",
             grainInterfaceData.TypeName);
@@ -618,13 +618,14 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 }
 
                 var snippet = new StringBuilder();
-                snippet.AppendFormat("Public Function {0}({1}) As {2} Implements {3}.{0}\n",
+                snippet.AppendFormat("Public Function {0}({1}) As {2} Implements {3}.{0}",
                     methodInfo.Name,
                     parameterList,
                     GetGenericTypeName(methodInfo.ReturnType, type => { }, t => false),
-                    GetGenericTypeName(methodInfo.DeclaringType, type => { }, t => false));
-                snippet.AppendFormat("            {0}\n", GetBasicMethodImpl(methodInfo));
-                snippet.Append("        End Function\n");
+                    GetGenericTypeName(methodInfo.DeclaringType, type => { }, t => false))
+                    .AppendLine();
+                snippet.AppendFormat("            {0}", GetBasicMethodImpl(methodInfo)).AppendLine();
+                snippet.AppendLine("        End Function");
                 return new CodeSnippetTypeMember(snippet.ToString());
             }
 
