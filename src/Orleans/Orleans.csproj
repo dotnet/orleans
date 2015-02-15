@@ -363,13 +363,12 @@
     <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
     <!-- Extract the sources for clientgen -->
     <Message Text="[OrleansDllBootstrapUsingClientGen] - Searching for ClientGen sources" Importance="high" />
-    <XmlPeek Namespaces="&lt;Namespace Prefix='msb' Uri='http://schemas.microsoft.com/developer/msbuild/2003'/&gt;" 
-             XmlInputPath="$(SolutionDir)\ClientGenerator\ClientGenerator.csproj" 
-             Query="/msb:Project/msb:ItemGroup/msb:Compile/@Include">
-      <Output TaskParameter="Result" ItemName="Peeked" />
-    </XmlPeek>
+    <ItemGroup>
+      <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*.cs" />
+      <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*\*.cs" />
+    </ItemGroup>
     <PropertyGroup>
-      <ClientGenSources>@(Peeked->'$(SolutionDir)ClientGenerator\%(Identity)')</ClientGenSources>
+      <ClientGenSources>@(CodeGenSrcFiles->'%(Identity)')</ClientGenSources>
     </PropertyGroup>
     <Message Text="ClientGenSources extracted: $(ClientGenSources)" Importance="high" />
     <!-- Compile orleans dll -->
