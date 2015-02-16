@@ -21,21 +21,38 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System;
 using System.Threading.Tasks;
 
-using Orleans.AzureUtils;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Runtime;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
-    /// <summary>
-    /// Persistent stream provider that uses azure queue for persistence
-    /// </summary>
-    public class AzureQueueStreamProvider : PersistentStreamProvider<AzureQueueAdapterFactory>
+    public class SimpleAzureQueueAdapterFactory : IQueueAdapterFactory
     {
+        private string dataConnectionString;
+        private string queueName;
+        private string providerName;
+
+        public const string DATA_CONNECTION_STRING = "DataConnectionString";
+        public const string QUEUE_NAME_STRING = "QueueName";
+        
+        public virtual void Init(IProviderConfiguration config, string providerName, Logger logger)
+        {
+            if (config == null) throw new ArgumentNullException("config");
+            if (!config.Properties.TryGetValue(DATA_CONNECTION_STRING, out dataConnectionString))
+                throw new ArgumentException(String.Format("{0} property not set", DATA_CONNECTION_STRING));
+            if (!config.Properties.TryGetValue(QUEUE_NAME_STRING, out queueName))
+                throw new ArgumentException(String.Format("{0} property not set", QUEUE_NAME_STRING));
+
+            this.providerName = providerName;
+        }
+
+        public virtual Task<IQueueAdapter> CreateAdapter()
+        {
+            var adapter = new SimpleAzureQueueAdapter(dataConnectionString, providerName, queueName);
+            return Task.FromResult<IQueueAdapter>(adapter);
+        }
     }
 }
