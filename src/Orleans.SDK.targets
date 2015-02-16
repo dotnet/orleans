@@ -81,7 +81,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/nomerge"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(SnkFile)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))"/>
+    <!-- Next line is equivalent to MSBuild.Escape but works on Mono xbuild too -->
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$(DefineConstants.Replace(';','%3B'))"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')"/>
@@ -119,7 +120,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/svr"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(SnkFile)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))"/>
+    <!-- Next line is equivalent to MSBuild.Escape but works on Mono xbuild too -->
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$(DefineConstants.Replace(';','%3B'))"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')"/>
