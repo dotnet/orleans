@@ -146,6 +146,7 @@
     <Compile Include="Streams\Core\IAsyncObservable.cs" />
     <Compile Include="Streams\Internal\IStreamControl.cs" />
     <Compile Include="Streams\Core\IStreamIdentity.cs" />
+    <Compile Include="Streams\Providers\StreamProviderDirection.cs" />
     <Compile Include="Streams\Providers\IStreamProviderImpl.cs" />
     <Compile Include="Streams\Providers\IStreamProviderManager.cs" />
     <Compile Include="Streams\Providers\IStreamProviderRuntime.cs" />
