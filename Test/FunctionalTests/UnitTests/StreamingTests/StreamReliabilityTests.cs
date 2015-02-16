@@ -24,7 +24,6 @@ namespace UnitTests.Streaming.Reliability
     [TestClass]
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviderInterfaces.dll")]
     [DeploymentItem("OrleansProviders.dll")]
     public class StreamReliabilityTests : UnitTestBase
     {

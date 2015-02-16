@@ -17,7 +17,6 @@ namespace UnitTests.StreamingTests
     [TestClass]
     [DeploymentItem("Config_StorageErrors.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviderInterfaces.dll")]
     [DeploymentItem("OrleansProviders.dll")]
     public class StreamPubSubReliabilityTests : UnitTestBase
     {

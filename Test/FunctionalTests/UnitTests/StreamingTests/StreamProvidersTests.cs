@@ -10,7 +10,6 @@ namespace UnitTests.Streaming
 {
     [DeploymentItem("Config_DevStorage.xml")]
     [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviderInterfaces.dll")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class StreamProvidersTests_ProviderConfigNotLoaded : UnitTestBase
@@ -116,7 +115,6 @@ namespace UnitTests.Streaming
     }
 
     [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviderInterfaces.dll")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class StreamProvidersTests_ProviderConfigLoaded : UnitTestBase

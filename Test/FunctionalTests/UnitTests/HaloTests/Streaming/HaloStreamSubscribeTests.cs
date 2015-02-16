@@ -9,7 +9,6 @@ using UnitTests.StreamingTests;
 namespace UnitTests.HaloTests.Streaming
 {
     [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviderInterfaces.dll")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class HaloStreamSubscribeTests : UnitTestBase

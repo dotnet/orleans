@@ -143,7 +143,6 @@ namespace UnitTests.Stats
     [TestClass]
     [DeploymentItem("Niklas-DevTestClientConfiguration.xml")]
     [DeploymentItem("Niklas-DevTestServerConfiguration.xml")]
-    [DeploymentItem("OrleansProviderInterfaces.dll")]
     [DeploymentItem("OrleansProviders.dll")]
     public class SqlClientInitTests : UnitTestBase
     {
