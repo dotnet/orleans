@@ -25,7 +25,8 @@ using System;
 using System.Net;
 using System.Data.Services.Client;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
+using Microsoft.WindowsAzure.Storage.Table.Protocol;
 using Orleans.Runtime;
 using Orleans.AzureUtils;
 
