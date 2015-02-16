@@ -480,6 +480,11 @@ namespace Orleans.TestFramework
                         dir = Path.Combine(dir, "Bin"); // for local builds
                     matches = true;
                 }
+                else if (dir.EndsWith("tst")) // if running under VSO
+                {
+                    dir = Path.Combine(Path.GetDirectoryName(dir), "bin");
+                    matches = true;
+                }
                 if (matches)
                 {
                     if (!Directory.Exists(dir))
