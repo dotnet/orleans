@@ -27,9 +27,10 @@ using System.Data.Services.Common;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Microsoft.WindowsAzure.Storage.Table;
+
 
 namespace Orleans.AzureUtils
 {

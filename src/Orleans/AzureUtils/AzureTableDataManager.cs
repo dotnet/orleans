@@ -21,11 +21,6 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Shared.Protocol;
-using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.WindowsAzure.Storage.Table.Queryable;
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Data.Services.Client;
@@ -34,6 +29,11 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
+using Microsoft.WindowsAzure.Storage.Table.Queryable;
+using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
 {
@@ -90,7 +90,7 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-                var tableReference = tableCreationClient.GetTableReference(TableName);
+                CloudTable tableReference = tableCreationClient.GetTableReference(TableName);
                 bool didCreate = await Task<bool>.Factory.FromAsync(
                      tableReference.BeginCreateIfNotExists,
                      tableReference.EndCreateIfNotExists,
@@ -117,10 +117,6 @@ namespace Orleans.AzureUtils
         /// Deletes the Azure table.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
-        /// <summary>
-        /// Deletes the Azure table.
-        /// </summary>
-        /// <returns>Completion promise for this operation.</returns>
         public async Task DeleteTableAsync()
         {
             const string operation = "DeleteTable";
@@ -129,7 +125,7 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-                var tableReference = tableCreationClient.GetTableReference(TableName);
+                CloudTable tableReference = tableCreationClient.GetTableReference(TableName);
                 bool didDelete = await Task<bool>.Factory.FromAsync(
                         tableReference.BeginDeleteIfExists,
                         tableReference.EndDeleteIfExists,
@@ -166,7 +162,11 @@ namespace Orleans.AzureUtils
 
             try
             {
-                var tableReference = tableOperationsClient.GetTableReference(TableName);
+                // WAS:
+                // svc.AddObject(TableName, data);
+                // SaveChangesOptions.None
+
+                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 try
                 {
                     var opResult = await Task<TableResult>.Factory.FromAsync(
@@ -203,10 +203,14 @@ namespace Orleans.AzureUtils
 
             try
             {
-                var tableReference = tableOperationsClient.GetTableReference(TableName);
+                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 try
                 {
-                    //TODO: It feels like this should be simply as follows with the new libraries (cf. the commented code)...
+                    // WAS:
+                    // svc.AttachTo(TableName, data, ANY_ETAG);
+                    // svc.UpdateObject(data);
+                    // SaveChangesOptions.ReplaceOnUpdate,
+
                     var opResult = await Task<TableResult>.Factory.FromAsync(
                        tableReference.BeginExecute,
                        tableReference.EndExecute,
@@ -228,15 +232,86 @@ namespace Orleans.AzureUtils
             }
         }
 
+
+        /// <summary>
+        /// Merhes a data entry in the Azure table, without checking eTags.
+        /// </summary>
+        /// <param name="data">Data to be merged in the table.</param>
+        /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
+        public async Task<string> MergeTableEntryAsync(T data)
+        {
+            const string operation = "MergeTableEntry";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} entry {1} into table {2}", operation, data, TableName);
+
+            try
+            {
+                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
+                try
+                {
+                    // WAS:
+                    // svc.AttachTo(TableName, data, ANY_ETAG);
+                    // svc.UpdateObject(data);
+
+                    var opResult = await Task<TableResult>.Factory.FromAsync(
+                          tableReference.BeginExecute,
+                          tableReference.EndExecute,
+                          TableOperation.Merge(data),
+                          null);
+
+                    return opResult.Etag;
+                }
+                catch (Exception exc)
+                {
+                    Logger.Warn(ErrorCode.AzureTable_07, String.Format("Intermediate error merging entry {0} to the table {1}",
+                        (data == null ? "null" : data.ToString()), TableName), exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+
         /// <summary>
         /// Updates a data entry in the Azure table: updates an already existing data in the table, by using eTag.
         /// Fails if the data does not already exist or of eTag does not match.
         /// </summary>
         /// <param name="data">Data to be updated into the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public Task<string> UpdateTableEntryAsync(T data, string dataEtag)
+        public async Task<string> UpdateTableEntryAsync(T data, string dataEtag)
         {
-            return UpdateTableEntryConditionallyAsync(data, dataEtag, null, null);
+            const string operation = "UpdateTableEntryAsync";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1}  entry {2}", operation, TableName, data);
+
+            try
+            {
+                try
+                {
+                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
+                    data.ETag = dataEtag;
+
+                    var opResult = await Task<TableResult>.Factory.FromAsync(
+                        tableReference.BeginExecute,
+                        tableReference.EndExecute,
+                        TableOperation.Replace(data),
+                        null);
+
+                    //The ETag of data is needed in further operations.                                        
+                    return opResult.Etag;
+                }
+                catch (Exception exc)
+                {
+                    CheckAlertWriteError(operation, data, null, exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
         }
 
         /// <summary>
@@ -298,7 +373,7 @@ namespace Orleans.AzureUtils
 
         #region Internal functions
 
-        internal async Task<string> InsertTableEntryConditionallyAsync(T data, T tableVersion, string tableVersionEtag, bool updateTableVersion = true)
+        internal async Task<string> InsertTableEntryConditionallyAsync(T data, T tableVersion, string tableVersionEtag)
         {
             const string operation = "InsertTableEntryConditionally";
             string tableVersionData = (tableVersion == null ? "null" : tableVersion.ToString());
@@ -310,13 +385,21 @@ namespace Orleans.AzureUtils
             {                                
                 try
                 {
-                    var tableReference = tableOperationsClient.GetTableReference(TableName);
+                    // WAS:
+                    // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
+                    // svc.AddObject(TableName, data);
+                    // --- 
+                    // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
+                    // svc.UpdateObject(tableVersion);
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch, 
+                    // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
+                    // return dataResult.ETag;
+
+                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                     var entityBatch = new TableBatchOperation();
                     entityBatch.Add(TableOperation.Insert(data));
-                    if (updateTableVersion)
-                    {
-                        entityBatch.Add(TableOperation.InsertOrReplace(tableVersion));
-                    }
+                    tableVersion.ETag = tableVersionEtag;
+                    entityBatch.Add(TableOperation.Replace(tableVersion));
                                                                                
                     var opResults = await Task<IList<TableResult>>.Factory.FromAsync(
                         tableReference.BeginExecuteBatch,
@@ -352,13 +435,25 @@ namespace Orleans.AzureUtils
             {
                 try
                 {
-                    var tableReference = tableOperationsClient.GetTableReference(TableName);
+                    // WAS:
+                    // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
+                    // svc.AttachTo(TableName, data, dataEtag);
+                    // svc.UpdateObject(data);
+                    // ----
+                    // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
+                    // svc.UpdateObject(tableVersion);
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch, 
+                    // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
+                    // return dataResult.ETag;
+
+                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                     var entityBatch = new TableBatchOperation();
+                    data.ETag = dataEtag;
                     entityBatch.Add(TableOperation.Replace(data));
                     if (tableVersion != null && tableVersionEtag != null)
                     {
-
-                        entityBatch.Add(TableOperation.InsertOrReplace(tableVersion));
+                        tableVersion.ETag = tableVersionEtag;
+                        entityBatch.Add(TableOperation.Replace(tableVersion));
                     }
                                         
                     var opResults = await Task<IList<TableResult>>.Factory.FromAsync(
@@ -384,37 +479,6 @@ namespace Orleans.AzureUtils
             }            
         }
 
-        internal async Task<string> MergeTableEntryAsync(T data)
-        {
-            const string operation = "MergeTableEntry";
-            var startTime = DateTime.UtcNow;
-            if(Logger.IsVerbose2) Logger.Verbose2("{0} entry {1} into table {2}", operation, data, TableName);
-
-            try
-            {
-                var tableReference = tableOperationsClient.GetTableReference(TableName);                
-                try
-                {
-                    var opResult = await Task<TableResult>.Factory.FromAsync(
-                          tableReference.BeginExecute,
-                          tableReference.EndExecute,
-                          TableOperation.Merge(data),
-                          null);
-
-                    return opResult.Etag;
-                }
-                catch (Exception exc)
-                {
-                    Logger.Warn(ErrorCode.AzureTable_07, String.Format("Intermediate error merging entry {0} to the table {1}",
-                        (data == null ? "null" : data.ToString()), TableName), exc);
-                    throw;
-                }
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
-        }
 
         /// <summary>
         /// Deletes a set of already existing data entries in the table, by using eTag.
@@ -435,11 +499,17 @@ namespace Orleans.AzureUtils
             
             try
             {
-                var tableReference = tableOperationsClient.GetTableReference(TableName);                
+                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);                
                 var entityBatch = new TableBatchOperation();
                 foreach(var tuple in list)
                 {
-                    entityBatch.Delete(tuple.Item1);
+                    // WAS:
+                    // svc.AttachTo(TableName, tuple.Item1, tuple.Item2);
+                    // svc.DeleteObject(tuple.Item1);
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
+                    T item = tuple.Item1;
+                    item.ETag = tuple.Item2;
+                    entityBatch.Delete(item);
                 }
                 
                 try
@@ -476,8 +546,8 @@ namespace Orleans.AzureUtils
 
             try
             {
-                var tableReference = tableOperationsClient.GetTableReference(TableName);                
-                var cloudTableQuery = tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
+                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);                
+                TableQuery<T> cloudTableQuery = tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
                 try
                 {
                     Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
@@ -503,7 +573,7 @@ namespace Orleans.AzureUtils
                         backoff);
 
                     // Data was read successfully if we got to here                    
-                    return results.Select(i => Tuple.Create(i, i.ETag)).ToList();                    
+                    return results.Select((T i) => Tuple.Create(i, i.ETag)).ToList();                    
                 }
                 catch (Exception exc)
                 {
@@ -537,17 +607,24 @@ namespace Orleans.AzureUtils
 
             try
             {
-                var tableReference = tableOperationsClient.GetTableReference(TableName);
+                                
+                // WAS:
+                // svc.AttachTo(TableName, entry);
+                // svc.UpdateObject(entry);
+                // SaveChangesOptions.None | SaveChangesOptions.Batch,
+                // SaveChangesOptions.None == Insert-or-merge operation, SaveChangesOptions.Batch == Batch transaction
+                // http://msdn.microsoft.com/en-us/library/hh452241.aspx
+
+                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 var entityBatch = new TableBatchOperation();
                 foreach (T entry in data)
                 {
-                    entityBatch.InsertOrReplace(entry);
+                    entityBatch.Insert(entry);
                 }
 
                 bool fallbackToInsertOneByOne = false;
                 try
                 {
-                    // SaveChangesOptions.None == Insert-or-merge operation, SaveChangesOptions.Batch == Batch transaction
                     // http://msdn.microsoft.com/en-us/library/hh452241.aspx
                     await Task<IList<TableResult>>.Factory.FromAsync(
                         tableReference.BeginExecuteBatch,
@@ -580,7 +657,7 @@ namespace Orleans.AzureUtils
                 var promises = new List<Task>();
                 foreach (T entry in data)
                 {
-                    promises.Add(UpsertTableEntryAsync(entry));
+                    promises.Add(CreateTableEntryAsync(entry));
                 }
                 await Task.WhenAll(promises);
             }
@@ -654,7 +731,11 @@ namespace Orleans.AzureUtils
 
             try
             {
-                var tableReference = tableClient.GetTableReference(TableName);
+                // WAS:
+                // svc.AddObject(TableName, entity);
+                // SaveChangesOptions.None,
+
+                CloudTable tableReference = tableClient.GetTableReference(TableName);
                 try
                 {
                     await Task<TableResult>.Factory.FromAsync(
@@ -671,6 +752,10 @@ namespace Orleans.AzureUtils
 
                 try
                 {
+                    // WAS:
+                    // svc.DeleteObject(entity);
+                    // SaveChangesOptions.None,
+
                     await Task<TableResult>.Factory.FromAsync(
                         tableReference.BeginExecute,
                         tableReference.EndExecute,
