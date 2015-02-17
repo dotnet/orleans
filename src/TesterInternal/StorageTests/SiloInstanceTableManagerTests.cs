@@ -128,11 +128,11 @@ namespace UnitTests.StorageTests
         }
 
         [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
-        public async Task SiloInstanceTable_Op_InsertSiloEntryConditionally()
+        public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             SiloInstanceTableEntry newEntry = manager.CreateTableVersionEntry(0);
 
-            bool didInsert = await manager.InsertSiloEntryConditionally(newEntry, null, null, false)
+            bool didInsert = await manager.CreateTableVersionEntryAsync(newEntry)
                 .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
 
             Assert.IsTrue(didInsert, "Did insert");
