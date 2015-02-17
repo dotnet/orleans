@@ -1,0 +1,111 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Microsoft.Studios.StudiosNebula.PerformanceCounters</name>
+    </assembly>
+    <members>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaInstancedPerformanceCounter.DefaultCounter">
+            <summary>
+            Returns the Non-Instanced counter - Used for installing the perf counter.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaInstancedPerformanceCounter.CategoryName">
+            <summary>
+            Gets the name of the Category for this PerfCounter
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaInstancedPerformanceCounter.CounterName">
+            <summary>
+            Gets this Counter Name.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaInstancedPerformanceCounter.Item(System.String)">
+            <summary>
+            Gets the NebulaPerformanceCounter with the instancename requested.
+            </summary>
+            <param name="instanceName"></param>
+            <returns></returns>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.Category">
+            <summary>
+            Gets the category of the performance counter.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.CounterType">
+            <summary>
+            Gets the type of the performance counter.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.InstanceName">
+            <summary>
+            Gets the instance name of the performance counter.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.Name">
+            <summary>
+            Gets the name of the performance counter.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.ReadOnly">
+            <summary>
+            Gets whether the performance counter is read only or not.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.SampleRate">
+            <summary>
+            Gets the sample rate that determines how often the performance counter gets aggregated and logged.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.FailedToInstall">
+            <summary>
+            Gets whether the performance counter failed to be installed or not.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.InstallationException">
+            <summary>
+            Gets the exception caught if the performance counter has failed to install.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounter.Active">
+            <summary>
+            Gets whether the performance counter is active or not, either due to being disabled from the config file or from having failed installation.
+            </summary>
+        </member>
+        <member name="P:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounters.CategoryType">
+            <summary>
+            Indicates whether this PerformanceCounterCategory is single or multi-instance.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Studios.StudiosNebula.PerformanceCounters.NebulaPerformanceCounterCategory.Initialize">
+            <summary>
+            Initializes this instance.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Studios.StudiosNebula.PerformanceCounters.PerformanceCounterHelper.CreateCategory(System.String,System.Diagnostics.PerformanceCounterCategoryType,System.Collections.Generic.ICollection{Microsoft.Studios.StudiosNebula.PerformanceCounters.PerformanceCounterInfo})">
+            <summary>
+            Creates a performance counter category.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Studios.StudiosNebula.PerformanceCounters.PerformanceCounterHelper.DeleteCategory(System.String)">
+            <summary>
+            Deletes a performance counter category if it exists.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Studios.StudiosNebula.PerformanceCounters.PerformanceCounterHelper.InitializePerformanceCounter(Microsoft.Studios.StudiosNebula.PerformanceCounters.PerformanceCounterInfo)">
+            <summary>
+            Initializes a nebula performance counter. 
+            ATTENTION: This can only be invoked after all categories and counters have been created.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Studios.StudiosNebula.PerformanceCounters.PerformanceCounterHelper.GetBaseType(System.Diagnostics.PerformanceCounterType)">
+            <summary>
+            Will return a base type if applicable, otherwise null.
+            </summary>
+        </member>
+        <member name="T:Microsoft.Studios.StudiosNebula.PerformanceCounters.PerformanceCounterInfo">
+            <summary>
+            Class to hold information regarding a performance counter.
+            </summary>
+        </member>
+    </members>
+</doc>

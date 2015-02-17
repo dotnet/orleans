@@ -1,0 +1,49 @@
+1. Make sure that Orleans.Runtime.MembershipService.MembershipServiceTestAgent is compiled and enabled to run
+(Enable #DEBUG_MEMBERSHIP directive in MembershipOracle.cs).
+
+2. Configure performance parameters (#servers, #voters, ...) in RuntimeTimeouts / Orleans config file / liveness.txt file located in the directory from which SiloHost.exe is run.
+The latter is read by MembershipServiceTestAgent, in case such file exists.
+The configuration with liveness.txt is pretty simple - just specify constants in the order they appear in RuntimeTimeouts class.
+
+Example configuration in liveness.txt: 30000 5000 3 3 3 1800000 false 0.2 0
+
+which means read table every 30 sec (=30000 ms), probe every 5 sec (=5000 ms), 
+vote after 3 failed probes, each silo probes 3 silo, 3 votes per death declaration,
+vote expires after 30 minutes (1800000 ms), do not use gossip (to use it, write true),
+kill 20% of silos (0.2) and use deterministic consecutive failures (to set to random failures, last parameter should be 1. Notice that in this
+case primary silo may fail, and then tests might not run correctly).
+
+
+3. Go to <Orleans>\Code\Prototype\OrleansV4
+and build the solution with
+> build.cmd /p:BuildNumber=1 /p:RunTest=false
+
+4. Go to <Orleans>\Code\Prototype\Test\PerfTests 
+and copy all powershell scripts (*.ps1 files) to 
+<Orleans>\Code\Binaries\SDK-DROP\RemoteDeployment.
+
+5. Go to <Orleans>\Code\Binaries\SDK-DROP\RemoteDeployment.
+
+6. Copy configuration files found in the "config files".
+These configs will be used to deploy silos on container machines.
+
+7. Run TestClients.ps1 script.
+While testing membership service, you might want to make sure the client actually does not run (to avoid "noise" effects).
+The easiest (and dirty) way to do that is to remove ChirperNetworkDriver.exe under <Orleans>\Code\Binaries\SDK-DROP\Binaries\ChirperClient.
+This way, the client scripts will fail to load the client, but silos will be deployed and undeployed as required.
+
+Alternative way is to run DeploySilos.ps1.
+
+If everything goes OK, a new directory will be created under RemoteDeployment with silos logs.
+
+
+8. Go to the created directory with logs and copy produceStats.sh and ResultsInterpretor.exe files there.
+Run "produceStats.sh" only.
+It is a bash script (you need to install cygwin from www.cygwin.com and run it from there).
+The script runs ResultsInterpretor.exe, which accepts file with lines holding time stamps, representing the time servers decided to kill themselves and the time they discovered first/last failure,
+and produces output of "time (sec) : #servers that know about the failure by that time".
+The scripts takes this output and produces text rows each having "time : #num servers knowing about first failure : #num servers knowing about last failure" format.
+The output is final.csv file, which can be opened in Excel.
+
+Notice that both the script and the exe file rely on the actual strings produced by Orleans and its membership service (which should be in Verbose3 verbosity level).
+If strings change, you might need to change the script and the exe.

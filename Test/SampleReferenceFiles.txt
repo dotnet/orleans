@@ -1,0 +1,15 @@
+ClientGenerator.exe
+CounterControl.exe
+Orleans.dll
+OrleansHost.exe
+OrleansHost.exe.config
+OrleansRuntime.dll
+OrleansAzureUtils.dll
+OrleansManager.exe
+OrleansProviders.dll
+ClientConfiguration.xml
+Orleans.SDK.targets
+Microsoft.WindowsAzure.Configuration.dll
+Microsoft.WindowsAzure.StorageClient.dll
+TestGrainInterfaces.dll
+TestGrains.dll

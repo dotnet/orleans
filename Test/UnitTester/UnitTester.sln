@@ -1,0 +1,56 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GrainInterfaces", "GrainInterfaces\GrainInterfaces.csproj", "{86F1756C-82A7-447E-BF7C-A36256AA67F4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grains", "Grains\Grains.csproj", "{982229D1-C0E7-4D27-A443-DD4958D5C5FE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{30C31827-A15C-4AA9-8662-351C17E6401F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestHost", "UnitTestHost\UnitTestHost.csproj", "{9CE6C107-E9B5-4AD7-8E8E-061832CE33A5}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 5
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://vstfpg03:8080/tfs/pg03
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = GrainInterfaces\\GrainInterfaces.csproj
+		SccProjectName1 = GrainInterfaces
+		SccLocalPath1 = GrainInterfaces
+		SccProjectUniqueName2 = Grains\\Grains.csproj
+		SccProjectName2 = Grains
+		SccLocalPath2 = Grains
+		SccProjectUniqueName3 = UnitTests\\UnitTests.csproj
+		SccProjectName3 = UnitTests
+		SccLocalPath3 = UnitTests
+		SccProjectUniqueName4 = UnitTestHost\\UnitTestHost.csproj
+		SccProjectName4 = UnitTestHost
+		SccLocalPath4 = UnitTestHost
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{86F1756C-82A7-447E-BF7C-A36256AA67F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86F1756C-82A7-447E-BF7C-A36256AA67F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86F1756C-82A7-447E-BF7C-A36256AA67F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86F1756C-82A7-447E-BF7C-A36256AA67F4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{982229D1-C0E7-4D27-A443-DD4958D5C5FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{982229D1-C0E7-4D27-A443-DD4958D5C5FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{982229D1-C0E7-4D27-A443-DD4958D5C5FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{982229D1-C0E7-4D27-A443-DD4958D5C5FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{30C31827-A15C-4AA9-8662-351C17E6401F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30C31827-A15C-4AA9-8662-351C17E6401F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30C31827-A15C-4AA9-8662-351C17E6401F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30C31827-A15C-4AA9-8662-351C17E6401F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CE6C107-E9B5-4AD7-8E8E-061832CE33A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CE6C107-E9B5-4AD7-8E8E-061832CE33A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CE6C107-E9B5-4AD7-8E8E-061832CE33A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CE6C107-E9B5-4AD7-8E8E-061832CE33A5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

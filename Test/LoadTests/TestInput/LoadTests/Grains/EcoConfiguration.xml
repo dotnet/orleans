@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <Microsoft.Eco>
+    <eventLogger>
+      <eventLog name="Application"
+               throttlingEnabled="true"
+               throttleWindowInSeconds="300"
+               eventLevel="Warning"/>
+      <eventsFile eventLevel="Off" />
+      <eventSource id="AzureCommonStorage"
+                eventLogLevel="Warning"
+                eventsFileLevel="Off"
+                autopilotLogFileLevel="Off" />
+    </eventLogger>
+  </Microsoft.Eco>
+</configuration>
+

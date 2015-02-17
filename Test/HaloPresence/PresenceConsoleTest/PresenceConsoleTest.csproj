@@ -1,0 +1,149 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{45BB656F-5CB5-468B-8D06-C3FBD136F983}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>PresenceConsoleTest</RootNamespace>
+    <AssemblyName>PresenceConsoleTest</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisLogFile>obj\Debug\PresenceConsoleTest.exe.CodeAnalysisLog.xml</CodeAnalysisLogFile>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisLogFile>obj\Release\PresenceConsoleTest.exe.CodeAnalysisLog.xml</CodeAnalysisLogFile>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OrleansReferenceBase>..\..\..\Samples\References\</OrleansReferenceBase>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Corinth.Blf">
+      <HintPath>..\MidnightPresence\Corinth.Blf.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Halo.Configuration">
+      <HintPath>..\MidnightPresence\Microsoft.Halo.Configuration.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Studios.StudiosNebula.Utils">
+      <HintPath>..\MidnightPresence\Microsoft.Studios.StudiosNebula.Utils.dll</HintPath>
+    </Reference>
+    <Reference Include="MidnightPresence.GrainInterfaces">
+      <HintPath>..\MidnightPresence\MidnightPresence.GrainInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Orleans">
+      <HintPath>..\..\References\Orleans.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansAzureUtils">
+      <HintPath>..\..\References\OrleansAzureUtils.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansRuntime">
+      <HintPath>..\..\References\OrleansRuntime.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Xceed.Compression">
+      <HintPath>..\MidnightPresence\Xceed.Compression.dll</HintPath>
+    </Reference>
+    <Reference Include="Xceed.Compression.Formats">
+      <HintPath>..\MidnightPresence\Xceed.Compression.Formats.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ReachPresenceUtilities\BlfHelper.cs" />
+    <Compile Include="PresenceWorkerDriver.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PresenceWorker.cs" />
+    <Compile Include="ReachPresenceUtilities\StreamExtensions.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ClientConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\LoadTests\PersistenceLoadTest\PersistenceLoadTest.csproj">
+      <Project>{1b91efb7-1d8d-4c9f-9979-7941eab4eae0}</Project>
+      <Name>PersistenceLoadTest</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\LoadTests\ReminderLoadTest\ReminderLoadTest.csproj">
+      <Project>{3439b4e2-b439-467f-ae24-47900c438488}</Project>
+      <Name>ReminderLoadTest</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LoadTestBase\LoadTestBase.csproj">
+      <Project>{2E672034-B0C2-4EE7-9A58-5FC490F8D785}</Project>
+      <Name>LoadTestBase</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+      mkdir "$(SolutionDir)TestInput\LoadTests"
+      mkdir "$(SolutionDir)TestInput\LoadTests\Client"
+      mkdir "$(SolutionDir)TestInput\LoadTests\Grains"
+
+      copy "$(TargetDir)ClientConfiguration.xml" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(ProjectDir)..\..\..\OrleansV4\Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(ProjectDir)..\..\..\OrleansV4\Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\bin\runtimes\base\x64\msshrtmi.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)Orleans.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)OrleansAzureUtils.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)OrleansRuntimeGrainInterfaces.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)PresenceConsoleTest.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)PersistenceLoadTest.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)LoadTestBase.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(SolutionDir)..\HaloPresence\GrainBenchmarkLoadTest\$(OutDir)\GrainBenchmarkLoadTest.*" "$(SolutionDir)TestInput\LoadTests\Client"
+
+      copy "$(ProjectDir)..\MidnightPresence\*.*" "$(SolutionDir)TestInput\LoadTests\Client"
+
+      copy "$(ProjectDir)..\MidnightPresence\*.*" "$(SolutionDir)TestInput\LoadTests\Grains"
+    </PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

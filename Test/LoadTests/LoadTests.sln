@@ -1,0 +1,255 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30723.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest", "LoadTest\LoadTest.csproj", "{3924BD12-A39B-45B9-BB86-C155423655E9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{22A7541E-6907-4EE2-8114-520886FAF70C} = {22A7541E-6907-4EE2-8114-520886FAF70C}
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785} = {2E672034-B0C2-4EE7-9A58-5FC490F8D785}
+		{86F6F267-417A-405C-BC91-8E9EFBC40488} = {86F6F267-417A-405C-BC91-8E9EFBC40488}
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983} = {45BB656F-5CB5-468B-8D06-C3FBD136F983}
+		{E4823E76-2CD9-4CF4-8F24-F74941E8FECC} = {E4823E76-2CD9-4CF4-8F24-F74941E8FECC}
+		{6261B581-9916-4DFE-9974-56548875605C} = {6261B581-9916-4DFE-9974-56548875605C}
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59} = {56504385-3AF1-4C9A-AAB3-DED763B3CB59}
+		{923C19A7-CE4D-4A38-A39F-6C4046923DDC} = {923C19A7-CE4D-4A38-A39F-6C4046923DDC}
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0} = {1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2} = {539044BA-0C8D-41B7-B435-E836E9D7B7B2}
+		{CEC4CACE-B017-45E1-A437-14EBB5850382} = {CEC4CACE-B017-45E1-A437-14EBB5850382}
+		{5D0522D4-E251-4B0C-AF67-235548984BF6} = {5D0522D4-E251-4B0C-AF67-235548984BF6}
+		{3439B4E2-B439-467F-AE24-47900C438488} = {3439B4E2-B439-467F-AE24-47900C438488}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestFramework", "TestFramework\TestFramework.csproj", "{7E24102C-4FEA-4D4A-8E22-E06CFEEB7A43}"
+	ProjectSection(ProjectDependencies) = postProject
+		{86F6F267-417A-405C-BC91-8E9EFBC40488} = {86F6F267-417A-405C-BC91-8E9EFBC40488}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BabySitter", "BabySitter\BabySitter.csproj", "{6261B581-9916-4DFE-9974-56548875605C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9317C097-EDB4-410B-A165-8C17C80F79E0}"
+	ProjectSection(SolutionItems) = preProject
+		LoadTests1.vsmdi = LoadTests1.vsmdi
+		..\SampleReferenceFiles.txt = ..\SampleReferenceFiles.txt
+		TestSettings1.testsettings = TestSettings1.testsettings
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PresenceConsoleTest", "..\HaloPresence\PresenceConsoleTest\PresenceConsoleTest.csproj", "{45BB656F-5CB5-468B-8D06-C3FBD136F983}"
+	ProjectSection(ProjectDependencies) = postProject
+		{22A7541E-6907-4EE2-8114-520886FAF70C} = {22A7541E-6907-4EE2-8114-520886FAF70C}
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59} = {56504385-3AF1-4C9A-AAB3-DED763B3CB59}
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0} = {1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2} = {539044BA-0C8D-41B7-B435-E836E9D7B7B2}
+		{3439B4E2-B439-467F-AE24-47900C438488} = {3439B4E2-B439-467F-AE24-47900C438488}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTestBase", "..\HaloPresence\LoadTestBase\LoadTestBase.csproj", "{2E672034-B0C2-4EE7-9A58-5FC490F8D785}"
+	ProjectSection(ProjectDependencies) = postProject
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2} = {539044BA-0C8D-41B7-B435-E836E9D7B7B2}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GrainBenchmarkLoadTest", "..\HaloPresence\GrainBenchmarkLoadTest\GrainBenchmarkLoadTest.csproj", "{56504385-3AF1-4C9A-AAB3-DED763B3CB59}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReminderLoadTest", "ReminderLoadTest\ReminderLoadTest.csproj", "{3439B4E2-B439-467F-AE24-47900C438488}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTestGrainInterfaces", "LoadTestGrainInterfaces\LoadTestGrainInterfaces.csproj", "{539044BA-0C8D-41B7-B435-E836E9D7B7B2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{86F6F267-417A-405C-BC91-8E9EFBC40488} = {86F6F267-417A-405C-BC91-8E9EFBC40488}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTestGrains", "LoadTestGrains\LoadTestGrains.csproj", "{22A7541E-6907-4EE2-8114-520886FAF70C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistenceLoadTest", "PersistenceLoadTest\PersistenceLoadTest.csproj", "{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamPullingAgentBenchmark", "StreamPullingAgentBenchmark\StreamPullingAgentBenchmark.csproj", "{CEC4CACE-B017-45E1-A437-14EBB5850382}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElasticityBenchmarkTest", "ElasticityBenchmarkTest\ElasticityBenchmarkTest.csproj", "{5D0522D4-E251-4B0C-AF67-235548984BF6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "packages", "packages", "{61F1FD05-734B-47C8-91F8-CF030225BDF3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "EPPlus 3.1.3 sample", "EPPlus 3.1.3 sample", "{4758931F-3E5A-4F2F-8AF9-C3CBF439D3DE}"
+	ProjectSection(SolutionItems) = preProject
+		packages\EPPlus 3.1.3 sample\EPPlus.dll = packages\EPPlus 3.1.3 sample\EPPlus.dll
+		packages\EPPlus 3.1.3 sample\EPPlus.XML = packages\EPPlus 3.1.3 sample\EPPlus.XML
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMSStreamingBenchmark", "SMSStreamingBenchmark\SMSStreamingBenchmark.csproj", "{E4823E76-2CD9-4CF4-8F24-F74941E8FECC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMSPubSubSubscribeBenchmark", "SMSPubSubSubscribeBenchmark\SMSPubSubSubscribeBenchmark.csproj", "{923C19A7-CE4D-4A38-A39F-6C4046923DDC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewReminderLoadTest", "NewReminderLoadTest\NewReminderLoadTest.csproj", "{679C5A55-6D02-47A3-B5B4-6D70805236D9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FunctionalTests", "FunctionalTests", "{DBCB46F1-854C-4C51-8D07-DE76E12B900B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestGrainInterfaces", "..\FunctionalTests\UnitTestGrainInterfaces\UnitTestGrainInterfaces.csproj", "{86F6F267-417A-405C-BC91-8E9EFBC40488}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTestGrains", "..\FunctionalTests\UnitTestGrains\UnitTestGrains.csproj", "{02C113B1-7FF7-4EEE-8E90-F4F817B30D09}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "..\FunctionalTests\UnitTests\UnitTests.csproj", "{5F16887B-704E-4A77-853A-64308787B327}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "..\FunctionalTests\Test\Test.csproj", "{31A0CBF0-EC59-4087-8B66-3A920F20381C}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 20
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://vstfpg03:8080/tfs/pg03
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = LoadTest\\LoadTest.csproj
+		SccProjectName1 = LoadTest
+		SccLocalPath1 = LoadTest
+		SccProjectUniqueName2 = BabySitter\\BabySitter.csproj
+		SccProjectName2 = BabySitter
+		SccLocalPath2 = BabySitter
+		SccProjectUniqueName3 = TestFramework\\TestFramework.csproj
+		SccProjectName3 = TestFramework
+		SccLocalPath3 = TestFramework
+		SccProjectUniqueName4 = ..\\HaloPresence\\PresenceConsoleTest\\PresenceConsoleTest.csproj
+		SccProjectName4 = ../HaloPresence/PresenceConsoleTest
+		SccLocalPath4 = ..\\HaloPresence\\PresenceConsoleTest
+		SccProjectUniqueName5 = ..\\HaloPresence\\LoadTestBase\\LoadTestBase.csproj
+		SccProjectName5 = ../HaloPresence/LoadTestBase
+		SccLocalPath5 = ..\\HaloPresence\\LoadTestBase
+		SccProjectUniqueName6 = ..\\HaloPresence\\GrainBenchmarkLoadTest\\GrainBenchmarkLoadTest.csproj
+		SccProjectName6 = ../HaloPresence/GrainBenchmarkLoadTest
+		SccLocalPath6 = ..\\HaloPresence\\GrainBenchmarkLoadTest
+		SccProjectUniqueName7 = ReminderLoadTest\\ReminderLoadTest.csproj
+		SccProjectName7 = ReminderLoadTest
+		SccLocalPath7 = ReminderLoadTest
+		SccProjectUniqueName8 = LoadTestGrainInterfaces\\LoadTestGrainInterfaces.csproj
+		SccProjectName8 = LoadTestGrainInterfaces
+		SccLocalPath8 = LoadTestGrainInterfaces
+		SccProjectUniqueName9 = LoadTestGrains\\LoadTestGrains.csproj
+		SccProjectName9 = LoadTestGrains
+		SccLocalPath9 = LoadTestGrains
+		SccProjectUniqueName10 = PersistenceLoadTest\\PersistenceLoadTest.csproj
+		SccProjectName10 = PersistenceLoadTest
+		SccLocalPath10 = PersistenceLoadTest
+		SccProjectUniqueName11 = StreamPullingAgentBenchmark\\StreamPullingAgentBenchmark.csproj
+		SccProjectName11 = StreamPullingAgentBenchmark
+		SccLocalPath11 = StreamPullingAgentBenchmark
+		SccProjectUniqueName12 = ElasticityBenchmarkTest\\ElasticityBenchmarkTest.csproj
+		SccProjectName12 = ElasticityBenchmarkTest
+		SccLocalPath12 = ElasticityBenchmarkTest
+		SccProjectUniqueName13 = SMSStreamingBenchmark\\SMSStreamingBenchmark.csproj
+		SccProjectName13 = SMSStreamingBenchmark
+		SccLocalPath13 = SMSStreamingBenchmark
+		SccProjectUniqueName14 = SMSPubSubSubscribeBenchmark\\SMSPubSubSubscribeBenchmark.csproj
+		SccProjectName14 = SMSPubSubSubscribeBenchmark
+		SccLocalPath14 = SMSPubSubSubscribeBenchmark
+		SccProjectUniqueName15 = NewReminderLoadTest\\NewReminderLoadTest.csproj
+		SccProjectName15 = NewReminderLoadTest
+		SccLocalPath15 = NewReminderLoadTest
+		SccProjectUniqueName16 = ..\\FunctionalTests\\UnitTestGrainInterfaces\\UnitTestGrainInterfaces.csproj
+		SccProjectTopLevelParentUniqueName16 = LoadTests.sln
+		SccProjectName16 = ../FunctionalTests/UnitTestGrainInterfaces
+		SccLocalPath16 = ..\\FunctionalTests\\UnitTestGrainInterfaces
+		SccProjectUniqueName17 = ..\\FunctionalTests\\UnitTestGrains\\UnitTestGrains.csproj
+		SccProjectTopLevelParentUniqueName17 = LoadTests.sln
+		SccProjectName17 = ../FunctionalTests/UnitTestGrains
+		SccLocalPath17 = ..\\FunctionalTests\\UnitTestGrains
+		SccProjectUniqueName18 = ..\\FunctionalTests\\UnitTests\\UnitTests.csproj
+		SccProjectTopLevelParentUniqueName18 = LoadTests.sln
+		SccProjectName18 = ../FunctionalTests/UnitTests
+		SccLocalPath18 = ..\\FunctionalTests\\UnitTests
+		SccProjectUniqueName19 = ..\\FunctionalTests\\Test\\Test.csproj
+		SccProjectTopLevelParentUniqueName19 = LoadTests.sln
+		SccProjectName19 = ../FunctionalTests/Test
+		SccLocalPath19 = ..\\FunctionalTests\\Test
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3924BD12-A39B-45B9-BB86-C155423655E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3924BD12-A39B-45B9-BB86-C155423655E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3924BD12-A39B-45B9-BB86-C155423655E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3924BD12-A39B-45B9-BB86-C155423655E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E24102C-4FEA-4D4A-8E22-E06CFEEB7A43}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E24102C-4FEA-4D4A-8E22-E06CFEEB7A43}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E24102C-4FEA-4D4A-8E22-E06CFEEB7A43}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E24102C-4FEA-4D4A-8E22-E06CFEEB7A43}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6261B581-9916-4DFE-9974-56548875605C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6261B581-9916-4DFE-9974-56548875605C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6261B581-9916-4DFE-9974-56548875605C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6261B581-9916-4DFE-9974-56548875605C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Release|Any CPU.Build.0 = Release|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CEC4CACE-B017-45E1-A437-14EBB5850382}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CEC4CACE-B017-45E1-A437-14EBB5850382}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CEC4CACE-B017-45E1-A437-14EBB5850382}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CEC4CACE-B017-45E1-A437-14EBB5850382}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D0522D4-E251-4B0C-AF67-235548984BF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D0522D4-E251-4B0C-AF67-235548984BF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D0522D4-E251-4B0C-AF67-235548984BF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D0522D4-E251-4B0C-AF67-235548984BF6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4823E76-2CD9-4CF4-8F24-F74941E8FECC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4823E76-2CD9-4CF4-8F24-F74941E8FECC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4823E76-2CD9-4CF4-8F24-F74941E8FECC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4823E76-2CD9-4CF4-8F24-F74941E8FECC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{923C19A7-CE4D-4A38-A39F-6C4046923DDC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{923C19A7-CE4D-4A38-A39F-6C4046923DDC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{923C19A7-CE4D-4A38-A39F-6C4046923DDC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{923C19A7-CE4D-4A38-A39F-6C4046923DDC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{679C5A55-6D02-47A3-B5B4-6D70805236D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{679C5A55-6D02-47A3-B5B4-6D70805236D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{679C5A55-6D02-47A3-B5B4-6D70805236D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{679C5A55-6D02-47A3-B5B4-6D70805236D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86F6F267-417A-405C-BC91-8E9EFBC40488}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86F6F267-417A-405C-BC91-8E9EFBC40488}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86F6F267-417A-405C-BC91-8E9EFBC40488}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86F6F267-417A-405C-BC91-8E9EFBC40488}.Release|Any CPU.Build.0 = Release|Any CPU
+		{02C113B1-7FF7-4EEE-8E90-F4F817B30D09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02C113B1-7FF7-4EEE-8E90-F4F817B30D09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02C113B1-7FF7-4EEE-8E90-F4F817B30D09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02C113B1-7FF7-4EEE-8E90-F4F817B30D09}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F16887B-704E-4A77-853A-64308787B327}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F16887B-704E-4A77-853A-64308787B327}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F16887B-704E-4A77-853A-64308787B327}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F16887B-704E-4A77-853A-64308787B327}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31A0CBF0-EC59-4087-8B66-3A920F20381C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31A0CBF0-EC59-4087-8B66-3A920F20381C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31A0CBF0-EC59-4087-8B66-3A920F20381C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31A0CBF0-EC59-4087-8B66-3A920F20381C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4758931F-3E5A-4F2F-8AF9-C3CBF439D3DE} = {61F1FD05-734B-47C8-91F8-CF030225BDF3}
+		{86F6F267-417A-405C-BC91-8E9EFBC40488} = {DBCB46F1-854C-4C51-8D07-DE76E12B900B}
+		{02C113B1-7FF7-4EEE-8E90-F4F817B30D09} = {DBCB46F1-854C-4C51-8D07-DE76E12B900B}
+		{5F16887B-704E-4A77-853A-64308787B327} = {DBCB46F1-854C-4C51-8D07-DE76E12B900B}
+		{31A0CBF0-EC59-4087-8B66-3A920F20381C} = {DBCB46F1-854C-4C51-8D07-DE76E12B900B}
+	EndGlobalSection
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = LoadTests1.vsmdi
+	EndGlobalSection
+EndGlobal

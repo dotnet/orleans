@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<!-- 
+  This is a sample client configuration file. 
+  The comments illustrate common customizations.
+  Elements and attributes with no comments should not usually need to be modified.
+  For a detailed reference, see "Orleans Configuration Reference.html".
+-->
+<ClientConfiguration xmlns="urn:orleans">
+  <!-- 
+  The Gateway server and port must be statically known; that is, it can't be zero.
+  It is often convenient for the same node to be the primary node, the seed node, and the gateway node.
+  It is possible to have multiple gateway nodes; unless there is a very large number of clients, there is generally
+  no reason to do this, since the gateway node is primarily used as a directory service gateway. 
+  -->
+  
+  <!-- 
+        <Gateway Address="17xcg0820" Port="30000" Proxied="true" Subnet="10.68"/>
+-->
+  <!-- 
+  To turn tracing off, set DefaultTraceLevel="Off" and have no overrides. To see a minimum of messages, set DefaultTraceLevel="Error".
+    For the trace log file name, {0} is the silo name and {1} is the current time. 
+  Setting WriteTraces to true will cause detailed performance information to be collected and logged about the individual steps in the
+  message lifecycle. This may be useful debugging performance issues.
+  -->
+  <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" WriteTraces="false" LargeMessageWarningThreshold="300000">
+    <!--
+    To get more detailed application logging, you can change the TraceLevel attribute value to "Verbose" or "Verbose2".
+    Depending on the log levels you have used in your code, this will cause additional messages to be written to the log.
+    -->
+    <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+  </Tracing>
+  <Statistics WriteLogStatisticsToTable ="false"  LogWriteInterval="300s" MetricsTableWriteInterval="300s"/>
+<!--  <Messaging ResponseTimeout="30" UseStandardSerializer="true" MessageEncoding="Binary" SenderQueues="4"/> -->
+</ClientConfiguration>

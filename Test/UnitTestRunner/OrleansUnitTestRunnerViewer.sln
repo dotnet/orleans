@@ -1,0 +1,99 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogAnalyzerUserControl", "LogAnalyzerUserControl\LogAnalyzerUserControl.csproj", "{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogAnalyzerBusinessLogic", "LogFileAnalyzer\LogAnalyzerBusinessLogic\LogAnalyzerBusinessLogic.csproj", "{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansUnitTestRunnerConsoleApp", "OrleansUnitTestRunnerConsoleApp\OrleansUnitTestRunnerConsoleApp.csproj", "{D1530D99-43F0-4BA6-A60F-BA8899A74836}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansUnitTestRunner", "OrleansUnitTestRunner\OrleansUnitTestRunner.csproj", "{14383D2E-747E-46A3-A719-6DC8852BF8E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansUnitTestRunnerLibrary", "OrleansUnitTestRunnerLibrary\OrleansUnitTestRunnerLibrary.csproj", "{B554D57A-7F72-469D-ACED-3855DD69D73B}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 6
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://co1vstfat06.redmond.corp.microsoft.com:8080/
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = LogAnalyzerUserControl\\LogAnalyzerUserControl.csproj
+		SccProjectName1 = LogAnalyzerUserControl
+		SccLocalPath1 = LogAnalyzerUserControl
+		SccProjectUniqueName2 = LogFileAnalyzer\\LogAnalyzerBusinessLogic\\LogAnalyzerBusinessLogic.csproj
+		SccProjectName2 = LogFileAnalyzer/LogAnalyzerBusinessLogic
+		SccLocalPath2 = LogFileAnalyzer\\LogAnalyzerBusinessLogic
+		SccProjectUniqueName3 = OrleansUnitTestRunnerConsoleApp\\OrleansUnitTestRunnerConsoleApp.csproj
+		SccProjectName3 = OrleansUnitTestRunnerConsoleApp
+		SccLocalPath3 = OrleansUnitTestRunnerConsoleApp
+		SccProjectUniqueName4 = OrleansUnitTestRunner\\OrleansUnitTestRunner.csproj
+		SccProjectName4 = OrleansUnitTestRunner
+		SccLocalPath4 = OrleansUnitTestRunner
+		SccProjectUniqueName5 = OrleansUnitTestRunnerLibrary\\OrleansUnitTestRunnerLibrary.csproj
+		SccProjectName5 = OrleansUnitTestRunnerLibrary
+		SccLocalPath5 = OrleansUnitTestRunnerLibrary
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|Mixed Platforms = Debug|Mixed Platforms
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|Mixed Platforms = Release|Mixed Platforms
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{9FA4B8BD-535A-438B-9AB2-7E4378FC73A0}.Release|x86.ActiveCfg = Release|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{BAF5F4BC-9C0D-4FBC-9195-F3A4ECA22979}.Release|x86.ActiveCfg = Release|Any CPU
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Debug|x86.ActiveCfg = Debug|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Debug|x86.Build.0 = Debug|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Release|Any CPU.ActiveCfg = Release|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Release|Mixed Platforms.Build.0 = Release|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Release|x86.ActiveCfg = Release|x86
+		{D1530D99-43F0-4BA6-A60F-BA8899A74836}.Release|x86.Build.0 = Release|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Debug|x86.ActiveCfg = Debug|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Debug|x86.Build.0 = Debug|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Release|Any CPU.ActiveCfg = Release|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Release|Mixed Platforms.Build.0 = Release|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Release|x86.ActiveCfg = Release|x86
+		{14383D2E-747E-46A3-A719-6DC8852BF8E1}.Release|x86.Build.0 = Release|x86
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{B554D57A-7F72-469D-ACED-3855DD69D73B}.Release|x86.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
