@@ -31,8 +31,9 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Microsoft.WindowsAzure.Storage.Table;
+using Orleans.Runtime;
+
 
 namespace Orleans.AzureUtils
 {
@@ -377,11 +378,35 @@ namespace Orleans.AzureUtils
         /// Insert (create new) row entry
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
-        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string versionEtag, bool updateTableVersion = true)
+        internal async Task<bool> CreateTableVersionEntryAsync(SiloInstanceTableEntry tableEntry)
         {
             try
             {
-                await storage.InsertTableEntryConditionallyAsync(siloEntry, tableVersionEntry, versionEtag, updateTableVersion);
+                await storage.CreateTableEntryAsync(tableEntry);
+                return true;
+            }
+            catch (Exception exc)
+            {
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                if (!AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
+
+                if (logger.IsVerbose2) logger.Verbose2("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
+
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Insert (create new) row entry
+        /// </summary>
+        /// <param name="siloEntry">Silo Entry to be written</param>
+        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag)
+        {
+            try
+            {
+                await storage.InsertTableEntryConditionallyAsync(siloEntry, tableVersionEntry, tableVersionEtag);
                 return true;
             }
             catch (Exception exc)

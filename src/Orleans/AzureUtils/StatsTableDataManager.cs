@@ -28,8 +28,9 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Microsoft.WindowsAzure.Storage.Table;
+using Orleans.Runtime;
+
 
 namespace Orleans.AzureUtils
 {

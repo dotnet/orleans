@@ -58,7 +58,7 @@ namespace Orleans.Runtime.MembershipService
             if (tryInitTableVersion)
             {
                 var entry = table.tableManager.CreateTableVersionEntry(0);
-                await table.tableManager.InsertSiloEntryConditionally(entry, null, null, false).WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);   // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                await table.tableManager.CreateTableVersionEntryAsync(entry).WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);   // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
             }
             return table;
         }

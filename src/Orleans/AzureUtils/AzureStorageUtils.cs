@@ -28,13 +28,13 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Xml;
+using System.Data.Services.Client;
 using Microsoft.WindowsAzure;
-using Orleans.Runtime;
-using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using System.Data.Services.Client;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
+using Orleans.Runtime;
 
 
 namespace Orleans.AzureUtils

@@ -24,11 +24,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
-using Orleans.Runtime;
-using Orleans.Storage;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Queue;
+using Orleans.Runtime;
+using Orleans.Storage;
+
 
 namespace Orleans.AzureUtils
 {
