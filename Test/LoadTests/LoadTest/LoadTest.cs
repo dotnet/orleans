@@ -15,6 +15,8 @@ namespace LoadTest
     [DeploymentItem("TestConfiguration", "TestConfiguration")] // copy TestConfiguration directory to output directory of same name
     public class LoadTest : LoadTestBase
     {
+        private const string CLUSTER_NAME = "17xcg17_cluster"; //"nightly_build_cluster"
+
         public LoadTest()
         {
         }
@@ -50,7 +52,7 @@ namespace LoadTest
             }
             TestLoadScenario(
                 "nightly_build",
-                "nightly_build_cluster", //"17xcg18_cluster", //"nightly_build_cluster"
+                CLUSTER_NAME, // "nightly_build_cluster", //"17xcg18_cluster", //"nightly_build_cluster"
                 "MetricDefinition2",
                 testOptions);
         }
@@ -68,7 +70,7 @@ namespace LoadTest
             };
             TestLoadScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinition3",
                 testOptions,
                 clientGrammar: "ClientGrammerForNoTPSTracking");
@@ -108,7 +110,7 @@ namespace LoadTest
 
             TestLoadScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinition3",
                 deploymentOptions,
                 clientGrammar: "ClientGrammerForNoTPSTracking"
@@ -141,7 +143,7 @@ namespace LoadTest
 
             TestLoadScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinition3",
                 deploymentOptions,
                 clientGrammar: "ClientGrammerForNoTPSTracking"
@@ -234,7 +236,7 @@ namespace LoadTest
             QuickParser.DEBUG_ONLY_NO_WAITING = false;
             TestOldLogData(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinition3",
                 new ClientOptions() {ServerCount = 25, ClientCount = 10, ClientAppName = "UserLoadTest"},
                 @"\\17xcg1801\C$\TestResults\SavedLogs\cjwill-CJWILLSERVER-2-May-2012-22-06\1",
@@ -242,7 +244,7 @@ namespace LoadTest
                 clientGrammar: "ClientLogForUserLoadTest");
         }
 
-         [TestMethod, TestCategory("Reminders"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("Reminders"), TestCategory("Nightly")]
         public void RegisterReminderLoadTest()
         {
             int serverCount = 10;
@@ -252,7 +254,7 @@ namespace LoadTest
             QuickParser.DEBUG_ONLY_NO_WAITING = false;
             TestLoadScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinition3",
                 new ClientOptions
                 {

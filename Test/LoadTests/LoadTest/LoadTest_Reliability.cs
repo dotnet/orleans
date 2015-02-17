@@ -14,6 +14,8 @@ namespace LoadTest
     [DeploymentItem("TestConfiguration", "TestConfiguration")] // copy TestConfiguration directory to output directory of same name
     public class LoadTest_Reliability : LoadTestBase
     {
+        private const string CLUSTER_NAME = "17xcg17_cluster";
+
         public LoadTest_Reliability()
         {
         }
@@ -36,7 +38,7 @@ namespace LoadTest
         {
             TestFailoverScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinitionForReliability",
                 new ClientOptions() {ServerCount = 25, ClientCount = 1, ServersPerClient = 5},
                 restart: false,
@@ -48,7 +50,7 @@ namespace LoadTest
         {
             TestFailoverScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinitionForReliability",
                 new ClientOptions() {ServerCount = 25, ClientCount = 1, ServersPerClient = 5},
                 restart: true,
@@ -60,7 +62,7 @@ namespace LoadTest
         {
             TestFailoverScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                 CLUSTER_NAME,
                 "MetricDefinitionForReliability",
                 new ClientOptions() {ServerCount = 25, ClientCount = 1, ServersPerClient = 5},
                 restart: false,
@@ -73,7 +75,7 @@ namespace LoadTest
         {
             TestFailoverScenario(
                 "nightly_build",
-                "nightly_build_cluster",
+                CLUSTER_NAME,
                 "MetricDefinitionForReliability",
                 new ClientOptions() {ServerCount = 25, ClientCount = 1, ServersPerClient = 5},
                 restart: true,

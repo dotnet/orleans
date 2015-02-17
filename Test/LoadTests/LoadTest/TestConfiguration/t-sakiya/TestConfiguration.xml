@@ -24,7 +24,7 @@
     </Packages>
   </Deployment>
   <!--
-  <Cluster Name="nightly_build_cluster" AllowMachineReuse="false">
+  <Cluster Name="17xcg17_cluster" AllowMachineReuse="false">
     <Servers Prefix="17xcg07" Start="3" End="3" />
     <Servers Prefix="17xcg07" Start="14" End="19" />
     <Servers Prefix="17xcg07" Start="21" End="32"/>

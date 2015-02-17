@@ -14,7 +14,7 @@ namespace LoadTest
     [DeploymentItem("TestConfiguration", "TestConfiguration")] // copy TestConfiguration directory to output directory of same name
     public class LoadTest_Ping : LoadTestBase
     {
-        private static readonly string clusterName = "17xcg17_cluster"; // == nightly_build_cluster but more machines allocated to clients and less to servers
+        private static readonly string clusterName = "ping_test_cluster"; // == 17xcg17_cluster but more machines allocated to clients and less to servers
 
         public LoadTest_Ping()
         {

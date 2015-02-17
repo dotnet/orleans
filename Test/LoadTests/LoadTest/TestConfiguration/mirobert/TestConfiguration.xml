@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <TestConfiguration xmlns="urn:orleans">
-  <Cluster Name="nightly_build_cluster" AllowMachineReuse="false">
-    <Servers Prefix="17xcg16" Start="1" End="30" Skip="4,20,25,30"/>
-    <Clients Prefix="17xcg16" Start="31" End="44" Skip="36,43,44"/>
+  <Cluster Name="17xcg17_cluster" AllowMachineReuse="false">
+    <Servers Prefix="17xcg17" Start="1" End="33" Skip="3,10,14"/>
+    <Clients Prefix="17xcg17" Start="34" End="44" Skip="35"/>
     <Networking Subnet="10.68" StartPort="11111" GatewayPort="30000"/>
   </Cluster>
   <Cluster Name="17xcg16_cluster" AllowMachineReuse="false">
