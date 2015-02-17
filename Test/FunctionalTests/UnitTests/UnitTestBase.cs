@@ -872,12 +872,12 @@ namespace UnitTests
 
         internal void DeleteAllAzureQueues(string providerName, string deploymentId, string storageConnectionString)
         {
-            AzureQueueStreamProvider.DeleteAllUsedAzureQueues(providerName, deploymentId, storageConnectionString, this.logger).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(providerName, deploymentId, storageConnectionString, this.logger).Wait();
         }
 
         internal static void DeleteAllAzureQueues(string providerName, string deploymentId, string storageConnectionString, Logger logger)
         {
-            AzureQueueStreamProvider.DeleteAllUsedAzureQueues(providerName, deploymentId, storageConnectionString, logger).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(providerName, deploymentId, storageConnectionString, logger).Wait();
         }
 
         //public static void RemoveFromRemoteMachine(string machineName, string path)

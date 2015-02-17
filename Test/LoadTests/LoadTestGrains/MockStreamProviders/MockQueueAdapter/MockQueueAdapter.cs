@@ -16,6 +16,9 @@ namespace OrleansProviders.PersistentStream.MockQueueAdapter
 
         public bool IsRewindable { get { return true; } }
 
+        public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
+
+
         public MockQueueAdapter(string providerName, IMockQueueAdapterSettings settings, Func<IMockQueueAdapterBatchGenerator> generatorFactory, IMockQueueAdapterMonitor monitor)
         {
             if (settings == null)
