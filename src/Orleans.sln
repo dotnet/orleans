@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+VisualStudioVersion = 12.0.30723.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -116,6 +116,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterInternal", "TesterInt
 	ProjectSection(ProjectDependencies) = postProject
 		{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0} = {6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansAzureHost", "AzureSDKPlugin\OrleansAzureHost.csproj", "{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -280,6 +282,18 @@ Global
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Release|Win32.ActiveCfg = Release|Any CPU
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Release|x64.ActiveCfg = Release|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Release|Win32.ActiveCfg = Release|Any CPU
+		{38BDB75D-22F5-4010-B0B8-857FE6E9CE14}.Release|x64.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

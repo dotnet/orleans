@@ -204,13 +204,21 @@ namespace Orleans.Runtime.Host
             {
                 return roleInstance.InstanceEndpoints[endpointName];
             }
-            catch (Exception exc)
+            catch (Exception)
             {
-                var errorMsg = string.Format("Unable to obtain endpoint info for role {0} from role config parameter {1} -- Endpoints defined = [{2}]",
-                    roleInstance.Role.Name, endpointName, string.Join(", ", roleInstance.InstanceEndpoints)); 
+                try
+                {
+                    return roleInstance.InstanceEndpoints[string.Join(".", "Microsoft", "Orleans", endpointName)];
+                }
+                catch (Exception exc)
+                {
 
-                logger.Error(ErrorCode.SiloEndpointConfigError, errorMsg, exc);
-                throw new OrleansException(errorMsg, exc);
+                    var errorMsg = string.Format("Unable to obtain endpoint info for role {0} from role config parameter {1} -- Endpoints defined = [{2}]",
+                        roleInstance.Role.Name, endpointName, string.Join(", ", roleInstance.InstanceEndpoints));
+
+                    logger.Error(ErrorCode.SiloEndpointConfigError, errorMsg, exc);
+                    throw new OrleansException(errorMsg, exc);
+                }
             }
         }
 

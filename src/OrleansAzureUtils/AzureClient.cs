@@ -153,9 +153,15 @@ namespace Orleans.Runtime.Host
 
         private static string GetDataConnectionString()
         {
-            return GrainClient.TestOnlyNoConnect
-                ? "FakeConnectionString"
-                : RoleEnvironment.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
+            if (GrainClient.TestOnlyNoConnect) return "FakeConnectionString";
+            try
+            {
+                return RoleEnvironment.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
+            }
+            catch (RoleEnvironmentException)
+            {
+                return RoleEnvironment.GetConfigurationSettingValue(string.Join(".", "Microsoft", "Orleans", AzureConstants.DataConnectionConfigurationSettingName));
+            }
         }
 
         private static void InitializeImpl_FromConfig(ClientConfiguration config)
