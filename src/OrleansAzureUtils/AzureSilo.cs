@@ -158,7 +158,17 @@ namespace Orleans.Runtime.Host
                 RowKey = myEndpoint.IPEndpoint.Address + "-" + myEndpoint.IPEndpoint.Port + "-" + generation
             };
 
-            var connectionString = RoleEnvironment.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+            string connectionString = null;
+            try
+            {
+                connectionString = RoleEnvironment.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+            }
+            catch (RoleEnvironmentException)
+            {
+                // if the connection string does not exist, try Microsoft.Orleans.DataConnectionString (may be supplied by a plugin)
+                connectionString = RoleEnvironment.GetConfigurationSettingValue(string.Join(".", "Microsoft", "Orleans", DataConnectionConfigurationSettingName));
+            }
+
             try
             {
                 siloInstanceManager = OrleansSiloInstanceManager.GetManager(
