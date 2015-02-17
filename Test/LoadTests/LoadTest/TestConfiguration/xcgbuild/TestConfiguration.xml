@@ -87,7 +87,7 @@
   </Cluster>
   <Deployment Name="nightly_build">
     <Packages>
-      <Package Name="SDK Drop" Path="Release\TestSilo" Type="SDK"/>
+      <Package Name="SDK Drop" Path="TestSilo" Type="SDK"/>
       <Package Name="Reach Presence" Path="$(SolutionDir)\TestInput\LoadTests\Grains" Type="Application"/>
       <Package Name="PersistenceLoadTest" Path="$(SolutionDir)\TestInput\LoadTests\Client\PersistenceLoadTest.exe" Type="ClientApp"/>
       <Package Name="PresenceConsole" Path="$(SolutionDir)\TestInput\LoadTests\Client\PresenceConsoleTest.exe" Type="ClientApp"/>
