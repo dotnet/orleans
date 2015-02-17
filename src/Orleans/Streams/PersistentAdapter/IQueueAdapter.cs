@@ -65,6 +65,8 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns>True if this is a rewindable stream adapter, false otherwise.</returns>
         bool IsRewindable { get; }
+
+        StreamProviderDirection Direction { get; }
     }
 
     public static class QueueAdapterExtensions

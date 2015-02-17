@@ -23,7 +23,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Globalization;
+using System.IO;
 using System.Net;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
@@ -167,39 +170,39 @@ namespace UnitTests.General
         {
             Guid guid = Guid.NewGuid();
             GrainId grainId = GrainId.GetGrainIdForTesting(guid);
-            GrainId roundTripped = RoundTripFromToPrintable(grainId);
+            GrainId roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Guid key");
 
             string extKey = "Guid-ExtKey-1";
             guid = Guid.NewGuid();
             grainId = GrainId.GetGrainId(0, guid, extKey);
-            roundTripped = RoundTripFromToPrintable(grainId);
+            roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Guid key + Extended Key");
 
             grainId = GrainId.GetGrainId(0, guid, null);
-            roundTripped = RoundTripFromToPrintable(grainId);
+            roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Guid key + null Extended Key");
 
             long key = random.Next();
             guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
             grainId = GrainId.GetGrainIdForTesting(guid);
-            roundTripped = RoundTripFromToPrintable(grainId);
+            roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Int64 key");
 
             extKey = "Long-ExtKey-2";
             key = random.Next();
             guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
             grainId = GrainId.GetGrainId(0, guid, extKey);
-            roundTripped = RoundTripFromToPrintable(grainId);
+            roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Int64 key + Extended Key");
             
             guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
             grainId = GrainId.GetGrainId(0, guid, null);
-            roundTripped = RoundTripFromToPrintable(grainId);
+            roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Int64 key + null Extended Key");
         }
 
-        private GrainId RoundTripFromToPrintable(GrainId input)
+        private GrainId RoundTripGrainIdToParsable(GrainId input)
         {
             string str = input.ToParsableString();
             GrainId output = GrainId.FromParsableString(str);
@@ -492,6 +495,64 @@ namespace UnitTests.General
             int pkStartIdx = grainIdFullString.IndexOf(pkIdentifierStr, StringComparison.Ordinal) + pkIdentifierStr.Length + 1;
             string pkGuidString = grainIdFullString.Substring(pkStartIdx, Guid.Empty.ToString().Length);
             return pkGuidString;
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Identifiers")]
+        public void GrainReference_Test1()
+        {
+            Guid guid = Guid.NewGuid();
+            GrainId regularGrainId = GrainId.GetGrainIdForTesting(guid);
+            GrainReference grainRef = GrainReference.FromGrainId(regularGrainId);
+            TestGrainReference(grainRef);
+
+            grainRef = GrainReference.FromGrainId(regularGrainId, "generic");
+            TestGrainReference(grainRef);
+
+            GrainId systemTragetGrainId = GrainId.NewSystemTargetGrainIdByTypeCode(2);
+            grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, SiloAddress.NewLocalAddress(1));
+            TestGrainReference(grainRef);
+
+            GrainId observerGrainId = GrainId.NewClientAddressableGrainId();
+            grainRef = GrainReference.NewObserverGrainReference(observerGrainId, GuidId.GetNewGuidId());
+            TestGrainReference(grainRef);
+        }
+
+        private void TestGrainReference(GrainReference grainRef)
+        {
+            GrainReference roundTripped = RoundTripGrainReferenceToKey(grainRef);
+            Assert.AreEqual(grainRef, roundTripped, "GrainReference.ToKeyString");
+
+            roundTripped = RoundTripGrainReferenceOrleansSerializer(grainRef);
+            Assert.AreEqual(grainRef, roundTripped, "GrainReference.OrleansSerializer");
+
+            roundTripped = RoundTripGrainReferenceDotNetSerializer(grainRef);
+            Assert.AreEqual(grainRef, roundTripped, "GrainReference.DotNetSerializer");
+        }
+
+        private GrainReference RoundTripGrainReferenceToKey(GrainReference input)
+        {
+            string str = input.ToKeyString();
+            GrainReference output = GrainReference.FromKeyString(str);
+            return output;
+        }
+
+        private GrainReference RoundTripGrainReferenceOrleansSerializer(GrainReference input)
+        {
+            BinaryTokenStreamWriter writer = new BinaryTokenStreamWriter();
+            GrainReference.SerializeGrainReference(input, writer, typeof(GrainReference));
+            BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
+            GrainReference output = (GrainReference)GrainReference.DeserializeGrainReference(typeof(GrainReference), reader);
+            return output;
+        }
+
+        private GrainReference RoundTripGrainReferenceDotNetSerializer(GrainReference input)
+        {
+            IFormatter formatter = new BinaryFormatter();
+            MemoryStream stream = new MemoryStream(new byte[1000], true);
+            formatter.Serialize(stream, input);
+            stream.Position = 0;
+            GrainReference output = (GrainReference)formatter.Deserialize(stream);
+            return output;
         }
     }
 }

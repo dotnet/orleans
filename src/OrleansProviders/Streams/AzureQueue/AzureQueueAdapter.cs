@@ -43,6 +43,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         public string Name { get ; private set; }
         public bool IsRewindable { get { return false; } }
 
+        public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
+
         public AzureQueueAdapter(string dataConnectionString, string deploymentId, string providerName, int cacheSize)
         {
             if (String.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
