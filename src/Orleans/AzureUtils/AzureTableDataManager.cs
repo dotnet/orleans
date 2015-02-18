@@ -252,7 +252,9 @@ namespace Orleans.AzureUtils
                     // WAS:
                     // svc.AttachTo(TableName, data, ANY_ETAG);
                     // svc.UpdateObject(data);
-
+                    
+                    data.ETag = "*";
+                    //System.ArgumentException: Merge requires an ETag (which may be the '*' wildcard).
                     var opResult = await Task<TableResult>.Factory.FromAsync(
                           tableReference.BeginExecute,
                           tableReference.EndExecute,
