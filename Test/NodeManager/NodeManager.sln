@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NodeManager", "NodeManager.csproj", "{281A70DE-1AB7-48CB-A234-85CB4466C955}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 1
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://co1vstfat06.redmond.corp.microsoft.com:8080/
+		SccProjectUniqueName0 = NodeManager.csproj
+		SccProjectName0 = .
+		SccAuxPath0 = http://co1vstfat06.redmond.corp.microsoft.com:8080
+		SccLocalPath0 = .
+		SccProvider0 = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{281A70DE-1AB7-48CB-A234-85CB4466C955}.Debug|x86.ActiveCfg = Debug|x86
+		{281A70DE-1AB7-48CB-A234-85CB4466C955}.Debug|x86.Build.0 = Debug|x86
+		{281A70DE-1AB7-48CB-A234-85CB4466C955}.Release|x86.ActiveCfg = Release|x86
+		{281A70DE-1AB7-48CB-A234-85CB4466C955}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

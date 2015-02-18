@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ClientConfiguration xmlns="urn:orleans">
+  <GatewayProvider ProviderType="Config" />
+  <Gateway Address="" Port="30000" />
+  <SystemStore DeploymentId="loadtests" DataConnectionString="DefaultEndpointsProtocol=https;AccountName=orleanstestdata;AccountKey=qFJFT+YAikJPCE8V5yPlWZWBRGns4oti9tqG6/oYAYFGI4kFAnT91HeiWMa6pddUzDcG5OAmri/gk7owTOQZ+A=="/>
+  <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{2}-{1}.log" WriteMessagingTraces="false">
+    <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+    <TraceLevelOverride LogPrefix="AssemblyLoader.Client" TraceLevel="Warning" />
+  </Tracing>
+  <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" StatisticsCollectionLevel="Info"/>
+  <Messaging UseStandardSerializer="false" MessageEncoding="Binary" SenderQueues="8192" MaxResendCount="0" UseMessageBatching="false" MaxMessageBatchingSize="100"/>
+  <StreamProviders>
+    <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
+  </StreamProviders>  
+</ClientConfiguration>

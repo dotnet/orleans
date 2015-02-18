@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	This is a sample silo configuration file for use with a multi-server deployment, one silo per server. 
+	The comments illustrate common customizations.
+	Elements and attributes with no comments should not usually need to be modified.
+	For a detailed reference, see "Orleans Configuration Reference.html".
+-->
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <!-- 
+		The seed node must be the primary node.
+		You need to specify the primary's host, either by name or by IP address, and port number here.
+		-->
+    <SeedNode Address="" Port="11111" />
+    <Messaging UseStandardSerializer="false" SenderQueues="50" SuppressOrdering="true"  MaxResendCount="0"/>
+    <Liveness LivenessEnabled="true" LivenessType ="AzureTable" ProbeTimeout = "5" TableRefreshTimeout ="10" DeathVoteExpirationTimeout ="80"
+          NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" UseLivenessGossip="true" LivenessFileDirectory="."
+          IAmAliveTablePublishTimeout = "60" NumMissedTableIAmAliveLimit="3" MaxJoinAttemptTime="300" ExpectedClusterSize="25"/>
+    <Index ConnectionString="DomainIndexGrain" ClearOnStartup="true"/>
+    <Tasks Disabled="true"/>
+    <Azure DeploymentId="alansloadtests" DataConnectionString="DefaultEndpointsProtocol=https;AccountName=orleanstestdata;AccountKey=qFJFT+YAikJPCE8V5yPlWZWBRGns4oti9tqG6/oYAYFGI4kFAnT91HeiWMa6pddUzDcG5OAmri/gk7owTOQZ+A=="/>
+    <Caching CacheSize="1000000" InitialTTL="900" MaximumTTL="1800" />
+    <Application>
+      <Defaults>
+        <Deactivation AgeLimit="4500s"/>
+      </Defaults>
+    </Application>
+    <Directory ReplicationFactor="3" />
+  </Globals>
+  <Defaults>
+    <!-- 
+		For a distributed deployment with one silo per host, it is convenient to have all of the silos listening on the same port. 
+		In particular, this makes the port that the seed node will listen on predictable without requiring an Override element for that silo.
+		-->
+    <Networking Address="" Port="11111"/>
+    <ProxyingGateway Address="" Port="30000" />
+    <!-- 
+		To turn tracing off, set DefaultTraceLevel="Off" and have no overrides. To see a minimum of messages, set DefaultTraceLevel="Error".
+        For the trace log file name, {0} is the silo name and {1} is the current time. 
+		Setting WriteTraces to true will cause detailed performance information to be collected and logged about the individual steps in the
+		message lifecycle. This may be useful debugging performance issues.
+		-->
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" WriteMessagingTraces="false">
+      <!--
+			To get more detailed application logging, you can change the TraceLevel attribute value to "Verbose" or "Verbose2".
+			Depending on the log levels you have used in your code, this will cause additional messages to be written to the log.
+			-->
+      <!--<TraceLevelOverride LogPrefix="Runtime.Runtime.GrainDirectory.GrainDirectoryReplicationAgent/1" TraceLevel="Verbose" />-->
+      <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Warning" />
+      <TraceLevelOverride LogPrefix="Application" TraceLevel="Warning" />
+      <!-- TraceLevelOverride LogPrefix="Message" TraceLevel="Verbose" / -->
+    </Tracing>
+  </Defaults>
+  <Override Node="Primary">
+    <!-- 
+		Since the Primary silo is the seed node, which has to start at a known port so that the other silos can find it, we override its port here
+        instead of allowing the OS to pick a port for it at runtime. 
+		Note that this port must match the port specified in the Globals/SeedNode element.
+		-->
+    <!-- Networking Port="11111" />
+    <ProxyingGateway Address="" Port="30000" />
+  </Override>
+  <Override Node="Node2">
+    <ProxyingGateway Address="" Port="30000" />
+  </Override>
+  <Override Node="Node3">
+    <ProxyingGateway Address="" Port="30000" / -->
+  </Override>
+</OrleansConfiguration>

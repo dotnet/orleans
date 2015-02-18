@@ -1,0 +1,1336 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Events>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>GlobalPopulationCountsGenerated</EventName>
+    <EventId>200</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Global Population Totals:
+ Players: {0}
+ Sessions: {1}
+ Machines: {2}
+ Players in Fallback: {3}
+ Fallback Ratio: {4}.</Message>
+    <Parameters>Int64 players, Int64 sessions, Int64 machines, Int64 fallback, Double fallbackPercent</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>QueryRequestFailed</EventName>
+    <EventId>201</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Query request failed:
+ Details: {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>HeartbeatRequestFailed</EventName>
+    <EventId>202</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Heartbeat request failed:
+ Details: {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ErrorActivatingTimerForReachHopperCounterGrain</EventName>
+    <EventId>1</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Activating Timer for ReachHopperCounterGrain failed with Error {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>HopperCountsHasInvalidSize</EventName>
+    <EventId>2</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>In UpdateAggregate: The hopper counts byte array had an invalid size. Details: {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>TooManyItemsInAggregateCountsByteStream</EventName>
+    <EventId>3</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>In UpdateAggregate: There are too many items in the byte stream. Details: {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>FailedToSerializeChunkDynamicHopperStatistics</EventName>
+    <EventId>4</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Failed to Serialize ChunkDynamicHopperStatistics in Hopper Counter. Details: {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>CalculatingGlobalHopperTotals</EventName>
+    <EventId>5</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Start</OpcodeName>
+    <TaskName>CalculatingGlobalHopperTotals</TaskName>
+    <Message>Calculating global hopper totals.</Message>
+    <Parameters />
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>1</OpcodeValue>
+    <TaskValue>1</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ErrorWritingHopperCountsToStorage</EventName>
+    <EventId>6</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Writing Hopper Counts to Storage Failed with error {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ErrorRefreshingMidnightHopperCounterTimer</EventName>
+    <EventId>7</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Refreshing MidnightHopperCounter Timer Failed with Error {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>FinishedCalculatingGlobalHopperTotals</EventName>
+    <EventId>8</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Stop</OpcodeName>
+    <TaskName>CalculatingGlobalHopperTotals</TaskName>
+    <Message>Finished calculating global hopper totals.</Message>
+    <Parameters />
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>2</OpcodeValue>
+    <TaskValue>1</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ActivatedMidnightPlayerPresenceGrainForPlayer</EventName>
+    <EventId>9</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Activated MidnightPlayerPresenceGrain, PlayerId:{0}</Message>
+    <Parameters>UInt64 playerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionIdChangingForPlayer</EventName>
+    <EventId>10</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} SessionId changing from:{1} to:{2}, processing:{3} viewers</Message>
+    <Parameters>UInt64 playerId, Int64 oldSessionId, Int64 newSessionId, Int32 viewerCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ExpiringViewerForPlayer</EventName>
+    <EventId>11</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} expiring Viewer.ClientId:{1} ViewerRef:{2}</Message>
+    <Parameters>UInt64 playerId, Guid viewerId, String viewerDescription</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>NotifyingViewersOfNewSession</EventName>
+    <EventId>12</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} new SessionId:{1} notification to Viewer.ClientId:{2} ViewerRef:{3}</Message>
+    <Parameters>UInt64 playerId, Int64 newSessionId, Guid viewerId, String viewerDescription</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>RevokingSessionOwnershipClaim</EventName>
+    <EventId>13</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} RevokeOwnership, CurrentSessionId:{1} NewSessionId:{2}</Message>
+    <Parameters>UInt64 playerId, Int64 currentSessionId, Int64 newSessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>DeclaringSessionOwnershipClaim</EventName>
+    <EventId>14</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} DeclareOwnership, CurrentSessionId:{1} NewSessionId:{2}</Message>
+    <Parameters>UInt64 playerId, Int64 currentSessionId, Int64 newSessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ResettingViewerForClient</EventName>
+    <EventId>15</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} Resetting Viewer for ClientId:{1}</Message>
+    <Parameters>UInt64 playerId, Guid clientId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SubscribingViewerForClient</EventName>
+    <EventId>16</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} Subscribing Viewer for ClientId:{1} Expiration:{2} ViewerRef:{3}</Message>
+    <Parameters>UInt64 playerId, Guid clientId, Int64 expirationInMilliseconds, String viewerDescription</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>UnsubscribingViewerForClient</EventName>
+    <EventId>17</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>PlayerGrainId:{0} Unsubscribing Viewer for ClientId:{1} ViewerRef:{2}</Message>
+    <Parameters>UInt64 playerId, Guid clientId, String viewerDescription</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ProcessingHeartbeatForPlayer</EventName>
+    <EventId>18</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Player Grain {0} is processing a heartbeat</Message>
+    <Parameters>UInt64 playerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>MissingMachineIdWhileProcessingHeartbeatForSession</EventName>
+    <EventId>19</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Heartbeat to session {0} did not contain a machine id</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>PlayerUpdatingMembershipForGroup</EventName>
+    <EventId>21</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Player {0} is updating group membership for Group {1}:{2}.</Message>
+    <Parameters>UInt64 playerId, Int64 clanId, String clanName</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>RequestRouterStatistics</EventName>
+    <EventId>22</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>MidnightRequestRouter statistics: {0}</Message>
+    <Parameters>String statistics</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>WaypointQueryRequestExecutedSuccessfully</EventName>
+    <EventId>23</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Waypoint query request executed successfully.</Message>
+    <Parameters />
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>FailedToDeserializeQueryChunk</EventName>
+    <EventId>24</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Failed to deserialize query chunk. Details: {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>UnexpectedRequestCountForClans</EventName>
+    <EventId>25</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Received query request for clans but Request Count was unexpected. (Expected 1, Actual {0}</Message>
+    <Parameters>Int32 requestCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>UnexpectedRequestCountForClanAbbreviated</EventName>
+    <EventId>26</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Received query request for clan abbreviated but Request Count was unexpected. (Expected 1, Actual {0}</Message>
+    <Parameters>Int32 requestCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>QueryRequestProcessed</EventName>
+    <EventId>27</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Query Request executed Successfully</Message>
+    <Parameters />
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>FailedToDeserializeHeartbeatChunk</EventName>
+    <EventId>28</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Failed to deserialize Heartbeat Chunk. Details: {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>HeartbeatRequestProcessed</EventName>
+    <EventId>29</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Heartbeat request executed successfully</Message>
+    <Parameters />
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>HeartbeatBlfDeserializationFailed</EventName>
+    <EventId>30</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>BlfFile.DeserializeChunk failed on chunkIndex {0}, request length {1}, starting position {2}, current position {3}. Base 64 Encoded Blf (whole blf) after colon:{4}</Message>
+    <Parameters>Int32 chunkIndex, Int32 requestLength, Int64 startingPosition, Int64 currentPosition, String encodedBlf</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionActivated</EventName>
+    <EventId>31</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} Activated.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>UnsubscribingViewerForSession</EventName>
+    <EventId>32</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>SessionGrainId:{0} Removed Viewer for ClientId:{1} Viewers.Count:{2}</Message>
+    <Parameters>Int64 sessionId, Guid clientId, Int32 viewerCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SubscribingViewerForGameData</EventName>
+    <EventId>33</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>SessionGrainId:{0} Subscribed Viewer for ClientId:{1} Expiration:{2} ViewerRef:{3} Viewers.Count:{4}</Message>
+    <Parameters>Int64 sessionId, Guid clientId, Int64 expirationInMilliseconds, String viewerDescription, Int32 viewerCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>UnsubscribingViewerForGameData</EventName>
+    <EventId>34</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>SessionGrainId:{0} Unsubscribing Viewer for ClientId:{1} ViewerRef:{2}</Message>
+    <Parameters>Int64 sessionId, Guid clientId, String viewerDescription</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>ProcessingHeartbeatForSession</EventName>
+    <EventId>35</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>ProcessingHeartbeatForSession Session id {0} machineId {1} heartbeatDescription {2}</Message>
+    <Parameters>Int64 sessionId, Int64 machineId, String heartbeatDescription</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>InvalidCapacityInHeartbeatToSession</EventName>
+    <EventId>36</EventId>
+    <Version>0</Version>
+    <Level>Error</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Heartbeat to session {0} had an invalid capacity of {1}.</Message>
+    <Parameters>Int64 sessionId, Byte capacity</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>HostDataUpdatedForSession</EventName>
+    <EventId>37</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} updated HostData at {1} to: {2}</Message>
+    <Parameters>Int64 sessionId, String when, String hostDataDescription</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>CreatingLocalPlayersListForHeartbeatProcessing</EventName>
+    <EventId>38</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Creating a list of {0} player objects for local players</Message>
+    <Parameters>Int32 playerCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>NoValidPlayersReceivedInHeartbeat</EventName>
+    <EventId>39</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} received 0 valid players in heartbeat.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>PlayerCountMismatchInHeartbeat</EventName>
+    <EventId>40</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} received {1} valid players in heartbeat, but heartbeat indicated there should be {2} instead.</Message>
+    <Parameters>Int64 sessionId, Int32 receivedPlayerCount, Int32 expectedPlayerCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>PlayersReceivedInHeartbeat</EventName>
+    <EventId>41</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} received {1} valid players in heartbeat, currently has {2} in Players list.</Message>
+    <Parameters>Int64 sessionId, Int32 playersInHeartbeat, Int32 playersInSession</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionPlayerCountUpdated</EventName>
+    <EventId>42</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} has {1} players.</Message>
+    <Parameters>Int64 sessionId, Int32 playerCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAbortingPendingJoins</EventName>
+    <EventId>43</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is aborting pending incoming queued joins.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAbortingJoinOnHostRequest</EventName>
+    <EventId>44</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is aborting its join, because the target hosted asked it to.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionProcessedGameDataFromHeartbeat</EventName>
+    <EventId>45</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} finished processing game data from heartbeat.  Join Code: {1}, Session to Join: {2}</Message>
+    <Parameters>Int64 sessionId, Byte joinCode, Int64 sessionIdToJoin</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionUpdatingMembershipForGroup</EventName>
+    <EventId>46</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is updating group membership for Group {1}:{2}.</Message>
+    <Parameters>Int64 sessionId, Int64 clanId, String clanName</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionShouldUpdateHopperCheck</EventName>
+    <EventId>47</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is checking to see if it should update hopper counts.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionUpdatingHopperCounts</EventName>
+    <EventId>48</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is updating counts for HopperSession {1}.</Message>
+    <Parameters>Int64 sessionId, Int64 hopperSessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionUpdatingMachineAndPlayerData</EventName>
+    <EventId>49</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Updating Machine and Player Data.</Message>
+    <Parameters />
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionShouldForceOwnershipGrab</EventName>
+    <EventId>50</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Updating Machine and Player Data.  Forced Ownership Grab is {0}</Message>
+    <Parameters>Boolean shouldForceGrab</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionRemovingDeadLocalPlayer</EventName>
+    <EventId>51</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Removing Dead Local Player {0}.</Message>
+    <Parameters>Int64 deadPlayerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionUpdatingExistingLocalPlayer</EventName>
+    <EventId>52</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Updating Player Record for Existing Local Player {0}.</Message>
+    <Parameters>UInt64 playerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAddingNewLocalPlayer</EventName>
+    <EventId>53</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Updating Player Record for New Local Player {0}.</Message>
+    <Parameters>UInt64 playerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionCheckingForDeadUsers</EventName>
+    <EventId>54</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Host is checking for dead users to remove.</Message>
+    <Parameters />
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionRemovingDeadXBLPlayer</EventName>
+    <EventId>55</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Host considers Player {0} to be dead and is removing it.</Message>
+    <Parameters>UInt64 playerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionReceivedAttemptJoinRequest</EventName>
+    <EventId>56</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} has received an AttemptJoin request from Session {1} containing {2} players.</Message>
+    <Parameters>Int64 currentSessionId, Int64 incomingSessionId, Int32 playerCount</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAttemptJoinPlayerDoesntExist</EventName>
+    <EventId>57</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} did not contain player {1}, and the player grain had no session reference in it, so returning PlayerNotFound.</Message>
+    <Parameters>Int64 sessionId, UInt64 playerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAttemptJoinPlayerHasBadSessionInfo</EventName>
+    <EventId>58</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} did not contain player {1}, and the player grain pointed back at this session, so revoking ownership and returning PlayerNotFound.</Message>
+    <Parameters>Int64 sessionId, Int64 targetPlayerId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionMigratingAttemptJoin</EventName>
+    <EventId>59</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} did not contain player {1}, but the player grain pointed at session {2}, so attempting to migrate the join.</Message>
+    <Parameters>Int64 sessionId, UInt64 playerId, Int64 targetSessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionJoinFailedDueToInsufficientCapacity</EventName>
+    <EventId>60</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {1} cannot join Session {0} because there is not enough capacity.</Message>
+    <Parameters>Int64 sessionId, Int64 incomingSessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionJoinAlreadyComplete</EventName>
+    <EventId>61</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} believes that Session {1} has already joined it.</Message>
+    <Parameters>Int64 sessionId, Int64 incomingSession</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAttemptJoinPermitted</EventName>
+    <EventId>62</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is allowing Session {1} to join it.</Message>
+    <Parameters>Int64 sessionId, Int64 incomingSession</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAttemptJoinAborted</EventName>
+    <EventId>63</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is no longer attempting to join the same session.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionProcessingQueuedJoins</EventName>
+    <EventId>64</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is processing queued joins.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAttemptingToJoinSession</EventName>
+    <EventId>65</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is attempting to join session {1}.</Message>
+    <Parameters>Int64 sessionId, Int64 targetSessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionJoinedAnotherSessionSuccessfully</EventName>
+    <EventId>66</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} successfully joined session {1}.</Message>
+    <Parameters>Int64 sessionId, Int64 targetSessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionAbortingJoinDueToPlayerBackout</EventName>
+    <EventId>67</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is aborting a join, because the user backed out of it.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionProcessingLocalAbortJoin</EventName>
+    <EventId>68</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is now processing a local abort join request.</Message>
+    <Parameters>Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionQueryingPlayer</EventName>
+    <EventId>69</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Calling Query Player for Player {0} in Session {1}</Message>
+    <Parameters>UInt64 playerId, Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionQueryingPlayerForWaypoint</EventName>
+    <EventId>70</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Calling Waypoint Query Player for Player {0} in Session {1}</Message>
+    <Parameters>UInt64 playerId, Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>TestMethodIsBeingCalledForEntity</EventName>
+    <EventId>71</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Test method - {0} is being called on {1} - {2}</Message>
+    <Parameters>String methodInfo, String entityName, Int64 sessionId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionHopperCompilingAggregates</EventName>
+    <EventId>72</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Start</OpcodeName>
+    <TaskName>SessionHopperCompilingAggregates</TaskName>
+    <Message>Session Hopper {0} is beginning to compile aggregates</Message>
+    <Parameters>Int64 hopperId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>1</OpcodeValue>
+    <TaskValue>2</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionHopperFinishedCompilingAggregates</EventName>
+    <EventId>73</EventId>
+    <Version>0</Version>
+    <Level>Verbose</Level>
+    <Keywords />
+    <OpcodeName>Stop</OpcodeName>
+    <TaskName>SessionHopperCompilingAggregates</TaskName>
+    <Message>Session Hopper {0} is has finished compiling aggregates</Message>
+    <Parameters>Int64 hopperId</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>2</OpcodeValue>
+    <TaskValue>2</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SessionSendingFallbackHopperDataToBi</EventName>
+    <EventId>74</EventId>
+    <Version>0</Version>
+    <Level>Informational</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>Session {0} is telling BI that it has {2} players in Hopper {1}. Fallback BI Enabled: {3}. </Message>
+    <Parameters>Int64 sessionId, Int64 hopperId, Int32 playersInSession, Boolean biEnabled</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SendFallbackHopperInfoToBiFailed</EventName>
+    <EventId>75</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>FireAndForget call to BI Grain failed for HopperId: {0} failed with exception {1}</Message>
+    <Parameters>Int16 hopperId, String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+  <Event>
+    <ProviderName>Microsoft-Halo-Midnight-Presence</ProviderName>
+    <EventName>SendHopperInfoToBiFailed</EventName>
+    <EventId>76</EventId>
+    <Version>0</Version>
+    <Level>Warning</Level>
+    <Keywords />
+    <OpcodeName>Info</OpcodeName>
+    <TaskName>None</TaskName>
+    <Message>FireAndForget call to BI Grain failed with exception {0}</Message>
+    <Parameters>String exception</Parameters>
+    <AssemblyName>MidnightPresence.Grains</AssemblyName>
+    <ProviderGuid>bae582ea-bc0f-43f1-9776-6bed4daf9c1e</ProviderGuid>
+    <EventSourceType>PresenceEvents</EventSourceType>
+    <OpcodeValue>0</OpcodeValue>
+    <TaskValue>0</TaskValue>
+  </Event>
+</Events>

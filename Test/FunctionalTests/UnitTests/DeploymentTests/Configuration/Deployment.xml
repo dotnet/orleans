@@ -1,0 +1,10 @@
+<Deployment Name="Deployment1" DeploymentGroup="face5b8a-ac1c-4bf8-9f39-d26fd3d3face" xmlns="urn:xcg-deployment">
+  <TargetLocation Path="C:\Orleans" />
+  <Packages>
+    <Package Name="Orleans Runtime" Type="System" Path="." />
+  </Packages>
+  <RuntimeConfiguration Path=".\OrleansConfiguration.xml" />
+  <Nodes>
+    <Node HostName="localhost" NodeName="Primary" />
+  </Nodes>
+</Deployment>

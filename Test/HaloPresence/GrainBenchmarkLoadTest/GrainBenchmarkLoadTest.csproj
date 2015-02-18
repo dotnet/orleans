@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{56504385-3AF1-4C9A-AAB3-DED763B3CB59}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>GrainBenchmarkLoadTest</RootNamespace>
+    <AssemblyName>GrainBenchmarkLoadTest</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisLogFile>obj\Debug\PresenceConsoleTest.exe.CodeAnalysisLog.xml</CodeAnalysisLogFile>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisLogFile>obj\Release\PresenceConsoleTest.exe.CodeAnalysisLog.xml</CodeAnalysisLogFile>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OrleansReferenceBase>..\..\..\Samples\References\</OrleansReferenceBase>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Orleans">
+      <HintPath>..\..\References\Orleans.dll</HintPath>
+    </Reference>
+    <Reference Include="OrleansRuntime">
+      <HintPath>..\..\References\OrleansRuntime.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="GrainBenchmarkDriver.cs" />
+    <Compile Include="GrainBenchmarkGraph.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="GrainBenchmarkWorker.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="References\CopyLoadClientTo-XXX.cmd" />
+    <None Include="References\START_Load_Client.bat" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ClientConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\LoadTests\LoadTestGrainInterfaces\LoadTestGrainInterfaces.csproj">
+      <Project>{539044ba-0c8d-41b7-b435-e836e9d7b7b2}</Project>
+      <Name>LoadTestGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LoadTestBase\LoadTestBase.csproj">
+      <Project>{2e672034-b0c2-4ee7-9a58-5fc490f8d785}</Project>
+      <Name>LoadTestBase</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+      mkdir "$(SolutionDir)TestInput\LoadTests"
+      mkdir "$(SolutionDir)TestInput\LoadTests\Client"
+      mkdir "$(SolutionDir)TestInput\LoadTests\Grains"
+
+      copy "$(TargetDir)ClientConfiguration.xml" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(ProjectDir)..\..\..\OrleansV4\Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(ProjectDir)..\..\..\OrleansV4\Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\bin\runtimes\base\x64\msshrtmi.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)Orleans.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)OrleansAzureUtils.*" "$(SolutionDir)TestInput\LoadTests\Client"
+      copy "$(TargetDir)LoadTestBase.*" "$(SolutionDir)TestInput\LoadTests\Client"
+
+      copy "$(TargetDir)GrainBenchmarkLoadTest.*" "$(SolutionDir)TestInput\LoadTests\Client"
+</PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

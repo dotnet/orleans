@@ -1,0 +1,233 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PresenceConsoleTest", "PresenceConsoleTest\PresenceConsoleTest.csproj", "{45BB656F-5CB5-468B-8D06-C3FBD136F983}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserLoadTest", "UserLoadTest\UserLoadTest.csproj", "{971AC583-11D7-417D-B8FA-A528FA6AE56B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GrainBenchmarkLoadTest", "GrainBenchmarkLoadTest\GrainBenchmarkLoadTest.csproj", "{56504385-3AF1-4C9A-AAB3-DED763B3CB59}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTestBase", "LoadTestBase\LoadTestBase.csproj", "{2E672034-B0C2-4EE7-9A58-5FC490F8D785}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MidnightPresence", "MidnightPresence", "{328FCE7F-5AA1-4C2E-A848-7B5B9E33A20E}"
+	ProjectSection(SolutionItems) = preProject
+		MidnightPresence\Corinth.Blf.dll = MidnightPresence\Corinth.Blf.dll
+		MidnightPresence\Corinth.Blf.pdb = MidnightPresence\Corinth.Blf.pdb
+		MidnightPresence\EventSource.dll = MidnightPresence\EventSource.dll
+		MidnightPresence\EventSource.pdb = MidnightPresence\EventSource.pdb
+		MidnightPresence\Microsoft.Halo.Configuration.dll = MidnightPresence\Microsoft.Halo.Configuration.dll
+		MidnightPresence\Microsoft.Halo.Configuration.pdb = MidnightPresence\Microsoft.Halo.Configuration.pdb
+		MidnightPresence\Microsoft.Halo.Core.dll = MidnightPresence\Microsoft.Halo.Core.dll
+		MidnightPresence\Microsoft.Halo.Core.pdb = MidnightPresence\Microsoft.Halo.Core.pdb
+		MidnightPresence\Microsoft.Halo.Nebula.Utils.dll = MidnightPresence\Microsoft.Halo.Nebula.Utils.dll
+		MidnightPresence\Microsoft.Halo.Nebula.Utils.FSharp.dll = MidnightPresence\Microsoft.Halo.Nebula.Utils.FSharp.dll
+		MidnightPresence\Microsoft.Halo.Nebula.Utils.FSharp.pdb = MidnightPresence\Microsoft.Halo.Nebula.Utils.FSharp.pdb
+		MidnightPresence\Microsoft.Halo.Nebula.Utils.pdb = MidnightPresence\Microsoft.Halo.Nebula.Utils.pdb
+		MidnightPresence\Microsoft.Halo.PerformanceCounters.dll = MidnightPresence\Microsoft.Halo.PerformanceCounters.dll
+		MidnightPresence\Microsoft.Halo.PerformanceCounters.pdb = MidnightPresence\Microsoft.Halo.PerformanceCounters.pdb
+		MidnightPresence\Microsoft.Halo.Utilities.dll = MidnightPresence\Microsoft.Halo.Utilities.dll
+		MidnightPresence\Microsoft.Halo.Utilities.pdb = MidnightPresence\Microsoft.Halo.Utilities.pdb
+		MidnightPresence\MidnightPresence.GrainInterfaces.dll = MidnightPresence\MidnightPresence.GrainInterfaces.dll
+		MidnightPresence\MidnightPresence.GrainInterfaces.pdb = MidnightPresence\MidnightPresence.GrainInterfaces.pdb
+		MidnightPresence\MidnightPresence.Grains.dll = MidnightPresence\MidnightPresence.Grains.dll
+		MidnightPresence\MidnightPresence.Grains.pdb = MidnightPresence\MidnightPresence.Grains.pdb
+		MidnightPresence\MidnightPresence.GrainUtilities.dll = MidnightPresence\MidnightPresence.GrainUtilities.dll
+		MidnightPresence\MidnightPresence.GrainUtilities.pdb = MidnightPresence\MidnightPresence.GrainUtilities.pdb
+		MidnightPresence\MidnightPresence.Utilities.dll = MidnightPresence\MidnightPresence.Utilities.dll
+		MidnightPresence\MidnightPresence.Utilities.pdb = MidnightPresence\MidnightPresence.Utilities.pdb
+		MidnightPresence\Newtonsoft.Json.dll = MidnightPresence\Newtonsoft.Json.dll
+		MidnightPresence\Newtonsoft.Json.xml = MidnightPresence\Newtonsoft.Json.xml
+		MidnightPresence\Stats.Core.dll = MidnightPresence\Stats.Core.dll
+		MidnightPresence\Stats.Core.pdb = MidnightPresence\Stats.Core.pdb
+		MidnightPresence\System.Json.dll = MidnightPresence\System.Json.dll
+		MidnightPresence\System.Json.xml = MidnightPresence\System.Json.xml
+		MidnightPresence\System.Net.Http.dll = MidnightPresence\System.Net.Http.dll
+		MidnightPresence\System.Net.Http.Formatting.dll = MidnightPresence\System.Net.Http.Formatting.dll
+		MidnightPresence\System.Net.Http.Formatting.xml = MidnightPresence\System.Net.Http.Formatting.xml
+		MidnightPresence\System.Net.Http.WebRequest.dll = MidnightPresence\System.Net.Http.WebRequest.dll
+		MidnightPresence\System.Net.Http.WebRequest.xml = MidnightPresence\System.Net.Http.WebRequest.xml
+		MidnightPresence\System.Net.Http.xml = MidnightPresence\System.Net.Http.xml
+		MidnightPresence\Xceed.Compression.dll = MidnightPresence\Xceed.Compression.dll
+		MidnightPresence\Xceed.Compression.Formats.dll = MidnightPresence\Xceed.Compression.Formats.dll
+		MidnightPresence\Xceed.Compression.Formats.xml = MidnightPresence\Xceed.Compression.Formats.xml
+		MidnightPresence\Xceed.Compression.xml = MidnightPresence\Xceed.Compression.xml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ReachPresence", "ReachPresence", "{2F0BCEA0-330C-43C1-9BC4-E7B0639691C4}"
+	ProjectSection(SolutionItems) = preProject
+		ReachPresence\Bungie.Blf.dll = ReachPresence\Bungie.Blf.dll
+		ReachPresence\Bungie.Blf.pdb = ReachPresence\Bungie.Blf.pdb
+		ReachPresence\Microsoft.Halo.Configuration.dll = ReachPresence\Microsoft.Halo.Configuration.dll
+		ReachPresence\Microsoft.Halo.Configuration.pdb = ReachPresence\Microsoft.Halo.Configuration.pdb
+		ReachPresence\ReachPresence.GrainInterfaces.dll = ReachPresence\ReachPresence.GrainInterfaces.dll
+		ReachPresence\ReachPresence.GrainInterfaces.pdb = ReachPresence\ReachPresence.GrainInterfaces.pdb
+		ReachPresence\ReachPresence.Grains.dll = ReachPresence\ReachPresence.Grains.dll
+		ReachPresence\ReachPresence.Grains.pdb = ReachPresence\ReachPresence.Grains.pdb
+		ReachPresence\ReachPresence.GrainUtilities.dll = ReachPresence\ReachPresence.GrainUtilities.dll
+		ReachPresence\ReachPresence.GrainUtilities.pdb = ReachPresence\ReachPresence.GrainUtilities.pdb
+		ReachPresence\ReachPresence.Utilities.dll = ReachPresence\ReachPresence.Utilities.dll
+		ReachPresence\ReachPresence.Utilities.pdb = ReachPresence\ReachPresence.Utilities.pdb
+		ReachPresence\Xceed.Compression.dll = ReachPresence\Xceed.Compression.dll
+		ReachPresence\Xceed.Compression.Formats.dll = ReachPresence\Xceed.Compression.Formats.dll
+		ReachPresence\Xceed.Compression.Formats.xml = ReachPresence\Xceed.Compression.Formats.xml
+		ReachPresence\Xceed.Compression.xml = ReachPresence\Xceed.Compression.xml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HaloStats", "HaloStats", "{0A5D0549-100D-410E-8915-BB6954DB8E83}"
+	ProjectSection(SolutionItems) = preProject
+		HaloStats\Bungie.Blf.dll = HaloStats\Bungie.Blf.dll
+		HaloStats\Bungie.Blf.pdb = HaloStats\Bungie.Blf.pdb
+		HaloStats\Bungie.Core.dll = HaloStats\Bungie.Core.dll
+		HaloStats\Bungie.Core.pdb = HaloStats\Bungie.Core.pdb
+		HaloStats\BungieNet.Apps.Core.dll = HaloStats\BungieNet.Apps.Core.dll
+		HaloStats\BungieNet.Apps.Core.pdb = HaloStats\BungieNet.Apps.Core.pdb
+		HaloStats\Corinth.Blf.dll = HaloStats\Corinth.Blf.dll
+		HaloStats\Corinth.Blf.pdb = HaloStats\Corinth.Blf.pdb
+		HaloStats\EventSource.dll = HaloStats\EventSource.dll
+		HaloStats\EventSource.pdb = HaloStats\EventSource.pdb
+		HaloStats\Interop.Dia2Lib.dll = HaloStats\Interop.Dia2Lib.dll
+		HaloStats\Microsoft.Halo.Nebula.Diagnostics.dll = HaloStats\Microsoft.Halo.Nebula.Diagnostics.dll
+		HaloStats\Microsoft.Halo.Nebula.Diagnostics.pdb = HaloStats\Microsoft.Halo.Nebula.Diagnostics.pdb
+		HaloStats\Microsoft.Halo.Nebula.Utils.dll = HaloStats\Microsoft.Halo.Nebula.Utils.dll
+		HaloStats\Microsoft.Halo.Nebula.Utils.FSharp.dll = HaloStats\Microsoft.Halo.Nebula.Utils.FSharp.dll
+		HaloStats\Microsoft.Halo.Nebula.Utils.FSharp.pdb = HaloStats\Microsoft.Halo.Nebula.Utils.FSharp.pdb
+		HaloStats\Microsoft.Halo.Nebula.Utils.pdb = HaloStats\Microsoft.Halo.Nebula.Utils.pdb
+		HaloStats\Microsoft.Halo.PerformanceCounters.dll = HaloStats\Microsoft.Halo.PerformanceCounters.dll
+		HaloStats\Microsoft.Halo.PerformanceCounters.pdb = HaloStats\Microsoft.Halo.PerformanceCounters.pdb
+		HaloStats\Microsoft.Halo.Stats.Core.dll = HaloStats\Microsoft.Halo.Stats.Core.dll
+		HaloStats\Microsoft.Halo.Stats.Core.pdb = HaloStats\Microsoft.Halo.Stats.Core.pdb
+		HaloStats\Microsoft.Halo.Stats.GrainInterfaces.dll = HaloStats\Microsoft.Halo.Stats.GrainInterfaces.dll
+		HaloStats\Microsoft.Halo.Stats.GrainInterfaces.pdb = HaloStats\Microsoft.Halo.Stats.GrainInterfaces.pdb
+		HaloStats\Microsoft.Halo.Stats.Grains.dll = HaloStats\Microsoft.Halo.Stats.Grains.dll
+		HaloStats\Microsoft.Halo.Stats.Grains.pdb = HaloStats\Microsoft.Halo.Stats.Grains.pdb
+		HaloStats\Microsoft.Halo.Stats.GrainUtilities.dll = HaloStats\Microsoft.Halo.Stats.GrainUtilities.dll
+		HaloStats\Microsoft.Halo.Stats.GrainUtilities.pdb = HaloStats\Microsoft.Halo.Stats.GrainUtilities.pdb
+		HaloStats\Microsoft.Halo.Stats.Storage.dll = HaloStats\Microsoft.Halo.Stats.Storage.dll
+		HaloStats\Microsoft.Halo.Stats.Storage.pdb = HaloStats\Microsoft.Halo.Stats.Storage.pdb
+		HaloStats\Microsoft.Halo.Utilities.dll = HaloStats\Microsoft.Halo.Utilities.dll
+		HaloStats\Microsoft.Halo.Utilities.Localization.dll = HaloStats\Microsoft.Halo.Utilities.Localization.dll
+		HaloStats\Microsoft.Halo.Utilities.Localization.pdb = HaloStats\Microsoft.Halo.Utilities.Localization.pdb
+		HaloStats\Microsoft.Halo.Utilities.pdb = HaloStats\Microsoft.Halo.Utilities.pdb
+		HaloStats\Microsoft.HaloGrain.Utilities.dll = HaloStats\Microsoft.HaloGrain.Utilities.dll
+		HaloStats\Microsoft.HaloGrain.Utilities.pdb = HaloStats\Microsoft.HaloGrain.Utilities.pdb
+		HaloStats\Microsoft.IdentityModel.dll = HaloStats\Microsoft.IdentityModel.dll
+		HaloStats\Microsoft.ServiceBus.dll = HaloStats\Microsoft.ServiceBus.dll
+		HaloStats\Microsoft.ServiceBus.xml = HaloStats\Microsoft.ServiceBus.xml
+		HaloStats\Microsoft.Xbox.AzureStorageCommon.dll = HaloStats\Microsoft.Xbox.AzureStorageCommon.dll
+		HaloStats\Microsoft.Xbox.AzureStorageCommon.pdb = HaloStats\Microsoft.Xbox.AzureStorageCommon.pdb
+		HaloStats\Newtonsoft.Json.dll = HaloStats\Newtonsoft.Json.dll
+		HaloStats\Newtonsoft.Json.xml = HaloStats\Newtonsoft.Json.xml
+		HaloStats\perfCounters.xml = HaloStats\perfCounters.xml
+		HaloStats\Security.Cryptography.dll = HaloStats\Security.Cryptography.dll
+		HaloStats\Security.Cryptography.pdb = HaloStats\Security.Cryptography.pdb
+		HaloStats\Security.Cryptography.xml = HaloStats\Security.Cryptography.xml
+		HaloStats\SpartanToken.dll = HaloStats\SpartanToken.dll
+		HaloStats\SpartanToken.pdb = HaloStats\SpartanToken.pdb
+		HaloStats\Stats.Contract.dll = HaloStats\Stats.Contract.dll
+		HaloStats\Stats.Contract.pdb = HaloStats\Stats.Contract.pdb
+		HaloStats\Stats.Utilities.dll = HaloStats\Stats.Utilities.dll
+		HaloStats\Stats.Utilities.pdb = HaloStats\Stats.Utilities.pdb
+		HaloStats\StatsPerformanceCounters.dll = HaloStats\StatsPerformanceCounters.dll
+		HaloStats\StatsPerformanceCounters.pdb = HaloStats\StatsPerformanceCounters.pdb
+		HaloStats\StatsTestCommon.dll = HaloStats\StatsTestCommon.dll
+		HaloStats\StatsTestCommon.dll.config = HaloStats\StatsTestCommon.dll.config
+		HaloStats\StatsTestCommon.pdb = HaloStats\StatsTestCommon.pdb
+		HaloStats\System.Net.Http.Formatting.dll = HaloStats\System.Net.Http.Formatting.dll
+		HaloStats\System.Net.Http.Formatting.xml = HaloStats\System.Net.Http.Formatting.xml
+		HaloStats\System.Net.Http.WebRequest.dll = HaloStats\System.Net.Http.WebRequest.dll
+		HaloStats\System.Net.Http.WebRequest.xml = HaloStats\System.Net.Http.WebRequest.xml
+		HaloStats\TestHelper.dll = HaloStats\TestHelper.dll
+		HaloStats\TestHelper.pdb = HaloStats\TestHelper.pdb
+		HaloStats\TraceEvent.dll = HaloStats\TraceEvent.dll
+		HaloStats\TraceEvent.pdb = HaloStats\TraceEvent.pdb
+		HaloStats\Wintellect.Threading.dll = HaloStats\Wintellect.Threading.dll
+		HaloStats\Wintellect.Threading.pdb = HaloStats\Wintellect.Threading.pdb
+		HaloStats\Xceed.Compression.dll = HaloStats\Xceed.Compression.dll
+		HaloStats\Xceed.Compression.Formats.dll = HaloStats\Xceed.Compression.Formats.dll
+		HaloStats\Xceed.Compression.Formats.xml = HaloStats\Xceed.Compression.Formats.xml
+		HaloStats\Xceed.Compression.xml = HaloStats\Xceed.Compression.xml
+		HaloStats\Xceed.FileSystem.dll = HaloStats\Xceed.FileSystem.dll
+		HaloStats\Xceed.Zip.dll = HaloStats\Xceed.Zip.dll
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTestGrainInterfaces", "..\LoadTests\LoadTestGrainInterfaces\LoadTestGrainInterfaces.csproj", "{539044BA-0C8D-41B7-B435-E836E9D7B7B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTestGrains", "..\LoadTests\LoadTestGrains\LoadTestGrains.csproj", "{22A7541E-6907-4EE2-8114-520886FAF70C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistenceLoadTest", "..\LoadTests\PersistenceLoadTest\PersistenceLoadTest.csproj", "{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReminderLoadTest", "..\LoadTests\ReminderLoadTest\ReminderLoadTest.csproj", "{3439B4E2-B439-467F-AE24-47900C438488}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 9
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://vstfpg03:8080/tfs/pg03
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = PresenceConsoleTest\\PresenceConsoleTest.csproj
+		SccProjectName1 = PresenceConsoleTest
+		SccLocalPath1 = PresenceConsoleTest
+		SccProjectUniqueName2 = UserLoadTest\\UserLoadTest.csproj
+		SccProjectName2 = UserLoadTest
+		SccLocalPath2 = UserLoadTest
+		SccProjectUniqueName3 = GrainBenchmarkLoadTest\\GrainBenchmarkLoadTest.csproj
+		SccProjectName3 = GrainBenchmarkLoadTest
+		SccLocalPath3 = GrainBenchmarkLoadTest
+		SccProjectUniqueName4 = LoadTestBase\\LoadTestBase.csproj
+		SccProjectName4 = LoadTestBase
+		SccLocalPath4 = LoadTestBase
+		SccProjectUniqueName5 = ..\\LoadTests\\LoadTestGrainInterfaces\\LoadTestGrainInterfaces.csproj
+		SccProjectName5 = ../LoadTests/LoadTestGrainInterfaces
+		SccLocalPath5 = ..\\LoadTests\\LoadTestGrainInterfaces
+		SccProjectUniqueName6 = ..\\LoadTests\\LoadTestGrains\\LoadTestGrains.csproj
+		SccProjectName6 = ../LoadTests/LoadTestGrains
+		SccLocalPath6 = ..\\LoadTests\\LoadTestGrains
+		SccProjectUniqueName7 = ..\\LoadTests\\PersistenceLoadTest\\PersistenceLoadTest.csproj
+		SccProjectName7 = ../LoadTests/PersistenceLoadTest
+		SccLocalPath7 = ..\\LoadTests\\PersistenceLoadTest
+		SccProjectUniqueName8 = ..\\LoadTests\\ReminderLoadTest\\ReminderLoadTest.csproj
+		SccProjectName8 = ../LoadTests/ReminderLoadTest
+		SccLocalPath8 = ..\\LoadTests\\ReminderLoadTest
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45BB656F-5CB5-468B-8D06-C3FBD136F983}.Release|Any CPU.Build.0 = Release|Any CPU
+		{971AC583-11D7-417D-B8FA-A528FA6AE56B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{971AC583-11D7-417D-B8FA-A528FA6AE56B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{971AC583-11D7-417D-B8FA-A528FA6AE56B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{971AC583-11D7-417D-B8FA-A528FA6AE56B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56504385-3AF1-4C9A-AAB3-DED763B3CB59}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E672034-B0C2-4EE7-9A58-5FC490F8D785}.Release|Any CPU.Build.0 = Release|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{539044BA-0C8D-41B7-B435-E836E9D7B7B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{22A7541E-6907-4EE2-8114-520886FAF70C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B91EFB7-1D8D-4C9F-9979-7941EAB4EAE0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3439B4E2-B439-467F-AE24-47900C438488}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

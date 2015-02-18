@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Rules FriendlyName="Orleans Rules">
+  <Rule TypeName="ConsumePromises" Category="Orleans.Correctness" CheckId="MD1402">
+    <Name>Method return values should generally not be ignored</Name>
+    <Description>
+      When a method returns a value, it is generally an error to ignore the
+      return value.
+    </Description>
+    <Url/>
+    <Resolution>Consider using the value returned by the call to method '{0}' made from method '{1}'.</Resolution>
+    <Resolution Name="DontIgnoreReturnValueFromBox">Consider using the value returned by the boxing operation in method '{0}'.</Resolution>
+    <Resolution Name="DontIgnoreReturnValueFromNewobj">Consider using the value returned by the object allocation made from method '{0}'.</Resolution>
+    <Resolution Name="DontIgnoreReturnValueFromNewarr">Consider using the value returned by the array creation made from method '{0}'.</Resolution>
+    <Resolution Name="DontIgnoreReturnValueFromDelegate">Consider using the value returned by the call of delegate type '{0}' made from method '{1}'.</Resolution>
+    <MessageLevel Certainty="90">Warning</MessageLevel>
+    <FixCategories>NonBreaking</FixCategories>
+    <Email/>
+    <Owner/>
+  </Rule>
+</Rules>

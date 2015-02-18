@@ -1,0 +1,3318 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Security.Cryptography</name>
+    </assembly>
+    <members>
+        <member name="T:Security.Cryptography.AesCng">
+            <summary>
+                <para>
+                    The AesCng class provides a wrapper for the CNG implementation of the AES algorithm. It
+                    provides the same interface as the other AES implementations shipped with the .NET Framework,
+                    including <see cref="T:System.Security.Cryptography.AesManaged"/> and <see cref="T:System.Security.Cryptography.AesCryptoServiceProvider"/>.
+                </para>
+                <para>
+                    AesCng uses the BCrypt layer of CNG to do its work, and requires Windows Vista and the .NET
+                    Framework 3.5.
+               </para>
+               <para>
+                    Since most of the AesCng APIs are inherited from the <see cref="T:System.Security.Cryptography.Aes"/> base class, see the
+                    documentation for Aes for a complete API description.
+               </para>
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.ICngSymmetricAlgorithm">
+            <summary>
+                Interface for symmetric algorithms implemented over the CNG layer of Windows to provide CNG
+                implementation details through.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.ICngAlgorithm">
+            <summary>
+                Interface for algorithms implemented over the CNG layer of Windows to provide CNG implementation
+                details through.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.ICngAlgorithm.Provider">
+            <summary>
+                Gets the algorithm or key storage provider being used for the implementation of the CNG
+                algorithm.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.ICngSymmetricAlgorithm.CngMode">
+            <summary>
+                Get or set the CNG chaining mode the algorithm is using.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AesCng.#ctor">
+            <summary>
+                Constructs an AesCng object. The default settings for this object are:
+                <list type="bullet">
+                    <item>Algorithm provider - Microsoft Primitive Algorithm Provider</item>
+                    <item>Block size - 128 bits</item>
+                    <item>Feedback size - 8 bits</item>
+                    <item>Key size - 256 bits</item>
+                    <item>Cipher mode - CipherMode.CBC</item>
+                    <item>Padding mode - PaddingMode.PKCS7</item>
+                </list>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AesCng.#ctor(System.Security.Cryptography.CngProvider)">
+            <summary>
+                Constructs an AesCng object using the specified algorithm provider. The default settings for
+                this object are:
+                <list type="bullet">
+                    <item>Algorithm provider - Microsoft Primitive Algorithm Provider</item>
+                    <item>Block size - 128 bits</item>
+                    <item>Feedback size - 8 bits</item>
+                    <item>Key size - 256 bits</item>
+                    <item>Cipher mode - CipherMode.CBC</item>
+                    <item>Padding mode - PaddingMode.PKCS7</item>
+                </list>
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="algorithmProvider"/> is null</exception>
+            <param name="algorithmProvider">algorithm provider to use for AES computation</param>
+        </member>
+        <member name="P:Security.Cryptography.AesCng.Mode">
+            <summary>
+                Gets or sets the cipher mode to use during encryption or decryption. Supported modes are:
+                <list type="bullet">
+                    <item>CipherMode.CBC</item>
+                    <item>CipherMode.ECB</item>
+                    <item>CipherMode.CFB</item>
+                </list>
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.AuthenticatedAes">
+            <summary>
+                The AuthenticatedAes abstract base class forms the base class for concrete implementations of
+                authenticated AES algorithms. For instance, AES with CCM or GCM chaining modes provides
+                authentication, and therefore derive from AuthenticatedAes.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.AuthenticatedSymmetricAlgorithm">
+            <summary>
+                <para>
+                    The AuthenticatedSymmetricAlgorithm abstract base class forms the base class for symmetric
+                    algorithms which support authentication as well as encryption. Authenticated symmetric
+                    algorithms produce an authentication tag in addition to ciphertext, which allows data to be
+                    both authenticated and protected for privacy. For instance, AES with CCM or GCM chaining modes
+                    provides authentication, and therefore derive from AuthenticatedSymmetricAlgorithm.
+               </para>
+               <para>
+                    AuthenticatedSymmetricAlgorithm derives from <see cref="T:System.Security.Cryptography.SymmetricAlgorithm"/>, so all of the
+                    SymmetricAlgorithm APIs also apply to AuthenticatedSymmericAlgorithm objects.
+                </para>
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.AuthenticatedSymmetricAlgorithm.LegalTagSizesValue">
+            <summary>
+                The LegalTagSizes field is set by authenticated symmetric algorithm implementations to be the
+                set of valid authentication tag sizes expressed in bits.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.AuthenticatedSymmetricAlgorithm.TagSizeValue">
+            <summary>
+                The TagSizeValue field contains the current authentication tag size used by the authenticated
+                symmetric algorithm, expressed in bits.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.Create">
+            <summary>
+                Creates an instance of the default AuthenticatedSymmetricAlgorithm registered in
+                <see cref="T:Security.Cryptography.CryptoConfig2"/>. By default, this is the <see cref="T:Security.Cryptography.AuthenticatedAesCng"/>
+                 algorithm.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.Create(System.String)">
+            <summary>
+                Create an instance of the specified AuthenticatedSymmetricAlgorithm type. If the type cannot
+                be found in <see cref="T:Security.Cryptography.CryptoConfig2"/>, Create returns null.
+            </summary>
+            <param name="algorithm">name of the authenticated symmetric algorithm to create</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="algorithm"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateAuthenticatedEncryptor">
+            <summary>
+                Create an authenticated encryptor using the key, nonce, and authenticated data from the
+                properties of this algorithm object.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateAuthenticatedEncryptor(System.Byte[],System.Byte[])">
+            <summary>
+                Create an authenticated encryptor using the specified key and nonce, and using the
+                authenticated data from the property of this algorithm object.
+            </summary>
+            <param name="rgbKey">key to use for the encryption operation</param>
+            <param name="rgbIV">nonce to use for the encryption operation</param>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateAuthenticatedEncryptor(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+                Create an authenticated encryptor using the specified key, nonce, and authenticated data.
+            </summary>
+            <param name="rgbKey">key to use for the encryption operation</param>
+            <param name="rgbIV">nonce to use for the encryption operation</param>
+            <param name="rgbAuthenticatedData">optional extra authenticated data to use for the encryption operation</param>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateDecryptor">
+            <summary>
+                Create a decryptor using the key, nonce, authenticated data, and authentication tag from the
+                properties of this algorithm object.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateDecryptor(System.Byte[],System.Byte[])">
+            <summary>
+                Create a decryptor with the given key and nonce, using the authenticated data and
+                authentication tag from the properties of the algorithm object.
+            </summary>
+            <param name="rgbKey">key to use for the decryption operation</param>
+            <param name="rgbIV">nonce to use for the decryption operation</param>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateDecryptor(System.Byte[],System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+                Create a decryption transform with the given key, nonce, authenticated data, and
+                authentication tag.
+            </summary>
+            <param name="rgbKey">key to use for the decryption operation</param>
+            <param name="rgbIV">nonce to use for the decryption operation</param>
+            <param name="rgbAuthenticatedData">optional extra authenticated data to use for the decryption operation</param>
+            <param name="rgbTag">authenticated tag to verify while decrypting</param>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateEncryptor">
+            <summary>
+                Create an encryptor using the given key and nonce, and the authenticated data from this
+                algorithm.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.CreateEncryptor(System.Byte[],System.Byte[])">
+            <summary>
+                Create an encryptor using the given key and nonce, and the authenticated data from this
+                algorithm.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedSymmetricAlgorithm.ValidTagSize(System.Int32)">
+            <summary>
+                Determine if an authentication tag size (in bits) is valid for use with this algorithm.
+            </summary>
+            <param name="tagSize">authentication tag size in bits to check</param>
+        </member>
+        <member name="P:Security.Cryptography.AuthenticatedSymmetricAlgorithm.AuthenticatedData">
+            <summary>
+                <para>
+                    Gets or sets the authenticated data buffer.
+                </para>
+                <para>
+                    This data is included in calculations of the authentication tag, but is not included in
+                    the ciphertext.  A value of null means that there is no additional authenticated data.
+                </para>
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.AuthenticatedSymmetricAlgorithm.IV">
+            <summary>
+                Get or set the IV (nonce) to use with transorms created with this object.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if set to null</exception>
+        </member>
+        <member name="P:Security.Cryptography.AuthenticatedSymmetricAlgorithm.LegalTagSizes">
+            <summary>
+                Gets the ranges of legal sizes for authentication tags produced by this algorithm, expressed
+                in bits.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.AuthenticatedSymmetricAlgorithm.Tag">
+            <summary>
+                Gets or sets the authentication tag to use when verifying a decryption operation.  This
+                value is only read for decryption operaions, and is not used for encryption operations.  To
+                find the value of the tag generated on encryption, check the Tag property of the
+                IAuthenticatedCryptoTransform encryptor object.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if the tag is set to null</exception>
+            <exception cref="T:System.ArgumentException">if the tag is not a legal size</exception>
+        </member>
+        <member name="P:Security.Cryptography.AuthenticatedSymmetricAlgorithm.TagSize">
+            <summary>
+                Get or set the size (in bits) of the authentication tag
+            </summary>
+            <exception cref="T:System.ArgumentException">if the value is not a legal tag size</exception>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedAes.Create">
+            <summary>
+                Creates an instance of the default AuthenticatedAes registered in <see cref="T:Security.Cryptography.CryptoConfig2"/>.
+                By default, this is the <see cref="T:Security.Cryptography.AuthenticatedAesCng"/> algorithm.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedAes.Create(System.String)">
+            <summary>
+                Create an instance of the specified AuthenticatedAes type. If the type cannot be found in
+                <see cref="T:Security.Cryptography.CryptoConfig2"/>, Create returns null.
+            </summary>
+            <param name="algorithm">name of the authenticated symmetric algorithm to create</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="algorithm"/> is null</exception>
+        </member>
+        <member name="T:Security.Cryptography.AuthenticatedAesCng">
+             <summary>
+                 <para>
+                     The AuthenticatedAesCng class provides a wrapper for the CNG implementation of the
+                     authenticated AES algorithm. AesCng uses the BCrypt layer of CNG to do its work, and requires
+                     Windows Vista SP1 and the .NET Framework 3.5.
+                 </para>
+                 <para>
+                     More information on using AuthenticatedAesCng can be found here:
+                     http://blogs.msdn.com/shawnfa/archive/2009/03/17/authenticated-symmetric-encryption-in-net.aspx
+                 </para>
+                 <para>
+                     Since most of the AuthenticatedAesCng APIs are inherited from the
+                     <see cref="T:Security.Cryptography.AuthenticatedSymmetricAlgorithm"/> base class, see the documentation for
+                     AuthenticatedSymmetricAlgorithm for a complete API description.
+                 </para>
+                 <para>
+                     Example usage - encrypting and authenticating data using GCM
+                     <example>
+                         // Encrypt and authenticate data stored in byte array plaintext, using a key and IV.
+                         // Additionally, provide data that is required to validate the authentication tag, but
+                         // which does not get added into the ciphertext.
+                         using (AuthenticatedAesCng aes = new AuthenticatedAesCng())
+                         {
+                             aes.Key = GetEncryptionKey();
+                             aes.IV = GetNonce();
+                             aes.CngMode = CngChainingMode.Gcm;
+            
+                             // This data is required to verify the authentication tag, but will not go into the
+                             // ciphertext
+                             aes.AuthenticatedData = GetAdditionalAuthenticationData();
+            
+                             // Do the encryption
+                             using (MemoryStream ms = new MemoryStream())
+                             using (IAuthenticatedCryptoTransform encryptor = aes.CreateAuthenticatedEncryptor())
+                             using (CryptoStream cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+                             {
+                                 // Encrypt the plaintext
+                                 byte[] plaintext = GetPlaintext();
+                                 cs.Write(paintext, 0, paintext.Length);
+            
+                                 // Complete the encryption operation, and generate the authentication tag
+                                 cs.FlushFinalBlock();
+            
+                                 // Get the generated ciphertext and authentication tag
+                                 byte[] ciphertext = ms.ToArray();
+                                 byte[] authenticationTag = encryptor.GetTag();
+                             }
+                         }
+                     </example>
+                 </para>
+                 <para>
+                     Example usage - Decrypting and verifying data using GCM
+                     <example>
+                         // Decrypt and authenticate data stored in byte array ciphertext, using a key and IV. 
+                         // Additionally, provide data that is required to validate the authentication tag, but
+                         which does not get added into the ciphertext.
+                         using (AuthenticatedAesCng aes = new AuthenticatedAesCng())
+                         {
+                             aes.Key = GetEncryptionKey();
+                             aes.IV = GetNonce();
+                             aes.CngMode = CngChainingMode.Gcm;
+            
+                             // This data is required to verify the authentication tag, but will not go into the
+                             // ciphertext
+                             aes.AuthenticatedData = GetAdditionalAuthenticationData();
+            
+                             // The authentication tag was generated during the encryption operation.
+                             aes.Tag = GetAuthenticationTag();
+            
+                             // Do the decryption and authentication
+                             using (MemoryStream ms = new MemoryStream())
+                             using (ICryptoTransform decryptor = aes.CreateDecryptor())
+                             using (CryptoStream cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Write))
+                             {
+                                 // Decrypt the ciphertext
+                                 byte[] ciphertext = GetCiphertext();
+                                 cs.Write(ciphertext, 0, ciphertext.Length);
+            
+                                 // If the authentication tag does not validate, this call will throw a
+                                 // CryptographicException.
+                                 cs.FlushFinalBlock();
+            
+                                 // Get the decrypted and authenticated plaintext
+                                 byte[] decrypted = ms.ToArray();
+                             }
+                         }
+                     </example>
+                 </para>
+             </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedAesCng.#ctor">
+            <summary>
+                Constructs an AuthenticatedAesCng object. The default settings for this object are:
+                <list type="bullet">
+                    <item>Provider - Microsoft Primitive Algorithm Provider</item>
+                    <item>CngMode - CngChainingMode.Gcm</item>
+                </list>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.AuthenticatedAesCng.#ctor(System.Security.Cryptography.CngProvider)">
+            <summary>
+                Construct an AuthenticatedAesCng using a specific algorithm provider.  The default settings
+                for this object are:
+                <list type="bullet">
+                    <item>CngMode - CngChainingMode.Gcm</item>
+                </list>
+            </summary>
+            <param name="provider">algorithm provider to use for AES computation</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="provider"/> is null</exception>
+        </member>
+        <member name="P:Security.Cryptography.AuthenticatedAesCng.ChainingSupported">
+            <summary>
+                Gets a value determining if the AES object supports chaining multiple encryption calls, or if
+                all encryption or decryption must be done at once. Generally, this value won't matter to code
+                running against the AuthenticatedAesCng object, since the transforms produced by
+                AuthenticatedAesCng will take chaining support into account to ensure that only one call to
+                CNG is made if that is required.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.AuthenticatedAesCng.CngMode">
+            <summary>
+                Gets or sets the CNG cipher mode to use during encryption or decryption. This mode must be an
+                authenticating chaining mode, currently:
+                <list type="bullet">
+                    <item>CngChainingMode.Ccm</item>
+                    <item>CngChainingMode.Gcm</item>
+                </list>
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptAuthenticatedSymmetricAlgorithm">
+            <summary>
+                Generic implementation of an authenticated symmetric algorithm which is provided by the BCrypt
+                layer of CNG.  Concrete AuthenticatedSymmetricAlgorithm classes should contain an instance of this
+                type and delegate all of their work to that object.
+                
+                Most of the real encryption work occurs in the BCryptAuthenticatedCryptoTransform class. (see
+                code:code:Microsoft.Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform).
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricAlgorithm.SetupAlgorithm">
+            <summary>
+                Build an algorithm handle setup according to the parameters of this AES object
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricAlgorithm.UpdateLegalTagSizes">
+            <summary>
+                Update the legal tag sizes for this algorithm
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricAlgorithm.UpdateLegalTagSizes(Security.Cryptography.SafeBCryptAlgorithmHandle)">
+            <summary>
+                Update the legal tag sizes for this algortithm from an already opened algorithm handle
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricAlgorithm.ChainingSupported">
+            <summary>
+                Determine if the current mode supports calculating the authenticated cipher across multiple
+                transform calls, or must the entire cipher be calculated at once.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricAlgorithm.CngMode">
+            <summary>
+                Chaining mode to use for chaining in the authenticated algorithm.  This value should be one
+                of the CNG modes that is an authenticated chaining mode such as CCM or GCM.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricAlgorithm.Provider">
+            <summary>
+                Algorithm provider which is implementing the authenticated transform
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform">
+            <summary>
+                Generic crypto transform, which implements authenticated symmetric encryption and decryption for
+                algorithms implemented in the BCrypt layer of CNG.  This type is used as the workhorse for the
+                BCryptAuthenticatedSymmetricAlgorithm generic BCrypt authenticated symmetric algorithm
+                implementation.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.IAuthenticatedCryptoTransform">
+            <summary>
+                Interface for crypto transforms that support generating an authentication tag.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.ICryptoTransform2">
+            <summary>
+                Extended crypto transform interface which provides extra information about the capabilities of a
+                specific transform.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.ICryptoTransform2.CanChainBlocks">
+            <summary>
+                <para>
+                    Can the transform be used in a chained mode - where it is invoked multiple times before
+                    the final ciphertext and tag are retrieved.  (For example, can it transform each block in
+                    the input in seperate calls, or must they all come in through a single call.)
+                </para>
+                <para>
+                    This is different from CanTransformMultipleBlocks in that CanTransformMultipleBlocks
+                    indicates if a transform can handle multiple blocks of input in a single call, while
+                    CanChainBlocks indicates if a transform can chain multiple blocks of input across multiple
+                    calls to TransformBlock/TransformFinalBlock.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.IAuthenticatedCryptoTransform.GetTag">
+            <summary>
+                Get the authentication tag produced by the transform.  This is only valid in the encryption
+                case and only after the final block has been transformed.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">
+                If the crypto transform is a decryptor, or if the final block has not yet been transformed.
+            </exception>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.#ctor(Security.Cryptography.SafeBCryptAlgorithmHandle,System.Byte[],System.Byte[],System.Byte[],System.Boolean,System.Int32)">
+            <summary>
+                Create an encrypting authenticated symmetric algorithm transform.  This type takes ownership
+                of the incoming algorithm handle, which should no longer be used by the calling code after
+                it has called this constructor.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.#ctor(Security.Cryptography.SafeBCryptAlgorithmHandle,System.Byte[],System.Byte[],System.Byte[],System.Byte[],System.Boolean)">
+            <summary>
+                Create a decrypting authenticated symmetric algorithm transform.  This type takes ownership
+                of the incoming algorithm handle, which should no longer be used by the calling code after
+                it has called this constructor.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.GetTag">
+            <summary>
+                Get the authentication tag generated from encryption.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.TransformBlock(System.Byte[],System.Int32,System.Int32,System.Byte[],System.Int32)">
+            <summary>
+                Transforms some blocks of input data, but don't finalize the transform
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.TransformFinalBlock(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+                Transform the final block and finalize the encryption or decryption operation.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.CngTransform(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+                Transform given blocks of data
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.CanChainBlocks">
+            <summary>
+                Can the transform chain multiple blocks of ciphertext, or must they all come at once.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.CanReuseTransform">
+            <summary>
+                Gets a value indicating whether the transform can be reused.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.CanTransformMultipleBlocks">
+            <summary>
+                Gets a value indicating whether the transform can process multiple blocks at once.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.InputBlockSize">
+            <summary>
+                Gets the input block length in bytes.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BCryptAuthenticatedSymmetricCryptoTransform.OutputBlockSize">
+            <summary>
+                Gets the output block length in bytes.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptHMAC">
+            <summary>
+                Generic implementation of HMAC which is implemented by the BCrypt layer of Cng. Concrete HMAC
+                classes should contain an instance of the BCryptHMAC type and delegate their work to that object.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.AsymmetricPaddingMode">
+            <summary>
+                Padding modes 
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.AsymmetricPaddingMode.None">
+            <summary>
+                No padding
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.AsymmetricPaddingMode.Pkcs1">
+            <summary>
+                PKCS #1 padding
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.AsymmetricPaddingMode.Oaep">
+            <summary>
+                Optimal Asymmetric Encryption Padding
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.AsymmetricPaddingMode.Pss">
+            <summary>
+                Probabilistic Signature Scheme padding
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative">
+            <summary>
+                Native wrappers for bcrypt CNG APIs.
+                
+                The general pattern for this interop layer is that the BCryptNative type exports a wrapper method
+                for consumers of the interop methods.  This wrapper method puts a managed face on the raw
+                P/Invokes, by translating from native structures to managed types and converting from error
+                codes to exceptions.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.FinishHash(Security.Cryptography.SafeBCryptHashHandle)">
+            <summary>
+                Get the results of a hashing operation
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.GenerateRandomBytes(Security.Cryptography.SafeBCryptAlgorithmHandle,System.Byte[])">
+            <summary>
+                Fill a buffer with radom bytes
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.GetInt32Property``1(``0,System.String)">
+            <summary>
+                Get an integer valued named property from a BCrypt object.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.GetStringProperty``1(``0,System.String)">
+            <summary>
+                Get a string valued named property from a BCrypt object
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.GetValueTypeProperty``2(``0,System.String)">
+            <summary>
+                Get a property from a BCrypt which is returned as a structure
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.GetProperty``1(``0,System.String)">
+            <summary>
+                Get the value of a named property from a BCrypt object
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.HashData(Security.Cryptography.SafeBCryptHashHandle,System.Byte[])">
+            <summary>
+                Add some data to a hash in progress
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.ImportSymmetricKey(Security.Cryptography.SafeBCryptAlgorithmHandle,System.Byte[])">
+            <summary>
+                Import a raw symmetric key into a key handle
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.InitializeAuthnenticatedCipherModeInfo(Security.Cryptography.BCryptNative.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO@)">
+            <summary>
+                Initialize a BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO structure (in place of the
+                BCRYPT_INIT_AUTH_MODE_INFO macro)
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.MapChainingMode(System.Security.Cryptography.CipherMode)">
+            <summary>
+                Map a managed cipher mode to a BCrypt chaining mode
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.MapChainingMode(System.String)">
+            <summary>
+                Map a BCrypt chaining mode to a managed cipher mode
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.OpenAlgorithm(System.String,System.String)">
+            <summary>
+                Open a handle to a BCrypt algorithm provider
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.SetInt32Property``1(``0,System.String,System.Int32)">
+            <summary>
+                Set an integer valued property on a BCrypt object
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.SetStringProperty``1(``0,System.String,System.String)">
+            <summary>
+                Set a string valued property on a BCrypt object
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.SetProperty``1(``0,System.String,System.Byte[])">
+            <summary>
+                Set a named property value on a BCrypt object
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.SymmetricDecrypt(Security.Cryptography.SafeBCryptKeyHandle,System.Byte[],System.Byte[])">
+            <summary>
+                Decrypt some blocks of data
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.SymmetricDecrypt(Security.Cryptography.SafeBCryptKeyHandle,System.Byte[],System.Byte[],Security.Cryptography.BCryptNative.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO@)">
+            <summary>
+                Decrypt some blocks of data using authentication info
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.SymmetricEncrypt(Security.Cryptography.SafeBCryptKeyHandle,System.Byte[],System.Byte[])">
+            <summary>
+                Encrypt some blocks of data
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptNative.SymmetricEncrypt(Security.Cryptography.SafeBCryptKeyHandle,System.Byte[],System.Byte[],Security.Cryptography.BCryptNative.BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO@)">
+            <summary>
+                Encrypt some blocks of data using authentication information
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.AlgorithmName">
+            <summary>
+                Well known algorithm names
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.AlgorithmProviderOptions">
+            <summary>
+                Flags for BCryptOpenAlgorithmProvider
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.AuthenticatedCipherModeInfoFlags">
+            <summary>
+                Flags for use with the BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO structure
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.ChainingMode">
+            <summary>
+                Well known chaining modes
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.ErrorCode">
+            <summary>
+                Result codes from BCrypt APIs
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.KeyBlobMagicNumber">
+            <summary>
+                Magic numbers for different key blobs
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.KeyBlobType">
+            <summary>
+                Well known key blob tyes
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.ObjectPropertyName">
+            <summary>
+                Well known BCrypt object property names
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.ProviderName">
+            <summary>
+                Well known BCrypt provider names
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.BCryptPropertyGetter`1">
+            <summary>
+                Adapter to wrap specific BCryptGetProperty P/Invokes with a generic BCrypt handle type
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptNative.BCryptPropertySetter`1">
+            <summary>
+                Adapter to wrap specific BCryptSetProperty P/Invokes with a generic BCrypt handle type
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.SafeBCryptAlgorithmHandle">
+            <summary>
+                SafeHandle for a native BCRYPT_ALG_HANDLE
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.SafeBCryptHashHandle">
+            <summary>
+                SafeHandle for a BCRYPT_HASH_HANDLE.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.SafeHandleWithBuffer">
+            <summary>
+                Safe handle base class for safe handles which are associated with an additional data buffer that
+                must be kept alive for the same amount of time as the handle itself.
+                
+                This is required rather than having a seperate safe handle own the key data buffer blob so
+                that we can ensure that the key handle is disposed of before the key data buffer is freed.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.SafeHandleWithBuffer.ReleaseBuffer">
+            <summary>
+                Release the buffer associated with the handle
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.SafeHandleWithBuffer.ReleaseNativeHandle">
+            <summary>
+                Release just the native handle associated with the safe handle
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:Security.Cryptography.SafeHandleWithBuffer.DataBuffer">
+            <summary>
+                Buffer that holds onto the key data object. This data must be allocated with CoAllocTaskMem, 
+                or the ReleaseBuffer method must be overriden to match the deallocation function with the
+                allocation function.  Once the buffer is assigned into the DataBuffer property, the safe
+                handle owns the buffer and users of this property should not attempt to free the memory.
+                
+                This property should be set only once, otherwise the first data buffer will leak.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.SafeBCryptKeyHandle">
+            <summary>
+                SafeHandle for a native BCRYPT_KEY_HANDLE.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptSymmetricAlgorithm">
+            <summary>
+                Generic implementation of a symmetric algorithm which is provided by the BCrypt layer of CNG.
+                Concrete SymmetricAlgorithm classes should contain an instance of this type and delegate all of
+                their work to that object.
+                
+                Most of the real encryption work occurs in the BCryptSymmetricCryptoTransform class. (see
+                code:code:Microsoft.Security.Cryptography.BCryptSymmetricCryptoTransform).
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptSymmetricAlgorithm.SetupAlgorithm">
+            <summary>
+                Setup a BCrypt algorithm with our current parameters
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BCryptSymmetricCryptoTransform">
+            <summary>
+                Generic crypto transform, which implements symmetric encryption and decryption for algorithms
+                implemented in the BCrypt layer of CNG.  This type is used as the workhorse for the
+                BCryptSymmetricAlgorithm generic BCrypt symmetric algorithm implementation.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptSymmetricCryptoTransform.#ctor(Security.Cryptography.SafeBCryptAlgorithmHandle,System.Byte[],System.Byte[],System.Security.Cryptography.PaddingMode,System.Boolean)">
+            <summary>
+                Create an instance of an ICryptoTransform that can be used for BCrypt symmetric algorithms. 
+                
+                This object takes ownership of the algorithm handle passed in, and is responsible for
+                releasing it when it is no longer needed.  The algorithm handle should no longer be used by
+                other code once it is passed to this constructor.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptSymmetricCryptoTransform.DecryptBlocks(System.Byte[],System.Int32,System.Int32,System.Byte[],System.Int32,System.Boolean)">
+            <summary>
+                Decrypt ciphertext into plaintext without depadding the output
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptSymmetricCryptoTransform.EncryptBlocks(System.Byte[],System.Int32,System.Int32,System.Byte[],System.Int32)">
+            <summary>
+                Encrypt plaintext into ciphertext without applying padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BCryptSymmetricCryptoTransform.ProcessIV(System.Byte[],System.Int32,System.Security.Cryptography.CipherMode)">
+            <summary>
+                Process the user's IV into one that's acceptable to pass to BCrypt.
+                
+                We need to:
+                  1. Make a copy of the IV so that it's not modified (BCrypt will modify the IV buffer on
+                     calls to BCryptEncrypt / BCryptDecrypt, and we don't want the user's IV array to change).
+                  2. Ensure we have an IV if we're not in ECB mode
+                  3. Truncate the IV to the block size (for compatibility with v1.x)
+                  4. Return null for ECB
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.BlockPaddingMethod">
+            <summary>
+                Base class for paddings to derive from
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BlockPaddingMethod.Create(System.Security.Cryptography.PaddingMode,System.Int32)">
+            <summary>
+                Create a block padding method which can handle the given padding mode
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BlockPaddingMethod.CountPaddingBytes(System.Int32)">
+            <summary>
+                Figure out the number of padding bytes to create
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BlockPaddingMethod.PadBlock(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+                Apply padding to an input block.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.BlockPaddingMethod.DepadBlock(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+                Remove padding from a block
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BlockPaddingMethod.BlockSize">
+            <summary>
+                Size, in bytes, of blocks to pad
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BlockPaddingMethod.AddsExtraBlocks">
+            <summary>
+                Does the padding method add an extra block to the end of the input if the input block does
+                not need any padding.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.BlockPaddingMethod.CanRemovePadding">
+            <summary>
+                Can the padding method be reversed to remove the padding on decryption.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.AnsiPadding">
+            <summary>
+                ANSI X923 padding fills the remaining block with zeros, with the final byte being the total
+                number of padding bytes added.  If the last block is already complete, a new block is added.
+                
+                xx 00 00 00 00 00 00 07
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.IsoPadding">
+            <summary>
+                ISO 10126 padding fills the remaining block with random bytes, with the final byte being the total
+                number of padding bytes added.  If the last block is already complete, a new block is added.
+                
+                xx rr rr rr rr rr rr 07
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NoPadding">
+            <summary>
+                None padding does not add or remove anything from the input text.  This implies that the input
+                plaintext must already be a multiple of the block size.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.PkcsPadding">
+            <summary>
+                PKCS7 padding fills up the remainder of the block with bytes which are the same value as the
+                number of padding bytes applied.  If the last block is already complete, a new block is added.
+                
+                xx 07 07 07 07 07 07 07
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.ZerosPadding">
+            <summary>
+                Zeros padding fills out the final block with 0 bytes. It does not add an extra block if the
+                final block is already complete.  Note that since we cannot tell if the plaintext ends in a 00
+                byte, or if that byte is part of the padding, zeros padding cannot be removed.
+                
+                xx 00 00 00 00 00 00 00
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.OidGroup">
+            <summary>
+                The OidGroup enumeration has values for each of the built in Windows groups that OIDs can be
+                categorized into.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.AllGroups">
+            <summary>
+                When used for searching for or enumerating over OIDs, specifies that the search or enumeration
+                should include OIDs found in all of the groups. 
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.HashAlgorithm">
+            <summary>
+                A group for OIDs that represent hashing algortihms.  This maps to the native
+                CRYPT_HASH_ALG_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.EncryptionAlgorithm">
+            <summary>
+                A group for OIDs that represent symmetric encryption algorithms.  This maps to the native
+                CRYPT_ENCRYPT_ALG_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.PublicKeyAlgorithm">
+            <summary>
+                A group for OIDs that represent asymmetric encryption algorithms.  This maps to the native
+                CRYPT_PUBKEY_ALG_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.SignatureAlgorithm">
+            <summary>
+                A group for OIDs that represent digital signature algorithms.  This maps to the native
+                CRYPT_SIGN_ALG_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.Attribute">
+            <summary>
+                A group for OIDs that represent RDN attributes.  This maps to the native
+                CRYPT_RDN_ATTR_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.ExtensionOrAttribute">
+            <summary>
+                A group for OIDs that represent X.509 certificate extensions or attributes.  This maps to
+                the native CRYPT_EXT_OR_ATTR_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.EnhancedKeyUsage">
+            <summary>
+                A group for OIDs that represent X.509 certificate enhanced key usages.  This maps to the
+                native CRYPT_ENHKEY_USAGE_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.Policy">
+            <summary>
+                A group for OIDs that represent policies.  This maps to the native CRYPT_POLICY_OID_GROUP_ID
+                group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.Template">
+            <summary>
+                A group for OIDs that represent templates.  This maps to the native
+                CRYPT_TEMPLATE_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidGroup.KeyDerivationFunction">
+            <summary>
+                A group for OIDS that represent key derivation algorithms.  This maps to the native
+                CRYPT_KDF_OID_GROUP_ID group.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.OidRegistrationOptions">
+            <summary>
+                The OidRegistrationOptions enumeration has flags used to control how a new OID is registered on
+                the machine with the <see cref="M:Security.Cryptography.Oid2.Register(Security.Cryptography.OidRegistrationOptions)"/> API.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidRegistrationOptions.None">
+            <summary>
+                The OID is installed after the built in OIDs
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.OidRegistrationOptions.InstallBeforeDefaultEntries">
+            <summary>
+                The OID is installed before the built in OIDs.  This maps to the native
+                CRYPT_INSTALL_OID_INFO_BEFORE_FLAG option.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CapiNative">
+            <summary>
+                Native wrappers for CAPI APIs.
+                
+                The general pattern for this interop layer is that the CapiNative type exports a wrapper method
+                for consumers of the interop methods.  This wrapper method puts a managed face on the raw
+                P/Invokes, by translating from native structures to managed types and converting from error
+                codes to exceptions.
+                
+                The native definitions here are generally found in wincrypt.h
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CapiNative.ReadBlob(Security.Cryptography.CapiNative.CRYPTOAPI_BLOB)">
+            <summary>
+                Read a CAPI blob into a managed byte array
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CapiNative.RegisterOid(Security.Cryptography.CapiNative.CRYPT_OID_INFO,Security.Cryptography.OidRegistrationOptions)">
+            <summary>
+                Register a new OID on the machine
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CapiNative.OidEnumerationCallback(Security.Cryptography.CapiNative.CRYPT_OID_INFO@,System.IntPtr)">
+            <summary>
+                OID enumeration callback for Windows 
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CapiNative.OidEnumerationCallbackWin2k3(Security.Cryptography.CapiNative.CRYPT_OID_INFO_WIN2K3@,System.IntPtr)">
+            <summary>
+                OID enumeration callback for Windows 2003 and earlier
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CapiNative.TryFindOidInfo(System.String,Security.Cryptography.OidGroup,Security.Cryptography.CapiNative.OidKeyType,System.Boolean,Security.Cryptography.CapiNative.CRYPT_OID_INFO@)">
+            <summary>
+                Find an OID based upon a string key
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CapiNative.UnregisterOid(Security.Cryptography.CapiNative.CRYPT_OID_INFO)">
+            <summary>
+                Remove an OID from the machine registration
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CapiNative.UpgradeOidInfo(Security.Cryptography.CapiNative.CRYPT_OID_INFO_WIN2K3)">
+            <summary>
+                Convert an older Win2k3 sized OID info structure into a full OID info structure
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CapiNative.UseWin2k3OidStructures">
+            <summary>
+                The size of an OID structure grew between Windows 2003 and Windows Vista.  This property
+                detects which version of the OS we are on and which version of the structure to use. 
+                (CRYPT_OID_INFO_WIN2K3 for pre-Vista and CRYPT_OID_INFO for Vista or later).
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CapiNative.AlgorithmClass">
+            <summary>
+                Class fields for CAPI algorithm identifiers
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CapiNative.AlgorithmType">
+            <summary>
+                Type identifier fields for CAPI algorithm identifiers
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CapiNative.AlgorithmSubId">
+            <summary>
+                Sub identifiers for CAPI algorithm identifiers
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CapiNative.AlgorithmID">
+            <summary>
+                CAPI algorithm identifiers
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CngAlgorithm2">
+            <summary>
+                The CngAlgorithm2 class provides additional <see cref="T:System.Security.Cryptography.CngAlgorithm"/> objects to suppliment the
+                ones found on the standard <see cref="T:System.Security.Cryptography.CngAlgorithm"/> type.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngAlgorithm2.Aes">
+            <summary>
+                CngAlgorithm for the AES symmetric algorithm
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngAlgorithm2.Rsa">
+            <summary>
+                CngAlgorithm for the RSA asymmetric algorithm
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CngChainingMode">
+            <summary>
+                The CngChainingMode class provides a pseudo-enumeration similar to <see cref="T:System.Security.Cryptography.CngAlgorithm"/>
+                which provides an enumeration over chaining modes that CNG supports. Several of the enumeration
+                values are the CNG equivalents of the <see cref="T:System.Security.Cryptography.CipherMode"/> framework enumeration.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CngChainingMode.#ctor(System.String)">
+            <summary>
+                Creates a new CngChainingMode for the chaining mode string. This constructor should generally
+                not be used, and instead the built in values for the standard chaining modes should be
+                preferred.
+            </summary>
+            <param name="chainingMode">chaining mode to create a CngChainingMode object for</param>
+            <exception cref="T:System.ArgumentException">if <paramref name="chainingMode"/> is empty</exception>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="chainingMode"/> is null</exception>
+        </member>
+        <member name="P:Security.Cryptography.CngChainingMode.ChainingMode">
+            <summary>
+                Get the string which represents this chaining mode to CNG
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngChainingMode.Cbc">
+            <summary>
+                Gets a CngChainingMode object for the cipher block chaining mode. This is equivalent to
+                CipherMode.Cbc in the managed enumeration.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngChainingMode.Ccm">
+            <summary>
+                Gets a CngChainingMode object for the counter with cipher block chaining MAC authenticated
+                chaining mode.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngChainingMode.Cfb">
+            <summary>
+                Gets a CngChainingMode object for the cipher feedback mode. This is equivalent to
+                CipherMode.Cfb in the managed enumeration.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngChainingMode.Ecb">
+            <summary>
+                Gets a CngChainingMode object for the electronic codebook mode. This is equivalent to
+                CipherMode.Ecb in the managed enumeration.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngChainingMode.Gcm">
+            <summary>
+                Gets a CngChainingMode object for the counter with Galois/counter mode authenticated chaining
+                mode.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CngKeyExtensionMethods">
+            <summary>
+                <para>
+                    The CngKeyExtensionMethods class provides several extension methods for the
+                    <see cref="T:System.Security.Cryptography.CngKey"/>.  This type is in the Security.Cryptography namespace (not the
+                    System.Security.Cryptography namespace), so in order to use these extension methods, you will
+                    need to make sure you include this namespace as well as a reference to
+                    Security.Cryptography.dll.
+                </para>
+                <para>
+                    CngKey uses the NCrypt layer of CNG, and requires Windows Vista and the .NET Framework 3.5.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CngKeyExtensionMethods.CreateSelfSignedCertificate(System.Security.Cryptography.CngKey,System.Security.Cryptography.X509Certificates.X500DistinguishedName)">
+            <summary>
+                <para>
+                    CreateSelfSignedCertificate creates a new self signed certificate issued to the specified
+                    subject. The certificate will contain the key used to create the self signed certificate.
+                    Since the certificate needs to be signed, the CngKey used must be usable for signing, which
+                    means it must also contain a private key. If there is no private key, the operation will fail
+                    with a CryptographicException indicating that "The key does not exist."
+                </para>
+                <para>
+                    This overload creates a certificate which does take ownership of the underlying key - which
+                    means that the input CngKey will be disposed before this method exits and should no longer
+                    be used by the caller.
+                </para>
+            </summary>
+            <param name="key">key to wrap in a self signed certificate</param>
+            <param name="subjectName">the name of hte subject the self-signed certificate will be issued to</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="subjectName"/> is null</exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if the certificate cannot be created</exception>
+        </member>
+        <member name="M:Security.Cryptography.CngKeyExtensionMethods.CreateSelfSignedCertificate(System.Security.Cryptography.CngKey,Security.Cryptography.X509Certificates.X509CertificateCreationParameters)">
+            <summary>
+                <para>
+                    CreateSelfSignedCertificate creates a new self signed certificate issued to the specified
+                    subject. The certificate will contain the key used to create the self signed certificate.
+                    Since the certificate needs to be signed, the CngKey used must be usable for signing, which
+                    means it must also contain a private key. If there is no private key, the operation will fail
+                    with a CryptographicException indicating that "The key does not exist."
+                </para>
+                <para>
+                    If <paramref name="creationParameters"/> have TakeOwnershipOfKey set to true, the certificate
+                    generated will own the key and the input CngKey will be disposed to ensure that the caller
+                    doesn't accidentally use it beyond its lifetime (which is now controlled by the certificate
+                    object).
+                </para>
+                <para>
+                    Conversely, if TakeOwnershipOfKey is set to false, the API requires full trust to use, and
+                    also requires that the caller ensure that the generated certificate does not outlive the
+                    input CngKey object.
+                </para>
+            </summary>
+            <param name="key">key to wrap in a self signed certificate</param>
+            <param name="creationParameters">parameters to customize the self-signed certificate</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="creationParameters"/> is null</exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if the certificate cannot be created</exception>
+            <permission cref="T:System.Security.PermissionSet">
+                This API requries full trust if <paramref name="creationParameters"/> specifies TakeOwnershipOfKey
+                to be false.
+            </permission>
+        </member>
+        <member name="T:Security.Cryptography.CngProvider2">
+            <summary>
+                The CngProvider2 class provides additional <see cref="T:System.Security.Cryptography.CngProvider"/> objects to suppliment the
+                ones found on the standard <see cref="T:System.Security.Cryptography.CngProvider"/> type.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.CngProvider2.MicrosoftPrimitiveAlgorithmProvider">
+            <summary>
+                Get a CngProvider for the Microsoft Primitive algorithm provider
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CngProviderCollection">
+            <summary>
+                <para>
+                    The CngProviderCollection class implements an enumerator over the installed CNG providers on
+                    the machine. The enumerator specifically lists the NCrypt key storage providers, and does not
+                    work with the BCrypt layer of CNG.
+                </para>
+                <para>
+                    CngProviderCollection uses the NCrypt layer of CNG to do its work, and requires Windows Vista
+                    and the .NET Framework 3.5.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderCollection.GetEnumerator">
+            <summary>
+                Get an enumerator containing a <see cref="T:System.Security.Cryptography.CngProvider"/> for each of the installed NCrypt
+                key storage providers on the current machine.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderCollection.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+                Get an enumerator containing a <see cref="T:System.Security.Cryptography.CngProvider"/> for each of the installed NCrypt
+                key storage providers on the current machine.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.CngProviderExtensionMethods">
+            <summary>
+                <para>
+                    The CngProviderExtensionMethods type provides several extension methods for the
+                    <see cref="T:System.Security.Cryptography.CngProvider"/> class.  This type is in the Security.Cryptography namespace (not
+                    the System.Security.Cryptography namespace), so in order to use these extension methods, you
+                    will need to make sure you include this namespace as well as a reference to
+                    Security.Cryptography.dll
+                </para>
+                <para>
+                    CngProvider uses the NCrypt layer of CNG, and requires Windows Vista and the .NET Framework
+                    3.5.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderExtensionMethods.GetKeys(System.Security.Cryptography.CngProvider)">
+            <summary>
+                GetKeys provides an enumerator over all of the keys that are stored in the key storage
+                provider.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderExtensionMethods.GetKeys(System.Security.Cryptography.CngProvider,System.Security.Cryptography.CngKeyOpenOptions)">
+            <summary>
+                GetKeys provides an enumerator over all of the keys that are stored in the key storage
+                provider. This overload of GetKeys allows you to enumerate over only the user keys in the
+                KSP or only the machine keys.
+            </summary>
+            <param name="provider">CngProvider to enumerate the keys of</param>
+            <param name="openOptions">options to use when opening the CNG keys</param>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderExtensionMethods.GetKeys(System.Security.Cryptography.CngProvider,System.Security.Cryptography.CngKeyOpenOptions,System.Security.Cryptography.CngAlgorithm)">
+            <summary>
+                GetKeys provides an enumerator over all of the keys that are stored in the key storage
+                provider. This overload of GetKeys allows you to enumerate over only the user keys in the KSP
+                or only the machine keys. It also allows you to return only keys that are usable with a
+                specified algorithm.
+            </summary>
+            <param name="provider">CngProvider to enumerate the keys of</param>
+            <param name="openOptions">options to use when opening the CNG keys</param>
+            <param name="algorithm">algorithm that the returned keys should support</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="algorithm"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderExtensionMethods.GetSupportedAlgorithms(System.Security.Cryptography.CngProvider)">
+            <summary>
+                GetSupportedAlgorithms provides an enumerator over all of the algorithms that the NCrypt
+                provider supports.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderExtensionMethods.GetSupportedAlgorithms(System.Security.Cryptography.CngProvider,Security.Cryptography.NCryptAlgorithmOperations)">
+            <summary>
+                GetSupportedAlgorithms provides an enumerator over all of the algorithms that the NCrypt
+                provider supports. Each of the returned algortihms will support at least one of the
+                cryptographic operations specified by the operations parameter.
+            </summary>
+            <param name="provider">CngProvider to enumerate the supported algorithms of</param>
+            <param name="operations">operations that the returned algorithms should support</param>
+        </member>
+        <member name="M:Security.Cryptography.CngProviderExtensionMethods.OpenProvider(System.Security.Cryptography.CngProvider)">
+            <summary>
+                Gets a SafeHandle for the NCrypt provider. This handle can be used for P/Invoking to other
+                APIs which expect an NCRYPT_PROV_HANDLE parameter.
+            </summary>
+            <permission cref="T:System.Security.Permissions.SecurityPermission">
+                SecurityPermission/UnmanagedCode is required of the immediate caller to this API
+            </permission>
+        </member>
+        <member name="T:Security.Cryptography.CryptoConfig2">
+            <summary>
+                <para>
+                    .NET v3.5 added some new crypto algorithms in System.Core.dll, however due to layering
+                    restrictions CryptoConfig does not have registration entries for these algorithms.  Similarly,
+                    CryptoConfig does not know about any of the algorithms added in this assembly.
+                </para>
+                <para>
+                    CryptoConfig2 wraps the CryptoConfig.Create method, allowing it to also create System.Core and
+                    Microsoft.Security.Cryptography algorithm objects.
+                </para>
+                <para>
+                    CryptoConfig2 requires the .NET Framework 3.5.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CryptoConfig2.AddAlgorithm(System.Type,System.String[])">
+            <summary>
+                <para>
+                    AddAlgorithm allows an application to register a new algorithm with CryptoConfig2 in the
+                    current AppDomain. The algorithm is then creatable via calling
+                    <see cref="M:Security.Cryptography.CryptoConfig2.CreateFromName(System.String)"/> and supplying one of:
+                </para>
+                <list type="bullet">
+                    <item>The name of the algorithm type</item>
+                    <item>The namespace qualified name of the algorithm type</item>
+                    <item>Any of the aliases supplied for the type</item>
+                </list>
+                <para>
+                    This registration is valid only in the AppDomain that does the registration, and is not
+                    persisted. The registered algorithm will only be creatable via CryptoConfig2 and not via
+                    standard <see cref="T:System.Security.Cryptography.CryptoConfig"/>.
+                </para>
+                <para>
+                    All algorithms registered with CryptoConfig2 must have a default constructor, or they wil
+                     not be creatable at runtime.
+                </para>
+                <para>
+                    This method is thread safe.
+                </para>
+            </summary>
+            <permission cref="T:System.Security.PermissionSet">The immediate caller of this API must be fully trusted</permission>
+            <param name="algorithm">type to register with CryptoConfig2</param>
+            <param name="aliases">list of additional aliases which can create the type</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="algorithm"/> or <paramref name="aliases"/> are null
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+                if an alias is either null, empty, or a duplicate of an existing registered alias
+            </exception>
+        </member>
+        <member name="M:Security.Cryptography.CryptoConfig2.AddAlgorithmToMap(System.Collections.Generic.Dictionary{System.String,System.Type},System.Type,System.String[])">
+            <summary>
+                Add an algorithm to a given type map
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.CryptoConfig2.CreateFactoryFromName(System.String)">
+            <summary>
+                <para>
+                    CreateFactoryFromName is similar to <see cref="M:Security.Cryptography.CryptoConfig2.CreateFromName(System.String)"/>, except that instead of
+                    returning a single instance of a crypto algorithm, CreateFactoryFromName returns a
+                    function that can create new instances of the algorithm.   This function will be more
+                    efficient to use if multiple intsances of the same algorithm are needed than calling
+                    CreateFromName repeatedly.
+                </para>
+                <para>
+                    Name comparisons are case insensitive.
+                </para>
+                <para>
+                    This method is thread safe.
+                </para>
+            </summary>
+            <param name="name">name of the algorithm to create a factory for</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="name"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.CryptoConfig2.CreateFromName(System.String)">
+            <summary>
+                <para>
+                    CreateFromName attempts to map the given algorithm name into an instance of the specified
+                    algorithm. It works with both the built in algorithms in the .NET Framework 3.5 as well
+                    as the algorithms in the Security.Cryptography.dll assembly. Since it does work with the
+                    built in crypto types, CryptoConfig2.CreateFromName can be used as a drop-in replacement
+                    for <see cref="M:System.Security.Cryptography.CryptoConfig.CreateFromName(System.String)"/>
+                </para>
+                <para>
+                    Types in System.Core.dll and Security.Cryptography.dll can be mapped either by their
+                    simple type name or their namespace type name. For example, AesCng and
+                    Security.Cryptography.AesCng will both create an instance of the <see cref="T:Security.Cryptography.AesCng"/>
+                    type. Additionally, the following names are also given mappings in CryptoConfig2:
+                </para>
+                <list type="bullet">
+                    <item>AES - <see cref="T:System.Security.Cryptography.AesCryptoServiceProvider"/></item>
+                    <item>ECDsa - <see cref="T:System.Security.Cryptography.ECDsaCng"/></item>
+                    <item>ECDH - <see cref="T:System.Security.Cryptography.ECDiffieHellmanCng"/></item>
+                    <item>ECDiffieHellman - <see cref="T:System.Security.Cryptography.ECDiffieHellmanCng"/></item>
+                </list>
+                <para>
+                    Name comparisons are case insensitive.
+                </para>
+                <para>
+                    This method is thread safe.
+                </para>
+            </summary>
+            <param name="name">name of the algorithm to create</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="name"/> is null</exception>
+        </member>
+        <member name="P:Security.Cryptography.CryptoConfig2.DefaultAlgorithmMap">
+            <summary>
+                Default mapping of algorithm names to algorithm types
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.HMACSHA256Cng">
+            <summary>
+                <para>
+                    The HMACSHA256Cng class provides a wrapper for the CNG implementation of the HMAC SHA256
+                    algorithm. It provides the same interface as the other HMAC implementations shipped with the
+                    .NET Framework, including <see cref="T:System.Security.Cryptography.HMACSHA256"/>
+                </para>
+                <para>
+                    HMACSHA256Cng uses the BCrypt layer of CNG to do its work, and requires Windows Vista and the
+                    .NET Framework 3.5.
+                </para>
+                <para>
+                    Since most of the HMACSHA256Cng APIs are inherited from the <see cref="T:System.Security.Cryptography.HMAC"/> base class,
+                    please see the MSDN documentation for HMAC for a complete description.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA256Cng.#ctor">
+            <summary>
+                Constructs a HMACSHA256Cng object with a randomly generated key, which will use the Microsoft
+                PrimitiveAlgorithm Provider to do its work.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA256Cng.#ctor(System.Byte[])">
+            <summary>
+                Constructs a HMACSHA256Cng object using the given key, which will use the Microsoft
+                Primitive Algorithm Provider to do its work.
+            </summary>
+            <param name="key">key to use when calculating the HMAC</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="key"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA256Cng.#ctor(System.Byte[],System.Security.Cryptography.CngProvider)">
+            <summary>
+                Constructs a HMACSHA256Cng object using the given key, which will calculate the HMAC using the
+                given algorithm provider and key.
+            </summary>
+            <param name="key">key to use when calculating the HMAC</param>
+            <param name="algorithmProvider">algorithm provider to calculate the HMAC in</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="key"/> or <paramref name="algorithmProvider"/> are null
+            </exception>
+        </member>
+        <member name="T:Security.Cryptography.HMACSHA384Cng">
+            <summary>
+                <para>
+                    The HMACSHA384Cng class provides a wrapper for the CNG implementation of the HMAC SHA384
+                    algorithm. It provides the same interface as the other HMAC implementations shipped with the
+                    .NET Framework, including <see cref="T:System.Security.Cryptography.HMACSHA256"/>
+                </para>
+                <para>
+                    HMACSHA384Cng uses the BCrypt layer of CNG to do its work, and requires Windows Vista and the
+                    .NET Framework 3.5.
+                </para>
+                <para>
+                    Since most of the HMACSHA384Cng APIs are inherited from the <see cref="T:System.Security.Cryptography.HMAC"/> base class,
+                    please see the MSDN documentation for HMAC for a complete description.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA384Cng.#ctor">
+            <summary>
+                Constructs a HMACSHA384Cng object with a randomly generated key, which will use the Microsoft
+                PrimitiveAlgorithm Provider to do its work.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA384Cng.#ctor(System.Byte[])">
+            <summary>
+                Constructs a HMACSHA384Cng object using the given key, which will use the Microsoft
+                Primitive Algorithm Provider to do its work.
+            </summary>
+            <param name="key">key to use when calculating the HMAC</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="key"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA384Cng.#ctor(System.Byte[],System.Security.Cryptography.CngProvider)">
+            <summary>
+                Constructs a HMACSHA384Cng object using the given key, which will calculate the HMAC using the
+                given algorithm provider and key.
+            </summary>
+            <param name="key">key to use when calculating the HMAC</param>
+            <param name="algorithmProvider">algorithm provider to calculate the HMAC in</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="key"/> or <paramref name="algorithmProvider"/> are null
+            </exception>
+        </member>
+        <member name="T:Security.Cryptography.HMACSHA512Cng">
+            <summary>
+                <para>
+                    The HMACSHA512Cng class provides a wrapper for the CNG implementation of the HMAC SHA512
+                    algorithm. It provides the same interface as the other HMAC implementations shipped with the
+                    .NET Framework, including <see cref="T:System.Security.Cryptography.HMACSHA256"/>
+                </para>
+                <para>
+                    HMACSHA512Cng uses the BCrypt layer of CNG to do its work, and requires Windows Vista and the
+                    .NET Framework 3.5.
+                </para>
+                <para>
+                    Since most of the HMACSHA512Cng APIs are inherited from the <see cref="T:System.Security.Cryptography.HMAC"/> base class,
+                    please see the MSDN documentation for HMAC for a complete description.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA512Cng.#ctor">
+            <summary>
+                Constructs a HMACSHA512Cng object with a randomly generated key, which will use the Microsoft
+                PrimitiveAlgorithm Provider to do its work.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA512Cng.#ctor(System.Byte[])">
+            <summary>
+                Constructs a HMACSHA512Cng object using the given key, which will use the Microsoft
+                Primitive Algorithm Provider to do its work.
+            </summary>
+            <param name="key">key to use when calculating the HMAC</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="key"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.HMACSHA512Cng.#ctor(System.Byte[],System.Security.Cryptography.CngProvider)">
+            <summary>
+                Constructs a HMACSHA512Cng object using the given key, which will calculate the HMAC using the
+                given algorithm provider and key.
+            </summary>
+            <param name="key">key to use when calculating the HMAC</param>
+            <param name="algorithmProvider">algorithm provider to calculate the HMAC in</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="key"/> or <paramref name="algorithmProvider"/> are null
+            </exception>
+        </member>
+        <member name="T:Security.Cryptography.ICngAsymmetricAlgorithm">
+            <summary>
+                Interface for asymmetric algorithms implemented over the CNG layer of Windows to provide CNG
+                implementation details through.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.ICngAsymmetricAlgorithm.Key">
+            <summary>
+                Get the CNG key being used by the asymmetric algorithm.
+            </summary>
+            <permission cref="T:System.Security.Permissions.SecurityPermission">
+                This method requires that the immediate caller have SecurityPermission/UnmanagedCode
+            </permission>
+        </member>
+        <member name="T:Security.Cryptography.NCryptAlgorithmOperations">
+            <summary>
+                Algorithm classes exposed by NCrypt
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative">
+            <summary>
+                Native wrappers for ncrypt CNG APIs.
+                
+                The general pattern for this interop layer is that the NCryptNative type exports a wrapper method
+                for consumers of the interop methods.  This wrapper method puts a managed face on the raw
+                P/Invokes, by translating from native structures to managed types and converting from error
+                codes to exceptions.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.DecryptData``1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],``0@,Security.Cryptography.AsymmetricPaddingMode,Security.Cryptography.NCryptNative.NCryptDecryptor{``0})">
+            <summary>
+                Generic decryption method, wrapped by decryption calls for specific padding modes
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.DecryptDataOaep(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],System.String)">
+            <summary>
+                Decrypt data using OAEP padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.DecryptDataPkcs1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[])">
+            <summary>
+                Decrypt data using PKCS1 padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.EncryptData``1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],``0@,Security.Cryptography.AsymmetricPaddingMode,Security.Cryptography.NCryptNative.NCryptEncryptor{``0})">
+            <summary>
+                Generic encryption method, wrapped by decryption calls for specific padding modes
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.EncryptDataOaep(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],System.String)">
+            <summary>
+                Encrypt data using OAEP padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.EncryptDataPkcs1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[])">
+            <summary>
+                Encrypt data using PKCS1 padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.EnumerateAlgorithms(Microsoft.Win32.SafeHandles.SafeNCryptProviderHandle,Security.Cryptography.NCryptAlgorithmOperations)">
+            <summary>
+                Get an array of information about all of the algorithms supported by a provider
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.EnumerateKeys(Microsoft.Win32.SafeHandles.SafeNCryptProviderHandle,System.Security.Cryptography.CngKeyOpenOptions)">
+            <summary>
+                Get an array of information about the keys stored in a KSP
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.EnumerateStorageProviders">
+            <summary>
+                Get an array of information about all of the installed storage providers on the machine
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.OpenKeyStorageProvider(System.String)">
+            <summary>
+                Open a raw handle to a KSP
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.SignHash``1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],``0@,Security.Cryptography.AsymmetricPaddingMode,Security.Cryptography.NCryptNative.NCryptHashSigner{``0})">
+            <summary>
+                Generic signature method, wrapped by signature calls for specific padding modes
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.SignHashPkcs1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],System.String)">
+            <summary>
+                Sign a hash, using PKCS1 padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.SignHashPss(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],System.String,System.Int32)">
+            <summary>
+                Sign a hash, using PSS padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.VerifySignature``1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],System.Byte[],``0@,Security.Cryptography.AsymmetricPaddingMode,Security.Cryptography.NCryptNative.NCryptSignatureVerifier{``0})">
+            <summary>
+                Generic signature verification method, wrapped by verification calls for specific padding modes
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.VerifySignaturePkcs1(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],System.String,System.Byte[])">
+            <summary>
+                Verify the signature of a hash using PKCS #1 padding
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.NCryptNative.VerifySignaturePss(Microsoft.Win32.SafeHandles.SafeNCryptKeyHandle,System.Byte[],System.String,System.Int32,System.Byte[])">
+            <summary>
+                Verify the signature of a hash using PSS padding
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative.KeyPropertyName">
+            <summary>
+                Well known key property names
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative.NCryptAlgorithmClass">
+            <summary>
+                NCrypt algorithm classes
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative.ErrorCode">
+            <summary>
+                Enum for some SECURITY_STATUS return codes
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative.NCryptDecryptor`1">
+            <summary>
+                Adapter to wrap specific NCryptDecrypt P/Invokes with specific padding info
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative.NCryptEncryptor`1">
+            <summary>
+                Adapter to wrap specific NCryptEncrypt P/Invokes with specific padding info
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative.NCryptHashSigner`1">
+            <summary>
+                Adapter to wrap specific NCryptSignHash P/Invokes with a specific padding info
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.NCryptNative.NCryptSignatureVerifier`1">
+            <summary>
+                Adapter to wrap specific NCryptVerifySignature P/Invokes with a specific padding info
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.SafeNCryptBuffer">
+            <summary>
+                Handle for buffers that need to be released with NCryptFreeBuffer
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.SafeNCryptBuffer.ReadArray``1(System.UInt32)">
+            <summary>
+                Helper method to read a structure out of the buffer, treating it as if it were an array of
+                T.  This method does not do any validation that the read data is within the buffer itself. 
+                
+                Esentially, this method treats the safe handle as if it were a native T[], and returns
+                handle[index].  It will add enough padding space such that each T will begin on a
+                pointer-sized location.
+            </summary>
+            <typeparam name="T">type of structure to read from the buffer</typeparam>
+            <param name="index">0 based index into the array to read the structure from</param>
+            <returns>the value of the structure at the index into the array</returns>
+        </member>
+        <member name="T:Security.Cryptography.Oid2">
+            <summary>
+                <para>
+                    Oid2 is an enhanced OID type over the <see cref="T:System.Security.Cryptography.Oid"/> type.  Oid2 provides some
+                    performance benefits when it is used to lookup OID information since it can do more directed
+                    queries than Oid does.  It also exposes additional information about the OID, such as group
+                    and algortihm mappings for CAPI and CNG.
+                </para>
+                <para>
+                    One notable difference between Oid2 and Oid is that Oid2 will never query for information
+                    about an Oid unless specifically instructed to via a call to EnumerateOidInformation or one of
+                    the FindBy methods. Simply constructing an Oid2 type does not trigger a lookup on information
+                    not provided.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.#ctor(System.String,System.String)">
+            <summary>
+                Constructs an Oid2 object with the given value and friendly name. No lookup is done for
+                further information on this OID. It is assigned a group of AllGroups and no algorithm mapping.
+            </summary>
+            <param name="oid">value of this OID</param>
+            <param name="friendlyName">friendly name for the OID</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="oid"/> or <paramref name="friendlyName"/> are null
+            </exception>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.#ctor(System.String,System.String,Security.Cryptography.OidGroup)">
+            <summary>
+                Constructs an Oid2 object with the given value and friendly name belonging to a specific
+                group. No lookup is done for further information on this OID. It has no algorithm mapping.
+            </summary>
+            <param name="oid">value of this OID</param>
+            <param name="friendlyName">friendly name for the OID</param>
+            <param name="group">group the OID belongs to</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="oid"/> or <paramref name="friendlyName"/> are null
+            </exception>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.#ctor(System.String,System.String,Security.Cryptography.OidGroup,System.Security.Cryptography.CngAlgorithm,System.Security.Cryptography.CngAlgorithm)">
+            <summary>
+                Constructs an Oid2 object with the given value and friendly name belonging to a specific
+                group. No lookup is done for further information on this OID. It has no CAPI algorithm
+                mapping, but does have optional CNG algorithm mappings.
+            </summary>
+            <param name="oid">value of this OID</param>
+            <param name="friendlyName">friendly name for the OID</param>
+            <param name="group">group the OID belongs to</param>
+            <param name="cngAlgorithm">CNG algorithm that this OID represents</param>
+            <param name="extraCngAlgorithm">additional CNG algorithm this OID represents</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="oid"/> or <paramref name="friendlyName"/> are null
+            </exception>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.#ctor(System.String,System.String,Security.Cryptography.OidGroup,System.Int32,System.Security.Cryptography.CngAlgorithm,System.Security.Cryptography.CngAlgorithm)">
+            <summary>
+                Constructs an Oid2 object with the given value and friendly name belonging to a specific
+                group. No lookup is done for further information on this OID. It has both a CAPI algorithm
+                mapping and optional CNG algorithm mappings.
+            </summary>
+            <param name="oid">value of this OID</param>
+            <param name="friendlyName">friendly name for the OID</param>
+            <param name="group">group the OID belongs to</param>
+            <param name="capiAlgorithm">CAPI algorithm ID that this OID represents</param>
+            <param name="cngAlgorithm">CNG algorithm that this OID represents</param>
+            <param name="extraCngAlgorithm">additional CNG algorithm this OID represents</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="oid"/> or <paramref name="friendlyName"/> are null
+            </exception>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.#ctor(Security.Cryptography.CapiNative.CRYPT_OID_INFO)">
+            <summary>
+                Unpack a CAPI CRYPT_OID_INFO structure into an Oid2
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.EnumerateOidInformation">
+            <summary>
+                This overload of EnumerateOidInformation returns an enumerator containing an Oid2 object for
+                every OID registered regardless of group.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.EnumerateOidInformation(Security.Cryptography.OidGroup)">
+            <summary>
+                This overload of EnumerateOidInformation returns an enumerator containing an Oid2 object for
+                every OID registered as belonging to a specific OID group.
+            </summary>
+            <param name="group">OID group to enumerate, AllGroups to enumerate every OID</param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.FindByFriendlyName(System.String)">
+            <summary>
+                This overload of FindByFriendlyName searches for any OID registered on the local machine with
+                the specified friendly name. It looks in all OID groups for an OID matching the name, but does
+                not look in the Active Directory for a matching OID. If no match is found, null is returned.
+            </summary>
+            <param name="friendlyName">name of the OID to search for</param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.FindByFriendlyName(System.String,Security.Cryptography.OidGroup)">
+            <summary>
+                This overload of FindByFriendlyName searches for any OID registered on the local machine with
+                the specified friendly name. It looks only in the specified OID groups for an OID matching the
+                name, and does not look in the Active Directory for a matching OID. If no match is found, null
+                is returned.
+            </summary>
+            <param name="friendlyName">name of the OID to search for</param>
+            <param name="group">OID group to enumerate, AllGroups to enumerate every OID</param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.FindByFriendlyName(System.String,Security.Cryptography.OidGroup,System.Boolean)">
+            <summary>
+                This overload of FindByFriendlyName searches for any OID registered on the local machine with
+                the specified friendly name. It looks only in the specified OID groups for an OID matching the
+                name, and can optionally look in the Active Directory for a matching OID. If no match is
+                found, null is returned.
+            </summary>
+            <param name="friendlyName">name of the OID to search for</param>
+            <param name="group">OID group to enumerate, AllGroups to enumerate every OID</param>
+            <param name="useNetworkLookup">
+                true to look in the Active Directory for a match, false to skip network lookup
+            </param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.FindByValue(System.String)">
+            <summary>
+                This overload of FindByValue searches for any OID registered on the local machine with the
+                specified OID value. It looks in all OID groups for an OID matching the value, but does not
+                look in the Active Directory for a matching OID. If no match is found, null is returned.
+            </summary>
+            <param name="oid">oid to search for</param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.FindByValue(System.String,Security.Cryptography.OidGroup)">
+            <summary>
+                This overload of FindByValue searches for any OID registered on the local machine with the
+                specified value. It looks only in the specified OID groups for an OID matching the value, and
+                does not look in the Active Directory for a matching OID. If no match is found, null is
+                returned.
+            </summary>
+            <param name="oid">oid to search for</param>
+            <param name="group">OID group to enumerate, AllGroups to enumerate every OID</param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.FindByValue(System.String,Security.Cryptography.OidGroup,System.Boolean)">
+            <summary>
+                This overload of FindByValue searches for any OID registered on the local machine with the
+                specified value. It looks only in the specified OID groups for an OID matching the value, and
+                can optionally look in the Active Directory for a matching OID. If no match is found, null is
+                returned.
+            </summary>
+            <param name="oid">oid to search for</param>
+            <param name="group">OID group to enumerate, AllGroups to enumerate every OID</param>
+            <param name="useNetworkLookup">
+                true to look in the Active Directory for a match, false to skip network lookup
+            </param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.Register">
+            <summary>
+                Register the OID on the local machine, so that later processes can query for the OID and
+                include it in enumerations. This method requires that the caller be fully trusted, and that
+                the user context that the calling application be run under be an Administrator on the machine.
+                Updating the registration table may have no effect on the current process, if Windows has
+                already read them. Instead, the process may need to be restarted to reflect the registration
+                changes. This overload of Register places the OID after the built in OIDs.
+            </summary>
+            <permission cref="T:System.Security.PermissionSet">The immediate caller of this API must be fully trusted</permission>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.Register(Security.Cryptography.OidRegistrationOptions)">
+            <summary>
+                Register the OID on the local machine, so that later processes can query for the OID and
+                include it in enumerations. This method requires that the caller be fully trusted, and that
+                the user context that the calling application be run under be an Administrator on the machine.
+                Updating the registration table may have no effect on the current process, if Windows has
+                already read them. Instead, the process may need to be restarted to reflect the registration
+                changes. This overload of Register can places the OID either before or after the built in OIDs
+                depending on the registration options.
+            </summary>
+            <permission cref="T:System.Security.PermissionSet">The immediate caller of this API must be fully trusted</permission>
+            <param name="registrationOptions">settings to register the OID with</param>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.RegisterSha2OidInformationForRsa">
+            <summary>
+                <para>
+                    On Windows 2003, the default OID -&gt; algorithm ID mappings for the SHA2 family of hash
+                    algorithms are not setup in a way that the .NET Framework v3.5 SP1 can understand them
+                    when creating RSA-SHA2 signatures. This method can be used to update the registrations on
+                    Windows 2003 so that RSA-SHA2 signatures work as expected.
+               </para>
+               <para>
+                    To call this method, the calling code must be fully trusted and running as an
+                    Administrator on the machine. If OID tables have already been read for the process, then
+                    the process may need to be restarted for the registration to take effect. Therefore, it is
+                    recommended to use this method in a setup program or as the first line of code in your
+                    application.
+                </para>
+                <para>
+                    While not required, this method will work on other versions of Windows and the .NET
+                    Framework. 
+                </para>
+            </summary>
+            <permission cref="T:System.Security.PermissionSet">This API requires that its immediate caller be fully trusted</permission>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.ToOid">
+            <summary>
+                Convert the Oid2 object into an Oid object that is usable by APIs in the .NET Framework which
+                expect an Oid rather than an Oid2. This method only transfers the OID value and friendly name
+                to the new Oid object. Group and algorithm mappings are lost.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.ToOidInfo">
+            <summary>
+                Convert an Oid2 into a CAPI OID_INFO
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Oid2.Unregister">
+            <summary>
+                Revert the registration of this OID, which may have been registered with one of the Register
+                overloads. As with OID registration, this method requires that the caller be fully trusted,
+                and that the user context that the calling application be run under be an Administrator on the
+                machine. Updating the registration table may have no effect on the current process, if Windows
+                has already read them. Instead, the process may need to be restarted to reflect the
+                registration changes.
+            </summary>
+            <permission cref="T:System.Security.PermissionSet">This API requires that its immediate caller be fully trusted</permission>
+        </member>
+        <member name="P:Security.Cryptography.Oid2.AlgorithmId">
+            <summary>
+                Get the CAPI algorithm ID represented by this OID.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">
+                if HasAlgorithmId is false
+            </exception>
+        </member>
+        <member name="P:Security.Cryptography.Oid2.CngAlgorithm">
+            <summary>
+                Get the CNG algorithm that this OID represents.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Oid2.CngExtraAlgorithm">
+            <summary>
+                Get an additional CNG algorithm that this OID represents.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Oid2.FriendlyName">
+            <summary>
+                Get the friendly name of the OID.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Oid2.Group">
+            <summary>
+                Get the OID group that this OID belongs to.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Oid2.HasAlgorithmId">
+            <summary>
+                Determines if the OID has a CAPI algorithm ID that it maps to, available in the AlgorithmId
+                property. This property does not check to see if the OID has matching CNG algorithms, which
+                can be checked by checking the CngAlgorithm property for null.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Oid2.Value">
+            <summary>
+                Get the string representation of the OID.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.RNGCng">
+            <summary>
+                <para>
+                    The RNGCng class provides a managed wrapper around the CNG random number generator. It
+                    provides the same interface as the other cryptographic random number generator implementation
+                    shipped with the .NET Framework, <see cref="T:System.Security.Cryptography.RNGCryptoServiceProvider"/>.
+                </para>
+                <para>
+                    RNGCng uses the BCrypt layer of CNG to do its work, and requires Windows Vista and the .NET
+                    Framework 3.5.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RNGCng.#ctor">
+            <summary>
+                Creates a new instance of a random number generator object using the Microsoft Primitive
+                Algorithm Provider.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RNGCng.#ctor(System.Security.Cryptography.CngProvider)">
+            <summary>
+                Creates a new instance of a random number generator object using the specified
+                algorithm provider.
+            </summary>
+            <param name="algorithmProvider">algorithm provider to use for random number generation</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="algorithmProvider"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.RNGCng.GenerateKey(System.Int32)">
+            <summary>
+                Helper function to generate a random key value using the static RNG
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RNGCng.GetBytes(System.Byte[])">
+            <summary>
+                <para>
+                    GetBytes fills the input data array with randomly generated bytes. The input values of the
+                    array are ignored.
+                </para>
+                <para>
+                    This method is thread safe.
+                </para>
+            </summary>
+            <param name="data">array to fill with randomly generated bytes</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="data"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.RNGCng.GetNonZeroBytes(System.Byte[])">
+            <summary>
+                GetNonZeroBytes is not implemented by the RNGCng class.
+            </summary>
+            <exception cref="T:System.NotImplementedException">GetNonZeroBytes is not implemented</exception>
+        </member>
+        <member name="P:Security.Cryptography.RNGCng.StaticRng">
+            <summary>
+                Static random number generator that can be shared within the AppDomain
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.RSACng">
+            <summary>
+                <para>
+                    The RSACng class provides a wrapper for the CNG implementation of the RSA algorithm. The
+                    interface provided by RSACng is derived from the <see cref="T:System.Security.Cryptography.RSA"/> base type, and not from
+                    the <see cref="T:System.Security.Cryptography.RSACryptoServiceProvider"/> class. Consequently, it is not a drop in
+                    replacement for existing uses of RSACryptoServiceProvider.
+                </para>
+                <para>
+                    RSACng uses a programming model more similar to the <see cref="T:System.Security.Cryptography.ECDsaCng"/> class than
+                    RSACryptoServiceProvider. For instance, unlike RSACryptoServiceProvider which has a key
+                    directly tied into the operations of the type itself, the key used by RsaCng is managed by a
+                    separate <see cref="T:System.Security.Cryptography.CngKey"/> object. Additionally, operations such as signing and verifying
+                    signatures take their parameters from a set of properties set on the RSACng object, similar to
+                    how ECDsaCng uses properties of its object to control the signing and verification operations.
+                </para>
+                <para>    
+                    RSACng uses the NCrypt layer of CNG to do its work, and requires Windows Vista and the .NET
+                    Framework 3.5.
+                </para>
+                <para>
+                    Example usage:
+                    <example>
+                        // Create an RSA-SHA256 signature using the key stored in "MyKey"
+                        byte[] dataToSign = Encoding.UTF8.GetBytes("Data to sign");
+                        using (CngKey signingKey = CngKey.Open("MyKey");
+                        using (RSACng rsa = new RSACng(signingKey))
+                        {
+                            rsa.SignatureHashAlgorithm = CngAlgorithm.Sha256;
+                            return rsa.SignData(dataToSign);
+                        }
+                    </example>
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.#ctor">
+            <summary>
+                Create an RSACng algorithm with a random 2048 bit key pair.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.#ctor(System.Int32)">
+            <summary>
+                Creates a new RSACng object that will use a randomly generated key of the specified size.
+                Valid key sizes range from 384 to 16384 bits, in increments of 8. It's suggested that a
+                minimum size of 2048 bits be used for all keys.
+            </summary>
+            <param name="keySize">size of hte key to generate, in bits</param>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="keySize"/> is not valid</exception>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.#ctor(System.Security.Cryptography.CngKey)">
+            <summary>
+                Creates a new RSACng object that will use the specified key. The key's
+                <see cref="P:System.Security.Cryptography.CngKey.AlgorithmGroup"/> must be Rsa.
+            </summary>
+            <param name="key">key to use for RSA operations</param>
+            <exception cref="T:System.ArgumentException">if <paramref name="key"/> is not an RSA key</exception>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="key"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.BuildKeyContainerPermission(System.Security.Cryptography.CngKey,System.Security.Permissions.KeyContainerPermissionFlags)">
+            <summary>
+                Build a key container permission that should be demanded before using the private key
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.CreateSignatureHashObject">
+            <summary>
+                Create an object to hash signature data with
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.ExportParameters(System.Boolean)">
+            <summary>
+                Exports the key used by the RSA object into an RSAParameters object.
+            </summary>
+            <permission cref="T:System.Security.Permissions.KeyContainerPermission">
+                 If the includePrivateParameters parameter is true and the CngKey is not ephemeral,
+                 KeyContainerPermission will be demanded.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.ImportParameters(System.Security.Cryptography.RSAParameters)">
+            <summary>
+                <para>
+                    ImportParameters will replace the existing key that RSACng is working with by creating a
+                    new CngKey for the parameters structure. If the parameters structure contains only an
+                    exponent and modulus, then only a public key will be imported. If the parameters also
+                    contain P and Q values, then a full key pair will be imported.
+                </para>
+                <para>
+                    The default KSP used by RSACng does not support importing full RSA key pairs on Windows
+                    Vista. If the ImportParameters method is called with a full key pair, the operation will
+                    fail with a CryptographicException stating that the operation was invalid. Other KSPs may
+                    have similar restrictions. To work around this, make sure to only import public keys when
+                    using the default KSP.
+                </para>
+            </summary>
+            <exception cref="T:System.ArgumentException">
+                if <paramref name="parameters"/> contains neither an exponent nor a modulus
+            </exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">
+                if <paramref name="parameters"/> is not a valid RSA key or if <paramref name="parameters"/> is a full key pair and the default KSP is used
+            </exception>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.DecryptValue(System.Byte[])">
+            <summary>
+                DecryptValue decrypts the input data using the padding mode specified in the
+                EncryptionPaddingMode property. The return value is the decrypted data.
+            </summary>
+            <param name="rgb">encrypted data to decrypt</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="rgb"/> is null</exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="rgb"/> could not be decrypted</exception>
+            <permission cref="T:System.Security.Permissions.KeyContainerPermission">
+                 This method requires KeyContainerPermission to the key in use if it is not ephemeral.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.EncryptValue(System.Byte[])">
+            <summary>
+                EncryptValue encrypts the input data using the padding mode specified in the
+                EncryptionPaddingMode property. The return value is the encrypted data.
+            </summary>
+            <param name="rgb">data to encrypt</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="rgb"/> is null</exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="rgb"/> could not be decrypted</exception>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.SignData(System.Byte[])">
+            <summary>
+                SignData signs the given data after hashing it with the SignatureHashAlgorithm algorithm.
+            </summary>
+            <param name="data">data to sign</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="data"/> is null</exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="data"/> could not be signed</exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <permission cref="T:System.Security.Permissions.KeyContainerPermission">
+                 This method will demand KeyContainerPermission if the key being used is not ephemeral.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.SignData(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+                SignData signs the given data after hashing it with the SignatureHashAlgorithm algorithm.
+            </summary>
+            <param name="data">data to sign</param>
+            <param name="offset">offset into the data that the signature should begin covering</param>
+            <param name="count">number of bytes to include in the signed data</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="data"/> is null</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+                if <paramref name="offset"/> or <paramref name="count"/> are negative, or if
+                <paramref name="count"/> specifies more bytes than are available in <paramref name="data"/>.
+            </exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="data"/> could not be signed</exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <permission cref="T:System.Security.Permissions.KeyContainerPermission">
+                 This method will demand KeyContainerPermission if the key being used is not ephemeral.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.SignData(System.IO.Stream)">
+            <summary>
+                SignData signs the given data after hashing it with the SignatureHashAlgorithm algorithm.
+            </summary>
+            <param name="data">data to sign</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="data"/> is null</exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="data"/> could not be signed</exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <permission cref="T:System.Security.Permissions.KeyContainerPermission">
+                 This method will demand KeyContainerPermission if the key being used is not ephemeral.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.SignHash(System.Byte[])">
+            <summary>
+                Sign data which was hashed using the SignatureHashAlgorithm; if the algorithm used to hash
+                the data was different, use the SignHash(byte[], CngAlgorithm) overload instead.
+            </summary>
+            <param name="hash">hash to sign</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="hash"/> is null</exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="data"/> could not be signed</exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <permission cref="T:System.Security.Permissions.KeyContainerPermission">
+                 This method will demand KeyContainerPermission if the key being used is not ephemeral.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.SignHash(System.Byte[],System.Security.Cryptography.CngAlgorithm)">
+            <summary>
+                Sign already hashed data, specifying the algorithm it was hashed with.  This method does not
+                use the SignatureHashAlgorithm property.
+            </summary>
+            <param name="hash">hash to sign</param>
+            <param name="hashAlgorithm">algorithm <paramref name="hash"/> was signed with</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="hash"/> or <paramref name="hashAlgorithm"/> are null
+             </exception>
+            <exception cref="T:System.Security.Cryptography.CryptographicException">if <paramref name="data"/> could not be signed</exception>
+            <permission cref="T:System.Security.Permissions.KeyContainerPermission">
+                 This method will demand KeyContainerPermission if the key being used is not ephemeral.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.VerifyData(System.Byte[],System.Byte[])">
+            <summary>
+                VerifyData verifies that the given signature matches given data after hashing it with the
+                SignatureHashAlgorithm algorithm.
+            </summary>
+            <param name="data">data to verify</param>
+            <param name="signature">signature of the data</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="data"/> or <paramref name="signature"/> are null
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <returns>true if the signature verifies for the data, false if it does not</returns>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.VerifyData(System.Byte[],System.Int32,System.Int32,System.Byte[])">
+            <summary>
+                VerifyData verifies that the given signature matches given data after hashing it with the
+                SignatureHashAlgorithm algorithm.
+            </summary>
+            <param name="data">data to verify</param>
+            <param name="offset">offset into the data that the signature should begin covering</param>
+            <param name="count">number of bytes to include in the signed data</param>
+            <param name="signature">signature of the data</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="data"/> or <paramref name="signature"/> are null
+            </exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+                if <paramref name="offset"/> or <paramref name="count"/> are negative, or if
+                <paramref name="count"/> specifies more bytes than are available in <paramref name="data"/>.
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <returns>true if the signature verifies for the data, false if it does not</returns>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.VerifyData(System.IO.Stream,System.Byte[])">
+            <summary>
+                VerifyData verifies that the given signature matches given data after hashing it with the
+                SignatureHashAlgorithm algorithm.
+            </summary>
+            <param name="data">data to verify</param>
+            <param name="signature">signature of the data</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="data"/> or <paramref name="signature"/> are null
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <returns>true if the signature verifies for the data, false if it does not</returns>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.VerifyHash(System.Byte[],System.Byte[])">
+            <summary>
+                Verify data which was signed and already hashed with the SignatureHashAlgorithm; if a
+                different hash algorithm was used to hash the data use the VerifyHash(byte[], byte[],
+                CngAlgorithm) overload instead.
+            </summary>
+            <param name="hash">hash to verify</param>
+            <param name="signature">signature of the data</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="hash"/> or <paramref name="signature"/> are null
+            </exception>
+            <exception cref="T:System.InvalidOperationException">
+                if SignatureHashAlgorithm is not MD5, SHA-1, SHA-256, SHA-384, or SHA-512
+            </exception>
+            <returns>true if the signature verifies for the hash, false if it does not</returns>
+        </member>
+        <member name="M:Security.Cryptography.RSACng.VerifyHash(System.Byte[],System.Byte[],System.Security.Cryptography.CngAlgorithm)">
+            <summary>
+                Verify data which was signed and hashed with the given hash algorithm.  This overload does
+                not use the SignatureHashAlgorithm property.
+            </summary>
+            <param name="hash">hash to verify</param>
+            <param name="signature">signature of the data</param>
+            <param name="hashAlgorithm">algorithm that <paramref name="hash"/> was hashed with</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="hash"/>, <paramref name="signature"/>, or
+                <paramref name="hashAlgorithm"/> are null
+            </exception>
+            <returns>true if the signature verifies for the hash, false if it does not</returns>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.EncryptionHashAlgorithm">
+            <summary>
+                Sets the hash algorithm to use when encrypting or decrypting data using the OAEP padding
+                method. This property is only used if data is encrypted or decrypted and the
+                EncryptionPaddingMode is set to AsymmetricEncryptionPaddingMode.Oaep. The default value is
+                Sha256.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if EncryptionHashAlgorithm is set to null</exception>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.EncryptionPaddingMode">
+            <summary>
+                Sets the padding mode to use when encrypting or decrypting data. The default value is
+                AsymmetricPaddingMode.Oaep.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if EncryptionPaddingMOde is set to null</exception>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.Key">
+            <summary>
+                Gets the key that will be used by the RSA object for any cryptographic operation that it uses.
+                This key object will be disposed if the key is reset, for instance by changing the KeySize
+                property, using ImportParamers to create a new key, or by Disposing of the parent RSA object.
+                Therefore, you should make sure that the key object is no longer used in these scenarios. This
+                object will not be the same object as the CngKey passed to the RSACng constructor if that
+                constructor was used, however it will point at the same CNG key.
+            </summary>
+            <permission cref="T:System.Security.Permissions.SecurityPermission">
+                SecurityPermission/UnmanagedCode is required to read this property.
+            </permission>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.KeyHandle">
+            <summary>
+                Helper property to get the NCrypt key handle
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.KeyExchangeAlgorithm">
+            <summary>
+                Returns "RSA-PKCS1-KeyEx". This property should not be used.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.Provider">
+            <summary>
+                Key storage provider being used for the algorithm
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.SignatureAlgorithm">
+            <summary>
+                Returns "http://www.w3.org/2000/09/xmldsig#rsa-sha1". This property should not be used.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.SignatureHashAlgorithm">
+            <summary>
+                Gets or sets the hash algorithm to use when signing or verifying data. The default value is
+                Sha256.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if SignatureHashAlgorithm is set to null</exception>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.SignaturePaddingMode">
+            <summary>
+                Gets or sets the padding mode to use when encrypting or decrypting data. The default value is
+                AsymmetricPaddingMode.Pkcs1.
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+                if SignaturePaddingMode is set to a mode other than Pkcs1 or Pss
+            </exception>
+        </member>
+        <member name="P:Security.Cryptography.RSACng.SignatureSaltBytes">
+            <summary>
+                Gets or sets the number of bytes of salt to use when signing data or verifying a signature
+                using the PSS padding mode. This property is only used if data is being signed or verified and
+                the SignaturePaddingMode is set to AsymmetricEncryptionPaddingMode.Pss. The default value is
+                20 bytes.
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+                if SignatureSaltBytes is set to a negative number
+            </exception>
+        </member>
+        <member name="T:Security.Cryptography.RSAPKCS1SHA256SignatureDescription">
+            <summary>
+                <para>
+                    The RSAPKCS1SHA256SignatureDescription class provides a signature description implementation
+                    for RSA-SHA256 signatures. It allows XML digital signatures to be produced using the
+                    http://www.w3.org/2001/04/xmldsig-more#rsa-sha256 signature type.
+                    RSAPKCS1SHA256SignatureDescription provides the same interface as other signature description
+                    implementations shipped with the .NET Framework, such as
+                    <see cref="T:System.Security.Cryptography.RSAPKCS1SHA1SignatureDescription"/>.
+                </para>
+                <para>
+                    RSAPKCS1SHA256SignatureDescription is not generally intended for use on its own, instead it
+                    should be consumed by higher level cryptography services such as the XML digital signature
+                    stack. It can be registered in <see cref="T:System.Security.Cryptography.CryptoConfig"/> so that these services can create
+                    instances of this signature description and use RSA-SHA256 signatures.
+                </para>
+                <para>
+                    Registration in CryptoConfig requires editing the machine.config file found in the .NET
+                    Framework installation's configuration directory (such as
+                    %WINDIR%\Microsoft.NET\Framework\v2.0.50727\Config or
+                    %WINDIR%\Microsoft.NET\Framework64\v2.0.50727\Config) to include registration information on
+                    the type. For example:
+                </para>
+                <example>
+                    <![CDATA[
+                        <configuration>
+                          <mscorlib>
+                            <!-- ... -->
+                            <cryptographySettings>
+                              <cryptoNameMapping>
+                                <cryptoClasses>
+                                  <cryptoClass RSASHA256SignatureDescription="Security.Cryptography.RSAPKCS1SHA256SignatureDescription, Security.Cryptography, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" />
+                                </cryptoClasses>
+                                <nameEntry name="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256" class="RSASHA256SignatureDescription" />
+                              </cryptoNameMapping>
+                            </cryptographySettings>
+                          </mscorlib>
+                        </configuration>
+                    ]]>
+                </example>
+                <para>
+                    After adding this registration entry, the assembly which contains the
+                    RSAPKCS1SHA256SignatureDescription (in the example above Security.Cryptography.dll) needs to
+                    be added to the GAC.
+               </para>
+               <para>
+                    Note that on 64 bit machines, both the Framework and Framework64 machine.config files should
+                    be updated, and if the signature description assembly is built bit-specific it needs to be
+                    added to both the 32 and 64 bit GACs.
+                </para>
+                <para>
+                    RSA-SHA256 signatures are first available on the .NET Framework 3.5 SP 1 and as such the
+                    RSAPKCS1SHA256SignatureDescription requires .NET 3.5 SP 1 and Windows Server 2003 or greater
+                    to work properly.
+                </para>
+                <para>
+                    On Windows 2003, the default OID registrations are not setup for the SHA2 family of hash
+                    algorithms, and this can cause the .NET Framework v3.5 SP 1 to be unable to create RSA-SHA2
+                    signatures. To fix this problem, the <see cref="M:Security.Cryptography.Oid2.RegisterSha2OidInformationForRsa"/>
+                    method can be called to create the necessary OID registrations.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.RSAPKCS1SHA256SignatureDescription.#ctor">
+            <summary>
+                Construct an RSAPKCS1SHA256SignatureDescription object. The default settings for this object
+                are:
+                <list type="bullet">
+                    <item>Digest algorithm - <see cref="T:System.Security.Cryptography.SHA256Managed"/></item>
+                    <item>Key algorithm - <see cref="T:System.Security.Cryptography.RSACryptoServiceProvider"/></item>
+                    <item>Formatter algorithm - <see cref="T:System.Security.Cryptography.RSAPKCS1SignatureFormatter"/></item>
+                    <item>Deformatter algorithm - <see cref="T:System.Security.Cryptography.RSAPKCS1SignatureDeformatter"/></item>
+                </list>
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.TripleDESCng">
+            <summary>
+                <para>
+                    The TripleDESCng class provides a wrapper for the CNG implementation of the 3DES algorithm. It
+                    provides the same interface as the <see cref="T:System.Security.Cryptography.TripleDESCryptoServiceProvider"/>
+                    implementation shipped with the .NET Framework.
+                </para>
+                <para>
+                    TripleDESCng uses the BCrypt layer of CNG to do its work, and requires Windows Vista and the
+                    .NET Framework 3.5.
+                </para>
+                <para>
+                    Since most of the TripleDESCng APIs are inherited from the <see cref="T:System.Security.Cryptography.TripleDES"/> base
+                    class, please see the MSDN documentation for TripleDES for a complete description.
+                </para>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.TripleDESCng.#ctor">
+            <summary>
+                Constructs a TripleDESCng object. The default settings for this object are:
+                <list type="bullet">
+                    <item>Algorithm provider - Microsoft Primitive Algorithm Provider</item>
+                    <item>Block size - 64 bits</item>
+                    <item>Feedback size - 64 bits</item>
+                    <item>Key size - 192 bits</item>
+                    <item>Cipher mode - CipherMode.CBC</item>
+                    <item>Padding mode - PaddingMode.PKCS7</item>
+                </list>
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.TripleDESCng.#ctor(System.Security.Cryptography.CngProvider)">
+            <summary>
+                Constructs a TripleDESCng object which uses the specified algorithm provider. The default
+                settings for this object are:
+                <list type="bullet">
+                    <item>Block size - 64 bits</item>
+                    <item>Feedback size - 64 bits</item>
+                    <item>Key size - 192 bits</item>
+                    <item>Cipher mode - CipherMode.CBC</item>
+                    <item>Padding mode - PaddingMode.PKCS7</item>
+                </list>
+            </summary>
+            <param name="algorithmProvider">algorithm provider to use for 3DES computation</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="algorithmProvider"/> is null</exception>
+        </member>
+        <member name="P:Security.Cryptography.TripleDESCng.Mode">
+            <summary>
+                Gets or sets the cipher mode to use during encryption or decryption. Supported modes are:
+                <list type="bullet">
+                    <item>CipherMode.CBC</item>
+                    <item>CipherMode.ECB</item>
+                    <item>CipherMode.CFB</item>
+                </list>
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.Win32Native">
+            <summary>
+                Native interop layer for Win32 APIs
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Win32Native.FormatMessageFromLibrary(System.Int32,System.String)">
+            <summary>
+                Lookup an error message in the message table of a specific library as well as the system
+                message table.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Win32Native.GetNTStatusMessage(System.Int32)">
+            <summary>
+                Get an error message for an NTSTATUS error code
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.SafeLibraryHandle">
+            <summary>
+                SafeHandle for a native HMODULE
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.SafeLocalAllocHandle">
+            <summary>
+                SafeHandle for memory allocated with LocalAlloc
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.Properties.Resources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.AlreadyTransformedFinalBlock">
+            <summary>
+              Looks up a localized string similar to This transform has already transformed its final block and can no longer transform additional data..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.CannotDecryptPartialBlock">
+            <summary>
+              Looks up a localized string similar to Cannot decrypt a partial block..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.DuplicateCryptoConfigAlias">
+            <summary>
+              Looks up a localized string similar to Alias &apos;{0}&apos; already exists in the CryptoConfig2 map..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.EmptyCryptoConfigAlias">
+            <summary>
+              Looks up a localized string similar to Null or empty CryptoConfig aliases are invalid..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.InvalidChainingModeName">
+            <summary>
+              Looks up a localized string similar to CNG chaining modes cannot have empty names..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.InvalidIVSize">
+            <summary>
+              Looks up a localized string similar to The specified IV was not long enough. IVs must be the same length as the block size..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.InvalidPadding">
+            <summary>
+              Looks up a localized string similar to The padding on the block is invalid and cannot be removed..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.InvalidRsaParameters">
+            <summary>
+              Looks up a localized string similar to The specified RSA parameters are not valid; both Exponent and Modulus are required fields..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.InvalidSignatureHashAlgorithm">
+            <summary>
+              Looks up a localized string similar to The hash algorithm is not supported for signatures. Only MD5, SHA1, SHA256,SHA384, and SHA512 are supported at this time..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.InvalidTagSize">
+            <summary>
+              Looks up a localized string similar to The specified tag is not a valid size for this implementation..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.KeyMustBeRsa">
+            <summary>
+              Looks up a localized string similar to The specified key must be an RSA key.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.MissingIV">
+            <summary>
+              Looks up a localized string similar to No IV was given, and the specified CipherMode requires the use of an IV..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.TagIsOnlyGeneratedAfterFinalBlock">
+            <summary>
+              Looks up a localized string similar to Authentication tags are only available after the final block has been transformed..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.TagIsOnlyGeneratedDuringEncryption">
+            <summary>
+              Looks up a localized string similar to Authentication tags are only generated during encryption operations, and cannot be retrieved from a decryption transform..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.UnsupportedCipherMode">
+            <summary>
+              Looks up a localized string similar to The specified CipherMode is not supported with BCrypt symmetric algorithms..
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.Properties.Resources.UnsupportedPaddingMode">
+            <summary>
+              Looks up a localized string similar to The specified PaddingMode is not supported.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.SafeCertContextHandle">
+            <summary>
+                <para>
+                    SafeCertContextHandle provides a SafeHandle class for an X509Certificate's certificate context
+                    as stored in its <see cref="P:System.Security.Cryptography.X509Certificates.X509Certificate.Handle"/>
+                    property.  This can be used instead of the raw IntPtr to avoid races with the garbage
+                    collector, ensuring that the X509Certificate object is not cleaned up from underneath you
+                    while you are still using the handle pointer.
+                </para>
+                <para>
+                    This safe handle type represents a native CERT_CONTEXT.
+                    (http://msdn.microsoft.com/en-us/library/aa377189.aspx)
+                </para>
+                <para>
+                    A SafeCertificateContextHandle for an X509Certificate can be obtained by calling the <see cref="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.GetCertificateContext(System.Security.Cryptography.X509Certificates.X509Certificate)"/> extension method.
+                </para>
+            </summary>
+            <permission cref="T:System.Security.Permissions.SecurityPermission">
+                The immediate caller must have SecurityPermission/UnmanagedCode to use this type.
+            </permission>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509AlternateName">
+            <summary>
+                The X509Alternate name type represents alternate name information pulled from an X509
+                certificate's subject or issuer alternate names extension.  This type serves as the base for the
+                more specific alternate name types which can contain more detailed data about the name.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509AlternateName.#ctor(Security.Cryptography.X509Certificates.AlternateNameType)">
+            <summary>
+                Construct an empty X509AlternateName of the specified type
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509AlternateName.FromAltNameEntry(Security.Cryptography.X509Certificates.X509Native.CERT_ALT_NAME_ENTRY)">
+            <summary>
+                Create an X509Alternate name object from a native CERT_ALT_NAME_ENTRY structure
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509AlternateName.AlternateNameType">
+            <summary>
+                Get the type of alternate name this object represents
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509AlternateName.AlternateName">
+            <summary>
+                Get the alternate name that this object represents.  The type of object returned from this
+                property depends upon how the specific alternate name type specifies its data.  Strongly
+                typed alternate name data can also be obtained from working with the subtypes directly.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509AlternateNameBlob">
+            <summary>
+                X509 alternate name implementation for alternate names stored as blobs.  For instance,
+                <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.DirectoryName"/> and <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.X400Address"/>
+                use alternate names stored as blobs.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509AlternateNameBlob.#ctor(Security.Cryptography.X509Certificates.AlternateNameType,System.Byte[])">
+            <summary>
+                Create an alternate name for the given blob
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="blob"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509AlternateNameBlob.GetBlob">
+            <summary>
+                Get the name blob
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509AlternateNameIPAddress">
+            <summary>
+                X509 alternate name implementation for alternate names stored as IP addresses.  The
+                <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.IPAddress"/> alternate name type is stored as an IP address.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509AlternateNameIPAddress.#ctor(Security.Cryptography.X509Certificates.AlternateNameType,System.Net.IPAddress)">
+            <summary>
+                Create an alternate name for the given IP address
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="address"/> is null</exception>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509AlternateNameIPAddress.Address">
+            <summary>
+                IP address held in the name
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509AlternateNameOther">
+            <summary>
+                X509 alternate name implementation for other forms of alternate names.  This type always uses
+                the <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.OtherName"/> alternate name type, and should have its type
+                determined via the value in its <see cref="P:Security.Cryptography.X509Certificates.X509AlternateNameOther.Oid"/> property.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509AlternateNameOther.#ctor(System.Byte[],Security.Cryptography.Oid2)">
+            <summary>
+                Create an alternate name for the given blob
+            </summary>
+            <param name="blob">raw alternate name blob</param>
+            <param name="oid">OID describing the type of alternate name</param>
+            <exception cref="T:System.ArgumentNullException">
+                if <paramref name="blob"/> or <paramref name="oid"/> are null
+            </exception>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509AlternateNameOther.Oid">
+            <summary>
+                Get the OID representing the type of this alternate name
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509AlternateNameString">
+            <summary>
+                X509 alternate name implementation for alternate names stored as strings.  THe
+                <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.DnsName"/>, <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.EdiPartyName"/>,
+                <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.RegisteredId"/>, <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.Rfc822Name"/>,
+                and <see cref="F:Security.Cryptography.X509Certificates.AlternateNameType.Url"/> alternate name types store their names as strings.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509AlternateNameString.#ctor(Security.Cryptography.X509Certificates.AlternateNameType,System.String)">
+            <summary>
+                Create an alternate name for the given string
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="name"/> is null</exception>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509AlternateNameString.Name">
+            <summary>
+                Alternate name
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509CertificateCreationParameters">
+            <summary>
+                The X509CertificateCreationParameters class allows customization of the properties of an X509
+                certificate that is being created. For instance, these parameters can be used with the
+                <see cref="M:Security.Cryptography.CngKeyExtensionMethods.CreateSelfSignedCertificate(System.Security.Cryptography.CngKey,Security.Cryptography.X509Certificates.X509CertificateCreationParameters)"/>
+                API.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.#ctor(System.Security.Cryptography.X509Certificates.X500DistinguishedName)">
+            <summary>
+                Creates a new X509CertificateCreationParameters object which can be used to create a new X509
+                certificate issued to the specified subject.
+            </summary>
+            <param name="subjectName">The name of the subject the new certificate will be issued to</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="subjectName"/> is null</exception>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.CertificateCreationOptions">
+            <summary>
+                Gets or sets the flags used to create the X509 certificate. The default value is
+                X509CertificateCreationOptions.DoNotLinkKeyInformation.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.EndTime">
+            <summary>
+                Gets or sets the expiration date of the newly created certificate. If not set, this property
+                defaults to one year after the X509CertificateCreationParameters object is constructed.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.Extensions">
+            <summary>
+                The Extensions property holds a collection of the X509Extensions that will be applied to the
+                newly created certificate.
+            </summary>
+            <permission cref="T:System.Security.Permissions.SecurityPermission">
+                This property requires SecurityPermission/UnmanagedCode to access
+            </permission>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.SignatureAlgorithm">
+            <summary>
+                Gets or sets the algorithm which will be used to sign the newly created certificate. If this
+                property is not set, the default value is X509CertificateSignatureAlgorithm.RsaSha1.
+            </summary>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+                if the value specified is not a member of the <see cref="T:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm"/>
+                enumeration.
+            </exception>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.TakeOwnershipOfKey">
+            <summary>
+                Gets or sets a value indicating which object owns the lifetime of the incoming key
+                once the certificate is created.  If set to true, then the certificate owns the lifetime
+                of the key and the key object may be destroyed.  If set to false, the key object continues
+                to own the key lifetime and must therefore outlive the certificate.
+            </summary>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.SubjectName">
+            <summary>
+                Gets or sets the name of the subject that the newly created certificate will be issued to.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">if SubjectName is set to a null value</exception>
+        </member>
+        <member name="P:Security.Cryptography.X509Certificates.X509CertificateCreationParameters.StartTime">
+            <summary>
+                Gets or sets the time that the newly created certificate will become valid. If not set, this
+                property defaults to the time that the X509CertificateCreationParameters object is created.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods">
+            <summary>
+                The X509CertificateExtensionMethods type provides extension methods for the
+                <see cref="T:System.Security.Cryptography.X509Certificates.X509Certificate"/> class. X509CertificateExtensionMethods is in the
+                Security.Cryptography.X509Certificates namespace (not the
+                System.Security.Cryptography.X509Certificates namespace), so in order to use these extension
+                methods, you will need to make sure you include this namespace as well as a reference to
+                Security.Cryptography.dll. 
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.GetAlternateNames(System.Security.Cryptography.X509Certificates.X509Certificate,Security.Cryptography.Oid2)">
+            <summary>
+                Get all the alternate names encoded under a specific extension OID.  The <see cref="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.GetIssuerAlternateNames(System.Security.Cryptography.X509Certificates.X509Certificate)"/> and <see cref="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.GetSubjectAlternateNames(System.Security.Cryptography.X509Certificates.X509Certificate)"/> extension
+                methods provide direct access to the subject and issuer names, which can be friendlier to
+                use than this method.
+            </summary>
+            <param name="certificate">X509 certificate to get the alternate names of</param>
+            <param name="alternateNameExtensionOid">OID representing the alternate names to retrieve</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="alternateNameExtensionOid"/> is null</exception>
+            <permission cref="T:System.Security.PermissionSet">
+                The immediate caller must be fully trusted to use this method.
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.GetCertificateContext(System.Security.Cryptography.X509Certificates.X509Certificate)">
+            <summary>
+                Get a <see cref="T:Security.Cryptography.X509Certificates.SafeCertContextHandle"/> for the X509 certificate.  The caller of this
+                method owns the returned safe handle, and should dispose of it when they no longer need it. 
+                This handle can be used independently of the lifetime of the original X509 certificate.
+            </summary>
+            <permission cref="T:System.Security.Permissions.SecurityPermission">
+                The immediate caller must have SecurityPermission/UnmanagedCode to use this method
+            </permission>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.GetIssuerAlternateNames(System.Security.Cryptography.X509Certificates.X509Certificate)">
+            <summary>
+                Get all of the alternate names a certificate has for its issuer
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.GetSubjectAlternateNames(System.Security.Cryptography.X509Certificates.X509Certificate)">
+            <summary>
+                Get all of the alternate names a certificate has for its subject
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509CertificateExtensionMethods.HasCngKey(System.Security.Cryptography.X509Certificates.X509Certificate)">
+            <summary>
+                The HasCngKey method returns true if the X509Certificate is referencing a key stored with with
+                NCrypt in CNG. It will return true if the certificate's key is a reference to a key stored in
+                CNG, and false otherwise. For instance, if the key is stored with CAPI or if the key is not
+                linked by the certificate and is contained directly in it, this method will return false.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Certificate2ExtensionMethods">
+            <summary>
+                The X509Certificate2ExtensionMethods type provides several extension methods for the
+                <see cref="T:System.Security.Cryptography.X509Certificates.X509Certificate2"/> class. This type is in the Security.Cryptography.X509Certificates
+                namespace (not the System.Security.Cryptography.X509Certificates namespace), so in order to use
+                these extension methods, you will need to make sure you include this namespace as well as a
+                reference to Security.Cryptography.dll.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Certificate2ExtensionMethods.GetCngPrivateKey(System.Security.Cryptography.X509Certificates.X509Certificate2)">
+            <summary>
+                <para>
+                    The GetCngPrivateKey method will return a <see cref="T:System.Security.Cryptography.CngKey"/> representing the private
+                    key of an X.509 certificate which has its private key stored with NCrypt rather than with
+                    CAPI. If the key is not stored with NCrypt or if there is no private key available,
+                    GetCngPrivateKey returns null.
+                </para>
+                <para>
+                    The HasCngKey method can be used to test if the certificate does have its private key
+                    stored with NCrypt.
+                </para>
+                <para>
+                    The X509Certificate that is used to get the key must be kept alive for the lifetime of the
+                    CngKey that is returned - otherwise the handle may be cleaned up when the certificate is
+                    finalized.
+                </para>
+            </summary>
+            <permission cref="T:System.Security.Permissions.SecurityPermission">The caller of this method must have SecurityPermission/UnmanagedCode.</permission>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.AlternateNameType">
+            <summary>
+                Types of alternate names that can be applied to an X509 certificate
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.OtherName">
+            <summary>
+                Alternate name that isn't one of the standard alternate name types.  This corresponds to the
+                CERT_ALT_NAME_OTHER_NAME type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.Rfc822Name">
+            <summary>
+                Alternate name represented as an email address as defined in RFC 822.  This corresponds to the
+                CERT_ALT_NAME_RFC822_NAME type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.DnsName">
+            <summary>
+                Alternate name represented as a DNS name.  This corresponds to the CERT_ALT_NAME_DNS_NAME type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.X400Address">
+            <summary>
+                Alternate name represented as an x400 address.  This corresponds to the
+                CERT_ALT_NAME_X400_ADDRESS type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.DirectoryName">
+            <summary>
+                Alternate name given as a directory name.  This corresponds to the
+                CERT_ALT_NAME_DIRECTORY_NAME type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.EdiPartyName">
+            <summary>
+                Alternate name given as an EDI party name.  This corresponds to the
+                CERT_ALT_NAME_EDI_PARTY_NAME type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.Url">
+            <summary>
+                Alternate URL.  This corresponds to the CERT_ALT_NAME_URL type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.IPAddress">
+            <summary>
+                Alternate name as an IP address.  This corresponds to the CERT_ALT_NAME_IP_ADDRESS type.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.AlternateNameType.RegisteredId">
+            <summary>
+                Alternate name as a registered ID.  This corresponds to the CERT_ALT_NAME_REGISTERED_ID type.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509CertificateCreationOptions">
+            <summary>
+                The X509CertificateCreationOptions enumeration provides a set of flags for use when creating a new
+                X509 certificate.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateCreationOptions.None">
+            <summary>
+                Do not set any flags when creating the certificate
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateCreationOptions.DoNotSignCertificate">
+            <summary>
+                Create an unsigned certificate.  This maps to the CERT_CREATE_SELFSIGN_NO_SIGN flag.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateCreationOptions.DoNotLinkKeyInformation">
+            <summary>
+                By default, certificates will reference their private keys by setting the
+                CERT_KEY_PROV_INFO_PROP_ID; the DoNotLinkKeyInformation flag causes the certificate to
+                instead contain the private key direclty rather than by reference.  This maps to the
+                CERT_CREATE_SELFSIGN_NO_KEY_INFO flag.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm">
+            <summary>
+                The X509CertificateSignatureAlgorithm enumeration provides a set of algorithms which can be used
+                to sign an X509 certificate.
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.RsaSha1">
+            <summary>
+                The certificate is signed with RSA-SHA1
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.RsaSha256">
+            <summary>
+                The certificate is signed with RSA-SHA256
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.RsaSha384">
+            <summary>
+                The certificate is signed with RSA-SHA384
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.RsaSha512">
+            <summary>
+                The certificate is signed with RSA-SHA512
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.ECDsaSha1">
+            <summary>
+                The certificate is signed with ECDSA-SHA1
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.ECDsaSha256">
+            <summary>
+                The certificate is signed with ECDSA-SHA256
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.ECDsaSha384">
+            <summary>
+                The certificate is signed with ECDSA-SHA384
+            </summary>
+        </member>
+        <member name="F:Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm.ECDsaSha512">
+            <summary>
+                The certificate is signed with ECDSA-SHA512
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native">
+            <summary>
+                Native wrappers for X509 certificate APIs.
+                
+                The general pattern for this interop layer is that the X509Native type exports a wrapper method
+                for consumers of the interop methods.  This wrapper method puts a managed face on the raw
+                P/Invokes, by translating from native structures to managed types and converting from error
+                codes to exceptions.
+                
+                These APIs should strictly layer on top of the lower-level CNG and CAPI native APIs
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.AcquireCngPrivateKey(Security.Cryptography.X509Certificates.SafeCertContextHandle)">
+            <summary>
+                Get the private key of a certificate
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.CreateSelfSignedCertificate(System.Security.Cryptography.CngKey,System.Boolean,System.Byte[],Security.Cryptography.X509Certificates.X509CertificateCreationOptions,System.String,System.DateTime,System.DateTime,System.Security.Cryptography.X509Certificates.X509ExtensionCollection)">
+            <summary>
+                Create a self signed certificate around a CNG key
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.DecodeExtension(Security.Cryptography.X509Certificates.X509Native.CERT_EXTENSION)">
+            <summary>
+                Decode a certificate extension into a buffer.  This buffer must be closed before the
+                containing certificate is closed
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.DuplicateCertContext(System.IntPtr)">
+            <summary>
+                Duplicate the certificate context into a safe handle
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.FindExtension(Security.Cryptography.X509Certificates.SafeCertContextHandle,System.String)">
+            <summary>
+                Find the certificate extension identified with the given OID
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.GetCertificateProperty(Security.Cryptography.X509Certificates.SafeCertContextHandle,Security.Cryptography.X509Certificates.X509Native.CertificateProperty)">
+            <summary>
+                Get an arbitrary property of a certificate
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.GetCertInfo(Security.Cryptography.X509Certificates.SafeCertContextHandle)">
+            <summary>
+                Get the certificate context which corresponds to the given certificate info
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.GetCertificateProperty``1(Security.Cryptography.X509Certificates.SafeCertContextHandle,Security.Cryptography.X509Certificates.X509Native.CertificateProperty)">
+            <summary>
+                Get a property of a certificate formatted as a structure
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.HasExtension(Security.Cryptography.X509Certificates.SafeCertContextHandle,System.String)">
+            <summary>
+                Determine if a certificate context has a particular extension
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.HasCertificateProperty(Security.Cryptography.X509Certificates.SafeCertContextHandle,Security.Cryptography.X509Certificates.X509Native.CertificateProperty)">
+            <summary>
+                Determine if a certificate has a specific property
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.X509Certificates.X509Native.MapCertificateSignatureAlgorithm(Security.Cryptography.X509Certificates.X509CertificateSignatureAlgorithm)">
+            <summary>
+                Get the corresponding OID for an X509 certificate signature algorithm
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.AcquireCertificateKeyOptions">
+            <summary>
+                Flags for the CryptAcquireCertificatePrivateKey API
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.CertificateEncodingType">
+            <summary>
+                Flags indicating how a certificate is encoded
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.CertificateProperty">
+            <summary>
+                Well known certificate property IDs
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.CertificatePropertySetFlags">
+            <summary>
+                Flags for the CertSetCertificateContextProperty API
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.CertificateVersion">
+            <summary>
+                X509 version numbers
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.DecodeObjectFlags">
+            <summary>
+                Flags for the CryptDecodeObjectEx API
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.ErrorCode">
+            <summary>
+                Error codes returned from X509 APIs
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.X509Certificates.X509Native.KeySpec">
+            <summary>
+                KeySpec for CERT_KEY_CONTEXT structures
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.Xml.EncryptedXmlExtensionMethods">
+            <summary>
+                The EncryptedXmlExtension methods type provides several extension methods for the 
+                <see cref="T:System.Security.Cryptography.Xml.EncryptedXml"/> class. This type is in the Security.Cryptography.Xml namespace (not
+                the System.Security.Cryptography.Xml namespace), so in order to use these extension methods, you
+                will need to make sure you include this namespace as well as a reference to
+                Security.Cryptography.dll.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Xml.EncryptedXmlExtensionMethods.ReplaceData2(System.Security.Cryptography.Xml.EncryptedXml,System.Xml.XmlElement,System.Byte[])">
+            <summary>
+                Replace the XML element with the decrypted data.  This method works very much like the
+                standard <see cref="M:System.Security.Cryptography.Xml.EncryptedXml.ReplaceData(System.Xml.XmlElement,System.Byte[])"/> API, with one exception.  If inputElement is
+                the root element of an XML document, ReplaceData2 will ensure that any other top-level XML
+                items (such as the XML declaration) will not be overwritten, whereas ReplaceData always
+                overwrites the entire XML document with the decrypted data.
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.Xml.TransformFactory">
+            <summary>
+                The TransformFactory class provides helper methods for programmatically creating transforms for
+                use with the <see cref="T:System.Security.Cryptography.Xml.SignedXml"/> class. Since many of the transforms do not have constructors
+                or other method that allow them to be created easily in code when creating an XML signature, they
+                generally have to be constructed via XML. TransformFactory provides APIs that allow you to create
+                these transforms without having to directly create the XML for the transform by hand.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Xml.TransformFactory.CreateXPathTransform(System.String)">
+            <summary>
+                Creates an XPath transform for the given XPath query. The transform created from this method
+                does not bring any XML namespaces into scope, so the XPath query must not rely on any XML
+                namespaces from the XML being signed.
+            </summary>
+            <param name="xpath">XPath query to embed into the transform</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="xpath"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.Xml.TransformFactory.CreateXPathTransform(System.String,System.Collections.Generic.IDictionary{System.String,System.String})">
+            <summary>
+                <para>
+                    Creates an XPath transform for the given XPath query. If <paramref name="namespaces"/>
+                    is provided, it should contain mappings of XML namespace prefixes to namespace URIs. Each
+                    key in the dictionary will be interpreted as a prefix corresponding to the value's URI.
+                </para>
+                <para>
+                    The XPath query can rely upon the namespaces brought into scope by the
+                    <paramref name="namespaces"/> dictionary, but not any other namespaces in the XML being
+                    signed.
+                </para>
+            </summary>
+            <param name="xpath">XPath query to embed into the transform</param>
+            <param name="namespaces">optional XML namespace mappings to bring into scope for the query</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="xpath"/> is null</exception>
+        </member>
+        <member name="T:Security.Cryptography.Xml.XmlDSigNodeList">
+            <summary>
+                Basic implementation of an XmlNodeList
+            </summary>
+        </member>
+        <member name="T:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform">
+             <summary>
+                 <para>
+                     XmlDsigXPathWithNamespacesTransform provides a version of the XPath transform which allows the
+                     XPath expression to use the namespace mappings in scope at the point of the XML declaration of
+                     the XPath expression. The standard XmlDsigXPathTransform requires that any namespaces being
+                     used in the XPath expression be defined on the XPath node explicitly. This version of the
+                     transform allows any namepsace in scope at the XPath node to be used, even if they are not
+                     explicitly declared on the node itself.
+                 </para>
+                 <para>
+                     In order to use this transform when signing, simply add it to the Reference section that
+                     should be processed with the XPath expression. For example:
+                 </para>
+                 <example>
+                     Reference reference = new Reference("");
+                     reference.AddTransform(new XmlDsigEnvelopedSignatureTransform());
+            
+                     // Ensure that we can use the clrsec namespace in the XPath expression
+                     Dictionary&lt;string, string&gt; additionalNamespaces = new Dictionary&lt;string, string&gt;();
+                     additionalNamespaces ["clrsec"] = "http://www.codeplex.com/clrsecurity";
+                     reference.AddTransform(new XmlDsigXPathWithNamespacesTransform("ancestor-or-self::node()[@clrsec:sign='true']", null, additionalNamespaces));
+                 </example>
+                 <para>
+                     For verification purposes, machine.config must be setup to map the XPath transform URL to
+                     XmlDsigXPathWithNamespacesTransform so that SignedXml creates this version of the XPath
+                     transform when processing a signature.
+                 </para>
+                 <para>
+                     Registration in CryptoConfig requires editing the machine.config file found in the .NET
+                     Framework installation's configuration directory (such as
+                     %WINDIR%\Microsoft.NET\Framework\v2.0.50727\Config or
+                     %WINDIR%\Microsoft.NET\Framework64\v2.0.50727\Config) to include registration information on
+                     the type. For example:
+                 </para>
+                 <example>
+                     <![CDATA[
+                       <configuration>
+                         <mscorlib>
+                           <cryptographySettings>
+                             <cryptoNameMapping>
+                               <cryptoClasses>
+                                 <cryptoClass XmlDsigXPathWithNamespacesTransform="Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform, Security.Cryptography, Version=1.4.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" />
+                               </cryptoClasses>
+                               <nameEntry name="http://www.w3.org/TR/1999/REC-xpath-19991116" class="XmlDsigXPathWithNamespacesTransform" />
+                             </cryptoNameMapping>
+                           </cryptographySettings>
+                         </mscorlib>
+                       </configuration>    
+                     ]]>
+                 </example>
+                 <para>
+                     After adding this registration entry, the assembly which contains the
+                     XmlDsigXPathWithNamespacesTransform (in the example above Security.Cryptography.dll) needs to
+                     be added to the GAC.
+                 </para>
+                 <para>  
+                     Note that on 64 bit machines, both the Framework and Framework64 machine.config files should
+                     be updated, and if the signature description assembly is built bit-specific it needs to be
+                     added to both the 32 and 64 bit GACs.
+                 </para>
+                 <para>
+                     See http://www.w3.org/TR/xmldsig-core/#sec-XPath for more information on the XPath transform.
+                 </para>
+                 <para>
+                     Since most of the XmlDsigXPathWithNamespacesTransform APIs are inherited from the
+                     <see cref="T:System.Security.Cryptography.Xml.XmlDsigXPathTransform"/> base class, please see the MSDN documentation for
+                     XmlDsigXPathTransform for a complete list of the methods and properties available on
+                     XmlDsigXPathWithNamespacesTransform.
+                 </para>
+             </summary>
+        </member>
+        <member name="M:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform.#ctor">
+            <summary>
+                Constructs an XmlDsigXPathWithNamespacesTransform object without an initial XPath query or
+                namespaces.  This constructor should not be used, and is provided so that the type may be
+                instantiated from CryptoConfig.
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform.#ctor(System.String)">
+            <summary>
+                Constructs an XmlDsigXPathWithNamespacesTransform object which will apply the given XPath
+                expression when it is invoked. No XML namespaces will be brought into scope for use in the
+                query.
+            </summary>
+            <param name="xpath">xpath expression to use in this transform</param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="xpath"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform.#ctor(System.String,System.Collections.Generic.IDictionary{System.String,System.String})">
+            <summary>
+                Constructs an XmlDsigXPathWithNamespacesTransform object which will apply the given XPath
+                expression when it is invoked. Any namespace mappings in the explicitNamespaces dictionary
+                will be available for use in the XPath expression and will also be added to the XPath node in
+                the transform's XML, which allows the transform to be processed by the standard
+                XmlDsigXPathTransform.
+            </summary>
+            <param name="xpath">xpath expression to use in this transform</param>
+            <param name="explicitNamespaces">
+                namespaces mappings to add directly to the XPath portion of the transform
+            </param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="xpath"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform.#ctor(System.String,System.Collections.Generic.IDictionary{System.String,System.String},System.Collections.Generic.IDictionary{System.String,System.String})">
+            <summary>
+                Constructs an XmlDsigXPathWithNamespacesTransform object which will apply the given XPath
+                expression when it is invoked. Any namespace mappings in the explicitNamespaces dictionary
+                will be available for use in the XPath expression and will also be added to the XPath node in
+                the transform's XML, which allows the transform to be processed by the standard
+                XmlDsigXPathTransform. The additionalNamespaces dictionary provides namespace mappings which
+                will be available during signing but which will not be added to the XPath node of the
+                transform. These namespaces will need to be in scope from elsewhere in the XML document during
+                verification for the transform to succeed.
+            </summary>
+            <param name="xpath">xpath expression to use in this transform</param>
+            <param name="explicitNamespaces">
+                namespaces mappings to add directly to the XPath portion of the transform
+            </param>
+            <param name="additionalNamespaces">
+                namespaces to use while signing, but not to bring into scope explicitly on the XPath portion
+                of the transform
+            </param>
+            <exception cref="T:System.ArgumentNullException">if <paramref name="xpath"/> is null</exception>
+        </member>
+        <member name="M:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform.LoadInnerXml(System.Xml.XmlNodeList)">
+            <summary>
+                Build a transform from its XML representation
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform.LoadInput(System.Object)">
+            <summary>
+                Load input nodes to process
+            </summary>
+        </member>
+        <member name="M:Security.Cryptography.Xml.XmlDsigXPathWithNamespacesTransform.GetOutput">
+            <summary>
+                Get the output of running the XPath expression on the input nodes
+            </summary>
+        </member>
+    </members>
+</doc>
