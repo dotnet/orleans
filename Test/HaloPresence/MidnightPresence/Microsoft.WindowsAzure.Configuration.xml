@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Microsoft.WindowsAzure.Configuration</name>
+    </assembly>
+    <members>
+        <member name="T:Microsoft.WindowsAzure.CloudConfigurationManager">
+            <summary>
+            Configuration manager for accessing Windows Azure settings.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.CloudConfigurationManager.GetSetting(System.String)">
+            <summary>
+            Gets a setting with the given name.
+            </summary>
+            <param name="name">Setting name.</param>
+            <returns>Setting value or null if not found.</returns>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.CloudConfigurationManager.AppSettings">
+            <summary>
+            Gets application settings.
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.Resources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.Resources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.Resources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:Microsoft.WindowsAzure.Resources.ErrorArgumentEmptyString">
+            <summary>
+              Looks up a localized string similar to Argument &quot;{0}&quot; cannot be an empty string..
+            </summary>
+        </member>
+        <member name="T:Microsoft.WindowsAzure.AzureApplicationSettings">
+            <summary>
+            Windows Azure settings.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.AzureApplicationSettings.#ctor">
+            <summary>
+            Initializes the settings.
+            </summary>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.AzureApplicationSettings.IsMissingSettingException(System.Exception)">
+            <summary>
+            Checks whether the given exception represents an exception throws
+            for a missing setting.
+            </summary>
+            <param name="e">Exception</param>
+            <returns>True for the missing setting exception.</returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.AzureApplicationSettings.GetSetting(System.String)">
+            <summary>
+            Gets a setting with the given name.
+            </summary>
+            <param name="name">Setting name.</param>
+            <returns>Setting value or null if such setting does not exist.</returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.AzureApplicationSettings.GetValue(System.String,System.String,System.Func{System.String,System.String})">
+            <summary>
+            Gets setting's value from the given provider.
+            </summary>
+            <param name="providerName">Provider name.</param>
+            <param name="settingName">Setting name</param>
+            <param name="getValue">Method to obtain given setting.</param>
+            <returns>Setting value, or null if not found.</returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.AzureApplicationSettings.GetServiceRuntimeSetting(System.String)">
+            <summary>
+            Gets a configuration setting from the service runtime.
+            </summary>
+            <param name="name">Setting name.</param>
+            <returns>Setting value or null if not found.</returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.AzureApplicationSettings.GetServiceRuntimeAssembly">
+            <summary>
+            Loads and returns the latest available version of the service 
+            runtime assembly.
+            </summary>
+            <returns>Loaded assembly, if any.</returns>
+        </member>
+        <member name="M:Microsoft.WindowsAzure.NativeMethods.GetAssemblyPath(System.String)">
+            <summary>
+            Gets an assembly path from the GAC given a partial name.
+            </summary>
+            <param name="name">An assembly partial name. May not be null.</param>
+            <returns>
+            The assembly path if found; otherwise null;
+            </returns>
+        </member>
+    </members>
+</doc>

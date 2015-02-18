@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ClientConfiguration xmlns="urn:orleans">
+  <SystemStore SystemStoreType="SqlServer"
+               DataConnectionString="Data Source=niklasg-002;Initial Catalog=OrleansTesting;user id=testing;password=testingtesting123"/>
+  <StatisticsProviders>
+    <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="SQL" ConnectionString="Data Source=niklasg-002;Initial Catalog=OrleansTesting;user id=testing;password=testingtesting123" />
+  </StatisticsProviders>
+  <Tracing DefaultTraceLevel="Warning" TraceToConsole="true" TraceToFile="{0}-{1}.log">
+    <TraceLevelOverride LogPrefix="Application" TraceLevel="Warning" />
+  </Tracing>
+  <Statistics MetricsTableWriteInterval="10s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true"/>
+</ClientConfiguration>

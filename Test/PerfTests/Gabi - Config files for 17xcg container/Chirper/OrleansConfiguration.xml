@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	This is a sample silo configuration file, suitable for running multiple silos on one machine. 
+	The comments illustrate common customizations.
+	Elements and attributes with no comments should not usually need to be modified.
+	For a detailed reference, see "Orleans Configuration Reference.html".
+-->
+<OrleansConfiguration xmlns="urn:orleans">
+	<Globals>
+		<!-- 
+		The seed node must be the primary node.
+		You need to specify the primary's host, either by name or by IP address, and port number here.
+		-->
+		<SeedNode Address="17xcg0801" Port="11111" Subnet="10.68"/>
+	 	<Networking Subnet="10.68"/>
+                <Liveness LivenessType ="File" LivenessEnabled="true" ProbeTimeout = "5" TableRefreshTimeout ="10" DeathVoteExpirationTimeout ="80" 
+                       NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" UseLivenessGossip="false" LivenessFileDirectory="\\17xcg0801\c$\OrleansFileBasedMembershipTable"/>    
+
+        <Liveness LivenessEnabled="false" IAmAliveTimeout = "5" NumMissedIAmAlive = "3"/>
+	</Globals>
+	<Defaults>
+		<!-- 
+		Port 0 means "let the OS pick an unused port", which is good for a default, especially if you have more than one silo running
+		on a single host.
+		For a distributed deployment with one silo per host, it can be more convenient to have all of the silos listening on the same port, 
+		in which case you'd specify that port here instead of zero. 
+		-->
+		<Networking Address="" Port="11111" Subnet="10.68"/>
+                <ProxyingGateway Address="" Port="30000" />
+
+		<!-- 
+		To turn tracing off, set DefaultTraceLevel="Off" and have no overrides. To see a minimum of messages, set DefaultTraceLevel="Error".
+        For the trace log file name, {0} is the silo name and {1} is the current time. 
+		Setting WriteTraces to true will cause detailed performance information to be collected and logged about the individual steps in the
+		message lifecycle. This may be useful debugging performance issues.
+		-->
+		<Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" WriteTraces="false">
+			<!--
+			To get more detailed application logging, you can change the TraceLevel attribute value to "Verbose" or "Verbose2".
+			Depending on the log levels you have used in your code, this will cause additional messages to be written to the log.
+			-->
+			<TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+                        <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
+		</Tracing>
+		<Debug CrashOnUnobservedException="true" ForceConsistency="false" UseChess="false" Validation="false" />
+	</Defaults>
+<!-- 
+	<Override Node="17xcg0801">
+		<Networking Port="11111" Subnet="10.68"/>
+	</Override>
+-->
+</OrleansConfiguration>
