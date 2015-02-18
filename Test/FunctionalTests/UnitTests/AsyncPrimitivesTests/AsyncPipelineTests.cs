@@ -104,7 +104,7 @@ namespace UnitTests.AsyncPrimitivesTests
             await AsyncPipelineBlackBoxConsistencyTest(1);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("AsynchronyPrimitives")]
+        //[TestMethod, TestCategory("Nightly"), TestCategory("AsynchronyPrimitives")]
         public async Task AsyncPipelineMultiThreadedBlackBoxConsistencyTest()
         {
             await AsyncPipelineBlackBoxConsistencyTest(100);
