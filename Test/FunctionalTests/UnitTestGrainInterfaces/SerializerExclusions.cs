@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
 using Orleans;
 
 namespace Orleans.UnitTest.Unsigned.GrainInterfaces

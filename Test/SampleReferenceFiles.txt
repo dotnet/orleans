@@ -9,7 +9,5 @@ OrleansManager.exe
 OrleansProviders.dll
 ClientConfiguration.xml
 Orleans.SDK.targets
-Microsoft.WindowsAzure.Configuration.dll
-Microsoft.WindowsAzure.StorageClient.dll
 TestGrainInterfaces.dll
 TestGrains.dll

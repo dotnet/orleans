@@ -48,11 +48,28 @@
     <AssemblyOriginatorKeyFile>..\..\..\src\Orleans.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.WindowsAzure.Configuration, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
+    <Reference Include="Microsoft.Data.Edm, Version=5.6.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\LoadTests\packages\Microsoft.Data.Edm.5.6.2\lib\net40\Microsoft.Data.Edm.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.WindowsAzure.StorageClient, Version=1.7.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll</HintPath>
+    <Reference Include="Microsoft.Data.OData, Version=5.6.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\LoadTests\packages\Microsoft.Data.OData.5.6.2\lib\net40\Microsoft.Data.OData.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Data.Services.Client, Version=5.6.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\LoadTests\packages\Microsoft.Data.Services.Client.5.6.2\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.WindowsAzure.Configuration, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\LoadTests\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.3\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.WindowsAzure.Storage, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\LoadTests\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Spatial, Version=5.6.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\LoadTests\packages\System.Spatial.5.6.2\lib\net40\System.Spatial.dll</HintPath>
     </Reference>
     <Reference Include="Orleans">
       <HintPath>..\..\References\Orleans.dll</HintPath>
@@ -177,10 +194,19 @@
     <PreBuildEvent>set REF_DIR=$(SolutionDir)..\References
 
 if "$(BuildingInsideVisualStudio)" == "true" (
-set IN_DIR=$(SolutionDir)..\..\src\Tester\$(OutDir)
+@echo "ORLEANS_GH_CLONE" is $(ORLEANS_GH_CLONE)
+
+if "$(ORLEANS_GH_CLONE)" == "" (
+set IN_DIR=$(SolutionDir)..\..\OrleansV4\Tester\$(OutDir)
+) else (
+set IN_DIR=$(ORLEANS_GH_CLONE)\Tester\$(OutDir)
+)
+
 ) else (
 set IN_DIR=$(OutDir)
 )
+
+@echo IN_DIR is %25IN_DIR%25
 
 set D=%25REF_DIR%25
 if not exist "%25D%25" (md "%25D%25") else (del /s/q "%25D%25\*")

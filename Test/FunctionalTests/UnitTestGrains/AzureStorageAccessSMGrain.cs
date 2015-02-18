@@ -4,7 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -105,9 +107,9 @@ namespace UnitTestGrains
             logger.Info("WriteToAzureBlob - ContainerName={0} BlobName={1} byte[].Length={2}", containerName, blobName, data.Length);
             CloudBlobClient client = GetAzureBlobClient();
             CloudBlobContainer container = client.GetContainerReference(containerName);
-            container.CreateIfNotExist();
-            CloudBlob blobReference = container.GetBlobReference(blobName);
-            blobReference.UploadByteArray(data);
+            container.CreateIfNotExists();
+            var blobReference = container.GetBlobReferenceFromServer(blobName);
+            blobReference.UploadFromByteArray(data, 0, data.Length);
             return TaskDone.Done;
         }
 
@@ -117,9 +119,10 @@ namespace UnitTestGrains
             logger.Info("ReadFromAzureBlob - ContainerName={0} BlobName={1}", containerName, blobName);
             CloudBlobClient client = GetAzureBlobClient();
             CloudBlobContainer container = client.GetContainerReference(containerName);
-            container.CreateIfNotExist();
-            CloudBlob blobReference = container.GetBlobReference(blobName);
-            byte[] data = blobReference.DownloadByteArray();
+            container.CreateIfNotExists();
+            var blobReference = container.GetBlobReferenceFromServer(blobName);
+            byte[] data = new byte[1000*1000];
+            blobReference.DownloadToByteArray(data, 0);
             return Task.FromResult(data);
         }
 

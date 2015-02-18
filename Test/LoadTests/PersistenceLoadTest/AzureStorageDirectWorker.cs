@@ -8,7 +8,8 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
 using LoadTestBase;
 using LoadTestGrainInterfaces;
 using Orleans.AzureUtils;
@@ -153,8 +154,8 @@ namespace Orleans.Tests.Persistence
         }
     }
 
-    [DataServiceKey("PartitionKey", "RowKey")]
-    public class AzureTableTestEntry : TableServiceEntity
+    //[DataServiceKey("PartitionKey", "RowKey")]
+    public class AzureTableTestEntry : TableEntity
     {
         public string Data { get; set; }
 

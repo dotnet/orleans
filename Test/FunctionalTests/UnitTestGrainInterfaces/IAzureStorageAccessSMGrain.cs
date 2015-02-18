@@ -5,13 +5,13 @@ using System.Data.Services.Common;
 using System.Linq;
 using System.Text;
 using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
 
 namespace UnitTestGrainInterfaces
 {
     [Serializable]
-    [DataServiceKey("PartitionKey", "RowKey")]
-    public class UnitTestAzureData : TableServiceEntity
+    public class UnitTestAzureData : TableEntity
     {
         public byte[] Data { get; set; }
         public string StringData { get; set; }
