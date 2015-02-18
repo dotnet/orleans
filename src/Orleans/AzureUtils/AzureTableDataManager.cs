@@ -336,16 +336,40 @@ namespace Orleans.AzureUtils
         /// <returns>Value promise for tuple containing the data entry and its corresponding etag.</returns>
         public async Task<Tuple<T, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
-            Expression<Func<T, bool>> query = instance =>
-                instance.PartitionKey == partitionKey
-                && instance.RowKey == rowKey;
+            const string operation = "ReadSingleTableEntryAsync";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1} partitionKey {2} rowKey = {3}", operation, TableName, partitionKey, rowKey);
 
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
-            var data = queryResults.ToList();
-            if (data.Count >= 1) return data.First();
+            try
+            {
+                try
+                {
+                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
 
-            if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
-            return null;  // No data
+                    TableResult retrievedResult = await Task<TableResult>.Factory.FromAsync(
+                        tableReference.BeginExecute,
+                        tableReference.EndExecute,
+                        TableOperation.Retrieve<T>(partitionKey, rowKey),
+                        null);
+                    if (retrievedResult == null || retrievedResult.Result == null || AzureStorageUtils.IsNotFoundError((HttpStatusCode)retrievedResult.HttpStatusCode))
+                    {
+                        if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
+                        return null;  // No data
+                    }
+                    //The ETag of data is needed in further operations.                                        
+                    return new Tuple<T, string>(retrievedResult.Result as T, retrievedResult.Etag);
+                }
+                catch (Exception)
+                {
+                    //CheckAlertWriteError(operation, data, null, exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
+
         }
 
         /// <summary>
@@ -778,8 +802,7 @@ namespace Orleans.AzureUtils
 
         private bool IsServerBusy(Exception exc)
         {
-            string strCode = AzureStorageUtils.ExtractRestErrorCode(exc);
-            bool serverBusy = StorageErrorCodeStrings.ServerBusy.Equals(strCode);
+            bool serverBusy = AzureStorageUtils.IsServerBusy(exc);
             if (serverBusy) numServerBusy.Increment();
             return serverBusy;
         }
