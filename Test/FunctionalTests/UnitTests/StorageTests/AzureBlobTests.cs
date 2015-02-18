@@ -4,7 +4,8 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
 using Orleans.Runtime;
 
 namespace UnitTests.StorageTests
@@ -73,13 +74,13 @@ namespace UnitTests.StorageTests
             if (asyncCreateIfNotExist)
             {
                 bool didCreate = await Task.Factory.FromAsync(
-                    container.BeginCreateIfNotExist,
-                    cb => container.EndCreateIfNotExist(cb),
+                    container.BeginCreateIfNotExists,
+                    cb => container.EndCreateIfNotExists(cb),
                     null);
             }
             else
             {
-                container.CreateIfNotExist();
+                container.CreateIfNotExists();
             }
 
             bool ok = await WriteToBlogStorage(container, blobName, imgFile);
@@ -90,7 +91,7 @@ namespace UnitTests.StorageTests
         {
             byte[] img = File.ReadAllBytes(imgFile.FullName);
 
-            CloudBlob blob = container.GetBlobReference(blobName);
+            var blob = container.GetBlobReferenceFromServer(blobName);
             blob.Properties.ContentType = "image/" + imgFile.Extension.Substring(1);
 
 
