@@ -318,7 +318,7 @@ namespace Orleans.AzureUtils
             return storage.MergeTableEntryAsync(data);
         }
 
-        public Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -378,11 +378,17 @@ namespace Orleans.AzureUtils
         /// Insert (create new) row entry
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
-        internal async Task<bool> CreateTableVersionEntryAsync(SiloInstanceTableEntry tableEntry)
+        internal async Task<bool> TryCreateTableVersionEntryAsync()
         {
             try
             {
-                await storage.CreateTableEntryAsync(tableEntry);
+                var versionRow = await storage.ReadSingleTableEntryAsync(DeploymentId, SiloInstanceTableEntry.TABLE_VERSION_ROW);
+                if (versionRow != null && versionRow.Item1 != null)
+                {
+                    return false;
+                }
+                SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
+                await storage.CreateTableEntryAsync(entry);
                 return true;
             }
             catch (Exception exc)

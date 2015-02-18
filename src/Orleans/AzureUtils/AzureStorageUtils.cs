@@ -54,32 +54,29 @@ namespace Orleans.AzureUtils
         /// <returns><c>True</c> if this exception means the data being read was not present in Azure table storage</returns>
         public static bool TableStorageDataNotFound(Exception exc)
         {
-            if (exc is AggregateException)
+            HttpStatusCode httpStatusCode;
+            string restStatus;
+            if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
             {
-                exc = exc.GetBaseException();
-            }
-            var dsce = exc as DataServiceClientException;
-            if (dsce == null)
-            {
-                var dsre = exc as DataServiceRequestException;
-                if (dsre != null)
-                {
-                    dsce = dsre.GetBaseException() as DataServiceClientException;
-                }
-            }
-            if (dsce != null)
-            {
-                // Check for appropriate HTTP status codes
-                if (dsce.StatusCode == (int)HttpStatusCode.NotFound
-                    || dsce.StatusCode == (int)HttpStatusCode.NotImplemented /* New table: Azure table schema not yet initialized, so need to do first create */ )
+                if (AzureStorageUtils.IsNotFoundError(httpStatusCode)
+                    /* New table: Azure table schema not yet initialized, so need to do first create */)
                 {
                     return true;
                 }
-                exc = dsce;
+                return StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus);
             }
-            string restErrorCode = ExtractRestErrorCode(exc);
-            // Check for appropriate Azure REST error codes
-            return StorageErrorCodeStrings.ResourceNotFound.Equals(restErrorCode);
+            return false;
+        }
+
+        public static bool IsServerBusy(Exception exc)
+        {
+            HttpStatusCode httpStatusCode;
+            string restStatus;
+            if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
+            {
+                return StorageErrorCodeStrings.ServerBusy.Equals(restStatus);
+            }
+            return false;
         }
 
         /// <summary>
@@ -87,7 +84,7 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="exc">Exception to be inspected.</param>
         /// <returns>Returns REST error code if found, otherwise <c>null</c></returns>
-        public static string ExtractRestErrorCode(Exception exc)
+        internal static string ExtractRestErrorCode(Exception exc)
         {
             // Sample of REST error message returned from Azure storage service
             //<?xml version="1.0" encoding="utf-8" standalone="yes"?>
@@ -96,15 +93,20 @@ namespace Orleans.AzureUtils
             //  <message xml:lang="en-US">Operation could not be completed within the specified time. RequestId:6b75e963-c56c-4734-a656-066cfd03f327 Time:2011-10-09T19:33:26.7631923Z</message>
             //</error>
 
-            while (exc != null && !(exc is DataServiceClientException || exc is DataServiceQueryException))
+            while (exc != null && !(exc is DataServiceClientException || exc is DataServiceQueryException || exc is StorageException))
             {
                 exc = (exc.InnerException != null) ? exc.InnerException.GetBaseException() : exc.InnerException;
             }
-
+            if (exc is StorageException)
+            {
+                StorageException ste = exc as StorageException;
+                return ste.RequestInformation.ExtendedErrorInformation.ErrorCode;
+            }
             while (exc is DataServiceQueryException)
             {
                 exc = (exc.InnerException != null) ? exc.InnerException.GetBaseException() : exc.InnerException;
             }
+            
             if (exc is DataServiceClientException)
             {
                 try
@@ -114,7 +116,7 @@ namespace Orleans.AzureUtils
                     xml.Load(xmlReader);
                     var namespaceManager = new XmlNamespaceManager(xml.NameTable);
                     namespaceManager.AddNamespace("n", "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata");
-                   return xml.SelectSingleNode("/n:error/n:code", namespaceManager).InnerText;
+                    return xml.SelectSingleNode("/n:error/n:code", namespaceManager).InnerText;
                 }
                 catch (Exception e)
                 {
@@ -148,6 +150,15 @@ namespace Orleans.AzureUtils
             {
                 while (e != null)
                 {
+                    if (e is StorageException)
+                    {
+                        var ste = e as StorageException;
+                        httpStatusCode = (HttpStatusCode)ste.RequestInformation.HttpStatusCode;
+                        if (getExtendedErrors)
+                            restStatus = ExtractRestErrorCode(ste);
+                        return true;
+                    }
+
                     if (e is DataServiceQueryException)
                     {
                         var dsqe = e as DataServiceQueryException;
@@ -220,6 +231,21 @@ namespace Orleans.AzureUtils
 
             if (httpStatusCode == HttpStatusCode.PreconditionFailed) return true;
             if (httpStatusCode == HttpStatusCode.Conflict) return true;     //Primary key violation. The app is trying to insert an entity, but there’s an entity on the table with the same values for PartitionKey and RowKey properties on the entity being inserted.
+            if (httpStatusCode == HttpStatusCode.NotFound) return true;
+            if (httpStatusCode == HttpStatusCode.NotImplemented) return true; // New table: Azure table schema not yet initialized, so need to do first create
+            return false;
+        }
+
+        /// <summary>
+        /// Check whether a HTTP status code returned from a REST call might be due to a (temporary) storage contention error.
+        /// </summary>
+        /// <param name="httpStatusCode">HTTP status code to be examined.</param>
+        /// <returns>Returns <c>true</c> if the HTTP status code is due to storage contention.</returns>
+        public static bool IsNotFoundError(HttpStatusCode httpStatusCode)
+        {
+            // Status and Error Codes
+            // http://msdn.microsoft.com/en-us/library/dd179382.aspx
+
             if (httpStatusCode == HttpStatusCode.NotFound) return true;
             if (httpStatusCode == HttpStatusCode.NotImplemented) return true; // New table: Azure table schema not yet initialized, so need to do first create
             return false;
