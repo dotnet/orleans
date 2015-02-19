@@ -66,6 +66,10 @@
                 <File Id="File_CL_ClientGenerator.exe.config" Name="ClientGenerator.exe.config" Source="$(var.SDK_binaries_clnt_src)\ClientGenerator.exe.config" />
                 <File Id="File_CL_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.WindowsAzure.Configuration.dll" />
                 <File Id="File_CL_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.WindowsAzure.Storage.dll" />
+                <File Id="File_CL_Microsoft.Data.Edm.dll" Name="Microsoft.Data.Edm.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Edm.dll" />
+                <File Id="File_CL_Microsoft.Data.OData.dll" Name="Microsoft.Data.OData.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.OData.dll" />
+                <File Id="File_CL_Microsoft.Data.Services.Client.dll" Name="Microsoft.Data.Services.Client.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Services.Client.dll" />
+                <File Id="File_CL_System.Spatial.dll" Name="System.Spatial.dll" Source="$(var.SDK_binaries_clnt_src)\System.Spatial.dll" />
                 <File Id="File_CL_Orleans.dll" Name="Orleans.dll" Source="$(var.SDK_binaries_clnt_src)\Orleans.dll" />
                 <File Id="File_CL_Orleans.SDK.targets" Name="Orleans.SDK.targets" Source="$(var.SDK_binaries_clnt_src)\Orleans.SDK.targets" />
                 <File Id="File_CL_Orleans.xml" Name="Orleans.xml" Source="$(var.SDK_binaries_clnt_src)\Orleans.xml" />
@@ -87,6 +91,10 @@
                 <File Id="File_SE_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
                 <File Id="File_SE_Microsoft.WindowsAzure.ServiceRuntime.dll" Name="Microsoft.WindowsAzure.ServiceRuntime.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.ServiceRuntime.dll" />
                 <File Id="File_SE_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Storage.dll" />
+                <File Id="File_SE_Microsoft.Data.Edm.dll" Name="Microsoft.Data.Edm.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Edm.dll" />
+                <File Id="File_SE_Microsoft.Data.OData.dll" Name="Microsoft.Data.OData.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.OData.dll" />
+                <File Id="File_SE_Microsoft.Data.Services.Client.dll" Name="Microsoft.Data.Services.Client.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Services.Client.dll" />
+                <File Id="File_SE_System.Spatial.dll" Name="System.Spatial.dll" Source="$(var.SDK_binaries_clnt_src)\System.Spatial.dll" />
                 <File Id="File_SE_Orleans.dll" Name="Orleans.dll" Source="$(var.SDK_binaries_server_src)\Orleans.dll" />
                 <File Id="File_SE_Orleans.SDK.targets" Name="Orleans.SDK.targets" Source="$(var.SDK_binaries_server_src)\Orleans.SDK.targets" />
                 <File Id="File_SE_Orleans.xml" Name="Orleans.xml" Source="$(var.SDK_binaries_server_src)\Orleans.xml" />
@@ -131,6 +139,10 @@
               <File Id="File_LS_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
               <File Id="File_LS_Microsoft.WindowsAzure.ServiceRuntime.dll" Name="Microsoft.WindowsAzure.ServiceRuntime.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.ServiceRuntime.dll" />
               <File Id="File_LS_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Storage.dll" />
+              <File Id="File_LS_Microsoft.Data.Edm.dll" Name="Microsoft.Data.Edm.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Edm.dll" />
+              <File Id="File_LS_Microsoft.Data.OData.dll" Name="Microsoft.Data.OData.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.OData.dll" />
+              <File Id="File_LS_Microsoft.Data.Services.Client.dll" Name="Microsoft.Data.Services.Client.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Services.Client.dll" />
+              <File Id="File_LS_System.Spatial.dll" Name="System.Spatial.dll" Source="$(var.SDK_binaries_clnt_src)\System.Spatial.dll" />
               <File Id="File_LS_Orleans.dll" Name="Orleans.dll" Source="$(var.SDK_binaries_server_src)\Orleans.dll" />
               <File Id="File_LS_Orleans.SDK.targets" Name="Orleans.SDK.targets" Source="$(var.SDK_binaries_server_src)\Orleans.SDK.targets" />
               <File Id="File_LS_Orleans.xml" Name="Orleans.xml" Source="$(var.SDK_binaries_server_src)\Orleans.xml" />
