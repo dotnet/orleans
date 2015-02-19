@@ -44,7 +44,7 @@ namespace Orleans.AzureUtils
     /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
     /// </remarks>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
-    public class AzureTableDataManager<T> where T: TableEntity, new()
+    public class AzureTableDataManager<T> where T : class, ITableEntity, new()
     {
         /// <summary> Name of the table this instance is managing. </summary>
         public string TableName { get; private set; }
@@ -234,11 +234,11 @@ namespace Orleans.AzureUtils
 
 
         /// <summary>
-        /// Merhes a data entry in the Azure table, without checking eTags.
+        /// Merges a data entry in the Azure table, without checking eTags.
         /// </summary>
         /// <param name="data">Data to be merged in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> MergeTableEntryAsync(T data)
+        public async Task<string> MergeTableEntryAsync(T data, string eTag)
         {
             const string operation = "MergeTableEntry";
             var startTime = DateTime.UtcNow;
@@ -246,14 +246,15 @@ namespace Orleans.AzureUtils
 
             try
             {
-                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
+               
                 try
                 {
                     // WAS:
                     // svc.AttachTo(TableName, data, ANY_ETAG);
                     // svc.UpdateObject(data);
-                    
-                    data.ETag = "*";
+
+                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
+                    data.ETag = eTag;
                     //System.ArgumentException: Merge requires an ETag (which may be the '*' wildcard).
                     var opResult = await Task<TableResult>.Factory.FromAsync(
                           tableReference.BeginExecute,
@@ -323,9 +324,36 @@ namespace Orleans.AzureUtils
         /// <param name="data">Data entry to be deleted from the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
         public async Task DeleteTableEntryAsync(T data, string eTag)
-        {
-            var list = new List<Tuple<T, string>> {new Tuple<T, string>(data, eTag)};
-            await DeleteTableEntriesAsync(list);
+        {            
+            const string operation = "DeleteTableEntryAsync";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1}  entry {2}", operation, TableName, data);
+
+            try
+            {
+                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);       
+                data.ETag = eTag;
+                
+                try
+                {                    
+                     var opResult =  await Task<TableResult>.Factory.FromAsync(
+                        tableReference.BeginExecute,
+                        tableReference.EndExecute,
+                        TableOperation.Delete(data),
+                        null);
+                }
+                catch (Exception exc)
+                {
+                    Logger.Warn(ErrorCode.AzureTable_08,
+                        String.Format("Intermediate error deleting entry {0} from the table {1}.",
+                            data, TableName), exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
         }
 
         /// <summary>
@@ -735,7 +763,7 @@ namespace Orleans.AzureUtils
             const string operation = "InitializeTableSchemaFromEntity";
             var startTime = DateTime.UtcNow;
 
-            TableEntity entity = new T();
+            ITableEntity entity = new T();
             entity.PartitionKey = Guid.NewGuid().ToString();
             entity.RowKey = Guid.NewGuid().ToString();
             Array.ForEach(
