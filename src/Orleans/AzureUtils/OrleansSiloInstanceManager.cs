@@ -315,7 +315,7 @@ namespace Orleans.AzureUtils
 
         internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
         {
-            return storage.MergeTableEntryAsync(data);
+            return storage.MergeTableEntryAsync(data, "*");
         }
 
         internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
