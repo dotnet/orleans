@@ -1,4 +1,0 @@
-HaloStatsLoadTest.exe
-
-pause
-

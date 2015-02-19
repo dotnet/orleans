@@ -1,9 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<OrleansConfiguration xmlns="urn:orleans">
-  <Globals>
-    <StorageProviders>
-      <Provider Type="UnitTests.StorageTests.MockStorageProvider" Name="config0" Prop0="0" Prop1="1" />
-      <Provider Type="UnitTests.StorageTests.MockStorageProvider" Name="config1" Prop2="2" Prop3="3" />
-    </StorageProviders>
-  </Globals>
-</OrleansConfiguration>

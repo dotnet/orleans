@@ -1,4 +1,0 @@
-﻿<hostitem:hostItem hostitem:baseType="Microsoft.Office.Tools.Excel.WorkbookBase" hostitem:namespace="ImporterWorkbook" hostitem:className="ThisWorkbook" hostitem:identifier="ImporterWorkbook" hostitem:primaryCookie="ThisWorkbook" hostitem:master="true" hostitem:factoryType="Microsoft.Office.Tools.Excel.Factory" hostitem:startupIndex="0" xmlns:hostitem="http://schemas.microsoft.com/2004/VisualStudio/Tools/Applications/HostItem.xsd">
-  <hostitem:hostObject hostitem:name="ThisApplication" hostitem:identifier="ThisApplication" hostitem:type="Microsoft.Office.Interop.Excel.Application" hostitem:cookie="Application" hostitem:modifier="Internal" />
-  <hostitem:hostControl hostitem:name="ActionsPane" hostitem:identifier="ActionsPane" hostitem:type="Microsoft.Office.Tools.ActionsPane" hostitem:primaryCookie="ActionsPane" hostitem:extenderCookie="" hostitem:modifier="Internal" />
-</hostitem:hostItem>
