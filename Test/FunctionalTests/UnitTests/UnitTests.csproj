@@ -115,7 +115,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Data.Services.Client" />
     <Reference Include="System.Management" />
     <Reference Include="System.Management.Automation" />
     <Reference Include="System.Runtime.Remoting" />
