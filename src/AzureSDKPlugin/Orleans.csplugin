@@ -3,7 +3,7 @@
   xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition"
   namespace="Microsoft.Orleans">
   <Startup priority="-1">
-    <Task commandLine="startorleans.cmd" taskType="foreground" />
+    <Task commandLine="StartOrleansPlugin.cmd" taskType="foreground" />
   </Startup>
   <ConfigurationSettings>
     <Setting name="DataConnectionString" />  

@@ -59,7 +59,7 @@
     <None Include="Orleans.csplugin">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="startorleans.cmd">
+    <None Include="StartOrleansPlugin.cmd">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
