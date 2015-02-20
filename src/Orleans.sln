@@ -78,6 +78,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{80801A64-30AD-4B07-801C-2479A87AC527}"
 	ProjectSection(SolutionItems) = preProject
 		SDK\ClientConfiguration.xml = SDK\ClientConfiguration.xml
+		SDK\ClientConfiguration.xsd = SDK\ClientConfiguration.xsd
 		SDK\InstallOrleansVSTools.cmd = SDK\InstallOrleansVSTools.cmd
 		SDK\OrleansConfiguration.xml = SDK\OrleansConfiguration.xml
 		SDK\OrleansVSTools.vsix = SDK\OrleansVSTools.vsix
