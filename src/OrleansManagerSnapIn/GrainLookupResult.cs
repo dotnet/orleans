@@ -5,15 +5,9 @@ namespace OrleansManager
     [Serializable]
     public struct GrainLookupResult : IEquatable<GrainLookupResult>
     {
-        public string SiloAddress { get; }
-        public string ActivationId { get; }
-
-        public GrainLookupResult(string siloAddress, string activationId)
-        {
-            SiloAddress = siloAddress;
-            ActivationId = activationId;
-        }
-
+        public string SiloAddress { get; set; }
+        public string ActivationId { get; set; }
+        
         #region Equality
 
         public bool Equals(GrainLookupResult other)
@@ -29,19 +23,19 @@ namespace OrleansManager
                 return false;
             }
 
-            return obj is GrainLookupResult && Equals((GrainLookupResult)obj);
+            return obj is GrainLookupResult 
+                && Equals((GrainLookupResult)obj);
         }
 
         public override int GetHashCode()
         {
             unchecked
             {
-                return ((SiloAddress?.GetHashCode() ?? 0) * 397)
-                    ^ (ActivationId?.GetHashCode() ?? 0);
+                return (SiloAddress == null ? 0 : SiloAddress.GetHashCode() * 397)
+                    ^ (ActivationId == null ? 0 : ActivationId.GetHashCode());
             }
         }
-
-
+        
         public static bool operator ==(GrainLookupResult left, GrainLookupResult right)
         {
             return left.Equals(right);

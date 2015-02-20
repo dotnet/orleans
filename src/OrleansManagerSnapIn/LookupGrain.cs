@@ -14,6 +14,11 @@ namespace OrleansManager
     [Cmdlet(VerbsCommon.Find, "Grain")]
     public sealed class LookupGrain : Cmdlet
     {
+        public LookupGrain()
+        {
+            InterfaceTypeCode = -1;
+        }
+
         #region Parameters
 
         //TODO: provide info: how to get the type code
@@ -21,14 +26,14 @@ namespace OrleansManager
         /// The type code of the interface.
         /// </summary>
         [Parameter(ParameterSetName = "TypeCode", Position = 0, Mandatory = true)]
-        public int InterfaceTypeCode { get; set; } = -1;
+        public int InterfaceTypeCode { get; set; } 
 
         //TODO: provide info: how to get the implementation class name
         /// <summary>
         /// The class name of the implementation.
         /// </summary>
         [Parameter(ParameterSetName = "ClassName", Position = 0, Mandatory = true)]
-        public string ImplementationClassName { get; set; } = null;
+        public string ImplementationClassName { get; set; }
 
         [Parameter(ParameterSetName = "TypeCode", Position = 1, Mandatory = true)]
         [Parameter(ParameterSetName = "ClassName", Position = 1, Mandatory = true)]
@@ -39,7 +44,7 @@ namespace OrleansManager
         /// </summary>
         [Parameter(ParameterSetName = "TypeCode", Position = 2, Mandatory = true)]
         [Parameter(ParameterSetName = "ClassName", Position = 2, Mandatory = true)]
-        public string GrainId { get; set; } = string.Empty;
+        public string GrainId { get; set; }
         
         #endregion
         
@@ -78,10 +83,10 @@ namespace OrleansManager
             var lookupResult = directory.LookUp(grainId).Result.Item1 ?? new List<Tuple<SiloAddress, ActivationId>>();
 
             var grainLookupResults = lookupResult.Select(tuple => new GrainLookupResult
-            (
-                activationId: tuple.Item2.ToString(),
-                siloAddress: tuple.Item1.ToString()
-            ));
+            { 
+                ActivationId = tuple.Item2.ToString(),
+                SiloAddress = tuple.Item1.ToString()
+            });
 
             WriteObject(grainLookupResults, true);
         }

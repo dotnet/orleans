@@ -15,20 +15,25 @@ namespace OrleansManager
     [Cmdlet(VerbsCommon.Get, "GrainReport")]
     public sealed class GetGrainReport : Cmdlet
     {
+        public GetGrainReport()
+        {
+            InterfaceTypeCode = -1;
+        }
+
         #region Parameters
         //TODO: provide info: how to get the type code
         /// <summary>
         /// The type code of the interface.
         /// </summary>
         [Parameter(ParameterSetName = "TypeCode", Position = 0, Mandatory = true)]
-        public int InterfaceTypeCode { get; set; } = -1;
+        public int InterfaceTypeCode { get; set; }
 
         //TODO: provide info: how to get the implementation class name
         /// <summary>
         /// The class name of the implementation.
         /// </summary>
         [Parameter(ParameterSetName = "ClassName", Position = 0, Mandatory = true)]
-        public string ImplementationClassName { get; set; } = null;
+        public string ImplementationClassName { get; set; }
 
         /// <summary>
         /// The IPv4 or IPv6 address and the port of the gateway to connect to.
@@ -45,7 +50,7 @@ namespace OrleansManager
         /// </summary>
         [Parameter(ParameterSetName = "TypeCode", Position = 2, Mandatory = true)]
         [Parameter(ParameterSetName = "ClassName", Position = 2, Mandatory = true)]
-        public string GrainId { get; set; } = string.Empty;
+        public string GrainId { get; set; }
         
         #endregion
 

@@ -13,6 +13,11 @@ namespace OrleansManager
     [Cmdlet("Collect", "Activations")]
     public sealed class CollectActivations : Cmdlet
     {
+        public CollectActivations()
+        {
+            AgeLimit = TimeSpan.Zero;
+        }
+
         #region Parameters
 
         [Parameter(Mandatory = true, HelpMessageResourceId = "SiloAddressesParameter", ValueFromPipeline = true)]
@@ -22,12 +27,15 @@ namespace OrleansManager
         public IPEndPoint Gateway { get; set; }
 
         [Parameter(Mandatory = false, HelpMessageResourceId = "AgeLimitParameter")]
-        public TimeSpan AgeLimit { get; set; } = TimeSpan.Zero;
+        public TimeSpan AgeLimit { get; set; }
 
         #endregion
         
-        private static IManagementGrain ManagementGrain => OrleansManagerHelper.GetManagementGrain();
-        
+        private static IManagementGrain ManagementGrain
+        {
+            get { return OrleansManagerHelper.GetManagementGrain(); }
+        }
+
         protected override void BeginProcessing()
         {
             OrleansManagerHelper.Initialize(WriteError, WriteDebug);
