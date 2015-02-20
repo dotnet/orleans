@@ -1,0 +1,31 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Management Tool</title>
+    <authors>$author$</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <summary>
+      Powershell Snap-In for Microsoft Orleans Management
+    </summary>
+    <description>
+      $description$
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="1.0.0.0" />
+      <dependency id="Polly-Signed " version="2.2.1" />
+      <dependency id="System.Management.Automation" version="6.3.9600.17400" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="OrleansManagerSnapIn.dll" target="lib\net45" />
+    <file src="NuGet\tools\install.ps1" target="lib\net45\tools\install.ps1" />
+    <file src="NuGet\tools\uninstall.ps1" target="lib\net45\tools\uninstall.ps1" />
+  </files>
+</package>

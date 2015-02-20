@@ -1,0 +1,126 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <xs:annotation>
+    <xs:documentation xml:lang="en">
+      Visual Studio Code Analysis Custom Dictionary Schema Definition.
+      Copyright (c) Microsoft Corporation. All rights reserved.
+    </xs:documentation>
+  </xs:annotation>
+
+  <xs:element name="Dictionary" type="TDictionary">
+  </xs:element>
+
+  <xs:complexType name="TDictionary">
+    <xs:sequence minOccurs="0" maxOccurs="1">
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="Words" type="TWords" minOccurs="0" maxOccurs="unbounded" />
+        <xs:element name="Acronyms" type="TAcronyms" minOccurs="0" maxOccurs="unbounded" />
+      </xs:choice>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TWords">
+    <xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="Unrecognized" type="TUnrecognized" minOccurs="0" maxOccurs="unbounded" />
+        <xs:element name="Recognized" type="TRecognized" minOccurs="0" maxOccurs="unbounded" />
+        <xs:element name="Deprecated" type="TDeprecated" minOccurs="0" maxOccurs="unbounded" />
+        <xs:element name="Compound" type="TCompound" minOccurs="0" maxOccurs="unbounded" />
+        <xs:element name="DiscreteExceptions" type="TDiscreteExceptions" minOccurs="0" maxOccurs="unbounded" />
+      </xs:choice>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TUnrecognized">
+    <!-- 
+      This is a list of case-insensitive words that exist in the dictionary
+      but you do not want to be recognized by IdentifiersShouldBeSpelledCorrectly.
+      Do not add deprecated terms to this list, instead add these to a 
+      <Deprecated> node described below.
+    -->
+    <xs:sequence>
+      <xs:element name="Word" type="xs:string" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TRecognized">
+    <!--
+      This is a list of case-insensitive words that do not exist in the dictionary
+      but you still want to be considered as recognized by 
+      IdentifiersShouldBeSpelledCorrectly. Do not add compound words (e.g. 'FileName') 
+      to this list as this will cause CompoundWordsShouldBeBeCasedCorrectly to fire on 
+      usages of the compound word stating that they should be changed to their discrete equivalent 
+      (for example 'FileName' -> 'Filename').
+    -->
+    <xs:sequence>
+      <xs:element name="Word" type="xs:string" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TDeprecated">
+    <!-- 
+      This is a list of deprecated terms with their preferred alternates and is 
+      used by UsePreferredTerms. The deprecated terms are case-insensitive, 
+      however, make sure to pascal-case the preferred alternates. If a word 
+      does not have a preferred alternate, simply leave it blank.                                           
+    -->
+    <xs:sequence>
+      <xs:element name="Term" type="TPreferredTerm" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TCompound">
+    <!-- 
+      This is a list of discrete terms with their compound alternates and is used by 
+      CompoundWordsShouldBeCasedCorrectly. These are words that exist in the 
+      dictionary as discrete terms, however, should actually be cased as compound words. 
+      For example, 'Filename' exists in the dictionary and hence the spelling rules will 
+      not see it as unrecognized but its actual preferred usage is 'FileName'; adding it
+      below causes CompoundWordsShouldBeCasedCorrectly to fire. The discrete terms are 
+      case-insensitive, however, be sure to pascal-case the compound alternates.
+      Any discrete terms added below automatically get added to the list of discrete
+      exceptions to prevent CompoundWordsShouldBeCasedCorrectly from firing both on the
+      compound word (for example 'WhiteSpace') and its discrete alternate (for example 
+      'Whitespace').
+    -->
+    <xs:sequence>
+      <xs:element name="Term" type="TCompoundTerm" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TDiscreteExceptions">
+    <!--
+      This is a list of case-insensitive exceptions to the CompoundWordsShouldBeCasedCorrectly 
+      discrete term check. As this check works solely on the basis of whether two consecutive
+      tokens exists in the dictionary, it can have a high false positive rate. For example, 
+      'onset' exists in the dictionary but the user probably intended it to be 'OnSet'. 
+      Adding this word below prevents this rule from firing telling the user to change 'OnSet' 
+      to 'Onset'.
+    -->
+    <xs:sequence>
+      <xs:element name="Term" type="xs:string" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TPreferredTerm">
+    <xs:attribute name="PreferredAlternate" type="xs:string" use="required" />
+  </xs:complexType>
+
+  <xs:complexType name="TCompoundTerm">
+    <xs:attribute name="CompoundAlternate" type="xs:string" use="required" />
+  </xs:complexType>
+
+  <xs:complexType name="TAcronyms">
+    <xs:sequence>
+      <xs:element name="CasingExceptions" type="TCasingExceptions" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TCasingExceptions">
+    <xs:sequence>
+      <xs:element name="Acronym" type="xs:string" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
