@@ -1,0 +1,136 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<helpItems xmlns="http://msh" schema="maml" 
+           xmlns:maml="http://schemas.microsoft.com/maml/2004/10" 
+           xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" 
+           xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  <!-- 
+    TODO: write a help topic for every CmdLet. For details see 
+    http://blogs.msdn.com/b/powershell/archive/2006/09/14/draft-creating-cmdlet-help.aspx 
+  -->
+  <command:command>
+    <command:details>
+      <command:name>Verb-Noun cmdlet name</command:name>
+      <maml:description>
+        <maml:para> Short description of what cmdlet does.</maml:para>
+      </maml:description>
+      <maml:copyright>
+        <maml:para></maml:para>
+      </maml:copyright>
+      <command:verb>Cmdlet verb name</command:verb>
+      <command:noun>Cmdlet Noun name</command:noun>
+      <dev:version></dev:version>
+    </command:details>
+    <maml:description>
+      <maml:para>Detailed description of cmdlet.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Verb-Noun name of cmdlet</maml:name>
+        <command:parameter required="true" position="1">
+          <maml:name>Parameter1 name</maml:name>
+          <maml:description>
+            <maml:para>Description of parameter1.</maml:para>
+          </maml:description>
+          <command:parameterValue>value type</command:parameterValue>
+        </command:parameter>
+        <command:parameter required="false" position="named">
+          <maml:name>Parameter2 name</maml:name>
+          <maml:description>
+            <maml:para>Descrition of parameter2.</maml:para>
+          </maml:description>
+          <command:parameterValue>value type</command:parameterValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="true" position="1">
+        <maml:name>Parameter name</maml:name>
+        <maml:description>
+          <maml:para>Parameter description.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">
+          Paremeter value type.
+        </command:parameterValue>
+        <dev:type>
+          <maml:name></maml:name>
+          <maml:uri/>
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" position="1">
+        <maml:name>Parameter name</maml:name>
+        <maml:description>
+          <maml:para>Parameter description.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">
+          Paremeter value type.
+        </command:parameterValue>
+        <dev:type>
+          <maml:name></maml:name>
+          <maml:uri/>
+        </dev:type>
+        <dev:defaultValue></dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>Type name.</maml:name>
+          <maml:uri/>
+          <maml:description>
+            <maml:para>Description of type.</maml:para>
+          </maml:description>
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>Output object type.</maml:name>
+          <maml:uri />
+          <maml:description>
+            <maml:para>
+              Object type description
+            </maml:para>
+          </maml:description>
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <command:terminatingErrors />
+    <command:nonTerminatingErrors />
+    <maml:alertSet>
+      <maml:title></maml:title>
+      <maml:alert>
+        <maml:para>Add content for Remark1.</maml:para>
+      </maml:alert>
+      <maml:alert>
+        <maml:para>Add content for Remark2.</maml:para>
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>
+          ------------------------ EXAMPLE 1 ------------------------
+        </maml:title>
+        <maml:introduction>
+          <maml:para>Description of example.</maml:para>
+        </maml:introduction>
+        <dev:code>Example code.</dev:code>
+        <dev:remarks>
+          <maml:para>Remarks about the example.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <maml:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>TopicTitle</maml:linkText>
+        <maml:uri/>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>TopicTitle</maml:linkText>
+        <maml:uri/>
+      </maml:navigationLink>
+    </maml:relatedLinks>
+  </command:command>
+</helpItems>

@@ -1,0 +1,1 @@
+﻿#TODO: uninstall using admin rights
