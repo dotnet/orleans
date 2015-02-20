@@ -9,7 +9,7 @@ Orleans has been used extensively running in Microsoft Azure by several Microsof
 
 Installation
 =======
-The stable production-quality release v1.0.0 is located [here](https://github.com/dotnet/orleans/releases/tag/v1.0.0).
+The stable production-quality release v1.0.1 is located [here](https://github.com/dotnet/orleans/releases/tag/v1.0.1).
 
 The latest development branch build from CI is orleans_setup.msi located: [here](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/ws/Binaries/Release/)
 
