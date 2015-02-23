@@ -98,6 +98,7 @@
     <Compile Include="AzureUtils\SiloMetricsTableDataManager.cs" />
     <Compile Include="CodeGeneration\GrainState.cs" />
     <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
+    <Compile Include="CodeGeneration\Language.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
     <Compile Include="Core\Exceptions.cs" />
