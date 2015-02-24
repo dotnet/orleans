@@ -181,16 +181,20 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Get the instance named for the specified Azure role instance
         /// </summary>
-        /// <param name="deploymentId">Azure Deployment Id for this service</param>
         /// <param name="roleInstance">Azure role instance information</param>
         /// <returns>Instance name for this role</returns>
-        public static string GetInstanceName(string deploymentId, RoleInstance roleInstance)
+        public static string GetInstanceName(RoleInstance roleInstance)
         {
+            // Try to remove the deploymentId part of the instanceId, if it is there.
+            // The goal is mostly to remove undesired characters that are being added to deploymentId when run in Azure emulator.
+            // Notice that we should use RoleEnvironment.DeploymentId and not the deploymentId that is being passed to us by the user, 
+            // since in general this may be an arbitrary string and thus we will not remove the RoleEnvironment.DeploymentId correctly.
+            string deploymentId = RoleEnvironment.DeploymentId;
             string instanceId = roleInstance.Id;
             return GetInstanceNameInternal(deploymentId, instanceId);
         }
 
-        internal static string GetInstanceNameInternal(string deploymentId, string instanceId)
+        private static string GetInstanceNameInternal(string deploymentId, string instanceId)
         {
             return instanceId.Length > deploymentId.Length && instanceId.StartsWith(deploymentId)
                 ? instanceId.Substring(deploymentId.Length + 1)
@@ -203,7 +207,7 @@ namespace Orleans.Runtime.Host
         /// <returns>Instance name for the current role instance</returns>
         public static string GetMyInstanceName()
         {
-            return GetInstanceName(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance);
+            return GetInstanceName(RoleEnvironment.CurrentRoleInstance);
         }
 
         /// <summary>
