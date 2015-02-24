@@ -209,6 +209,7 @@ set SolutionDir=$(SolutionDir)
 set OutDir=$(OutDir)
 set TargetDir=$(TargetDir)
 set BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)
+set Configuration=$(Configuration)
 
 @echo Calling Build\PostBuild.cmd
 call "$(SolutionDir)Build\PostBuild.cmd"</PostBuildEvent>

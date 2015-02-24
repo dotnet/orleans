@@ -8,7 +8,7 @@
     <ProjectGuid>{792818EF-B3F8-4CE2-9886-4808713B15C4}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Orleans.Host.Azure.Utils</RootNamespace>
+    <RootNamespace>Orleans.Runtime.Host</RootNamespace>
     <AssemblyName>OrleansAzureUtils</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>

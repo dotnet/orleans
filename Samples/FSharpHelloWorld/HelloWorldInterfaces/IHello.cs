@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,33 +21,20 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Text;
 using Orleans;
 
-namespace UnitTests.SampleStreaming
+namespace FSharpWorldInterfaces
 {
-    public interface ISampleStreaming_ProducerGrain : IGrain
+    /// <summary>
+    /// Orleans grain communication interface IHello
+    /// </summary>
+    public interface IHello : Orleans.IGrainWithIntegerKey
     {
-        Task BecomeProducer(Guid streamId, string providerToUse);
-
-        Task StartPeriodicProducing();
-
-        Task StopPeriodicProducing();
-
-        Task<int> GetNumberProduced();
-    }
-
-    public interface ISampleStreaming_ConsumerGrain : IGrain
-    {
-        Task BecomeConsumer(Guid streamId, string providerToUse);
-
-        Task StopConsuming();
-
-        Task<int> GetNumberConsumed();
-    }
-
-    public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
-    {
+        Task<string> SayHello(string greeting);
     }
 }
