@@ -31,13 +31,13 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
+
 
 namespace Orleans.AzureUtils
 {
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class SiloInstanceTableEntry : TableServiceEntity
+    internal class SiloInstanceTableEntry : TableEntity
     {
         public string DeploymentId { get; set; }    // PartitionKey
         public string Address { get; set; }         // RowKey
@@ -315,10 +315,10 @@ namespace Orleans.AzureUtils
 
         internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
         {
-            return storage.MergeTableEntryAsync(data);
+            return storage.MergeTableEntryAsync(data, "*");
         }
 
-        public Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -378,11 +378,41 @@ namespace Orleans.AzureUtils
         /// Insert (create new) row entry
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
-        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string versionEtag, bool updateTableVersion = true)
+        internal async Task<bool> TryCreateTableVersionEntryAsync()
         {
             try
             {
-                await storage.InsertTableEntryConditionallyAsync(siloEntry, tableVersionEntry, versionEtag, updateTableVersion);
+                var versionRow = await storage.ReadSingleTableEntryAsync(DeploymentId, SiloInstanceTableEntry.TABLE_VERSION_ROW);
+                if (versionRow != null && versionRow.Item1 != null)
+                {
+                    return false;
+                }
+                SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
+                await storage.CreateTableEntryAsync(entry);
+                return true;
+            }
+            catch (Exception exc)
+            {
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                if (!AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
+
+                if (logger.IsVerbose2) logger.Verbose2("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
+
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Insert (create new) row entry
+        /// </summary>
+        /// <param name="siloEntry">Silo Entry to be written</param>
+        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag)
+        {
+            try
+            {
+                await storage.InsertTableEntryConditionallyAsync(siloEntry, tableVersionEntry, tableVersionEtag);
                 return true;
             }
             catch (Exception exc)

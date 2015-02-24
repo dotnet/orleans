@@ -27,8 +27,7 @@ using System.Data.Services.Common;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
-
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -353,9 +352,8 @@ namespace Orleans.Storage
         }
 
 
-        [Serializable]
-        [DataServiceKey("PartitionKey", "RowKey")]
-        internal class GrainStateEntity : TableServiceEntity
+        [Serializable]        
+        internal class GrainStateEntity : TableEntity
         {
             public byte[] Data { get; set; }
             public string StringData { get; set; }
@@ -393,7 +391,11 @@ namespace Orleans.Storage
                 try
                 {
                     Tuple<GrainStateEntity, string> data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey);
-
+                    if (data == null || data.Item1 == null)
+                    {
+                        if (logger.IsVerbose2) logger.Verbose2((int)ProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
+                        return null;
+                    }
                     GrainStateEntity stateEntity = data.Item1;
                     var record = new GrainStateRecord { Entity = stateEntity, ETag = data.Item2 };
                     if (logger.IsVerbose3) logger.Verbose3((int)ProviderErrorCode.AzureTableProvider_Storage_DataRead, "Read: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", stateEntity.PartitionKey, stateEntity.RowKey, TableName, record.ETag);
@@ -403,7 +405,7 @@ namespace Orleans.Storage
                 {
                     if (AzureStorageUtils.TableStorageDataNotFound(exc))
                     {
-                        if (logger.IsVerbose2) logger.Verbose2((int)ProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading: PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, exc);
+                        if (logger.IsVerbose2) logger.Verbose2((int)ProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, TraceLogger.PrintException(exc));
                         return null;  // No data
                     }
                     throw;
