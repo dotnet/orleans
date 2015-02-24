@@ -162,6 +162,11 @@ namespace Orleans.AzureUtils
                     if (e is DataServiceQueryException)
                     {
                         var dsqe = e as DataServiceQueryException;
+                        if (dsqe.Response == null)
+                        {
+                            e = e.GetBaseException();
+                            continue;
+                        }
                         httpStatusCode = (HttpStatusCode)dsqe.Response.StatusCode;
                         if (getExtendedErrors)
                             restStatus = ExtractRestErrorCode(dsqe);
