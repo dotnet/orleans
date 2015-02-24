@@ -26,7 +26,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 ﻿using System.Linq;
 ﻿using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 ﻿using Orleans.Runtime;
 ﻿using Orleans.Streams;
