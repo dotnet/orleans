@@ -8,7 +8,7 @@
     <ProjectGuid>{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>OrleansProviders</RootNamespace>
+    <RootNamespace>Orleans.Providers</RootNamespace>
     <AssemblyName>OrleansProviders</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
