@@ -125,6 +125,7 @@
     <Compile Include="Core\Exceptions.cs" />
     <Compile Include="Core\IGrainState.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
@@ -167,6 +168,7 @@
     <Compile Include="Streams\Core\IAsyncObservable.cs" />
     <Compile Include="Streams\Internal\IStreamControl.cs" />
     <Compile Include="Streams\Core\IStreamIdentity.cs" />
+    <Compile Include="Streams\Providers\StreamProviderDirection.cs" />
     <Compile Include="Streams\Providers\IStreamProviderImpl.cs" />
     <Compile Include="Streams\Providers\IStreamProviderManager.cs" />
     <Compile Include="Streams\Providers\IStreamProviderRuntime.cs" />
@@ -360,7 +362,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <ClientGenReferences>System.Data.dll;$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.2\lib\net40\Microsoft.Data.Services.Client.dll;</ClientGenReferences>
+    <CodeGenToolReferences>System.Data.dll;$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.2\lib\net40\Microsoft.Data.Services.Client.dll;</CodeGenToolReferences>
   </PropertyGroup>
   <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" 
           Condition="'$(BuildingInsideVisualStudio)' != 'true'" 
@@ -376,46 +378,53 @@
     <!-- Show values of some useful properties -->
     <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
   </Target>
-  <Target Name="OrleansDllBootstrapUsingClientGen" 
+  <Target Name="OrleansDllBootstrapUsingCodeGen"
           AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" 
           Inputs="@(Compile);@(ReferencePath)" 
           Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
-    <Message Text="[OrleansDllBootstrapUsingClientGen] - Bootstrapping the Orleans.dll" Importance="high" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
     <!-- Clean Generated directory -->
-    <Message Text="[OrleansDllBootstrapUsingClientGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
     <MakeDir Directories="$(IntermediateOutputPath)Generated" />
     <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
-    <!-- Extract the sources for clientgen -->
-    <Message Text="[OrleansDllBootstrapUsingClientGen] - Searching for ClientGen sources" Importance="high" />
+    <!-- Extract the sources for Orleans codegen tool -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Searching for Orleans CodeGen tool sources" Importance="high" />
     <ItemGroup>
       <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*.cs" />
       <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*\*.cs" />
     </ItemGroup>
     <PropertyGroup>
-      <ClientGenSources>@(CodeGenSrcFiles->'%(Identity)')</ClientGenSources>
+      <CodeGenToolSources>@(CodeGenSrcFiles->'%(Identity)')</CodeGenToolSources>
     </PropertyGroup>
-    <Message Text="ClientGenSources extracted: $(ClientGenSources)" Importance="high" />
+    <Message Text="CodeGenToolSources extracted: $(CodeGenToolSources)" Importance="high" />
     <!-- Compile orleans dll -->
-    <Message Text="[OrleansDllBootstrapUsingClientGen] - Compiling Orleans.dll for boot strap" Importance="high" />
-    <csc Sources="@(Compile)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(ClientGenReferences);Microsoft.VisualBasic.dll;$(SolutionDir)packages\WindowsAzure.Storage.4.3.0\lib\net40\Microsoft.WindowsAzure.Storage.dll" DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN;" KeyFile="$(AssemblyOriginatorKeyFile)" TargetType="$(OutputType)" />
-    <!-- $(SolutionDir)Dependencies\Windows-Azure-SDK\v$(AzureSdkVersion)\ref\Microsoft.WindowsAzure.StorageClient.dll; -->
-    <!-- Compile clientgen-->
-    <Message Text="[OrleansDllBootstrapUsingClientGen] - Compiling ClientGenerator for BootStrap" Importance="high" />
-    <csc Sources="$(ClientGenSources)" 
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for boot strap" Importance="high" />
+    <csc Sources="@(Compile)" 
+         OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
+         EmitDebugInformation="true" 
+         PdbFile="$(PdbFile)" 
+         Platform="$(PlatformTarget)" 
+         References="$(CodeGenToolReferences);$(SolutionDir)packages\WindowsAzure.Storage.4.3.0\lib\net40\Microsoft.WindowsAzure.Storage.dll"
+         DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN" 
+         KeyFile="$(AssemblyOriginatorKeyFile)" 
+         TargetType="$(OutputType)" />
+    <!-- Compile codegen tool exe -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans codegen tool for BootStrap" Importance="high" />
+    <csc Sources="$(CodeGenToolSources)"
          OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" 
          EmitDebugInformation="true" 
          PdbFile="$(PdbFile)" 
          Platform="$(PlatformTarget)" 
-         References="$(ClientGenReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
+         References="$(CodeGenToolReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
          DefineConstants="$(DefineConstants);CLIENTGEN_PROJECT" 
          KeyFile="$(AssemblyOriginatorKeyFile)" />
     <!-- Finally invoke ClientGenerator.exe on the recently built Orleans.dll -->
-    <Message Text="[OrleansDllBootstrapUsingClientGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
-      <ClientGenCmd>"$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" /nomerge /bootstrap "/in:$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</ClientGenCmd>
+      <CodeGenToolExecCmd>"$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" /nomerge /bootstrap "/in:$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</CodeGenToolExecCmd>
     </PropertyGroup>
-    <Message Text="[OrleansDllBootstrapUsingClientGen] - CodeGen Cmd = $(ClientGenCmd)" />
-    <Exec Command="$(ClientGenCmd)" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - CodeGen Cmd = $(CodeGenToolExecCmd)" />
+    <Exec Command="$(CodeGenToolExecCmd)" />
   </Target>
   <Target Name="WriteArgsToFileForDebugging" 
           AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" 
