@@ -59,22 +59,5 @@ namespace UnitTests.StorageTests
         {
             InitTableAsync().WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Wait();
         }
-
-        public async Task<IEnumerable<UnitTestAzureTableData>> ReadAllDataAsync(string partitionKey)
-        {
-            var data = await ReadAllTableEntriesForPartitionAsync(partitionKey)
-                .WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout);
-
-            return data.Select(tuple => tuple.Item1);
-        }
-
-        public Task<string> WriteDataAsync(string partitionKey, string rowKey, string stringData)
-        {
-            UnitTestAzureTableData dataObject = new UnitTestAzureTableData();
-            dataObject.PartitionKey = partitionKey;
-            dataObject.RowKey = rowKey;
-            dataObject.StringData = stringData;
-            return UpsertTableEntryAsync(dataObject);
-        }
     }
 }

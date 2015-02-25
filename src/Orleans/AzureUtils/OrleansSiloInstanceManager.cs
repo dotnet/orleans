@@ -315,7 +315,7 @@ namespace Orleans.AzureUtils
 
         internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
         {
-            return storage.MergeTableEntryAsync(data, "*");
+            return storage.MergeTableEntryAsync(data, AzureTableDataManager<SiloInstanceTableEntry>.ANY_ETAG);
         }
 
         internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
@@ -329,7 +329,18 @@ namespace Orleans.AzureUtils
 
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(deploymentId);
             var entriesList = new List<Tuple<SiloInstanceTableEntry, string>>(entries);
-            await storage.DeleteTableEntriesAsync(entriesList);
+            if (entriesList.Count <= AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            {
+                await storage.DeleteTableEntriesAsync(entriesList);
+            }else
+            {
+                List<Task> tasks = new List<Task>();
+                foreach (var batch in entriesList.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                {
+                    tasks.Add(storage.DeleteTableEntriesAsync(batch));
+                }
+                await Task.WhenAll(tasks);
+            }
             return entriesList.Count();
         }
 
@@ -412,7 +423,7 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                await storage.InsertTableEntryConditionallyAsync(siloEntry, tableVersionEntry, tableVersionEtag);
+                await storage.InsertTwoTableEntriesConditionallyAsync(siloEntry, tableVersionEntry, tableVersionEtag);
                 return true;
             }
             catch (Exception exc)
@@ -438,7 +449,7 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                await storage.UpdateTableEntryConditionallyAsync(siloEntry, entryEtag, tableVersionEntry, versionEtag);
+                await storage.UpdateTwoTableEntriesConditionallyAsync(siloEntry, entryEtag, tableVersionEntry, versionEtag);
                 return true;
             }
             catch (Exception exc)

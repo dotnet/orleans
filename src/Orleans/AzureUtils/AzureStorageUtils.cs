@@ -115,6 +115,8 @@ namespace Orleans.AzureUtils
                     var xmlReader = XmlReader.Create(new StringReader(exc.Message));
                     xml.Load(xmlReader);
                     var namespaceManager = new XmlNamespaceManager(xml.NameTable);
+                    // This is still the namespace error code will be returned in: 
+                    // https://msdn.microsoft.com/en-us/library/azure/dd179382.aspx
                     namespaceManager.AddNamespace("n", "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata");
                     return xml.SelectSingleNode("/n:error/n:code", namespaceManager).InnerText;
                 }
