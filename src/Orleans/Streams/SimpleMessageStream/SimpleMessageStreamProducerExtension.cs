@@ -161,7 +161,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             return TaskDone.Done;
         }
 
-        public Task RemoveSubscriber(GuidId subscriptionId)
+        public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
         {
             if (logger.IsVerbose)
             {

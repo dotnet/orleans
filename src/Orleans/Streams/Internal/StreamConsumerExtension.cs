@@ -231,12 +231,6 @@ namespace Orleans.Streams
             return TaskDone.Done;
         }
 
-        internal int DiagCountStreamObservers<T>(StreamId streamId)
-        {
-            return ((ObserversCollection<T>) allStreamObservers[streamId]).Count;
-        }
-
-
 
         /// <summary>
         /// Wraps a single application observer object, mainly to add Dispose fuctionality.

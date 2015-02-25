@@ -142,7 +142,7 @@ namespace Orleans.Streams
 
         public async Task RegisterConsumer(
             GuidId subscriptionId,
-//            StreamId streamId, 
+            StreamId streamId, 
             IStreamConsumerExtension streamConsumer, 
             StreamSequenceToken token, 
             IStreamFilterPredicateWrapper filter)
@@ -191,7 +191,7 @@ namespace Orleans.Streams
                         continue;
                     }
 
-                    Task addSubscriberPromise = producer.Producer.AddSubscriber(streamId, streamConsumer, token, filter)
+                    Task addSubscriberPromise = producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, token, filter)
                         .ContinueWith(t =>
                         {
                             if (t.IsFaulted)
@@ -238,7 +238,7 @@ namespace Orleans.Streams
             }
         }
 
-        public async Task UnregisterConsumer(GuidId subscriptionId)
+        public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId)
         {
             int numRemoved = State.Consumers.RemoveWhere(c => c.Equals(subscriptionId));
             counterConsumersRemoved.Increment();
@@ -255,7 +255,7 @@ namespace Orleans.Streams
                 // Notify producers about unregistered consumer.
                 var tasks = new List<Task>();
                 foreach (var producerState in State.Producers.Where(producerState => IsActiveProducer(producerState.Producer)))
-                    tasks.Add(producerState.Producer.RemoveSubscriber(subscriptionId));
+                    tasks.Add(producerState.Producer.RemoveSubscriber(subscriptionId, streamId));
                 
                 await Task.WhenAll(tasks);
             }

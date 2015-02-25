@@ -47,6 +47,6 @@ namespace Orleans.Streams
         Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
 
         [AlwaysInterleave]
-        Task RemoveSubscriber(GuidId subscriptionId);
+        Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId);
     }
 }

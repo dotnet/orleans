@@ -52,7 +52,7 @@ namespace Orleans.Streams
         public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.UnregisterConsumer(subscriptionId);
+            return streamRendezvous.UnregisterConsumer(subscriptionId, streamId);
         }
 
         public Task<int> ProducerCount(Guid guidId, string streamProvider, string streamNamespace)
