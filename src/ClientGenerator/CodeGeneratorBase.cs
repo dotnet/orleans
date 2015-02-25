@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
@@ -50,6 +50,7 @@ namespace Orleans.CodeGeneration
         protected const string CODE_GENERATOR_NAME = "Orleans-CodeGenerator";
         protected static readonly string CodeGeneratorVersion = RuntimeVersion.FileVersion;
         protected string CurrentNamespace;
+        private readonly Language language;
 
         /// <summary>
         /// Returns a name string for a nested class type name (ClassName.TypeName)
@@ -80,10 +81,11 @@ namespace Orleans.CodeGeneration
             return builder.ToString();
         }
 
-        protected CodeGeneratorBase()
+        protected CodeGeneratorBase(Language language)
         {
             ReferencedNamespaces = new HashSet<string>();
             ReferencedAssemblies = new HashSet<string>();
+            this.language = language;
         }
 
         internal HashSet<string> ReferencedNamespaces { get; private set; }
@@ -132,11 +134,11 @@ namespace Orleans.CodeGeneration
             return methodInfo.DeclaringType.IsInterface && typeof(IAddressable).IsAssignableFrom(methodInfo.DeclaringType);
         }
         
-        internal static CodeDomProvider GetCodeProvider(GrainClientGenerator.Language language, bool debug = false)
+        internal static CodeDomProvider GetCodeProvider(Language language, bool debug = false)
         {
             switch (language)
             {
-                case GrainClientGenerator.Language.CSharp:
+                case Language.CSharp:
                 {
                     var providerOptions = new Dictionary<string, string> { { "CompilerVersion", "v4.0" } };
                     if (debug)
@@ -144,7 +146,7 @@ namespace Orleans.CodeGeneration
 
                     return new CSharpCodeProvider(providerOptions);
                 }
-                case GrainClientGenerator.Language.VisualBasic:
+                case Language.VisualBasic:
                 {
                     var providerOptions = new Dictionary<string, string>();
                     if (debug)
@@ -266,7 +268,7 @@ namespace Orleans.CodeGeneration
                     AddReferencedAssembly(argument);
             }
 
-            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace));
+            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace), language);
             return GetNestedClassName(typeName);
         }
 

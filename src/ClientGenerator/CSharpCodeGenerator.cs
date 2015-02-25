@@ -39,7 +39,7 @@ namespace Orleans.CodeGeneration
     internal class CSharpCodeGenerator : NamespaceGenerator
     {
         public CSharpCodeGenerator(Assembly grainAssembly, string nameSpace)
-            : base(grainAssembly, nameSpace)
+            : base(grainAssembly, nameSpace, Language.CSharp)
         {}
 
         protected override string GetGenericTypeName(Type type, Action<Type> referred, Func<Type, bool> noNamespace = null)
@@ -50,7 +50,7 @@ namespace Orleans.CodeGeneration
 
             referred(type);
 
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.CSharp);
 
             if (!type.IsGenericType)
             {
@@ -193,7 +193,7 @@ namespace Orleans.CodeGeneration
                 var t = new System.Threading.Tasks.TaskCompletionSource<object>();
                 t.SetException(new NotImplementedException(""No grain interfaces for type {0}""));
                 return t.Task;
-                ", TypeUtils.GetFullName(grainType));
+                ", TypeUtils.GetFullName(grainType, Language.CSharp));
             }
 
             var builder = new StringBuilder();
@@ -523,7 +523,7 @@ namespace Orleans.CodeGeneration
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("{0} is global::Orleans.Grain ? {2}.{1}.Cast({0}.AsReference()) : {0}",
                         GetParameterName(paramInfo),
-                        GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType),
+                        GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType, Language.CSharp),
                         paramInfo.ParameterType.Namespace);
                 else
                     invokeArguments += GetParameterName(paramInfo);
