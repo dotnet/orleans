@@ -57,9 +57,6 @@ namespace Orleans.AzureUtils
 
         private readonly CloudTableClient tableOperationsClient;
 
-        internal const string ANY_ETAG = "*";
-        // See http://msdn.microsoft.com/en-us/library/windowsazure/dd894038.aspx
-
         private readonly CounterStatistic numServerBusy = CounterStatistic.FindOrCreate(StatisticNames.AZURE_SERVER_BUSY, true);
 
         /// <summary>
@@ -630,7 +627,7 @@ namespace Orleans.AzureUtils
 
         #region Internal functions
 
-        internal async Task<string> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
+        internal async Task<Tuple<string, string>> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
             const string operation = "InsertTableEntryConditionally";
             string data2Str = (data2 == null ? "null" : data2.ToString());
@@ -667,7 +664,7 @@ namespace Orleans.AzureUtils
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
                     //The ETag of data is needed in further operations.                    
-                    return opResults[0].Etag;                                                                                                                                                              
+                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);                                                                                                                                                              
                 }
                 catch (Exception exc)
                 {
@@ -681,7 +678,7 @@ namespace Orleans.AzureUtils
             }
         }
 
-        internal async Task<string> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
+        internal async Task<Tuple<string, string>> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
         {
             const string operation = "UpdateTableEntryConditionally";
             string data2Str = (data2 == null ? "null" : data2.ToString());
@@ -722,7 +719,7 @@ namespace Orleans.AzureUtils
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
                     //The ETag of data is needed in further operations.                                        
-                    return opResults[0].Etag;               
+                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);                   
                 }
                 catch (Exception exc)
                 {

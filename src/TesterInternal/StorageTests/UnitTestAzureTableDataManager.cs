@@ -39,6 +39,28 @@ namespace UnitTests.StorageTests
         public byte[] Data { get; set; }
         public string StringData { get; set; }
 
+        public UnitTestAzureTableData()
+        {
+
+        }
+
+        public UnitTestAzureTableData(string data, string partitionKey, string rowKey)
+        {
+            StringData = data;
+            PartitionKey = partitionKey;
+            RowKey = rowKey;
+        }
+
+        public UnitTestAzureTableData Clone()
+        {
+            return new UnitTestAzureTableData
+            {
+                StringData = this.StringData,
+                PartitionKey = this.PartitionKey,
+                RowKey = this.RowKey
+            };
+        }
+
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
