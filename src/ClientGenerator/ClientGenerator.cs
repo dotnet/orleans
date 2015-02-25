@@ -524,7 +524,7 @@ namespace Orleans.CodeGeneration
                     break;
 
                 case Language.FSharp:
-                    newArgs.AppendFormat(" -o:{0} ", options.InputLib.FullName);
+                    newArgs.AppendFormat(" -o:\"{0}\" ", options.InputLib.FullName);
                     newArgs.AppendFormat(" -g ");
                     newArgs.AppendFormat(" --debug:full ");
                     newArgs.AppendFormat(" --noframework ");
