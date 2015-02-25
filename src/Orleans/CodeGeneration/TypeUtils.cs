@@ -35,22 +35,31 @@ namespace Orleans.Runtime
     /// </summary>
     internal static class TypeUtils
     {
-        public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName=null)
+
+        private static string GetSimpleNameHandleArray(Type t, Language language)
+        {
+            if (t.IsArray && language == Language.VisualBasic)
+                return t.Name.Replace('[', '(').Replace(']', ')');
+
+            return t.Name;
+        }
+        
+        public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
         {
             if (t.IsNestedPublic || t.IsNestedPrivate)
             {
                 if (t.DeclaringType.IsGenericType)
-                    return GetTemplatedName(GetUntemplatedTypeName(t.DeclaringType.Name), t.DeclaringType, t.GetGenericArguments(), _ => true) + "." + GetUntemplatedTypeName(t.Name);
+                    return GetTemplatedName(GetUntemplatedTypeName(t.DeclaringType.Name), t.DeclaringType, t.GetGenericArguments(), _ => true, language) + "." + GetUntemplatedTypeName(t.Name, language);
                 
-                return GetTemplatedName(t.DeclaringType) + "." + GetUntemplatedTypeName(t.Name);
+                return GetTemplatedName(t.DeclaringType, language: language) + "." + GetUntemplatedTypeName(t.Name, language: language);
             }
 
-            if (t.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(t) ? GetFullName(t) : t.Name);
+            if (t.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language));
             
-            return fullName != null && fullName(t) ? GetFullName(t) : t.Name;
+            return fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language: language);
         }
 
-        public static string GetUntemplatedTypeName(string typeName)
+        public static string GetUntemplatedTypeName(string typeName, Language language = Language.CSharp)
         {
             int i = typeName.IndexOf('`');
             if (i > 0)
@@ -91,27 +100,35 @@ namespace Orleans.Runtime
             return t.IsArray && IsConcreteTemplateType(t.GetElementType());
         }
 
-        public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null)
+        public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
         {
-            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName), t, t.GetGenericArguments(), fullName);
+            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName, language), t, t.GetGenericArguments(), fullName, language);
 
-            return t.IsArray ? 
-                GetTemplatedName(t.GetElementType(), fullName) + "[" + new string(',', t.GetArrayRank() - 1) + "]" : 
-                GetSimpleTypeName(t, fullName);
+            if (t.IsArray)
+            {
+                bool isVB = language == Language.VisualBasic;
+
+                return GetTemplatedName(t.GetElementType(), fullName)
+                       + (isVB ? "(" : "[")
+                       + new string(',', t.GetArrayRank() - 1)
+                       + (isVB ? ")" : "]");
+            }
+            
+            return GetSimpleTypeName(t, fullName, language);
         }
 
-        public static string GetTemplatedName(string baseName, Type t, Type[] genericArguments, Func<Type, bool> fullName)
+        public static string GetTemplatedName(string baseName, Type t, Type[] genericArguments, Func<Type, bool> fullName, Language language = Language.CSharp)
         {
             if (!t.IsGenericType || (t.DeclaringType != null && t.DeclaringType.IsGenericType)) return baseName;
-
+            bool isVB = language == Language.VisualBasic;
             string s = baseName;
-            s += "<";
-            s += GetGenericTypeArgs(genericArguments, fullName);
-            s += ">";
+            s += isVB ? "(Of " : "<";
+            s += GetGenericTypeArgs(genericArguments, fullName, language);
+            s += isVB ? ")" : ">";
             return s;
         }
 
-        public static string GetGenericTypeArgs(Type[] args, Func<Type, bool> fullName)
+        public static string GetGenericTypeArgs(Type[] args, Func<Type, bool> fullName, Language language = Language.CSharp)
         {
             string s = String.Empty;
 
@@ -124,11 +141,11 @@ namespace Orleans.Runtime
                 }
                 if (!genericParameter.IsGenericType)
                 {
-                    s += GetSimpleTypeName(genericParameter, fullName);
+                    s += GetSimpleTypeName(genericParameter, fullName, language);
                 }
                 else
                 {
-                    s += GetTemplatedName(genericParameter, fullName);
+                    s += GetTemplatedName(genericParameter, fullName, language);
                 }
                 first = false;
             }
@@ -136,28 +153,29 @@ namespace Orleans.Runtime
             return s;
         }
 
-        public static string GetParameterizedTemplateName(Type t, bool applyRecursively = false, Func<Type, bool> fullName = null)
+        public static string GetParameterizedTemplateName(Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = tt => false;
 
-            return GetParameterizedTemplateName(t, fullName, applyRecursively);
+            return GetParameterizedTemplateName(t, fullName, applyRecursively, language);
         }
 
-        public static string GetParameterizedTemplateName(Type t, Func<Type,bool> fullName, bool applyRecursively = false)
+        public static string GetParameterizedTemplateName(Type t, Func<Type, bool> fullName, bool applyRecursively = false, Language language = Language.CSharp)
         {
-            return t.IsGenericType ? GetParameterizedTemplateName(GetSimpleTypeName(t, fullName), t, applyRecursively, fullName) : t.FullName;
+            return t.IsGenericType ? GetParameterizedTemplateName(GetSimpleTypeName(t, fullName), t, applyRecursively, fullName, language) : t.FullName;
         }
 
-        public static string GetParameterizedTemplateName(string baseName, Type t, bool applyRecursively = false, Func<Type, bool> fullName = null)
+        public static string GetParameterizedTemplateName(string baseName, Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = tt => false;
 
             if (!t.IsGenericType) return baseName;
 
+            bool isVB = language == Language.VisualBasic;
             string s = baseName;
-            s += "<";
+            s += isVB ? "(Of " : "<";
             bool first = true;
             foreach (var genericParameter in t.GetGenericArguments())
             {
@@ -167,7 +185,7 @@ namespace Orleans.Runtime
                 }
                 if (applyRecursively && genericParameter.IsGenericType)
                 {
-                    s += GetParameterizedTemplateName(genericParameter, applyRecursively);
+                    s += GetParameterizedTemplateName(genericParameter, applyRecursively, language: language);
                 }
                 else
                 {
@@ -177,7 +195,7 @@ namespace Orleans.Runtime
                 }
                 first = false;
             }
-            s += ">";
+            s += isVB ? ")" : ">";
             return s;
         }
 
@@ -253,18 +271,22 @@ namespace Orleans.Runtime
             return name.Contains("`") || name.Contains("[");
         }
 
-        public static string GetFullName(Type t)
+        public static string GetFullName(Type t, Language language = Language.CSharp)
         {
             if (t == null) throw new ArgumentNullException("t");
             if (t.IsNested && !t.IsGenericParameter)
             {
-                return t.Namespace + "." + t.DeclaringType.Name + "." + t.Name;
+                return t.Namespace + "." + t.DeclaringType.Name + "." + GetSimpleNameHandleArray(t, language);
             }
             if (t.IsArray)
             {
-                return GetFullName(t.GetElementType()) + "[" + new string(',', t.GetArrayRank() - 1) + "]";
+                bool isVB = language == Language.VisualBasic;
+                return GetFullName(t.GetElementType(), language)
+                       + (isVB ? "(" : "[")
+                       + new string(',', t.GetArrayRank() - 1)
+                       + (isVB ? ")" : "]");
             }
-            return t.FullName ?? ( t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
+            return t.FullName ?? ( t.IsGenericParameter ? GetSimpleNameHandleArray(t, language) : t.Namespace + "." + GetSimpleNameHandleArray(t, language));
         }
 
         /// <summary>
