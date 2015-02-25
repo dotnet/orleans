@@ -28,7 +28,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    public class SimpleMessageStreamProvider : IStreamProvider, IStreamProviderImpl
+    public class SimpleMessageStreamProvider : IStreamProviderImpl
     {
         public string                       Name { get; private set; }
 

@@ -22,11 +22,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿using System;
-using Orleans.Providers;
 
 namespace Orleans.Streams
 {
-    public interface IStreamProvider : IProvider
+    public interface IStreamProvider
     {
         IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace);
 

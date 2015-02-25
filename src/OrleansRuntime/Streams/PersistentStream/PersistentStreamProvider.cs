@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
     /// <typeparam name="TAdapterFactory"></typeparam>
-    public class PersistentStreamProvider<TAdapterFactory> : IStreamProvider, IStreamProviderImpl
+    public class PersistentStreamProvider<TAdapterFactory> : IStreamProviderImpl
         where TAdapterFactory : IQueueAdapterFactory, new()
     {
         private Logger                  logger;

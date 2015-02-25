@@ -43,16 +43,16 @@ namespace Orleans.Streams
             return streamRendezvous.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.RegisterConsumer(streamId, streamConsumer, token, filter);
+            return streamRendezvous.RegisterConsumer(subscriptionId, streamId, streamConsumer, token, filter);
         }
 
-        public Task UnregisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer)
+        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.UnregisterConsumer(streamId, streamConsumer);
+            return streamRendezvous.UnregisterConsumer(subscriptionId);
         }
 
         public Task<int> ProducerCount(Guid guidId, string streamProvider, string streamNamespace)
@@ -110,7 +110,7 @@ namespace Orleans.Streams
             foreach (var consumer in implicitSet)
             {
                 // we ignore duplicate entries-- there's no way a programmer could prevent the duplicate entry from being added if we threw an exception to communicate the problem. 
-                result.Add(new PubSubSubscriptionState(streamId, consumer, null, null));
+                result.Add(new PubSubSubscriptionState(GuidId.GetNewGuidId(), streamId, consumer, null, null));
             }
             return result;
         }
@@ -121,16 +121,15 @@ namespace Orleans.Streams
                 explicitPubSub.UnregisterProducer(streamId, streamProvider, streamProducer);
         }
 
-        public Task RegisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
-            return IsImplicitSubscriber(streamConsumer, streamId) ? TaskDone.Done : 
-                explicitPubSub.RegisterConsumer(streamId, streamProvider, streamConsumer, token, filter);
+            return IsImplicitSubscriber(streamConsumer, streamId) ? TaskDone.Done :
+                explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamProvider, streamConsumer, token, filter);
         }
 
-        public Task UnregisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer)
+        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
-            return IsImplicitSubscriber(streamConsumer, streamId) ? TaskDone.Done : 
-                explicitPubSub.UnregisterConsumer(streamId, streamProvider, streamConsumer);
+            return explicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider);
         }
 
         public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)
