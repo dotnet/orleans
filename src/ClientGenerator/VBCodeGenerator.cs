@@ -40,7 +40,7 @@ namespace Orleans.CodeGeneration
     internal class VBCodeGenerator : NamespaceGenerator
     {
         public VBCodeGenerator(Assembly grainAssembly, string nameSpace)
-            : base(grainAssembly, nameSpace)
+            : base(grainAssembly, nameSpace, Language.VisualBasic)
         {}
 
         protected override string FixupTypeName(string str)
@@ -56,12 +56,14 @@ namespace Orleans.CodeGeneration
 
             referred(type);
 
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type);
+            var name = (noNamespace(type) && !type.IsNested) ? 
+                    TypeUtils.GetTemplatedName(type, language: Language.VisualBasic) 
+                    : TypeUtils.GetFullName(type, Language.VisualBasic);
 
             if (!type.IsGenericType)
             {
-                if (type.FullName == null) 
-                    return type.Name;
+                if (type.FullName == null)
+                    return TypeUtils.GetTemplatedName(type, language: Language.VisualBasic);
 
                 var result = GetNestedClassName(name);
                 return result == "Void" ? "void" : result;
@@ -246,7 +248,7 @@ End If", pair.Key, pair.Value);
             Dim t = New System.Threading.Tasks.TaskCompletionSource(Of Object)()
             t.SetException(New NotImplementedException(""No grain interfaces for type {0}""))
             Return t.Task
-                ", TypeUtils.GetFullName(grainType));
+                ", TypeUtils.GetFullName(grainType, Language.VisualBasic));
             }
 
             var builder = new StringBuilder();
@@ -525,7 +527,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("If(typeof({0}) is Global.Orleans.Grain,{2}.{1}.Cast({0}.AsReference()),{0})",
                         GetParameterName(paramInfo),
-                        GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType),
+                        GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType, Language.VisualBasic),
                         paramInfo.ParameterType.Namespace);
                 else
                     invokeArguments += GetParameterName(paramInfo);
@@ -676,7 +678,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 foreach (Type argument in type.GetGenericArguments())
                     AddReferencedAssembly(argument);
 
-            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace));
+            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace), Language.VisualBasic);
             typeName = GetNestedClassName(typeName);
             typeName = typeName.Replace("<", "(Of ").Replace(">", ")");
             return typeName;

@@ -135,7 +135,7 @@ namespace Orleans.CodeGeneration.Serialization
             return true;
         }
 
-        internal static void GenerateSerializers(Assembly grainAssembly, Dictionary<string, NamespaceGenerator> namespaceDictionary, string outputAssemblyName, GrainClientGenerator.Language language)
+        internal static void GenerateSerializers(Assembly grainAssembly, Dictionary<string, NamespaceGenerator> namespaceDictionary, string outputAssemblyName, Language language)
         {
             Type toGen;
             NamespaceGenerator extraNamespace = null;
@@ -150,7 +150,7 @@ namespace Orleans.CodeGeneration.Serialization
                     if (extraNamespace == null)
                     {
                         // Calculate a unique namespace name based on the output assembly name
-                        extraNamespace = new NamespaceGenerator(grainAssembly, outputAssemblyName + "Serializers");
+                        extraNamespace = new NamespaceGenerator(grainAssembly, outputAssemblyName + "Serializers", language);
                         namespaceDictionary.Add("OrleansSerializers", extraNamespace);
                     }
 
