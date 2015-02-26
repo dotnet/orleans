@@ -55,7 +55,7 @@ namespace Orleans.AzureUtils
         /// <summary> Connection string for the Azure storage account used to host this table. </summary>
         protected string ConnectionString { get; set; }
 
-        private readonly CloudTableClient tableOperationsClient;
+        private CloudTable tableReference;
 
         private readonly CounterStatistic numServerBusy = CounterStatistic.FindOrCreate(StatisticNames.AZURE_SERVER_BUSY, true);
 
@@ -72,7 +72,6 @@ namespace Orleans.AzureUtils
             ConnectionString = storageConnectionString;
 
             AzureStorageUtils.ValidateTableName(tableName);
-            tableOperationsClient = GetCloudTableOperationsClient();
         }
 
         /// <summary>
@@ -87,17 +86,20 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-                CloudTable tableReference = tableCreationClient.GetTableReference(TableName);
+                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
                 bool didCreate = await Task<bool>.Factory.FromAsync(
-                     tableReference.BeginCreateIfNotExists,
-                     tableReference.EndCreateIfNotExists,
+                     tableRef.BeginCreateIfNotExists,
+                     tableRef.EndCreateIfNotExists,
                      null);
 
                 Logger.Info(ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
-                await InitializeTableSchemaFromEntity(tableCreationClient);
+                await InitializeTableSchemaFromEntity(tableRef);
 
                 Logger.Info(ErrorCode.AzureTable_36, "Initialized schema for Azure storage table {0}", TableName);
+
+                CloudTableClient tableOperationsClient = GetCloudTableOperationsClient();
+                tableReference = tableOperationsClient.GetTableReference(TableName);
             }
             catch (Exception exc)
             {
@@ -163,7 +165,6 @@ namespace Orleans.AzureUtils
                 // svc.AddObject(TableName, data);
                 // SaveChangesOptions.None
 
-                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 try
                 {
                     // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then CreateIfNotExistsAsync.
@@ -201,11 +202,10 @@ namespace Orleans.AzureUtils
 
             try
             {
-                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 try
                 {
                     // WAS:
-                    // svc.AttachTo(TableName, data, ANY_ETAG);
+                    // svc.AttachTo(TableName, data, null);
                     // svc.UpdateObject(data);
                     // SaveChangesOptions.ReplaceOnUpdate,
 
@@ -251,7 +251,6 @@ namespace Orleans.AzureUtils
                     // svc.AttachTo(TableName, data, ANY_ETAG);
                     // svc.UpdateObject(data);
 
-                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                     data.ETag = eTag;
                     // Merge requires an ETag (which may be the '*' wildcard).
                     var opResult = await Task<TableResult>.Factory.FromAsync(
@@ -291,7 +290,6 @@ namespace Orleans.AzureUtils
             {
                 try
                 {
-                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                     data.ETag = dataEtag;
 
                     var opResult = await Task<TableResult>.Factory.FromAsync(
@@ -328,8 +326,7 @@ namespace Orleans.AzureUtils
             if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1}  entry {2}", operation, TableName, data);
 
             try
-            {
-                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);       
+            {   
                 data.ETag = eTag;
                 
                 try
@@ -371,8 +368,6 @@ namespace Orleans.AzureUtils
             {
                 try
                 {
-                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
-
                     TableResult retrievedResult = await Task<TableResult>.Factory.FromAsync(
                         tableReference.BeginExecute,
                         tableReference.EndExecute,
@@ -430,30 +425,29 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="list">List of data entries and their corresponding etags to be deleted from the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        public async Task DeleteTableEntriesAsync(IReadOnlyCollection<Tuple<T, string>> list)
+        public async Task DeleteTableEntriesAsync(IReadOnlyCollection<Tuple<T, string>> collection)
         {
             const string operation = "DeleteTableEntries";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("Deleting {0} table entries: {1}", TableName, Utils.EnumerableToString(list));
+            if (Logger.IsVerbose2) Logger.Verbose2("Deleting {0} table entries: {1}", TableName, Utils.EnumerableToString(collection));
 
-            if (list == null) throw new ArgumentNullException("list");
+            if (collection == null) throw new ArgumentNullException("list");
 
-            if (list.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
             {
-                throw new ArgumentOutOfRangeException("data", list.Count,
+                throw new ArgumentOutOfRangeException("collection", collection.Count,
                         "Too many rows for bulk delete - max " + AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
             }
 
-            if (list == null || !list.Any())
+            if (collection.Count == 0)
             {
                 return;
             }
 
             try
             {
-                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 var entityBatch = new TableBatchOperation();
-                foreach (var tuple in list)
+                foreach (var tuple in collection)
                 {
                     // WAS:
                     // svc.AttachTo(TableName, tuple.Item1, tuple.Item2);
@@ -476,7 +470,7 @@ namespace Orleans.AzureUtils
                 {
                     Logger.Warn(ErrorCode.AzureTable_08,
                         String.Format("Intermediate error deleting entries {0} from the table {1}.",
-                            Utils.EnumerableToString(list), TableName), exc);
+                            Utils.EnumerableToString(collection), TableName), exc);
                     throw;
                 }
             }
@@ -498,7 +492,6 @@ namespace Orleans.AzureUtils
 
             try
             {
-                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 TableQuery<T> cloudTableQuery = tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
                 try
                 {
@@ -550,18 +543,23 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="list">List of data entries to be inserted into the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        public async Task BulkInsertTableEntries(IReadOnlyCollection<T> data)
+        public async Task BulkInsertTableEntries(IReadOnlyCollection<T> collection)
         {
             const string operation = "BulkInsertTableEntries";
-            if (data == null) throw new ArgumentNullException("data");
-            if (data.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (collection == null) throw new ArgumentNullException("data");
+            if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
             {
-                throw new ArgumentOutOfRangeException("data", data.Count,
+                throw new ArgumentOutOfRangeException("data", collection.Count,
                         "Too many rows for bulk update - max " + AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
             }
 
+            if (collection.Count == 0)
+            {
+                return;
+            }
+
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("Bulk inserting {0} entries to {1} table", data.Count, TableName);
+            if (Logger.IsVerbose2) Logger.Verbose2("Bulk inserting {0} entries to {1} table", collection.Count, TableName);
 
             try
             {
@@ -573,9 +571,8 @@ namespace Orleans.AzureUtils
                 // SaveChangesOptions.None == Insert-or-merge operation, SaveChangesOptions.Batch == Batch transaction
                 // http://msdn.microsoft.com/en-us/library/hh452241.aspx
 
-                CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                 var entityBatch = new TableBatchOperation();
-                foreach (T entry in data)
+                foreach (T entry in collection)
                 {
                     entityBatch.Insert(entry);
                 }
@@ -595,7 +592,7 @@ namespace Orleans.AzureUtils
                 catch (Exception exc)
                 {
                     Logger.Warn(ErrorCode.AzureTable_37, String.Format("Intermediate error bulk inserting {0} entries in the table {1}",
-                        data.Count, TableName), exc);
+                        collection.Count, TableName), exc);
 
                     var dsre = exc.GetBaseException() as DataServiceRequestException;
                     if (dsre != null)
@@ -613,7 +610,7 @@ namespace Orleans.AzureUtils
 
                 // Bulk insert failed, so try to insert rows one by one instead
                 var promises = new List<Task>();
-                foreach (T entry in data)
+                foreach (T entry in collection)
                 {
                     promises.Add(CreateTableEntryAsync(entry));
                 }
@@ -649,7 +646,6 @@ namespace Orleans.AzureUtils
                     // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
                     // return dataResult.ETag;
 
-                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                     var entityBatch = new TableBatchOperation();
                     entityBatch.Add(TableOperation.Insert(data1));
                     data2.ETag = data2Etag;
@@ -700,7 +696,6 @@ namespace Orleans.AzureUtils
                     // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
                     // return dataResult.ETag;
 
-                    CloudTable tableReference = tableOperationsClient.GetTableReference(TableName);
                     var entityBatch = new TableBatchOperation();
                     data1.ETag = data1Etag;
                     entityBatch.Add(TableOperation.Replace(data1));
@@ -743,6 +738,8 @@ namespace Orleans.AzureUtils
                 CloudTableClient operationsClient = storageAccount.CreateCloudTableClient();
                 operationsClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableOperationRetryPolicy;
                 operationsClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableOperationTimeout;
+                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
+                operationsClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return operationsClient;
             }
             catch (Exception exc)
@@ -757,10 +754,12 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudStorageAccount storageAccount = AzureStorageUtils.GetCloudStorageAccount(ConnectionString);
-                CloudTableClient client = storageAccount.CreateCloudTableClient();
-                client.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableCreationRetryPolicy;
-                client.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-                return client;
+                CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
+                creationClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableCreationRetryPolicy;
+                creationClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
+                creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
+                return creationClient;
             }
             catch (Exception exc)
             {
@@ -770,7 +769,7 @@ namespace Orleans.AzureUtils
         }
 
         // Based on: http://blogs.msdn.com/b/cesardelatorre/archive/2011/03/12/typical-issue-one-of-the-request-inputs-is-not-valid-when-working-with-the-wa-development-storage.aspx
-        private async Task InitializeTableSchemaFromEntity(CloudTableClient tableClient)
+        private async Task InitializeTableSchemaFromEntity(CloudTable tableRef)
         {
             const string operation = "InitializeTableSchemaFromEntity";
             var startTime = DateTime.UtcNow;
@@ -801,12 +800,11 @@ namespace Orleans.AzureUtils
                 // svc.AddObject(TableName, entity);
                 // SaveChangesOptions.None,
 
-                CloudTable tableReference = tableClient.GetTableReference(TableName);
                 try
                 {
                     await Task<TableResult>.Factory.FromAsync(
-                        tableReference.BeginExecute,
-                        tableReference.EndExecute,
+                        tableRef.BeginExecute,
+                        tableRef.EndExecute,
                         TableOperation.Insert(entity),
                         null);
                 }
@@ -823,8 +821,8 @@ namespace Orleans.AzureUtils
                     // SaveChangesOptions.None,
 
                     await Task<TableResult>.Factory.FromAsync(
-                        tableReference.BeginExecute,
-                        tableReference.EndExecute,
+                        tableRef.BeginExecute,
+                        tableRef.EndExecute,
                         TableOperation.Delete(entity),
                         null);
                 }
