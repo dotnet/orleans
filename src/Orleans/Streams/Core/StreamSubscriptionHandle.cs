@@ -45,7 +45,7 @@ namespace Orleans.Streams
         #endregion
     }
 
-    public abstract class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>
+    internal abstract class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>
     {
         public abstract IAsyncStream<T> Stream { get; }
 
