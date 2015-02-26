@@ -38,6 +38,8 @@ namespace Orleans.Streams
     [Serializable]
     public abstract class StreamSubscriptionHandle<T> : IEquatable<StreamSubscriptionHandle<T>>
     {
+        public abstract IAsyncStream<T> Stream { get; }
+
         #region IEquatable<StreamSubscriptionHandle<T>> Members
 
         public abstract bool Equals(StreamSubscriptionHandle<T> other);
@@ -47,8 +49,6 @@ namespace Orleans.Streams
 
     internal abstract class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>
     {
-        public abstract IAsyncStream<T> Stream { get; }
-
         public abstract GuidId SubscriptionId { get; }
     }
 }
