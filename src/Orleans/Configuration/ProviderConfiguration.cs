@@ -140,11 +140,14 @@ namespace Orleans.Runtime.Configuration
         internal void SetProviderManager(IProviderManager manager)
         {
             this.providerManager = manager;
-            foreach (var child in childConfigurations)
-                child.SetProviderManager(manager);
+            if (childConfigurations != null)
+            {
+                foreach (var child in childConfigurations)
+                    child.SetProviderManager(manager);
+            }
         }
 
-        internal void SetProperty(string key, string val)
+        public void SetProperty(string key, string val)
         {
             if (!properties.ContainsKey(key))
             {
@@ -177,7 +180,7 @@ namespace Orleans.Runtime.Configuration
 
                 var list = new List<IProvider>();
 
-                if (childConfigurations.Count == 0)
+                if (childConfigurations == null || childConfigurations.Count == 0)
                     return list; // empty list
 
                 foreach (var config in childConfigurations)
