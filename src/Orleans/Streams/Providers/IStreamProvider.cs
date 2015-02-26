@@ -27,6 +27,9 @@ namespace Orleans.Streams
 {
     public interface IStreamProvider
     {
+        /// <summary>Name of the stream provider.</summary>
+        string Name { get; }
+
         IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace);
 
         /// <summary>
