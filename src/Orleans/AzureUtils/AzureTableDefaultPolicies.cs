@@ -23,8 +23,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Diagnostics;
-using Orleans.Runtime;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Orleans.Runtime;
+
 
 namespace Orleans.AzureUtils
 {

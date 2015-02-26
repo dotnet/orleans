@@ -39,6 +39,28 @@ namespace UnitTests.StorageTests
         public byte[] Data { get; set; }
         public string StringData { get; set; }
 
+        public UnitTestAzureTableData()
+        {
+
+        }
+
+        public UnitTestAzureTableData(string data, string partitionKey, string rowKey)
+        {
+            StringData = data;
+            PartitionKey = partitionKey;
+            RowKey = rowKey;
+        }
+
+        public UnitTestAzureTableData Clone()
+        {
+            return new UnitTestAzureTableData
+            {
+                StringData = this.StringData,
+                PartitionKey = this.PartitionKey,
+                RowKey = this.RowKey
+            };
+        }
+
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
@@ -58,23 +80,6 @@ namespace UnitTests.StorageTests
             : base(INSTANCE_TABLE_NAME, storageConnectionString)
         {
             InitTableAsync().WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Wait();
-        }
-
-        public async Task<IEnumerable<UnitTestAzureTableData>> ReadAllDataAsync(string partitionKey)
-        {
-            var data = await ReadAllTableEntriesForPartitionAsync(partitionKey)
-                .WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout);
-
-            return data.Select(tuple => tuple.Item1);
-        }
-
-        public Task<string> WriteDataAsync(string partitionKey, string rowKey, string stringData)
-        {
-            UnitTestAzureTableData dataObject = new UnitTestAzureTableData();
-            dataObject.PartitionKey = partitionKey;
-            dataObject.RowKey = rowKey;
-            dataObject.StringData = stringData;
-            return UpsertTableEntryAsync(dataObject);
         }
     }
 }
