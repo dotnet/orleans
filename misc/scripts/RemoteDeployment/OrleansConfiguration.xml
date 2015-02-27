@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	This is a sample silo configuration file for use with a multi-server deployment, one silo per server. 
+-->
+<OrleansConfiguration xmlns="urn:orleans">
+	<Globals>
+    <StorageProviders>
+      <!-- To use Azure storage for grain state, uncomment one of the following lines: -->
+      <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="UseDevelopmentStorage=true" />-->
+      <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY" />-->
+    </StorageProviders>
+	</Globals>
+	<Defaults>
+		<!-- 
+		For a distributed deployment with one silo per host, it is convenient to have all of the silos listening on the same port. 
+		In particular, this makes the port that the seed node will listen on predictable without requiring an Override element for that silo.
+		-->
+		<Networking Address="" Port="11111" />
+    <ProxyingGateway Address="" Port="30000" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log">
+      <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+    </Tracing>
+  </Defaults>
+</OrleansConfiguration>

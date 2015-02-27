@@ -44,7 +44,7 @@ namespace Orleans.CodeGeneration.Serialization
         /// <summary>
         /// Generate all the necessary logic for serialization of payload types used by grain interfaces.
         /// </summary>
-        internal static void GenerateSerializationForClass(Type t, CodeNamespace container, HashSet<string> referencedNamespaces, GrainClientGenerator.Language language)
+        internal static void GenerateSerializationForClass(Type t, CodeNamespace container, HashSet<string> referencedNamespaces, Language language)
         {
             var generateSerializers = !CheckForCustomSerialization(t);
             var generateCopier = !CheckForCustomCopier(t);
@@ -52,7 +52,7 @@ namespace Orleans.CodeGeneration.Serialization
             if (!generateSerializers && !generateCopier)
                 return; // If the class declares all custom implementations, then we don't need to do anything...
 
-            bool notVB = (language != GrainClientGenerator.Language.VisualBasic);
+            bool notVB = (language != Language.VisualBasic);
             var openGenerics = notVB ? "<" : "(Of ";
             var closeGenerics = notVB ? ">" : ")";
 
@@ -210,7 +210,7 @@ namespace Orleans.CodeGeneration.Serialization
                 else
                 {
                     var typeName = TypeUtils.GetParameterizedTemplateName(t, tt => tt.Namespace != container.Name && !referencedNamespaces.Contains(tt.Namespace), true);
-                    if (language == GrainClientGenerator.Language.VisualBasic)
+                    if (language == Language.VisualBasic)
                         typeName = typeName.Replace("<", "(Of ").Replace(">", ")");
                     constructor = new CodeVariableDeclarationStatement(classTypeReference, "result", 
                         new CodeObjectCreateExpression(typeName));
@@ -305,7 +305,7 @@ namespace Orleans.CodeGeneration.Serialization
                     }
                 }
 
-                var typeName = fld.FieldType.OrleansTypeName();
+                var typeName = TypeUtils.GetTemplatedName(fld.FieldType, _ => !_.IsGenericParameter, language);
 
                 // See if it's a public field
                 if ((getter == null) || (setter == null))

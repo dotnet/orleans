@@ -373,7 +373,7 @@ namespace Orleans.Runtime.Host
             if (string.IsNullOrWhiteSpace(Name))
                 Name = "Silo";
 
-            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + exc;
+            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + TraceLogger.PrintException(exc);
             if (logger != null) logger.Error(ErrorCode.Runtime_Error_100105, errMsg, exc);
 
             // Dump Startup error to a log file

@@ -57,8 +57,8 @@ namespace Orleans.Runtime.MembershipService
             // so we always have a first table version row, before this silo starts working.
             if (tryInitTableVersion)
             {
-                var entry = table.tableManager.CreateTableVersionEntry(0);
-                await table.tableManager.InsertSiloEntryConditionally(entry, null, null, false).WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);   // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                await table.tableManager.TryCreateTableVersionEntryAsync().WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
             }
             return table;
         }

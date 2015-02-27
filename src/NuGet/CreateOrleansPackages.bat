@@ -24,7 +24,7 @@ if "%BASE_PATH%" == "." (
 
 if EXIST "%VERSION%" (
     @Echo Using version number from file %VERSION%
-    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type %VERSION%`) do set VERSION=%%i.%%j.0
+    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type %VERSION%`) do set VERSION=%%i.%%j.%%k
 ) else (
     @Echo ERROR: Unable to read version number from file %VERSION%
     GOTO Usage
@@ -37,6 +37,7 @@ if EXIST "%VERSION%" (
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
   "%NUGET_EXE%" pack "%%G" -Version %VERSION% -BasePath "%BASE_PATH%" %NUGET_PACK_OPTS%
+  if ERRORLEVEL 1 EXIT /B 1
 )
 
 GOTO EOF

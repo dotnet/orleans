@@ -12,10 +12,14 @@
     <AssemblyName>TestGrainInterfaces</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SccProjectName></SccProjectName>
-    <SccLocalPath></SccLocalPath>
-    <SccAuxPath></SccAuxPath>
-    <SccProvider></SccProvider>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
@@ -48,17 +52,8 @@
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.WindowsAzure.Configuration, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.StorageClient, Version=1.7.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data.Services.Client">
-      <Private>False</Private>
-    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -77,10 +72,6 @@
     <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
-      <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
-      <Name>OrleansRuntime</Name>
     </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>

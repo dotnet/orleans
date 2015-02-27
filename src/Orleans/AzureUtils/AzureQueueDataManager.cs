@@ -24,10 +24,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
-
+using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Runtime;
 using Orleans.Storage;
+
 
 namespace Orleans.AzureUtils
 {
@@ -49,19 +50,19 @@ namespace Orleans.AzureUtils
         public static int MaxQueueOperationRetries;
         public static TimeSpan PauseBetweenQueueOperationRetries;
         public static TimeSpan QueueOperationTimeout;
-        public static RetryPolicy QueueOperationRetryPolicy;
+        public static IRetryPolicy QueueOperationRetryPolicy;
 
         static AzureQueueDefaultPolicies()
         {
             MaxQueueOperationRetries = 5;
             PauseBetweenQueueOperationRetries = TimeSpan.FromMilliseconds(100);
-            QueueOperationRetryPolicy = RetryPolicies.Retry(MaxQueueOperationRetries, PauseBetweenQueueOperationRetries); // 5 x 100ms
+            QueueOperationRetryPolicy = new LinearRetry(PauseBetweenQueueOperationRetries, MaxQueueOperationRetries); // 5 x 100ms
             QueueOperationTimeout = PauseBetweenQueueOperationRetries.Multiply(MaxQueueOperationRetries).Multiply(6);    // 3 sec
         }
     }
 
     /// <summary>
-    /// Utility class to encapsulate access to Azure queue storage .
+    /// Utility class to encapsulate access to Azure queue storage.
     /// </summary>
     /// <remarks>
     /// Used by Azure queue streaming provider.
@@ -134,7 +135,7 @@ namespace Orleans.AzureUtils
 
                 // Create the queue if it doesn't already exist.
 
-                bool didCreate = await Task<bool>.Factory.FromAsync(queue.BeginCreateIfNotExist, queue.EndCreateIfNotExist, null);
+                bool didCreate = await Task<bool>.Factory.FromAsync(queue.BeginCreateIfNotExists, queue.EndCreateIfNotExists, null);
 
                 logger.Info(ErrorCode.AzureQueue_01, "{0} Azure storage queue {1}", (didCreate ? "Created" : "Attached to"), QueueName);
             }

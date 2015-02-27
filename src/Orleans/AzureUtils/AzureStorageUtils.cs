@@ -23,15 +23,17 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Services.Client;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Xml;
+using System.Data.Services.Client;
 using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.StorageClient;
-
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans.Runtime;
 
 
@@ -46,38 +48,40 @@ namespace Orleans.AzureUtils
     public static class AzureStorageUtils
     {
         /// <summary>
+        /// ETag of value "*" to match any etag for conditional table operations (update, nerge, delete).
+        /// </summary>
+        public const string ANY_ETAG = "*";
+
+        /// <summary>
         /// Inspect an exception returned from Azure storage libraries to check whether it means that attempt was made to read some data that does not exist in storage table.
         /// </summary>
         /// <param name="exc">Exception that was returned by Azure storage library operation</param>
         /// <returns><c>True</c> if this exception means the data being read was not present in Azure table storage</returns>
         public static bool TableStorageDataNotFound(Exception exc)
         {
-            if (exc is AggregateException)
+            HttpStatusCode httpStatusCode;
+            string restStatus;
+            if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
             {
-                exc = exc.GetBaseException();
-            }
-            var dsce = exc as DataServiceClientException;
-            if (dsce == null)
-            {
-                var dsre = exc as DataServiceRequestException;
-                if (dsre != null)
-                {
-                    dsce = dsre.GetBaseException() as DataServiceClientException;
-                }
-            }
-            if (dsce != null)
-            {
-                // Check for appropriate HTTP status codes
-                if (dsce.StatusCode == (int)HttpStatusCode.NotFound
-                    || dsce.StatusCode == (int)HttpStatusCode.NotImplemented /* New table: Azure table schema not yet initialized, so need to do first create */ )
+                if (AzureStorageUtils.IsNotFoundError(httpStatusCode)
+                    /* New table: Azure table schema not yet initialized, so need to do first create */)
                 {
                     return true;
                 }
-                exc = dsce;
+                return StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus);
             }
-            string restErrorCode = ExtractRestErrorCode(exc);
-            // Check for appropriate Azure REST error codes
-            return StorageErrorCodeStrings.ResourceNotFound.Equals(restErrorCode);
+            return false;
+        }
+
+        public static bool IsServerBusy(Exception exc)
+        {
+            HttpStatusCode httpStatusCode;
+            string restStatus;
+            if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
+            {
+                return StorageErrorCodeStrings.ServerBusy.Equals(restStatus);
+            }
+            return false;
         }
 
         /// <summary>
@@ -85,41 +89,16 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="exc">Exception to be inspected.</param>
         /// <returns>Returns REST error code if found, otherwise <c>null</c></returns>
-        public static string ExtractRestErrorCode(Exception exc)
+        private static string ExtractRestErrorCode(Exception exc)
         {
-            // Sample of REST error message returned from Azure storage service
-            //<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-            //<error xmlns="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-            //  <code>OperationTimedOut</code>
-            //  <message xml:lang="en-US">Operation could not be completed within the specified time. RequestId:6b75e963-c56c-4734-a656-066cfd03f327 Time:2011-10-09T19:33:26.7631923Z</message>
-            //</error>
-
-            while (exc != null && !(exc is DataServiceClientException || exc is DataServiceQueryException))
+            while (exc != null && !(exc is StorageException))
             {
                 exc = (exc.InnerException != null) ? exc.InnerException.GetBaseException() : exc.InnerException;
             }
-
-            while (exc is DataServiceQueryException)
+            if (exc is StorageException)
             {
-                exc = (exc.InnerException != null) ? exc.InnerException.GetBaseException() : exc.InnerException;
-            }
-            if (exc is DataServiceClientException)
-            {
-                try
-                {
-                    var xml = new XmlDocument();
-                    var xmlReader = XmlReader.Create(new StringReader(exc.Message));
-                    xml.Load(xmlReader);
-                    var namespaceManager = new XmlNamespaceManager(xml.NameTable);
-                    namespaceManager.AddNamespace("n", "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata");
-                   return xml.SelectSingleNode("/n:error/n:code", namespaceManager).InnerText;
-                }
-                catch (Exception e)
-                {
-                    var log = TraceLogger.GetLogger("AzureStorageUtils", TraceLogger.LoggerType.Runtime);
-                    log.Warn(ErrorCode.AzureTable_16, String.Format("Problem extracting REST error code from Data='{0}'", exc.Message), e);
-                    if (Debugger.IsAttached) throw; // For debug purposes only; Problem will just get logged in all other cases
-                }
+                StorageException ste = exc as StorageException;
+                return ste.RequestInformation.ExtendedErrorInformation.ErrorCode;
             }
             return null;
         }
@@ -146,33 +125,13 @@ namespace Orleans.AzureUtils
             {
                 while (e != null)
                 {
-                    if (e is DataServiceQueryException)
+                    if (e is StorageException)
                     {
-                        var dsqe = e as DataServiceQueryException;
-                        httpStatusCode = (HttpStatusCode)dsqe.Response.StatusCode;
+                        var ste = e as StorageException;
+                        httpStatusCode = (HttpStatusCode)ste.RequestInformation.HttpStatusCode;
                         if (getExtendedErrors)
-                            restStatus = ExtractRestErrorCode(dsqe);
+                            restStatus = ExtractRestErrorCode(ste);
                         return true;
-                    }
-                    if (e is DataServiceClientException)
-                    {
-                        var dsce = e as DataServiceClientException;
-                        httpStatusCode = (HttpStatusCode)dsce.StatusCode;
-                        if (getExtendedErrors)
-                            restStatus = ExtractRestErrorCode(dsce);
-                        return true;
-                    }
-                    if (e is DataServiceRequestException)
-                    {
-                        var dsre = e as DataServiceRequestException;
-                        List<OperationResponse> innerResponses = dsre.Response.ToList();
-                        if (innerResponses.Any())
-                        {
-                            httpStatusCode = (HttpStatusCode)innerResponses.First().StatusCode;
-                            if (getExtendedErrors)
-                                restStatus = ExtractRestErrorCode(dsre);
-                            return true;
-                        }
                     }
                     e = e.InnerException;
                 }
@@ -223,6 +182,21 @@ namespace Orleans.AzureUtils
             return false;
         }
 
+        /// <summary>
+        /// Check whether a HTTP status code returned from a REST call might be due to a (temporary) storage contention error.
+        /// </summary>
+        /// <param name="httpStatusCode">HTTP status code to be examined.</param>
+        /// <returns>Returns <c>true</c> if the HTTP status code is due to storage contention.</returns>
+        public static bool IsNotFoundError(HttpStatusCode httpStatusCode)
+        {
+            // Status and Error Codes
+            // http://msdn.microsoft.com/en-us/library/dd179382.aspx
+
+            if (httpStatusCode == HttpStatusCode.NotFound) return true;
+            if (httpStatusCode == HttpStatusCode.NotImplemented) return true; // New table: Azure table schema not yet initialized, so need to do first create
+            return false;
+        }
+
         internal static CloudStorageAccount GetCloudStorageAccount(string storageConnectionString)
         {
             // Connection string must be specified always, even for development storage.
@@ -238,7 +212,7 @@ namespace Orleans.AzureUtils
 
         internal static CloudQueueClient GetCloudQueueClient(
             string storageConnectionString,
-            RetryPolicy retryPolicy,
+            IRetryPolicy retryPolicy,
             TimeSpan timeout,
             TraceLogger logger)
         {
@@ -246,8 +220,8 @@ namespace Orleans.AzureUtils
             {
                 var storageAccount = GetCloudStorageAccount(storageConnectionString);
                 CloudQueueClient operationsClient = storageAccount.CreateCloudQueueClient();
-                operationsClient.RetryPolicy = retryPolicy;
-                operationsClient.Timeout = timeout;
+                operationsClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
+                operationsClient.DefaultRequestOptions.ServerTimeout = timeout;
                 return operationsClient;
             }
             catch (Exception exc)
@@ -324,7 +298,7 @@ namespace Orleans.AzureUtils
         {
             return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
                     message.Id,
-                    message.NextVisibleTime.HasValue ? TraceLogger.PrintDate(message.NextVisibleTime.Value) : "",
+                    message.NextVisibleTime.HasValue ? TraceLogger.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
                     message.DequeueCount,
                     message.PopReceipt,
                     message.AsString);

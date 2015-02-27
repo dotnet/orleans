@@ -361,5 +361,26 @@ namespace Orleans.Runtime
             all.AddRange(rtle.LoaderExceptions);
             throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenence.", all);
         }
+
+        /// <summary>
+        /// </summary>
+        public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
+        {
+            var batch = new List<T>(batchSize);
+            foreach (var item in sequence)
+            {
+                batch.Add(item);
+                // when we've accumulated enough in the batch, send it out  
+                if (batch.Count >= batchSize)
+                {
+                    yield return batch; // batch.ToArray();
+                    batch = new List<T>(batchSize);
+                }
+            }
+            if (batch.Count > 0)
+            {
+                yield return batch; //batch.ToArray();
+            }
+        }
     }
 }

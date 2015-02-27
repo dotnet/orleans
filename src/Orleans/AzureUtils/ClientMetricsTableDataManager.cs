@@ -27,15 +27,15 @@ using System.Data.Services.Common;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+
 
 namespace Orleans.AzureUtils
 {
     [Serializable]
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class ClientMetricsData : TableServiceEntity
+    internal class ClientMetricsData : TableEntity
     {
         public string DeploymentId { get; set; }
         public string Address { get; set; }
