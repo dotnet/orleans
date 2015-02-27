@@ -47,6 +47,7 @@ namespace Orleans.Streams
         #endregion
     }
 
+    [Serializable]
     internal abstract class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>
     {
         public abstract GuidId SubscriptionId { get; }
