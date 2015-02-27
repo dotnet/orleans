@@ -148,19 +148,15 @@ namespace Orleans.Streams
             IStreamFilterPredicateWrapper filter)
         {
             // This Where clause will return either zero or one PubSubSubscriptionState
-            var found = State.Consumers.Where(s => s.Equals(subscriptionId)).ToArray();
-            PubSubSubscriptionState pubSubState;
-            if (found.Length == 0)
+            PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
+            if (pubSubState == null)
             {
                 pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer, token, filter);
                 State.Consumers.Add(pubSubState);
             }
-            else
-            {
-                pubSubState = found[0];
-                if (filter != null)
-                    pubSubState.AddFilter(filter);
-            }
+
+            if (filter != null)
+                pubSubState.AddFilter(filter);
             
             counterConsumersAdded.Increment();
             counterConsumersTotal.Increment();
