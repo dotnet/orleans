@@ -12,7 +12,7 @@
 	Setting WriteTraces to true will cause detailed performance information to be collected and logged about the individual steps in the
 	message lifecycle. This may be useful debugging performance issues.
 	-->
-	<Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" WriteTraces="false">
+	<Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="none" >
 		<!--
 		To get more detailed application logging, you can change the TraceLevel attribute value to "Verbose" or "Verbose2".
 		Depending on the log levels you have used in your code, this will cause additional messages to be written to the log.
