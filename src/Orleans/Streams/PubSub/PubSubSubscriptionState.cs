@@ -95,9 +95,9 @@ namespace Orleans.Streams
 
         public static bool operator ==(PubSubSubscriptionState left, PubSubSubscriptionState right)
         {
-            if (left == null && right == null)
+            if ((object)left == null && (object)right == null)
                 return true;
-            if (left != null)
+            if ((object)left != null)
             {
                 return left.Equals(right);
             }
