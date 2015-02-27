@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Configuration
     public class ProviderConfiguration : IProviderConfiguration
     {
         private IDictionary<string, string> properties;
-        private IList<ProviderConfiguration> childConfigurations;
+        private readonly IList<ProviderConfiguration> childConfigurations;
         private IList<IProvider> childProviders;
         [NonSerialized]
         private IProviderManager providerManager;
@@ -52,6 +52,7 @@ namespace Orleans.Runtime.Configuration
         internal ProviderConfiguration()
         {
             properties = new Dictionary<string, string>();
+            childConfigurations = new List<ProviderConfiguration>();
         }
 
         public ProviderConfiguration(IDictionary<string, string> properties, string type, string name)
@@ -59,6 +60,7 @@ namespace Orleans.Runtime.Configuration
             this.properties = properties;
             Type = type;
             Name = name;
+            childConfigurations = new List<ProviderConfiguration>();
         }
 
         // for testing purposes
@@ -66,13 +68,12 @@ namespace Orleans.Runtime.Configuration
         {
             this.properties = properties;
             this.childProviders = childProviders;
+            childConfigurations = new List<ProviderConfiguration>();
         }
 
         // Load from an element with the format <Provider Type="..." Name="...">...</Provider>
         internal void Load(XmlElement child, IDictionary<string, IProviderConfiguration> alreadyLoaded, XmlNamespaceManager nsManager)
         {
-            childConfigurations = new List<ProviderConfiguration>();
-
             if (nsManager == null)
             {
                 nsManager = new XmlNamespaceManager(new NameTable());
@@ -140,11 +141,8 @@ namespace Orleans.Runtime.Configuration
         internal void SetProviderManager(IProviderManager manager)
         {
             this.providerManager = manager;
-            if (childConfigurations != null)
-            {
-                foreach (var child in childConfigurations)
-                    child.SetProviderManager(manager);
-            }
+            foreach (var child in childConfigurations)
+                child.SetProviderManager(manager);
         }
 
         public void SetProperty(string key, string val)
@@ -180,7 +178,7 @@ namespace Orleans.Runtime.Configuration
 
                 var list = new List<IProvider>();
 
-                if (childConfigurations == null || childConfigurations.Count == 0)
+                if (childConfigurations.Count == 0)
                     return list; // empty list
 
                 foreach (var config in childConfigurations)
