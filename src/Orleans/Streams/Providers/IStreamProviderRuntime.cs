@@ -117,5 +117,7 @@ namespace Orleans.Streams
         Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace);
 
         Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
+
+        GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId);
     }
 }

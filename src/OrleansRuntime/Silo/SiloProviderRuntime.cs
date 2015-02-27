@@ -34,7 +34,7 @@ using Orleans.Streams;
 
 namespace Orleans.Runtime.Providers
 {
-    internal class SiloProviderRuntime : IProviderRuntime, IStreamProviderRuntime
+    internal class SiloProviderRuntime : IStreamProviderRuntime
     { 
         private static volatile SiloProviderRuntime instance;
         private static readonly object syncRoot = new Object();

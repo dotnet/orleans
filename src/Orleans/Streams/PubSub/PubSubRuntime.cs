@@ -78,6 +78,12 @@ namespace Orleans.Streams
                 new Type[] { typeof(Guid), typeof(string) },
                 new object[] { streamId.Guid, streamId.ProviderName + "_" + streamId.Namespace });
         }
+
+        public GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId)
+        {
+            return GuidId.GetNewGuidId();
+        }
+
     }
     
     internal class StreamPubSubImpl : IStreamPubSub
@@ -110,7 +116,8 @@ namespace Orleans.Streams
             foreach (var consumer in implicitSet)
             {
                 // we ignore duplicate entries-- there's no way a programmer could prevent the duplicate entry from being added if we threw an exception to communicate the problem. 
-                result.Add(new PubSubSubscriptionState(GuidId.GetNewGuidId(), streamId, consumer, null, null));
+                GuidId subscriptionId = GuidId.GetGuidId(GrainExtensions.GetGrainId(consumer).GetPrimaryKey());
+                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, consumer, null, null));
             }
             return result;
         }
@@ -145,6 +152,14 @@ namespace Orleans.Streams
         private bool IsImplicitSubscriber(IAddressable addressable, StreamId streamId)
         {
             return implicitPubSub.IsImplicitSubscriber(GrainExtensions.GetGrainId(addressable), streamId);
+        }
+
+        public GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId)
+        {
+            GrainId grainId = GrainExtensions.GetGrainId(requesterAddress);
+            return implicitPubSub.IsImplicitSubscriber(grainId, streamId)
+                ? GuidId.GetGuidId(grainId.GetPrimaryKey())
+                : GuidId.GetNewGuidId();
         }
     }
 }
