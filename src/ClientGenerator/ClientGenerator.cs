@@ -703,6 +703,10 @@ namespace Orleans.CodeGeneration
                             options.FSharpCompilerPath = path;
                             if (!string.IsNullOrEmpty(path))
                                 Console.WriteLine("F# compiler path = '{0}' ", options.FSharpCompilerPath);
+                            else
+                            {
+                                Console.Error.WriteLine("F# compiler path not set!");
+                            }
                         }
                         else if (arg.StartsWith("/rootns:") || arg.StartsWith("/rns:"))
                         {
