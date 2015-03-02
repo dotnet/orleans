@@ -32,12 +32,10 @@ namespace Orleans.Streams
     internal class ImplicitStreamSubscriberTable
     {
         private readonly Dictionary<string, HashSet<int>> table;
-        private readonly Func<IAddressable, IStreamConsumerExtension> caster;
 
         internal ImplicitStreamSubscriberTable()
         {
             table = new Dictionary<string, HashSet<int>>();
-            caster = GrainFactory.Cast<IStreamConsumerExtension>;
         }
 
         /// <summary>
@@ -53,7 +51,7 @@ namespace Orleans.Streams
             {
                 if (!TypeUtils.IsGrainClass(grainClass))
                 {
-                    return;
+                    continue;
                 }
 
                 // we collect all namespaces that the specified grain class should implicitly subscribe to.
@@ -174,9 +172,9 @@ namespace Orleans.Streams
         /// <returns></returns>
         private IStreamConsumerExtension MakeConsumerReference(Guid primaryKey, int implTypeCode)
         {
-            var grainId = GrainId.GetGrainId(implTypeCode, primaryKey);
+            GrainId grainId = GrainId.GetGrainId(implTypeCode, primaryKey);
             IAddressable addressable = GrainReference.FromGrainId(grainId);
-            return caster(addressable);
+            return GrainFactory.Cast<IStreamConsumerExtension>(addressable);
         }
 
         /// <summary>
