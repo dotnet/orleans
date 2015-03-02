@@ -122,6 +122,7 @@
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
+    <Compile Include="Providers\StorageProviderUtils.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
     <Compile Include="AssemblyLoader\AssemblyLoader.cs" />
@@ -155,7 +156,9 @@
     <Compile Include="Streams\Core\AsyncObservableExtensions.cs" />
     <Compile Include="Streams\Internal\GenericAsyncObserver.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
+    <Compile Include="Streams\PersistentStreams\PersistentStreamProvider.cs" />
     <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />
+    <Compile Include="Streams\PersistentStreams\StreamQueueBalancerType.cs" />
     <Compile Include="Streams\Predicates\FilterPredicateWrapperData.cs" />
     <Compile Include="Streams\Predicates\IStreamFilterPredicateWrapper.cs" />
     <Compile Include="Streams\Core\IAsyncObservable.cs" />
@@ -353,15 +356,13 @@
     <None Include="..\Orleans.snk">
       <Link>Orleans.snk</Link>
     </None>
-    <None Include="packages.config"/>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <CodeGenToolReferences>System.Data.dll;$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll;</CodeGenToolReferences>
   </PropertyGroup>
-  <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" 
-          Condition="'$(BuildingInsideVisualStudio)' != 'true'" 
-          Outputs="$(SolutionDir)Build\Version.txt">
+  <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
     <PropertyGroup Condition="'$(BuildNumber)' == ''">
       <BuildNumber>1</BuildNumber>
     </PropertyGroup>
@@ -373,10 +374,7 @@
     <!-- Show values of some useful properties -->
     <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
   </Target>
-  <Target Name="OrleansDllBootstrapUsingCodeGen" 
-          AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" 
-          Inputs="@(Compile);@(ReferencePath)" 
-          Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
+  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
     <!-- Clean Generated directory -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
@@ -394,25 +392,10 @@
     <Message Text="CodeGenToolSources extracted: $(CodeGenToolSources)" Importance="high" />
     <!-- Compile orleans dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for boot strap" Importance="high" />
-    <csc Sources="@(Compile)" 
-         OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
-         EmitDebugInformation="true" 
-         PdbFile="$(PdbFile)" 
-         Platform="$(PlatformTarget)" 
-         References="$(CodeGenToolReferences);$(SolutionDir)packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll" 
-         DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN" 
-         KeyFile="$(AssemblyOriginatorKeyFile)" 
-         TargetType="$(OutputType)" />
+    <csc Sources="@(Compile)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(CodeGenToolReferences);$(SolutionDir)packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll" DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN" KeyFile="$(AssemblyOriginatorKeyFile)" TargetType="$(OutputType)" />
     <!-- Compile codegen tool exe -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans codegen tool for BootStrap" Importance="high" />
-    <csc Sources="$(CodeGenToolSources)" 
-         OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" 
-         EmitDebugInformation="true" 
-         PdbFile="$(PdbFile)" 
-         Platform="$(PlatformTarget)" 
-         References="$(CodeGenToolReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" 
-         DefineConstants="$(DefineConstants);CLIENTGEN_PROJECT" 
-         KeyFile="$(AssemblyOriginatorKeyFile)" />
+    <csc Sources="$(CodeGenToolSources)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(CodeGenToolReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" DefineConstants="$(DefineConstants);CLIENTGEN_PROJECT" KeyFile="$(AssemblyOriginatorKeyFile)" />
     <!-- Finally invoke ClientGenerator.exe on the recently built Orleans.dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
@@ -421,10 +404,7 @@
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - CodeGen Cmd = $(CodeGenToolExecCmd)" />
     <Exec Command="$(CodeGenToolExecCmd)" />
   </Target>
-  <Target Name="WriteArgsToFileForDebugging" 
-          AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" 
-          Inputs="@(Compile);@(ReferencePath)" 
-          Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
+  <Target Name="WriteArgsToFileForDebugging" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
     <MakeDir Directories="$(IntermediateOutputPath)Generated" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
@@ -447,8 +427,7 @@
     <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)" />
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')" />
   </Target>
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" 
-          Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>
@@ -458,7 +437,6 @@ For more information, see http://go.microsoft.com/fwlink/?LinkID=322105.
 The missing file is {0}.
       </ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" 
-           Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
+    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
 </Project>

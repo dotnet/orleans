@@ -196,11 +196,9 @@
     <Compile Include="Scheduler\WorkQueue.cs" />
     <Compile Include="Silo\SiloControl.cs" />
     <Compile Include="Storage\StorageProviderManager.cs" />
-    <Compile Include="Storage\StorageProviderUtils.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingManager.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingAgent.cs" />
     <Compile Include="Streams\PubSub\PubSubRendezvousGrain.cs" />
-    <Compile Include="Streams\PersistentStream\PersistentStreamProvider.cs" />
     <Compile Include="Core\SystemTarget.cs" />
     <Compile Include="Catalog\ActivationDirectory.cs" />
     <Compile Include="GrainTypeManager\SiloAssemblyLoader.cs" />
