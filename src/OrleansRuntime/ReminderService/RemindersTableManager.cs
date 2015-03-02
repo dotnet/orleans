@@ -229,7 +229,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                await DeleteTableEntryAsync(reminderEntry, eTag); //"*")
+                await DeleteTableEntryAsync(reminderEntry, eTag);
                 return true;
             }catch(Exception exc)
             {
@@ -264,8 +264,13 @@ namespace Orleans.Runtime.ReminderService
                     .GroupBy(x => x.Item1.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
 
                 foreach (var entriesPerPartition in groupedByHash.Values)
-                    tasks.Add(DeleteTableEntriesAsync(entriesPerPartition));
-                
+                {
+                    foreach (var batch in entriesPerPartition.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                    {
+                        tasks.Add(DeleteTableEntriesAsync(batch));
+                    }
+                }
+
                 await Task.WhenAll(tasks);
             }
         }

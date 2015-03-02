@@ -80,6 +80,7 @@
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="StorageTests\AzureMembershipTableTests.cs" />
     <Compile Include="StorageTests\StorageTestConstants.cs" />

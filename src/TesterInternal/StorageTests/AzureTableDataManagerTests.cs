@@ -26,8 +26,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
 using UnitTests.Tester;
@@ -35,91 +39,298 @@ using UnitTests.Tester;
 namespace UnitTests.StorageTests
 {
     [TestClass]
-    public class AzureTableDataManager
+    public class AzureTableDataManagerTests
     {
         private string PartitionKey;
         private UnitTestAzureTableDataManager manager;
+
+
+        private UnitTestAzureTableData GenerateNewData()
+        {
+            return new UnitTestAzureTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
+        }
 
         [TestInitialize]
         public void TestInitialize()
         {
             UnitTestUtils.ConfigureThreadPoolSettingsForStorageTests();
-
             // Pre-create table, if required
             manager = new UnitTestAzureTableDataManager(StorageTestConstants.DataConnectionString);
-
-            PartitionKey = "AzureTableTests-" + Guid.NewGuid();
+            PartitionKey = "PK-AzureTableDataManagerTests-" + Guid.NewGuid();
         }
 
-        [TestMethod, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
-        public void AzureTableDataManager_WriteAlot_SinglePartition()
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_CreateTableEntryAsync()
         {
-            const string testName = "AzureTable_WriteAlot_SinglePartition";
-            const int iterations = 2000;
-            const int batchSize = 1000;
-            const int numPartitions = 1;
-
-            // Write some data
-            WriteAlot_Async(testName, numPartitions, iterations, batchSize);
-        }
-
-        [TestMethod, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
-        public void AzureTableDataManager_WriteAlot_MultiPartition()
-        {
-            const string testName = "AzureTable_WriteAlot_MultiPartition";
-            const int iterations = 2000;
-            const int batchSize = 1000;
-            const int numPartitions = 100;
-
-            // Write some data
-            WriteAlot_Async(testName, numPartitions, iterations, batchSize);
-        }
-
-        [TestMethod, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
-        public void AzureTableDataManager_ReadAll_SinglePartition()
-        {
-            const string testName = "AzureTable_ReadAll";
-            const int iterations = 1000;
-
-            // Write some data
-            WriteAlot_Async(testName, 1, iterations, iterations);
-
-            Stopwatch sw = Stopwatch.StartNew();
-
-            var data = manager.ReadAllDataAsync(PartitionKey)
-                .WaitForResultWithThrow(AzureTableDefaultPolicies.TableCreationTimeout);
-
-            sw.Stop();
-            int count = data.Count();
-            Console.WriteLine("AzureTable_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
-
-            Assert.IsTrue(count >= iterations, "ReadAllshould return some data: Found={0}", count);
-        }
-
-        private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
-        {
-            Console.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
-            List<Task> promises = new List<Task>();
-            Stopwatch sw = Stopwatch.StartNew();
-            for (int i = 0; i < iterations; i++)
+            var data = GenerateNewData();
+            await manager.CreateTableEntryAsync(data);
+            try
             {
-                string partitionKey = PartitionKey;
-                if (numPartitions > 1) partitionKey += (i % numPartitions);
-                string rowKey = i.ToString(CultureInfo.InvariantCulture);
-                var promise = manager.WriteDataAsync(partitionKey, rowKey, rowKey);
-                promises.Add(promise);
-                if ((i % batchSize) == 0 && i > 0)
-                {
-                    Task.WhenAll(promises).WaitWithThrow(AzureTableDefaultPolicies.TableCreationTimeout);
-                    promises.Clear();
-                    Console.WriteLine("{0} has written {1} rows in {2} at {3} RPS",
-                        testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
-                }
+                var data2 = data.Clone();
+                data2.StringData = "NewData";
+                await manager.CreateTableEntryAsync(data2);
+                Assert.Fail("Should have thrown StorageException.");
             }
-            Task.WhenAll(promises).WaitWithThrow(AzureTableDefaultPolicies.TableCreationTimeout);
-            sw.Stop();
-            Console.WriteLine("{0} completed. Wrote {1} entries to {2} partition(s) in {3} at {4} RPS",
-                testName, iterations, numPartitions, sw.Elapsed, iterations / sw.Elapsed.TotalSeconds);
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.Conflict, exc.RequestInformation.HttpStatusCode, "Creating an already existing entry.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.Conflict, httpStatusCode);
+                Assert.AreEqual("EntityAlreadyExists", restStatus);
+            }
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.AreEqual(data.StringData, tuple.Item1.StringData);
+        }
+
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_UpsertTableEntryAsync()
+        {
+            var data = GenerateNewData();
+            await manager.UpsertTableEntryAsync(data);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.AreEqual(data.StringData, tuple.Item1.StringData);
+
+            var data2 = data.Clone();
+            data2.StringData = "NewData";
+            await manager.UpsertTableEntryAsync(data2);
+            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            Assert.AreEqual(data2.StringData, tuple.Item1.StringData);
+        }
+
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_UpdateTableEntryAsync()
+        {
+            var data = GenerateNewData();
+            try
+            {
+                await manager.UpdateTableEntryAsync(data, AzureStorageUtils.ANY_ETAG);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.NotFound, exc.RequestInformation.HttpStatusCode, "Update before insert.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.NotFound, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
+            }
+
+            await manager.UpsertTableEntryAsync(data);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.AreEqual(data.StringData, tuple.Item1.StringData);
+
+            var data2 = data.Clone();
+            data2.StringData = "NewData";
+            string eTag1 = await manager.UpdateTableEntryAsync(data2, AzureStorageUtils.ANY_ETAG);
+            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            Assert.AreEqual(data2.StringData, tuple.Item1.StringData);
+
+            var data3 = data.Clone();
+            data3.StringData = "EvenNewerData";
+            string ignoredETag = await manager.UpdateTableEntryAsync(data3, eTag1);
+            tuple = await manager.ReadSingleTableEntryAsync(data3.PartitionKey, data3.RowKey);
+            Assert.AreEqual(data3.StringData, tuple.Item1.StringData);
+
+            try
+            {
+                string eTag3 = await manager.UpdateTableEntryAsync(data3.Clone(), eTag1);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.PreconditionFailed, exc.RequestInformation.HttpStatusCode, "Wrong eTag");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.PreconditionFailed, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ConditionNotMet, restStatus);
+            }
+        }
+
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_DeleteTableAsync()
+        {
+            var data = GenerateNewData();
+            try
+            {
+                await manager.DeleteTableEntryAsync(data, AzureStorageUtils.ANY_ETAG);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.NotFound, exc.RequestInformation.HttpStatusCode, "Delete before create.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.NotFound, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
+            }
+
+            string eTag1 = await manager.UpsertTableEntryAsync(data);
+            await manager.DeleteTableEntryAsync(data, eTag1);
+
+            try
+            {
+                await manager.DeleteTableEntryAsync(data, eTag1);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.NotFound, exc.RequestInformation.HttpStatusCode, "Deleting an already deleted item.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.NotFound, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
+            }
+
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.IsNull(tuple);
+        }
+
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_MergeTableAsync()
+        {
+            var data = GenerateNewData();
+            try
+            {
+                await manager.MergeTableEntryAsync(data, AzureStorageUtils.ANY_ETAG);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.NotFound, exc.RequestInformation.HttpStatusCode, "Merge before create.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.NotFound, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
+            }
+
+            string eTag1 = await manager.UpsertTableEntryAsync(data);
+            var data2 = data.Clone();
+            data2.StringData = "NewData";
+            await manager.MergeTableEntryAsync(data2, eTag1);
+
+            try
+            {
+                await manager.MergeTableEntryAsync(data, eTag1);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.PreconditionFailed, exc.RequestInformation.HttpStatusCode, "Wrong eTag.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.PreconditionFailed, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ConditionNotMet, restStatus);
+            }
+
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.AreEqual("NewData", tuple.Item1.StringData);
+        }
+
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_ReadSingleTableEntryAsync()
+        {
+            var data = GenerateNewData();
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            Assert.IsNull(tuple);
+        }
+
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_InsertTwoTableEntriesConditionallyAsync()
+        {
+            var data1 = GenerateNewData();
+            var data2 = GenerateNewData();
+            try
+            {
+                await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, AzureStorageUtils.ANY_ETAG);
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.NotFound, exc.RequestInformation.HttpStatusCode, "Upadte item 2 before created it.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.NotFound, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
+            }
+
+            string etag = await manager.CreateTableEntryAsync(data2.Clone());
+            var tuple = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
+            try
+            {
+                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), tuple.Item2);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.Conflict, exc.RequestInformation.HttpStatusCode, "Inserting an already existing item 1.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.Conflict, httpStatusCode);
+                Assert.AreEqual("EntityAlreadyExists", restStatus);
+            }
+
+            try
+            {
+                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), AzureStorageUtils.ANY_ETAG);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.Conflict, exc.RequestInformation.HttpStatusCode, "Inserting an already existing item 1 AND wring eTag");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.Conflict, httpStatusCode);
+                Assert.AreEqual("EntityAlreadyExists", restStatus);
+            };
+        }
+
+        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        public async Task AzureTableDataManager_UpdateTwoTableEntriesConditionallyAsync()
+        {
+            var data1 = GenerateNewData();
+            var data2 = GenerateNewData();
+            try
+            {
+                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, AzureStorageUtils.ANY_ETAG, data2, AzureStorageUtils.ANY_ETAG);
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.NotFound, exc.RequestInformation.HttpStatusCode, "Update before insert.");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.NotFound, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
+            }
+
+            string etag = await manager.CreateTableEntryAsync(data2.Clone());
+            var tuple1 = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
+            var tuple2 = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
+
+            try
+            {
+                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
+                Assert.Fail("Should have thrown StorageException.");
+            }
+            catch (StorageException exc)
+            {
+                Assert.AreEqual((int)HttpStatusCode.PreconditionFailed, exc.RequestInformation.HttpStatusCode, "Wrong eTag");
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
+                Assert.AreEqual(HttpStatusCode.PreconditionFailed, httpStatusCode);
+                Assert.AreEqual(StorageErrorCodeStrings.ConditionNotMet, restStatus);
+            }
         }
     }
 }

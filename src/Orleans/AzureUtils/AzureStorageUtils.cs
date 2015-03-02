@@ -48,6 +48,11 @@ namespace Orleans.AzureUtils
     public static class AzureStorageUtils
     {
         /// <summary>
+        /// ETag of value "*" to match any etag for conditional table operations (update, nerge, delete).
+        /// </summary>
+        public const string ANY_ETAG = "*";
+
+        /// <summary>
         /// Inspect an exception returned from Azure storage libraries to check whether it means that attempt was made to read some data that does not exist in storage table.
         /// </summary>
         /// <param name="exc">Exception that was returned by Azure storage library operation</param>
@@ -84,16 +89,9 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="exc">Exception to be inspected.</param>
         /// <returns>Returns REST error code if found, otherwise <c>null</c></returns>
-        internal static string ExtractRestErrorCode(Exception exc)
+        private static string ExtractRestErrorCode(Exception exc)
         {
-            // Sample of REST error message returned from Azure storage service
-            //<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-            //<error xmlns="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-            //  <code>OperationTimedOut</code>
-            //  <message xml:lang="en-US">Operation could not be completed within the specified time. RequestId:6b75e963-c56c-4734-a656-066cfd03f327 Time:2011-10-09T19:33:26.7631923Z</message>
-            //</error>
-
-            while (exc != null && !(exc is DataServiceClientException || exc is DataServiceQueryException || exc is StorageException))
+            while (exc != null && !(exc is StorageException))
             {
                 exc = (exc.InnerException != null) ? exc.InnerException.GetBaseException() : exc.InnerException;
             }
@@ -101,29 +99,6 @@ namespace Orleans.AzureUtils
             {
                 StorageException ste = exc as StorageException;
                 return ste.RequestInformation.ExtendedErrorInformation.ErrorCode;
-            }
-            while (exc is DataServiceQueryException)
-            {
-                exc = (exc.InnerException != null) ? exc.InnerException.GetBaseException() : exc.InnerException;
-            }
-            
-            if (exc is DataServiceClientException)
-            {
-                try
-                {
-                    var xml = new XmlDocument();
-                    var xmlReader = XmlReader.Create(new StringReader(exc.Message));
-                    xml.Load(xmlReader);
-                    var namespaceManager = new XmlNamespaceManager(xml.NameTable);
-                    namespaceManager.AddNamespace("n", "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata");
-                    return xml.SelectSingleNode("/n:error/n:code", namespaceManager).InnerText;
-                }
-                catch (Exception e)
-                {
-                    var log = TraceLogger.GetLogger("AzureStorageUtils", TraceLogger.LoggerType.Runtime);
-                    log.Warn(ErrorCode.AzureTable_16, String.Format("Problem extracting REST error code from Data='{0}'", exc.Message), e);
-                    if (Debugger.IsAttached) throw; // For debug purposes only; Problem will just get logged in all other cases
-                }
             }
             return null;
         }
@@ -157,40 +132,6 @@ namespace Orleans.AzureUtils
                         if (getExtendedErrors)
                             restStatus = ExtractRestErrorCode(ste);
                         return true;
-                    }
-
-                    if (e is DataServiceQueryException)
-                    {
-                        var dsqe = e as DataServiceQueryException;
-                        if (dsqe.Response == null)
-                        {
-                            e = e.GetBaseException();
-                            continue;
-                        }
-                        httpStatusCode = (HttpStatusCode)dsqe.Response.StatusCode;
-                        if (getExtendedErrors)
-                            restStatus = ExtractRestErrorCode(dsqe);
-                        return true;
-                    }
-                    if (e is DataServiceClientException)
-                    {
-                        var dsce = e as DataServiceClientException;
-                        httpStatusCode = (HttpStatusCode)dsce.StatusCode;
-                        if (getExtendedErrors)
-                            restStatus = ExtractRestErrorCode(dsce);
-                        return true;
-                    }
-                    if (e is DataServiceRequestException)
-                    {
-                        var dsre = e as DataServiceRequestException;
-                        List<OperationResponse> innerResponses = dsre.Response.ToList();
-                        if (innerResponses.Any())
-                        {
-                            httpStatusCode = (HttpStatusCode)innerResponses.First().StatusCode;
-                            if (getExtendedErrors)
-                                restStatus = ExtractRestErrorCode(dsre);
-                            return true;
-                        }
                     }
                     e = e.InnerException;
                 }

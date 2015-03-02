@@ -9,45 +9,52 @@ if "%FrameworkVersion%" == "" set FrameworkVersion=v4.0.30319
 SET MSBUILDEXEDIR=%FrameworkDir%\%FrameworkVersion%
 SET MSBUILDEXE=%MSBUILDEXEDIR%\MSBuild.exe
 
+set PROJ=%CMDHOME%\Orleans.sln
+
+@echo ===== Building %PROJ% =====
+
 @echo Build Debug ==============================
+
 SET CONFIGURATION=Debug
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-"%MSBUILDEXE%" %CMDHOME%\Orleans.sln
+"%MSBUILDEXE%" /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-
-@REM Install Visual Studio SDK and uncomment the following lines 
-@REM to build Visual Studio project templates.
-@REM
-@REM %MSBUILDEXE% %CMDHOME%\OrleansVSTools\OrleansVSTools.sln
-@REM xcopy /s /y %CMDHOME%\SDK\VSIX %OutDir%\VSIX\
-@REM @if ERRORLEVEL 1 GOTO :ErrorStop
-
-"%MSBUILDEXE%" /p:Configuration=%CONFIGURATION% /p:OutputPath=. %CMDHOME%\Build\OrleansSetup.wixproj
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD succeeded for %CONFIGURATION%
-
+@echo BUILD ok for %CONFIGURATION% %PROJ%
 
 @echo Build Release ============================
+
 SET CONFIGURATION=Release
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-"%MSBUILDEXE%" %CMDHOME%\Orleans.sln
+"%MSBUILDEXE%" /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
+@echo BUILD ok for %CONFIGURATION% %PROJ%
 
+@echo Build Release Installers =================
+
+SET CONFIGURATION=Release
+
+set STEP=VSIX
+@REM
 @REM Install Visual Studio SDK and uncomment the following lines 
 @REM to build Visual Studio project templates.
 @REM
-@REM %MSBUILDEXE% %CMDHOME%\OrleansVSTools\OrleansVSTools.sln
+@REM "%MSBUILDEXE%" /p:Configuration=%CONFIGURATION% "%CMDHOME%\OrleansVSTools\OrleansVSTools.sln"
 @REM xcopy /s /y %CMDHOME%\SDK\VSIX %OutDir%\VSIX\
 @REM @if ERRORLEVEL 1 GOTO :ErrorStop
+@REM @echo BUILD ok for VSIX package for %PROJ%
 
-"%MSBUILDEXE%" /p:Configuration=%CONFIGURATION% /p:OutputPath=. %CMDHOME%\Build\OrleansSetup.wixproj
+set STEP=WIX
+"%MSBUILDEXE%" /p:Configuration=%CONFIGURATION% /p:OutputPath=. "%CMDHOME%\Build\OrleansSetup.wixproj"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD succeeded for %CONFIGURATION%
+@echo BUILD ok for WIX package for %PROJ%
+
+@echo ===== Build succeeded for %PROJ% =====
 @GOTO :EOF
 
 :ErrorStop
-@echo BUILD FAILED for %CONFIGURATION% with error %ERRORLEVEL% - CANNOT CONTINUE
+if "%STEP%" == "" set STEP=%CONFIGURATION%
+@echo ===== Build FAILED for %PROJ% -- %STEP% with error %ERRORLEVEL% - CANNOT CONTINUE =====
 
 :EOF
