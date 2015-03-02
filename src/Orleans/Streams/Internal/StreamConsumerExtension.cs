@@ -305,14 +305,14 @@ namespace Orleans.Streams
             public override bool Equals(StreamSubscriptionHandle<T> other)
             {
                 var o = other as ObserverWrapper<T>;
-                return o != null && subscriptionId == o.subscriptionId;
+                return o != null && subscriptionId.Equals(o.subscriptionId);
             }
 
             #endregion
 
             public override bool Equals(object obj)
             {
-                return Equals(obj as ObserverWrapper<T>);
+                return Equals(obj as StreamSubscriptionHandle<T>);
             }
 
             public override int GetHashCode()
