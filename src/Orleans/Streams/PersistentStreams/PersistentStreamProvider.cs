@@ -99,17 +99,7 @@ namespace Orleans.Providers.Streams.Common
             if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
                 queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
-                if (providerRuntime.InSilo)
-                {
-                    IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(balancerType, Name, Silo.CurrentSilo.LocalSiloStatusOracle, providerRuntime, queueAdapter.GetStreamQueueMapper());
-                    var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-                    var manager = new PersistentStreamPullingManager(managerId, Name, providerRuntime, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
-                    providerRuntime.RegisterSystemTarget(manager);
-                    // Init the manager only after it was registered locally.
-                    var managerGrainRef = PersistentStreamPullingManagerFactory.Cast(manager.AsReference());
-                    // Need to call it as a grain reference though.
-                    await managerGrainRef.Initialize(queueAdapter.AsImmutable());
-                }
+                await providerRuntime.StartPullingAgents(Name, balancerType, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout);
             }
         }
 
