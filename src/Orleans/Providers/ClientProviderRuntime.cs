@@ -191,5 +191,15 @@ namespace Orleans.Providers
         {
             return null;
         }
+
+        public Task StartPullingAgents(
+            string streamProviderName,
+            StreamQueueBalancerType balancerType,
+            IQueueAdapter queueAdapter,
+            TimeSpan getQueueMsgsTimerPeriod,
+            TimeSpan initQueueTimeout)
+        {
+            return TaskDone.Done;
+        }
     }
 }

@@ -27,6 +27,7 @@ using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
 using Orleans.Providers;
+using Orleans.Concurrency;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
@@ -231,6 +232,24 @@ namespace Orleans.Runtime.Providers
         public object GetCurrentSchedulingContext()
         {
             return RuntimeContext.CurrentActivationContext;
+        }
+
+        public async Task StartPullingAgents(
+            string streamProviderName,
+            StreamQueueBalancerType balancerType,
+            IQueueAdapter queueAdapter,
+            TimeSpan getQueueMsgsTimerPeriod,
+            TimeSpan initQueueTimeout)
+        {
+            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
+                balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, this, queueAdapter.GetStreamQueueMapper());
+            var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
+            this.RegisterSystemTarget(manager);
+            // Init the manager only after it was registered locally.
+            var managerGrainRef = PersistentStreamPullingManagerFactory.Cast(manager.AsReference());
+            // Need to call it as a grain reference though.
+            await managerGrainRef.Initialize(queueAdapter.AsImmutable());
         }
     }
 }
