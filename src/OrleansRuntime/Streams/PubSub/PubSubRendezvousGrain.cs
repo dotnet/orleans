@@ -147,7 +147,6 @@ namespace Orleans.Streams
             StreamSequenceToken token, 
             IStreamFilterPredicateWrapper filter)
         {
-            // This Where clause will return either zero or one PubSubSubscriptionState
             PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
             if (pubSubState == null)
             {

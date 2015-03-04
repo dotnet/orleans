@@ -115,6 +115,11 @@ namespace Orleans.Streams
             return myExtension != null && myExtension.RemoveObserver(handle);
         }
 
+        internal Task<int> DiagGetConsumerObserversCount()
+        {
+            return Task.FromResult(myExtension.DiagCountStreamObservers<T>(stream.StreamId));
+        }
+
         private async Task BindExtensionLazy()
         {
             if (myExtension == null)

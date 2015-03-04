@@ -23,7 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Threading.Tasks;
+﻿using System.Linq;
+﻿using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -59,13 +60,13 @@ namespace Orleans.Streams
 
             internal void AddObserver(ObserverWrapper<T> observer)
             {
-                localObservers.TryAdd(observer.subscriptionId, observer);
+                localObservers.TryAdd(observer.SubscriptionId, observer);
             }
 
             internal void RemoveObserver(ObserverWrapper<T> observer)
             {
                 ObserverWrapper<T> ignore;
-                localObservers.TryRemove(observer.subscriptionId, out ignore);
+                localObservers.TryRemove(observer.SubscriptionId, out ignore);
             }
 
             internal bool IsEmpty
@@ -99,9 +100,9 @@ namespace Orleans.Streams
                     await DeliverItem(itemTuple.Item1, itemTuple.Item2);
             }
 
-            internal int Count
+            internal int GetObserverCountForStream(StreamId streamId)
             {
-                get { return localObservers.Count; }
+                return localObservers.Values.Count(o => o.StreamId.Equals(streamId));
             }
 
             public async Task CompleteStream()
@@ -157,7 +158,7 @@ namespace Orleans.Streams
             var observerWrapper = (ObserverWrapper<T>)handle;
             IStreamObservers obs;
             // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-            if (!allStreamObservers.TryGetValue(observerWrapper.subscriptionId, out obs)) return true;
+            if (!allStreamObservers.TryGetValue(observerWrapper.SubscriptionId, out obs)) return true;
 
             var observersCollection = (ObserversCollection<T>)obs;
             observersCollection.RemoveObserver(observerWrapper);
@@ -165,7 +166,7 @@ namespace Orleans.Streams
             if (!observersCollection.IsEmpty) return false;
 
             IStreamObservers ignore;
-            allStreamObservers.TryRemove(observerWrapper.subscriptionId, out ignore);
+            allStreamObservers.TryRemove(observerWrapper.SubscriptionId, out ignore);
             // if we don't have any more subsribed streams, unsubscribe the extension.
             return true;
         }
@@ -231,6 +232,12 @@ namespace Orleans.Streams
             return TaskDone.Done;
         }
 
+        internal int DiagCountStreamObservers<T>(StreamId streamId)
+        {
+            return allStreamObservers.Values
+                                     .OfType<ObserversCollection<T>>()
+                                     .Aggregate(0, (count,o) => count + o.GetObserverCountForStream(streamId));
+        }
 
         /// <summary>
         /// Wraps a single application observer object, mainly to add Dispose fuctionality.
@@ -242,7 +249,7 @@ namespace Orleans.Streams
             [NonSerialized]
             private IAsyncObserver<T> observer;
             private readonly StreamImpl<T> streamImpl;
-            internal readonly GuidId subscriptionId;
+            private readonly GuidId subscriptionId;
             private readonly IStreamFilterPredicateWrapper filterWrapper;
 
             internal StreamId StreamId { get { return streamImpl.StreamId; } }

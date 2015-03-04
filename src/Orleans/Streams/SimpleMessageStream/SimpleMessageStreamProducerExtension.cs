@@ -207,20 +207,19 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();
                 var immutableItem = new Immutable<object>(item);
-                foreach (GuidId subscriptionId in consumers.Keys)
+                foreach (KeyValuePair<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> subscriptionKvp in consumers)
                 {
-                    var data = consumers[subscriptionId];
-                    IStreamConsumerExtension remoteConsumer = data.Item1;
+                    IStreamConsumerExtension remoteConsumer = subscriptionKvp.Value.Item1;
 
                     // Apply filter(s) to see if we should forward this item to this consumer
-                    IStreamFilterPredicateWrapper filter = data.Item2;
+                    IStreamFilterPredicateWrapper filter = subscriptionKvp.Value.Item2;
                     if (filter != null)
                     {
                         if (!filter.ShouldReceive(streamId, filter.FilterData, item))
                             continue;
                     }
 
-                    Task task = remoteConsumer.DeliverItem(subscriptionId, immutableItem, null);
+                    Task task = remoteConsumer.DeliverItem(subscriptionKvp.Key, immutableItem, null);
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }

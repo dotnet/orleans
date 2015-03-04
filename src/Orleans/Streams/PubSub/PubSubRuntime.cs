@@ -130,13 +130,16 @@ namespace Orleans.Streams
 
         public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
-            return IsImplicitSubscriber(streamConsumer, streamId) ? TaskDone.Done :
-                explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamProvider, streamConsumer, token, filter);
+            return IsImplicitSubscriber(streamConsumer, streamId)
+                ? TaskDone.Done
+                : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamProvider, streamConsumer, token, filter);
         }
 
         public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
-            return explicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider);
+            return IsImplicitSubscriber(subscriptionId, streamId)
+                ? TaskDone.Done
+                : explicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider);
         }
 
         public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)
@@ -153,10 +156,17 @@ namespace Orleans.Streams
         {
             return implicitPubSub.IsImplicitSubscriber(GrainExtensions.GetGrainId(addressable), streamId);
         }
+        private bool IsImplicitSubscriber(GuidId subscriptionId, StreamId streamId)
+        {
+            return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId);
+        }
 
         public GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId)
         {
             GrainId grainId = GrainExtensions.GetGrainId(requesterAddress);
+            // If there is an implicit subscription setup for the provided grain on this provided stream, subscription should match the stream Id.
+            // If there is no implicit subscription setup, generate new random unique subscriptionId.
+            // TODO: Replace subscription id with statically generated subscriptionId instead of getting it from the streamId.
             return implicitPubSub.IsImplicitSubscriber(grainId, streamId)
                 ? GuidId.GetGuidId(grainId.GetPrimaryKey())
                 : GuidId.GetNewGuidId();

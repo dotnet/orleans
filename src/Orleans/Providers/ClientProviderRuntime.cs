@@ -201,10 +201,5 @@ namespace Orleans.Providers
         {
             return TaskDone.Done;
         }
-
-        public GuidId CreateSubscriptionId(StreamId streamId)
-        {
-            return GuidId.GetNewGuidId();
-        }
     }
 }
