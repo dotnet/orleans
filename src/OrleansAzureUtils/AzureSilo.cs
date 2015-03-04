@@ -185,6 +185,7 @@ namespace Orleans.Runtime.Host
             // Always use Azure table for membership when running silo in Azure
             host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
             host.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
+            host.SetExpectedClusterSize(RoleEnvironment.CurrentRoleInstance.Role.Instances.Count);
             siloInstanceManager.RegisterSiloInstance(myEntry);
 
             // Initialise this Orleans silo instance
