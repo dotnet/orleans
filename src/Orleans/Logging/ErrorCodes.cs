@@ -749,6 +749,10 @@ namespace Orleans
         GatewayManager_NoGateways               = GatewayBase + 13,
         GatewayNetworkError                     = GatewayBase + 14,
         GatewayFailedToParse                    = GatewayBase + 15,
+        ClientRegistrarFailedToRegister         = GatewayBase + 16,
+        ClientRegistrarFailedToUnregister_1     = GatewayBase + 17,
+        ClientRegistrarFailedToUnregister_2     = GatewayBase + 18,
+        ClientRegistrarTimerFailed              = GatewayBase + 19,
 
         TimerBase                               = Runtime + 1400,
         TimerChangeError                        = PerfCounterTimerError, // Backward compatability
