@@ -21,15 +21,16 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Providers.Streams.AzureQueue;
+using UnitTests.SampleStreaming;
 using UnitTests.Tester;
 
-namespace UnitTests.SampleStreaming
+namespace Tester.StreamingTests
 {
     [DeploymentItem("OrleansConfigurationForUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
@@ -136,8 +137,7 @@ namespace UnitTests.SampleStreaming
 
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(() => CheckCounters(producer, consumer, assertAreEqual: false), _timeout);
-            await CheckCounters(producer, consumer);
+            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
             }
@@ -158,8 +158,7 @@ namespace UnitTests.SampleStreaming
             await producer.StopPeriodicProducing();
             //int numProduced = producer.NumberProduced.Result;
 
-            await UnitTestUtils.WaitUntilAsync(() => CheckCounters(producer, consumer, assertAreEqual: false), _timeout);
-            await CheckCounters(producer, consumer);
+            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -180,18 +179,17 @@ namespace UnitTests.SampleStreaming
             await producer.StopPeriodicProducing();
             //int numProduced = producer.NumberProduced.Result;
 
-            await UnitTestUtils.WaitUntilAsync( () => CheckCounters( producer, consumer, assertAreEqual: false ), _timeout );
-            await CheckCounters( producer, consumer );
+            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
 
-        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertAreEqual = true)
+        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
             logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
-            if (assertAreEqual)
+            if (assertIsTrue)
             {
                 Assert.AreEqual(numProduced, numConsumed, String.Format("numProduced = {0}, numConsumed = {1}", numProduced, numConsumed));
                 return true;

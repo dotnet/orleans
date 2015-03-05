@@ -73,6 +73,7 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="SampleStreamingGrain.cs" />
     <Compile Include="SimpleObserverableGrain.cs" />
     <Compile Include="ObserverGrain.cs" />

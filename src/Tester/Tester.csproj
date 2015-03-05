@@ -103,6 +103,8 @@
     <Compile Include="ResultHandle.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
+    <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
+    <Compile Include="StreamingTests\SubscriptionMultiplicityTests.cs" />
     <Compile Include="UnitTestSiloHostOptions.cs" />
     <Compile Include="UnitTestSiloHost.cs" />
     <Compile Include="UnitTestUtils.cs" />

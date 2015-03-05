@@ -32,7 +32,7 @@ namespace UnitTests.Tester
 {
     public class UnitTestUtils
     {
-        public static async Task WaitUntilAsync(Func<Task<bool>> predicate, TimeSpan timeout)
+        public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout)
         {
             bool keepGoing = true;
             int numLoops = 0;
@@ -46,7 +46,7 @@ namespace UnitTests.Tester
                         // need to wait a bit to before re-checking the condition.
                         await Task.Delay(TimeSpan.FromSeconds(1));
                     }
-                    while (!await predicate() && keepGoing);
+                    while (!await predicate(keepGoing) && keepGoing);
                 };
             // ReSharper restore AccessToModifiedClosure
 
@@ -59,7 +59,6 @@ namespace UnitTests.Tester
             {
                 keepGoing = false;
             }
-            Assert.IsTrue(task.IsCompleted, "The test completed {0} loops then timed out after {1}", numLoops, timeout);
         }
 
         public static TimeSpan Multiply(TimeSpan time, double value)

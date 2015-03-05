@@ -21,20 +21,21 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.Providers.Streams.AzureQueue;
-﻿using TestGrainInterfaces;
-﻿using TestGrains;
-﻿using UnitTests.Tester;
+using Orleans.Streams;
+using TestGrainInterfaces;
+using UnitTests.SampleStreaming;
+using UnitTests.Tester;
 
-namespace UnitTests.SampleStreaming
+namespace Tester.StreamingTests
 {
     public class SubscriptionMultiplicityTests : UnitTestSiloHost
     {
-        private const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
         private readonly string streamProviderName;
 
         public SubscriptionMultiplicityTests(UnitTestSiloOptions siloOptions, string streamProviderName)
@@ -52,54 +53,97 @@ namespace UnitTests.SampleStreaming
             StopAllSilos();
         }
 
-        public void TestCleanup()
-        {
-            if (streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
-            {
-                const string dataConnectionString = "UseDevelopmentStorage=true";
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, DeploymentId, dataConnectionString, logger).Wait();
-            }
-        }
-
         public async Task MultipleSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
-            // consumer joins first, producer later
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
-
+            // get producer and consumer
             ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
+            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+
+            // setup two subscriptions
+            StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+            StreamSubscriptionHandle<int> secondSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+
+            // produce some messages
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-
             Thread.Sleep(1000);
-
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(() => CheckCounters(producer, consumer, assertAreEqual: false), _timeout);
-            await CheckCounters(producer, consumer);
+            // check
+            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
 
-            await consumer.StopConsuming();
+            // unsubscribe
+            await consumer.StopConsuming(firstSubscriptionHandle);
+            await consumer.StopConsuming(secondSubscriptionHandle);
         }
 
-        public async Task SMSAddAndRemoveSubscriptionTest(Guid streamGuid, string streamNamespace)
+        public async Task AddAndRemoveSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
+            // get producer and consumer
+            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
+            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+
+            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+
+            // setup one subscription and send messsages
+            StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+
+            await producer.StartPeriodicProducing();
+            Thread.Sleep(1000);
+            await producer.StopPeriodicProducing();
+
+            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+
+            // clear counts
+            await consumer.ClearNumberConsumed();
+            await producer.ClearNumberProduced();
+
+            // setup second subscription and send messages
+            StreamSubscriptionHandle<int> secondSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+
+            await producer.StartPeriodicProducing();
+            Thread.Sleep(1000);
+            await producer.StopPeriodicProducing();
+
+            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
+
+            // clear counts
+            await consumer.ClearNumberConsumed();
+            await producer.ClearNumberProduced();
+
+            // remove first subscription and send messages
+            await consumer.StopConsuming(firstSubscriptionHandle);
+
+            await producer.StartPeriodicProducing();
+            Thread.Sleep(1000);
+            await producer.StopPeriodicProducing();
+
+            await UnitTestUtils.WaitUntilAsync((lastTry) => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+
+            await consumer.StopConsuming(secondSubscriptionHandle);
         }
 
-        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertAreEqual = true)
+        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int consumerCount, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
-            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
-            if (assertAreEqual)
+            if (assertIsTrue)
             {
-                Assert.AreEqual(numProduced, numConsumed, String.Format("numProduced = {0}, numConsumed = {1}", numProduced, numConsumed));
-                return true;
+                Assert.IsTrue(numProduced > 0, "Events were not produced");
+                Assert.AreEqual(consumerCount, numConsumed.Count, "Incorrect number of consumers");
+                foreach (int consumed in numConsumed.Values)
+                {
+                    Assert.AreEqual(numProduced, consumed, "Produced and consumed counts do not match");
+                }
             }
-            else
+            else if (numProduced <= 0 || // no events produced?
+                     consumerCount != numConsumed.Count || // subscription counts are wrong?
+                     numConsumed.Values.Any(consumedCount => consumedCount != numProduced)) // consumed events don't match produced events for any subscription?
             {
-                return numProduced == numConsumed;
+                return false;
             }
+            return true;
         }
     }
 }

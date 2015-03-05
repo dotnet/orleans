@@ -21,54 +21,49 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using UnitTests.Tester;
 
-namespace UnitTests.SampleStreaming
+namespace Tester.StreamingTests
 {
     [DeploymentItem("OrleansConfigurationForUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class SMSSubscriptionMultiplicityTests : SubscriptionMultiplicityTests
     {
+        private const string StreamNamespace = "SMSSubscriptionMultiplicityTestsNamespace";
+
         public SMSSubscriptionMultiplicityTests()
             : base(new UnitTestSiloOptions
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForUnitTests.xml"),
-            }, "SMSProvider", TimeSpan.FromSeconds(30))
+            }, "SMSProvider")
         {
         }
 
         // Use ClassCleanup to run code after all tests in a class have run
         [ClassCleanup]
-        public static void MyClassCleanup()
+        public static new void MyClassCleanup()
         {
-            base.MyClassCleanup();
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            base.TestCleanup();
+            SubscriptionMultiplicityTests.MyClassCleanup();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
         public async Task SMSMultipleSubscriptionTest()
         {
             logger.Info("************************ SMSMultipleSubscriptionTest *********************************");
-            await MultipleSubscriptionTest(Guid.NewGuid());
+            await MultipleSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
         public async Task SMSAddAndRemoveSubscriptionTest()
         {
             logger.Info("************************ SMSAddAndRemoveSubscriptionTest *********************************");
-            await AddAndRemoveSubscriptionTest(Guid.NewGuid());
+            await AddAndRemoveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
     }
 }
