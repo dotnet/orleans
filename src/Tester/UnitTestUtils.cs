@@ -46,7 +46,7 @@ namespace UnitTests.Tester
                         // need to wait a bit to before re-checking the condition.
                         await Task.Delay(TimeSpan.FromSeconds(1));
                     }
-                    while (!await predicate(keepGoing) && keepGoing);
+                    while (!await predicate(!keepGoing) && keepGoing);
                 };
             // ReSharper restore AccessToModifiedClosure
 
@@ -59,6 +59,7 @@ namespace UnitTests.Tester
             {
                 keepGoing = false;
             }
+            await task;
         }
 
         public static TimeSpan Multiply(TimeSpan time, double value)
