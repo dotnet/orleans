@@ -38,6 +38,7 @@ namespace UnitTests.SampleStreaming
     {
         private const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
         private const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
+        private const string StreamNamespace = "SampleStreamNamespace";
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private Guid streamId;
@@ -124,10 +125,10 @@ namespace UnitTests.SampleStreaming
         {
             // consumer joins first, producer later
             ISampleStreaming_ConsumerGrain consumer = SampleStreaming_ConsumerGrainFactory.GetGrain(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, streamProvider);
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            await producer.BecomeProducer(streamId, streamProvider);
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 
@@ -145,10 +146,10 @@ namespace UnitTests.SampleStreaming
         {
             // producer joins first, consumer later
             ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            await producer.BecomeProducer(streamId, streamProvider);
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
             ISampleStreaming_ConsumerGrain consumer = SampleStreaming_ConsumerGrainFactory.GetGrain(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, streamProvider);
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 
@@ -167,10 +168,10 @@ namespace UnitTests.SampleStreaming
         {
             // producer joins first, consumer later
             ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain( Guid.NewGuid() );
-            await producer.BecomeProducer( streamId, streamProvider );
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
             ISampleStreaming_InlineConsumerGrain consumer = SampleStreaming_InlineConsumerGrainFactory.GetGrain( Guid.NewGuid() );
-            await consumer.BecomeConsumer( streamId, streamProvider );
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 

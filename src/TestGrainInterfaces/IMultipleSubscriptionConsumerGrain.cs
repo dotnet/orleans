@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,35 +21,22 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
-﻿using System.Threading.Tasks;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Orleans;
-﻿
-namespace UnitTests.SampleStreaming
+using Orleans.Streams;
+
+namespace TestGrainInterfaces
 {
-    public interface ISampleStreaming_ProducerGrain : IGrain
+    public interface IMultipleSubscriptionConsumerGrain : IGrain
     {
-        Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
+        Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
-        Task StartPeriodicProducing();
+        Task StopConsuming(StreamSubscriptionHandle<int> handle);
 
-        Task StopPeriodicProducing();
+        Task<Dictionary<StreamSubscriptionHandle<int>, int>> GetNumberConsumed();
 
-        Task<int> GetNumberProduced();
-
-        Task ClearNumberProduced();
-    }
-
-    public interface ISampleStreaming_ConsumerGrain : IGrain
-    {
-        Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
-
-        Task StopConsuming();
-
-        Task<int> GetNumberConsumed();
-    }
-
-    public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
-    {
+        Task ClearNumberConsumed();
     }
 }

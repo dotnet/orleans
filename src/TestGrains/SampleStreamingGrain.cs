@@ -31,11 +31,11 @@ namespace UnitTests.SampleStreaming
 {
     internal class SampleConsumerObserver<T> : IAsyncObserver<T>
     {
-        private SampleStreaming_ConsumerGrain hostingGrain;
+        private readonly SampleStreaming_ConsumerGrain hostingGrain;
 
-        internal SampleConsumerObserver(SampleStreaming_ConsumerGrain _hostingGrain)
+        internal SampleConsumerObserver(SampleStreaming_ConsumerGrain hostingGrain)
         {
-            hostingGrain = _hostingGrain;
+            this.hostingGrain = hostingGrain;
         }
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
@@ -64,7 +64,6 @@ namespace UnitTests.SampleStreaming
         private int numProducedItems;
         private IDisposable producerTimer;
         internal Logger logger;
-        internal static readonly string StreamNamespace = "SampleStreamNamespace";
 
         public override Task OnActivateAsync()
         {
@@ -74,11 +73,11 @@ namespace UnitTests.SampleStreaming
             return TaskDone.Done;
         }
 
-        public Task BecomeProducer(Guid streamId, string providerToUse)
+        public Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info("BecomeProducer");
             IStreamProvider streamProvider = base.GetStreamProvider(providerToUse);
-            producer = streamProvider.GetStream<int>(streamId, SampleStreaming_ProducerGrain.StreamNamespace);
+            producer = streamProvider.GetStream<int>(streamId, streamNamespace);
             return TaskDone.Done;
         }
 
@@ -100,6 +99,12 @@ namespace UnitTests.SampleStreaming
         public Task<int> GetNumberProduced()
         {
             return Task.FromResult(numProducedItems);
+        }
+
+        public Task ClearNumberProduced()
+        {
+            numProducedItems = 0;
+            return TaskDone.Done;
         }
 
         private Task TimerCallback(object state)
@@ -131,12 +136,12 @@ namespace UnitTests.SampleStreaming
             return TaskDone.Done;
         }
 
-        public async Task BecomeConsumer(Guid streamId, string providerToUse)
+        public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info("BecomeConsumer");
             consumerObserver = new SampleConsumerObserver<int>(this);
             IStreamProvider streamProvider = base.GetStreamProvider(providerToUse);
-            consumer = streamProvider.GetStream<int>(streamId, SampleStreaming_ProducerGrain.StreamNamespace);
+            consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
             consumerInterface = await consumer.SubscribeAsync(consumerObserver);
         }
 
@@ -146,7 +151,6 @@ namespace UnitTests.SampleStreaming
             if (consumerInterface != null)
             {
                 await consumer.UnsubscribeAsync(consumerInterface);
-                //consumerInterface.Dispose();
                 consumerInterface = null;
             }
         }
@@ -173,11 +177,11 @@ namespace UnitTests.SampleStreaming
             return TaskDone.Done;
         }
 
-        public async Task BecomeConsumer( Guid streamId, string providerToUse )
+        public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info( "BecomeConsumer" );
             IStreamProvider streamProvider = base.GetStreamProvider( providerToUse );
-            consumer = streamProvider.GetStream<int>( streamId, SampleStreaming_ProducerGrain.StreamNamespace );
+            consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
             consumerInterface = await consumer.SubscribeAsync( OnNextAsync, OnErrorAsync, OnCompletedAsync );
         }
 
