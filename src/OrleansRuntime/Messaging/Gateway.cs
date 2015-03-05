@@ -146,10 +146,7 @@ namespace Orleans.Runtime.Messaging
             lock (lockable)
             {
                 ClientState cs = null;
-                if (!clientSockets.TryGetValue(sock, out cs))
-                {
-                    return;
-                }
+                if (!clientSockets.TryGetValue(sock, out cs)) return;
 
                 EndPoint endPoint = null;
                 try

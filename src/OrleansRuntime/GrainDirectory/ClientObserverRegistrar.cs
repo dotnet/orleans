@@ -35,9 +35,9 @@ namespace Orleans.Runtime
     internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar
     {
         private readonly ILocalGrainDirectory grainDirectory;
-        private readonly ISiloMessageCenter localMessageCenter;
+        private readonly ISiloMessageCenter messageCenter;
         private readonly SiloAddress myAddress;
-        private readonly OrleansTaskScheduler localScheduler;
+        private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
         private readonly TraceLogger logger;
         private GrainTimer clientRefreshTimer;
@@ -48,9 +48,9 @@ namespace Orleans.Runtime
             : base(Constants.ClientObserverRegistrarId, myAddr)
         {
             grainDirectory = dir;
-            localMessageCenter = mc;
+            messageCenter = mc;
             myAddress = myAddr;
-            localScheduler = scheduler;
+            this.scheduler = scheduler;
             orleansConfig = config;
             logger = TraceLogger.GetLogger(typeof(ClientObserverRegistrar).Name);
         }
@@ -79,7 +79,7 @@ namespace Orleans.Runtime
             // Use a ActivationId that is hashed from clientId, and not random ActivationId.
             // That way, when we refresh it in the directiry, its the same one.
             var addr = GetClientActivationAddress(clientId);
-            localScheduler.QueueTask(
+            scheduler.QueueTask(
                 () => grainDirectory.RegisterAsync(addr), this.SchedulingContext)
                     .LogException(logger, ErrorCode.ClientRegistrarFailedToRegister, String.Format("Directory.RegisterAsync {0} failed.", addr))
                         .Ignore();
@@ -88,9 +88,9 @@ namespace Orleans.Runtime
         internal void ClientDropped(GrainId clientId)
         {
             var addr = GetClientActivationAddress(clientId);
-            localScheduler.QueueTask(
+            scheduler.QueueTask(
                 () => grainDirectory.UnregisterAsync(addr), this.SchedulingContext)
-                    .LogException(logger, ErrorCode.ClientRegistrarFailedToUnregister_1, String.Format("Directory.UnregisterAsync {0} failed.", addr))
+                    .LogException(logger, ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnregisterAsync {0} failed.", addr))
                         .Ignore();
         }
 
@@ -104,16 +104,14 @@ namespace Orleans.Runtime
                 {
                     var addr = GetClientActivationAddress(clientId);
                     Task task = grainDirectory.RegisterAsync(addr).
-                        LogException(logger, ErrorCode.ClientRegistrarFailedToUnregister_2,
-                            String.Format("Directory.UnregisterAsync {0} failed.", addr));
-                    task.Ignore();
+                        LogException(logger, ErrorCode.ClientRegistrarFailedToRegister_2, String.Format("Directory.RegisterAsync {0} failed.", addr));
                     tasks.Add(task);
                 }
                 await Task.WhenAll(tasks);
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.ClientRegistrarTimerFailed, "OnClientRefreshTimer has thrown.", exc);
+                logger.Error(ErrorCode.ClientRegistrarTimerFailed, "OnClientRefreshTimer has thrown.", exc.GetBaseException());
             }
         }
 
@@ -130,7 +128,7 @@ namespace Orleans.Runtime
         /// </summary>
         public async Task<ActivationAddress> RegisterClientObserver(GrainId grainId, GrainId clientId)
         {
-            localMessageCenter.RecordProxiedGrain(grainId, clientId);
+            messageCenter.RecordProxiedGrain(grainId, clientId);
             var addr = ActivationAddress.NewActivationAddress(myAddress, grainId);
             await grainDirectory.RegisterAsync(addr);
             return addr;
@@ -141,9 +139,9 @@ namespace Orleans.Runtime
         /// </summary>
         public async Task UnregisterClientObserver(GrainId target)
         {
-            if (localMessageCenter.IsProxying)
+            if (messageCenter.IsProxying)
             {
-                localMessageCenter.RecordUnproxiedGrain(target);
+                messageCenter.RecordUnproxiedGrain(target);
             }
             await grainDirectory.DeleteGrain(target);
         }
