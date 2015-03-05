@@ -23,7 +23,7 @@ This list is for websites and applications that are powered by Orleans.
 Wesbites/Apps|Link|Notes
 -------------|----|-----
 Halo 4 - 343 Industries|<a href="https://www.halowaypoint.com" target="_blank">https://www.halowaypoint.com</a>|
-Pegasus Mission|<a href="http://pegasusmission.com," target="_blank">http://pegasusmission.com</a>|[More Info](https://github.com/dotnet/orleans/issues/99#issuecomment-74697629)|
+Pegasus Mission|<a href="http://pegasusmission.com," target="_blank">http://pegasusmission.com</a>|[More Info](http://pegasusmission.com/2015/03/04/orleans-above-the-cloud-piraeus-overview/) and [here](https://github.com/dotnet/orleans/issues/99#issuecomment-74697629)|
 
 
 
