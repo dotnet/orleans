@@ -110,10 +110,10 @@ namespace Orleans.Runtime.Messaging
             OutboundQueue.Start();
         }
 
-        public void StartGateway()
+        public void StartGateway(ClientObserverRegistrar clientRegistrar)
         {
             if (Gateway != null)
-                Gateway.Start();
+                Gateway.Start(clientRegistrar);
         }
 
         public void PrepareToStop()

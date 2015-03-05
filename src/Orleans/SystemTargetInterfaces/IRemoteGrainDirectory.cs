@@ -39,8 +39,7 @@ namespace Orleans.Runtime
         Dictionary<ActivationId, IActivationInfo> Instances { get; }
         int VersionTag { get; }
         bool SingleInstance { get; }
-        void AddActivation(ActivationAddress addr);
-        void AddActivation(ActivationId act, SiloAddress silo);
+        bool AddActivation(ActivationId act, SiloAddress silo);
         ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo);
         bool RemoveActivation(ActivationAddress addr);
         bool RemoveActivation(ActivationId act, bool force);

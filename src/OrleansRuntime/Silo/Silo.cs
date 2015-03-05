@@ -88,6 +88,7 @@ namespace Orleans.Runtime
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
         private IMembershipOracle membershipOracle;
+        private ClientObserverRegistrar clientRegistrar;
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
@@ -300,7 +301,8 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-            RegisterSystemTarget(new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory));
+            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
+            RegisterSystemTarget(clientRegistrar);
             RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
@@ -465,8 +467,11 @@ namespace Orleans.Runtime
                 // Now that we're active, we can start the gateway
                 var mc = messageCenter as MessageCenter;
                 if (mc != null)
-                    mc.StartGateway();
-                
+                    mc.StartGateway(clientRegistrar);
+
+                scheduler.QueueTask(clientRegistrar.Start, ((SystemTarget)clientRegistrar).SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+
                 SystemStatus.Current = SystemStatus.Running;
             }
             catch (Exception exc)
