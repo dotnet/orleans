@@ -33,24 +33,18 @@ using UnitTests.Tester;
 
 namespace Tester.StreamingTests
 {
-    public class SubscriptionMultiplicityTests : UnitTestSiloHost
+    public class SubscriptionMultiplicityTestRunner
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
         private readonly string streamProviderName;
 
-        public SubscriptionMultiplicityTests(UnitTestSiloOptions siloOptions, string streamProviderName)
-            : base(siloOptions)
+        public SubscriptionMultiplicityTestRunner(string streamProviderName)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
                 throw new ArgumentNullException("streamProviderName");
             }
             this.streamProviderName = streamProviderName;
-        }
-
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         public async Task MultipleSubscriptionTest(Guid streamGuid, string streamNamespace)

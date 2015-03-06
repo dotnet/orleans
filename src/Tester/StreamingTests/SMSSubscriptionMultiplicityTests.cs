@@ -32,38 +32,41 @@ namespace Tester.StreamingTests
     [DeploymentItem("OrleansConfigurationForUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SMSSubscriptionMultiplicityTests : SubscriptionMultiplicityTests
+    public class SMSSubscriptionMultiplicityTests : UnitTestSiloHost
     {
+        private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSSubscriptionMultiplicityTestsNamespace";
+        private readonly SubscriptionMultiplicityTestRunner runner;
 
         public SMSSubscriptionMultiplicityTests()
             : base(new UnitTestSiloOptions
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForUnitTests.xml"),
-            }, "SMSProvider")
+            })
         {
+            runner = new SubscriptionMultiplicityTestRunner(SMSStreamProviderName);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run
         [ClassCleanup]
         public static new void MyClassCleanup()
         {
-            SubscriptionMultiplicityTests.MyClassCleanup();
+            StopAllSilos();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
         public async Task SMSMultipleSubscriptionTest()
         {
             logger.Info("************************ SMSMultipleSubscriptionTest *********************************");
-            await MultipleSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
         public async Task SMSAddAndRemoveSubscriptionTest()
         {
             logger.Info("************************ SMSAddAndRemoveSubscriptionTest *********************************");
-            await AddAndRemoveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.AddAndRemoveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
     }
 }
