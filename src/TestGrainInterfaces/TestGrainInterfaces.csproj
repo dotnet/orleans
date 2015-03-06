@@ -44,11 +44,6 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ISampleStreamingGrain.cs" />
@@ -62,10 +57,6 @@
     <Compile Include="Properties\orleans.codegen.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
-      <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
-      <Name>ClientGenerator</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>

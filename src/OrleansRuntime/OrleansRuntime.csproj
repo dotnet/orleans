@@ -84,16 +84,12 @@
       <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.configuration" />
     <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Core" />
     <Reference Include="System.Spatial">
       <HintPath>..\packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
     </Reference>
-    <Reference Include="System.Web.Extensions" />
-    <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
@@ -220,10 +216,6 @@
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
-      <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
-      <Name>ClientGenerator</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>

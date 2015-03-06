@@ -46,31 +46,8 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Data.Edm">
-      <HintPath>..\packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.OData">
-      <HintPath>..\packages\Microsoft.Data.OData.5.6.0\lib\net40\Microsoft.Data.OData.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.Services.Client">
-      <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework" />
-    <Reference Include="Microsoft.WindowsAzure.Configuration">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Runtime.Remoting" />
-    <Reference Include="System.Spatial">
-      <HintPath>..\packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="SampleStreamingGrain.cs" />
@@ -84,22 +61,6 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
-      <Project>{E782DD19-51F7-4F66-8217-BACAC33767E4}</Project>
-      <Name>ClientGenerator</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\OrleansManager\OrleansManager.csproj">
-      <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
-      <Name>OrleansManager</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj">
-      <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
-      <Name>OrleansProviders</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
-      <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
-      <Name>OrleansRuntime</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
