@@ -69,6 +69,11 @@ namespace Orleans.Runtime
             return FindOrCreate(grain.Key);
         }
 
+        internal static ActivationId GetActivationId(GrainId grain)
+        {
+            return FindOrCreate(grain.Key);
+        }
+
         internal static ActivationId GetActivationId(UniqueKey key)
         {
             return FindOrCreate(key);

@@ -76,20 +76,25 @@ namespace Orleans.Runtime.GrainDirectory
             SingleInstance = false;
         }
 
-        public void AddActivation(ActivationAddress addr)
-        {
-            AddActivation(addr.Activation, addr.Silo);
-        }
-
-        public void AddActivation(ActivationId act, SiloAddress silo)
+        public bool AddActivation(ActivationId act, SiloAddress silo)
         {
             if (SingleInstance && (Instances.Count > 0) && !Instances.ContainsKey(act))
             {
                 throw new InvalidOperationException(
                     "Attempting to add a second activation to an existing grain in single activation mode");
             }
+            IActivationInfo info;
+            if (Instances.TryGetValue(act, out info))
+            {
+                if (info.SiloAddress.Equals(silo))
+                {
+                    // just refresh, no need to generate new VersionTag
+                    return false;
+                }
+            }
             Instances[act] = new ActivationInfo(silo);
             VersionTag = rand.Next();
+            return true;
         }
 
         public ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo)
