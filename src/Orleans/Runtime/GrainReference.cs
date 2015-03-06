@@ -52,8 +52,11 @@ namespace Orleans.Runtime
 
         internal bool IsSystemTarget { get { return GrainId.IsSystemTarget; } }
 
-        private bool IsClientAddressableObject { get { return GrainId.IsClientAddressableObject && UseObserverId; } }
-        private static bool UseObserverId { get { return false; } } // for now disable, untill we switch to actualy use NewObserverGrainReference creater.
+        internal bool IsObserverReference { get { return GrainId.IsClientGrain && UseObserverId; } }
+
+        internal GuidId ObserverId { get { return observerId; } }
+        
+        private static bool UseObserverId { get { return true; } } // for now disable, untill we switch to actualy use NewObserverGrainReference creater.
 
         private bool HasGenericArgument { get { return !String.IsNullOrEmpty(genericArguments); } }
 
@@ -106,9 +109,9 @@ namespace Orleans.Runtime
         private GrainReference(GrainId grainId, GuidId observerId)
         {
             GrainId = grainId;
-            if (UseObserverId && !grainId.IsClientAddressableObject)
+            if (UseObserverId && !grainId.IsClient)
             {
-                throw new ArgumentException("grainId", String.Format("Trying to create a GrainReference for Observer with grain id {0}, but passing non ClientAddressableObject grainId.", grainId));
+                throw new ArgumentException("grainId", String.Format("Trying to create a GrainReference for Observer with grain id {0}, but passing non Client grainId.", grainId));
             }
             if (UseObserverId && observerId == null)
             {
@@ -192,7 +195,7 @@ namespace Orleans.Runtime
             {
                 return Equals(SystemTargetSilo, other.SystemTargetSilo);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return observerId.Equals(other.observerId);
             }
@@ -207,7 +210,7 @@ namespace Orleans.Runtime
             {
                 hash = hash ^ SystemTargetSilo.GetHashCode();
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 hash = hash ^ observerId.GetHashCode();
             }
@@ -555,7 +558,7 @@ namespace Orleans.Runtime
                 stream.Write((byte)0);
             }
 
-            if (input.IsClientAddressableObject)
+            if (input.IsObserverReference)
             {
                 input.observerId.SerializeToStream(stream);
             }
@@ -617,7 +620,7 @@ namespace Orleans.Runtime
             {
                 return String.Format("{0}:{1}/{2}", SYSTEM_TARGET_STR, GrainId, SystemTargetSilo);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId, observerId);
             }
@@ -631,7 +634,7 @@ namespace Orleans.Runtime
             {
                 return String.Format("{0}:{1}/{2}", SYSTEM_TARGET_STR, GrainId.ToDetailedString(), SystemTargetSilo);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId.ToDetailedString(), observerId.ToDetailedString());
             }
@@ -643,7 +646,7 @@ namespace Orleans.Runtime
         /// <summary> Get the key value for this grain, as a string. </summary>
         public string ToKeyString()
         {
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, GrainId.ToParsableString(), OBSERVER_ID_STR, observerId.ToParsableString());
             }
@@ -713,7 +716,7 @@ namespace Orleans.Runtime
             {
                 info.AddValue("SystemTargetSilo", SystemTargetSilo.ToParsableString(), typeof(string));
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 info.AddValue(OBSERVER_ID_STR, observerId.ToParsableString(), typeof(string));
             }
@@ -734,7 +737,7 @@ namespace Orleans.Runtime
                 var siloAddressStr = info.GetString("SystemTargetSilo");
                 SystemTargetSilo = SiloAddress.FromParsableString(siloAddressStr);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 var observerIdStr = info.GetString(OBSERVER_ID_STR);
                 observerId = GuidId.FromParsableString(observerIdStr);

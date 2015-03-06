@@ -52,7 +52,7 @@ namespace Orleans
         private readonly ClientConfiguration config;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private readonly Dictionary<GrainId, LocalObjectData> localObjects;
+        private readonly Dictionary<GuidId, LocalObjectData> localObjects;
 
         private readonly ProxiedMessageCenter transport;
         private bool listenForMessages;
@@ -149,7 +149,7 @@ namespace Orleans
                 PlacementStrategy.Initialize();
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-                localObjects = new Dictionary<GrainId, LocalObjectData>();
+                localObjects = new Dictionary<GuidId, LocalObjectData>();
                 CallbackData.Config = config;
 
                 if (!secondary)
@@ -371,7 +371,9 @@ namespace Orleans
             bool found = false;
             lock (localObjects)
             {
-                found = localObjects.TryGetValue(message.TargetGrain, out objectData);
+                //found = localObjects.TryGetValue(message.TargetGrain, out objectData);
+                // TODO: fix to extract the correct observerId from the message
+                found = localObjects.TryGetValue(GuidId.GetNewGuidId(), out objectData);
             }
 
             if (found)
@@ -393,14 +395,13 @@ namespace Orleans
             if (obj == null)
             {
                 //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                logger.Warn(ErrorCode.Runtime_Error_100162, 
-                    String.Format("Object associated with Grain ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.Grain, message));
+                logger.Warn(ErrorCode.Runtime_Error_100162,
+                    String.Format("Object associated with Observer ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.ObserverId, message));
                 lock (localObjects)
                 {    
                     // Try to remove. If it's not there, we don't care.
-                    localObjects.Remove(objectData.Grain);
+                    localObjects.Remove(objectData.ObserverId);
                 }
-                UnregisterObjectReference(objectData.Grain).Ignore();
                 return;
             }
 
@@ -819,18 +820,17 @@ namespace Orleans
             await Task.Run(asyncFunction); // No grain context on client - run on .NET thread pool
         }
 
-        public async Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.");
 
-            GrainId target = GrainId.NewClientAddressableGrainId();
-            await transport.RegisterObserver(target);
+            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId());
             lock (localObjects)
             {
-                localObjects.Add(target, new LocalObjectData(obj, target, invoker));
+                localObjects.Add(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker));
             }
-            return GrainReference.FromGrainId(target);
+            return Task.FromResult(gr);
         }
 
         public Task DeleteObjectReference(IAddressable obj)
@@ -840,36 +840,15 @@ namespace Orleans
 
             var reference = (GrainReference) obj;
 
-            return DeleteResolvedObjectReference(reference);
-        }
-
-        private Task DeleteResolvedObjectReference(GrainReference reference)
-        {
             LocalObjectData objData;
-
             lock (localObjects)
             {
-                if (localObjects.TryGetValue(reference.GrainId, out objData))
-                    localObjects.Remove(reference.GrainId);
+                if (localObjects.TryGetValue(reference.ObserverId, out objData))
+                    localObjects.Remove(reference.ObserverId);
                 else
                     throw new ArgumentException("Reference is not associated with a local object.", "reference");
             }
-            return UnregisterObjectReference(objData.Grain);
-        }
-
-        private async Task UnregisterObjectReference(GrainId grain)
-        {
-            try
-            {
-
-                await transport.UnregisterObserver(grain);
-                if (logger.IsVerbose) 
-                    logger.Verbose(ErrorCode.Runtime_Error_100315, "Successfully unregistered client target {0}", grain);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.Runtime_Error_100012, String.Format("Failed to unregister client target {0}.", grain), exc);
-            }
+            return TaskDone.Done;
         }
 
         public void DeactivateOnIdle(ActivationId id)
@@ -883,14 +862,14 @@ namespace Orleans
         {
             internal WeakReference LocalObject { get; private set; }
             internal IGrainMethodInvoker Invoker { get; private set; }
-            internal GrainId Grain { get; private set; }
+            internal GuidId ObserverId { get; private set; }
             internal Queue<Message> Messages { get; private set; }
             internal bool Running { get; set; }
 
-            internal LocalObjectData(IAddressable obj, GrainId grain, IGrainMethodInvoker invoker)
+            internal LocalObjectData(IAddressable obj, GuidId observerId, IGrainMethodInvoker invoker)
             {
                 LocalObject = new WeakReference(obj);
-                Grain = grain;
+                ObserverId = observerId;
                 Invoker = invoker;
                 Messages = new Queue<Message>();
                 Running = false;
