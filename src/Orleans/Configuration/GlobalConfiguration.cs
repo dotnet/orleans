@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -29,6 +29,7 @@ using System.Text;
 using System.Net;
 using System.Xml;
 using Orleans.AzureUtils;
+﻿using Orleans.Providers;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -670,12 +671,69 @@ namespace Orleans.Runtime.Configuration
                         {
                             var providerConfig = new ProviderCategoryConfiguration();
                             providerConfig.Load(child);
-                            ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+
+                            if (ProviderConfigurations.ContainsKey(providerConfig.Name))
+                            {
+                                var existingProviderConfig = ProviderConfigurations[providerConfig.Name];
+                                existingProviderConfig.Merge(providerConfig);
+                            }
+                            else
+                            {
+                                ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                            }
                         }
                         break;
                 }
             }
         }
+
+        /// <summary>
+        /// Registers given type of <typeparamref name="T"/> as bootstrap provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</typeparam>
+        /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
+        public void RegisterBootstrapProvider<T>(IDictionary<string, string> properties = null)
+        {
+            RegisterBootstrapProvider(typeof(T), properties);
+        }
+
+        /// <summary>
+        /// Registers given type of <typeparamref name="T"/> as bootstrap provider
+        /// </summary>
+        /// <param name="boostrapProviderType">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</param>
+        /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
+        public void RegisterBootstrapProvider(Type boostrapProviderType, IDictionary<string, string> properties = null) 
+        {
+            if (boostrapProviderType == null)
+                throw new ArgumentNullException("boostrapProviderType");
+
+            if (boostrapProviderType.IsAbstract ||
+                boostrapProviderType.IsGenericType ||
+                !typeof(IBootstrapProvider).IsAssignableFrom(boostrapProviderType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", 
+                                            "boostrapProviderType");
+
+            const string bootstrapCategoryKey = "Bootstrap";
+
+            var category = ProviderConfigurations.Find(bootstrapCategoryKey);
+            if (category == null)
+            {
+                category = new ProviderCategoryConfiguration(bootstrapCategoryKey);
+                ProviderConfigurations.Add(category.Name, category);
+            }
+
+            var fullName = boostrapProviderType.FullName;
+            if (category.Providers.ContainsKey(fullName))
+                throw new InvalidOperationException(
+                    string.Format("Bootstrap provider of type {0} has been already registered", 
+                                   boostrapProviderType));
+
+            var config = new ProviderConfiguration(
+                properties ?? new Dictionary<string, string>(), 
+                fullName, fullName);
+
+            category.Providers.Add(config.Name, config);
+        } 
 
         internal static void AdjustConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string deploymentId)
         {
