@@ -156,7 +156,7 @@ namespace Orleans.Runtime
         /// </summary>
         public static Task<GrainReference> CreateObjectReference(IAddressable o, IGrainMethodInvoker invoker)
         {
-            return RuntimeClient.Current.CreateObjectReference(o, invoker);
+            return Task.FromResult(RuntimeClient.Current.CreateObjectReference(o, invoker));
         }
 
         /// <summary>
@@ -164,7 +164,8 @@ namespace Orleans.Runtime
         /// </summary>
         public static Task DeleteObjectReference(IAddressable observer)
         {
-            return RuntimeClient.Current.DeleteObjectReference(observer);
+            RuntimeClient.Current.DeleteObjectReference(observer);
+            return TaskDone.Done;
         }
 
         #endregion

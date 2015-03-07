@@ -38,10 +38,6 @@ namespace Orleans.Runtime.Messaging
 
         bool IsProxying { get; }
 
-        void RecordProxiedGrain(GrainId id, GrainId client);
-
-        void RecordUnproxiedGrain(GrainId id);
-
         bool TryDeliverToProxy(Message msg);
 
         void StopAcceptingClientMessages();

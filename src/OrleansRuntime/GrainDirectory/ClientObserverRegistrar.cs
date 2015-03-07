@@ -158,35 +158,7 @@ namespace Orleans.Runtime
         {
             return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetActivationId(clientId));
         }
- 
-
-        #region IClientGateway Members
-
-        /// <summary>
-        /// Registers a client object on this gateway.
-        /// </summary>
-        public async Task<ActivationAddress> RegisterClientObserver(GrainId grainId, GrainId clientId)
-        {
-            messageCenter.RecordProxiedGrain(grainId, clientId);
-            var addr = ActivationAddress.NewActivationAddress(myAddress, grainId);
-            await grainDirectory.RegisterAsync(addr);
-            return addr;
-        }
-
-        /// <summary>
-        /// Unregisters client object from all gateways.
-        /// </summary>
-        public async Task UnregisterClientObserver(GrainId target)
-        {
-            if (messageCenter.IsProxying)
-            {
-                messageCenter.RecordUnproxiedGrain(target);
-            }
-            await grainDirectory.DeleteGrain(target);
-        }
-
-        #endregion
-    }
+     }
 }
 
 

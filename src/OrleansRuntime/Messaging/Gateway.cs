@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<GrainId, ClientState> clients;
         private readonly ConcurrentDictionary<Socket, ClientState> clientSockets;
-        private readonly ConcurrentDictionary<GrainId, ClientState> proxiedGrains;
+        //private readonly ConcurrentDictionary<GrainId, ClientState> proxiedGrains;
         private readonly SiloAddress gatewayAddress;
         private int nextGatewaySenderToUseForRoundRobin;
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
@@ -68,7 +68,7 @@ namespace Orleans.Runtime.Messaging
             dropper = new GatewayClientCleanupAgent(this);
             clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
-            proxiedGrains = new ConcurrentDictionary<GrainId, ClientState>();
+            //proxiedGrains = new ConcurrentDictionary<GrainId, ClientState>();
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messageCenter.MessagingConfiguration);
             this.gatewayAddress = SiloAddress.New(gatewayAddress, 0);
             lockable = new object();
@@ -162,31 +162,31 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void RecordProxiedGrain(GrainId grainId, GrainId clientId)
-        {
-            lock (lockable)
-            {
-                ClientState cs;
-                if (clients.TryGetValue(clientId, out cs))
-                {
-                    // TO DO done: what if we have an older proxiedGrain for this client?
-                    // We now support many proxied grains per client, so there's no need to handle it specially here.
-                    proxiedGrains.AddOrUpdate(grainId, cs, (k, v) => cs);
-                }
-            }
-        }
+        //internal void RecordProxiedGrain(GrainId grainId, GrainId clientId)
+        //{
+        //    lock (lockable)
+        //    {
+        //        ClientState cs;
+        //        if (clients.TryGetValue(clientId, out cs))
+        //        {
+        //            // TO DO done: what if we have an older proxiedGrain for this client?
+        //            // We now support many proxied grains per client, so there's no need to handle it specially here.
+        //            proxiedGrains.AddOrUpdate(grainId, cs, (k, v) => cs);
+        //        }
+        //    }
+        //}
 
-        internal void RecordSendingProxiedGrain(GrainId senderGrainId, Socket clientSocket)
-        {
-            // not taking global lock on the crytical path!
-            ClientState cs;
-            if (clientSockets.TryGetValue(clientSocket, out cs))
-            {
-                // TO DO done: what if we have an older proxiedGrain for this client?
-                // We now support many proxied grains per client, so there's no need to handle it specially here.
-                proxiedGrains.AddOrUpdate(senderGrainId, cs, (k, v) => cs);
-            }
-        }
+        //internal void RecordSendingProxiedGrain(GrainId senderGrainId, Socket clientSocket)
+        //{
+        //    // not taking global lock on the crytical path!
+        //    ClientState cs;
+        //    if (clientSockets.TryGetValue(clientSocket, out cs))
+        //    {
+        //        // TO DO done: what if we have an older proxiedGrain for this client?
+        //        // We now support many proxied grains per client, so there's no need to handle it specially here.
+        //        proxiedGrains.AddOrUpdate(senderGrainId, cs, (k, v) => cs);
+        //    }
+        //}
 
         internal SiloAddress TryToReroute(Message msg)
         {
@@ -199,14 +199,14 @@ namespace Orleans.Runtime.Messaging
             return clientsReplyRoutingCache.TryFindClientRoute(msg.TargetGrain, out gateway) ? gateway : null;
         }
 
-        internal void RecordUnproxiedGrain(GrainId id)
-        {
-            lock (lockable)
-            {
-                ClientState ignore;
-                proxiedGrains.TryRemove(id, out ignore);
-            }
-        }
+        //internal void RecordUnproxiedGrain(GrainId id)
+        //{
+        //    lock (lockable)
+        //    {
+        //        ClientState ignore;
+        //        proxiedGrains.TryRemove(id, out ignore);
+        //    }
+        //}
 
         internal void DropDisconnectedClients()
         {
@@ -247,12 +247,12 @@ namespace Orleans.Runtime.Messaging
                 SocketManager.CloseSocket(oldSocket);
             }
 
-            List<GrainId> proxies = proxiedGrains.Where((KeyValuePair<GrainId, ClientState> pair) => pair.Value.Id.Equals(client.Id)).Select(p => p.Key).ToList();
-            foreach (GrainId proxy in proxies)
-                proxiedGrains.TryRemove(proxy, out ignore);
+            //List<GrainId> proxies = proxiedGrains.Where((KeyValuePair<GrainId, ClientState> pair) => pair.Value.Id.Equals(client.Id)).Select(p => p.Key).ToList();
+            //foreach (GrainId proxy in proxies)
+            //    proxiedGrains.TryRemove(proxy, out ignore);
             
             MessagingStatisticsGroup.ConnectedClientCount.DecrementBy(1);
-            messageCenter.RecordClientDrop(proxies);
+            //messageCenter.RecordClientDrop(proxies);
         }
 
         /// <summary>
@@ -266,25 +266,25 @@ namespace Orleans.Runtime.Messaging
             ClientState client;
             
             // not taking global lock on the crytical path!
-            if (!proxiedGrains.TryGetValue(msg.TargetGrain, out client))
+            if (!clients.TryGetValue(msg.TargetGrain, out client))
                 return false;
             
-            if (!clients.ContainsKey(client.Id))
-            {
-                lock (lockable)
-                {
-                    if (!clients.ContainsKey(client.Id))
-                    {
-                        ClientState ignore;
-                        // Lazy clean-up for dropped clients
-                        proxiedGrains.TryRemove(msg.TargetGrain, out ignore);
-                        // I don't think this can ever happen. When we drop the client (the only place we remove the ClientState from clients collection)
-                        // we also actively remove all proxiedGrains for this client. So the clean-up will be non lazy.
-                        // leaving it for now.
-                        return false;
-                    }
-                }
-            }
+            //if (!clients.ContainsKey(client.Id))
+            //{
+            //    lock (lockable)
+            //    {
+            //        if (!clients.ContainsKey(client.Id))
+            //        {
+            //            ClientState ignore;
+            //            // Lazy clean-up for dropped clients
+            //            proxiedGrains.TryRemove(msg.TargetGrain, out ignore);
+            //            // I don't think this can ever happen. When we drop the client (the only place we remove the ClientState from clients collection)
+            //            // we also actively remove all proxiedGrains for this client. So the clean-up will be non lazy.
+            //            // leaving it for now.
+            //            return false;
+            //        }
+            //    }
+            //}
 
             // when this Gateway receives a message from client X to client addressale object Y
             // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
@@ -452,7 +452,8 @@ namespace Orleans.Runtime.Messaging
                 // Find the client state
                 ClientState clientState;
                 bool found;
-                lock (gateway.lockable)
+                // TODO: Why do we need this lock here if clients is a ConcurrentDictionary?
+                //lock (gateway.lockable)
                 {
                     found = gateway.clients.TryGetValue(client, out clientState);
                 }
@@ -527,7 +528,8 @@ namespace Orleans.Runtime.Messaging
                 // Find the client state
                 ClientState clientState;
                 bool found;
-                lock (gateway.lockable)
+                // TODO: Why do we need this lock here if clients is a ConcurrentDictionary?
+                //lock (gateway.lockable)
                 {
                     found = gateway.clients.TryGetValue(client, out clientState);
                 }

@@ -673,16 +673,6 @@ namespace Orleans
             return true;
         }
 
-        public bool ProcessOutgoingMessage(Message message)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool ProcessIncomingMessage(Message message)
-        {
-            throw new NotImplementedException();
-        }
-
         public void ReceiveResponse(Message response)
         {
             if (logger.IsVerbose2) logger.Verbose2("Received {0}", response);
@@ -820,7 +810,7 @@ namespace Orleans
             await Task.Run(asyncFunction); // No grain context on client - run on .NET thread pool
         }
 
-        public Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.");
@@ -830,10 +820,10 @@ namespace Orleans
             {
                 localObjects.Add(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker));
             }
-            return Task.FromResult(gr);
+            return gr;
         }
 
-        public Task DeleteObjectReference(IAddressable obj)
+        public void DeleteObjectReference(IAddressable obj)
         {
             if (!(obj is GrainReference))
                 throw new ArgumentException("Argument reference is not a grain reference.");
@@ -848,7 +838,6 @@ namespace Orleans
                 else
                     throw new ArgumentException("Reference is not associated with a local object.", "reference");
             }
-            return TaskDone.Done;
         }
 
         public void DeactivateOnIdle(ActivationId id)
