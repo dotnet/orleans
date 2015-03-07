@@ -1,0 +1,14 @@
+
+_theme_packages/*
+
+Thumbs.db
+.DS_Store
+
+!.gitkeep
+
+.rbenv-version
+.rvmrc
+Binaries/
+Samples/
+Test/
+obj/
