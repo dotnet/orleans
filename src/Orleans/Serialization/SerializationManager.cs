@@ -982,7 +982,7 @@ namespace Orleans.Serialization
                 // Note that the "!t.IsSerializable" is redundant in this if, but it's there in case
                 // this code block moves.
                 var rawException = obj as Exception;
-                var foo = new Exception(String.Format("Non-serializable exception of type {0}: {1}\r\nat {2}",
+                var foo = new Exception(String.Format("Non-serializable exception of type {0}: {1}" + Environment.NewLine + "at {2}",
                                                       t.OrleansTypeName(), rawException.Message,
                                                       rawException.StackTrace));
                 FallbackSerializer(foo, stream);
@@ -1885,13 +1885,13 @@ namespace Orleans.Serialization
                 }
                 if (!discardLine)
                 {
-                    line.Append("\n");
+                    line.AppendLine();
                     lines.Append(line);
                     ++count;
                 }
             }
 
-            var report = string.Format("Registered artifacts for {0} types:\n{1}", count, lines);
+            var report = string.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
             logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
         }
 

@@ -22,6 +22,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿﻿using System;
+using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
@@ -65,6 +67,14 @@ namespace UnitTests.Tester
             double ticksD = checked(time.Ticks * value);
             long ticks = checked((long)ticksD);
             return TimeSpan.FromTicks(ticks);
+        }
+
+        public static void ConfigureThreadPoolSettingsForStorageTests(int NumDotNetPoolThreads = 200)
+        {
+            ThreadPool.SetMinThreads(NumDotNetPoolThreads, NumDotNetPoolThreads);
+            ServicePointManager.Expect100Continue = false;
+            ServicePointManager.DefaultConnectionLimit = NumDotNetPoolThreads; // 1000;
+            ServicePointManager.UseNagleAlgorithm = false;
         }
     }
 }

@@ -5,35 +5,32 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{98D4DB83-175E-44D5-A14B-9C66EE89F037}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <ProjectGuid>{3AD197E3-30C1-48BF-AADA-3848F1E988DA}</ProjectGuid>
+    <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>HelloWordGrains</RootNamespace>
-    <AssemblyName>HelloWordGrains</AssemblyName>
+    <RootNamespace>HelloWorld</RootNamespace>
+    <AssemblyName>HelloWorld</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-  </PropertyGroup>
-  <PropertyGroup>
-    <StartAction>Program</StartAction>
-    <StartProgram>$(OrleansSDK)\LocalSilo\OrleansHost.exe</StartProgram>
-    <StartWorkingDirectory>$(OrleansSDK)\LocalSilo</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>$(OrleansSDK)\LocalSilo\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>$(OrleansSDK)\LocalSilo\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -47,41 +44,39 @@
       <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="OrleansRuntime">
+      <HintPath>$(OrleansSDK)\Binaries\OrleansServer\OrleansRuntime.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="HelloGrain.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="OrleansHostWrapper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\HelloWorldInterfaces\HelloWorldInterfaces.csproj">
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="DevTestClientConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DevTestServerConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HelloWorldInterfaces\FSharpWorldInterfaces.csproj">
       <Project>{163cce80-c506-468c-9b28-e2ff198097e3}</Project>
-      <Name>HelloWorldInterfaces</Name>
+      <Name>FSharpWorldInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <OrleansProjectType>Server</OrleansProjectType>
-  </PropertyGroup>
-  <Import Project="$(OrleansSDK)\Binaries\OrleansClient\Orleans.SDK.targets" />
-  <PropertyGroup>
-    <PostBuildEvent>
-      if exist "$(OrleansSDK)\LocalSilo" (
-      if not exist "$(OrleansSDK)\LocalSilo\Applications" (md "$(OrleansSDK)\LocalSilo\Applications")
-      if not exist  "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)" (md "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)")
-      copy /y *.dll  "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)\"
-      copy /y *.pdb  "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)\"
-      )
-      if exist "$(OrleansSDK)\Binaries" (
-      if not exist "$(OrleansSDK)\Binaries\Applications" (md "$(OrleansSDK)\Binaries\Applications")
-      if not exist  "$(OrleansSDK)\Binaries\Applications\$(RootNamespace)" (md "$(OrleansSDK)\Binaries\Applications\$(RootNamespace)")
-      copy /y *.dll "$(OrleansSDK)\Binaries\Applications\$(RootNamespace)\"
-      copy /y *.pdb "$(OrleansSDK)\Binaries\Applications\$(RootNamespace)\"
-      )
-    </PostBuildEvent>
-  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
-  </Target>-->
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
 </Project>

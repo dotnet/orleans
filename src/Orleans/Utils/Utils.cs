@@ -91,11 +91,15 @@ namespace Orleans.Runtime
         /// Each key-value pair is represented as the string description of the key followed by
         /// the string description of the value,
         /// separated by " -> ", and enclosed in curly brackets.</returns>
-        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string> toString = null, string separator = "\n")
+        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string> toString = null, string separator = null)
         {
             if (dict == null || dict.Count == 0)
             {
                 return "[]";
+            }
+            if (separator == null)
+            {
+                separator = Environment.NewLine;
             }
             var sb = new StringBuilder("[");
             var enumerator = dict.GetEnumerator();
@@ -356,6 +360,27 @@ namespace Orleans.Runtime
             var all = new List<Exception> { rtle };
             all.AddRange(rtle.LoaderExceptions);
             throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenence.", all);
+        }
+
+        /// <summary>
+        /// </summary>
+        public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
+        {
+            var batch = new List<T>(batchSize);
+            foreach (var item in sequence)
+            {
+                batch.Add(item);
+                // when we've accumulated enough in the batch, send it out  
+                if (batch.Count >= batchSize)
+                {
+                    yield return batch; // batch.ToArray();
+                    batch = new List<T>(batchSize);
+                }
+            }
+            if (batch.Count > 0)
+            {
+                yield return batch; //batch.ToArray();
+            }
         }
     }
 }

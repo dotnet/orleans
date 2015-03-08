@@ -24,10 +24,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
-
+using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Runtime;
 using Orleans.Storage;
+
 
 namespace Orleans.AzureUtils
 {
@@ -49,19 +50,19 @@ namespace Orleans.AzureUtils
         public static int MaxQueueOperationRetries;
         public static TimeSpan PauseBetweenQueueOperationRetries;
         public static TimeSpan QueueOperationTimeout;
-        public static RetryPolicy QueueOperationRetryPolicy;
+        public static IRetryPolicy QueueOperationRetryPolicy;
 
         static AzureQueueDefaultPolicies()
         {
             MaxQueueOperationRetries = 5;
             PauseBetweenQueueOperationRetries = TimeSpan.FromMilliseconds(100);
-            QueueOperationRetryPolicy = RetryPolicies.Retry(MaxQueueOperationRetries, PauseBetweenQueueOperationRetries); // 5 x 100ms
+            QueueOperationRetryPolicy = new LinearRetry(PauseBetweenQueueOperationRetries, MaxQueueOperationRetries); // 5 x 100ms
             QueueOperationTimeout = PauseBetweenQueueOperationRetries.Multiply(MaxQueueOperationRetries).Multiply(6);    // 3 sec
         }
     }
 
     /// <summary>
-    /// Utility class to encapsulate access to Azure queue storage .
+    /// Utility class to encapsulate access to Azure queue storage.
     /// </summary>
     /// <remarks>
     /// Used by Azure queue streaming provider.
@@ -81,7 +82,27 @@ namespace Orleans.AzureUtils
         /// Constructor.
         /// </summary>
         /// <param name="queueName">Name of the queue to be connected to.</param>
-        /// <param name="deploymentId">The deployment id pf the Azure service hosting this silo.</param>
+        /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
+        public AzureQueueDataManager(string queueName, string storageConnectionString)
+        {
+            AzureStorageUtils.ValidateQueueName(queueName);
+
+            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            QueueName = queueName;
+            ConnectionString = storageConnectionString;
+
+            queueOperationsClient = AzureStorageUtils.GetCloudQueueClient(
+                ConnectionString,
+                AzureQueueDefaultPolicies.QueueOperationRetryPolicy,
+                AzureQueueDefaultPolicies.QueueOperationTimeout,
+                logger);
+        }
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="queueName">Name of the queue to be connected to.</param>
+        /// <param name="deploymentId">The deployment id of the Azure service hosting this silo. It will be concatenated to the queueName.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         public AzureQueueDataManager(string queueName, string deploymentId, string storageConnectionString)
         {
@@ -114,7 +135,7 @@ namespace Orleans.AzureUtils
 
                 // Create the queue if it doesn't already exist.
 
-                bool didCreate = await Task<bool>.Factory.FromAsync(queue.BeginCreateIfNotExist, queue.EndCreateIfNotExist, null);
+                bool didCreate = await Task<bool>.Factory.FromAsync(queue.BeginCreateIfNotExists, queue.EndCreateIfNotExists, null);
 
                 logger.Info(ErrorCode.AzureQueue_01, "{0} Azure storage queue {1}", (didCreate ? "Created" : "Attached to"), QueueName);
             }
@@ -341,7 +362,9 @@ namespace Orleans.AzureUtils
 
         private void ReportErrorAndRethrow(Exception exc, string operation, ErrorCode errorCode)
         {
-            var errMsg = String.Format("Error doing {0} for Azure storage queue {1} \n Exception = \n {2}", operation, QueueName, exc);
+            var errMsg = String.Format(
+                "Error doing {0} for Azure storage queue {1} " + Environment.NewLine 
+                + "Exception = {2}", operation, QueueName, exc);
             logger.Error(errorCode, errMsg, exc);
             throw new AggregateException(errMsg, exc);
         }

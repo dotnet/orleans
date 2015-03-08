@@ -20,7 +20,7 @@ using System.Threading.Tasks;
 using System.Text;
 using Orleans;
 
-namespace HelloWordGrains
+namespace HelloWorldGrains
 {
     /// <summary>
     /// Orleans grain implementation class HelloGrain.

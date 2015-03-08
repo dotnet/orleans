@@ -287,6 +287,8 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan DirectoryLazyDeregistrationDelay { get; set; }
 
+        public TimeSpan ClientRegistrationRefresh { get; set; }
+
         internal bool PerformDeadlockDetection { get; set; }
 
         public string DefaultPlacementStrategy { get; set; }
@@ -344,6 +346,7 @@ namespace Orleans.Runtime.Configuration
         internal static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromMinutes(1);
         internal static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = TimeSpan.FromHours(2);
         private static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
         public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
         public static readonly string DEFAULT_PLACEMENT_STRATEGY = typeof(RandomPlacement).Name;
         private static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
@@ -383,6 +386,7 @@ namespace Orleans.Runtime.Configuration
             CacheTTLExtensionFactor = DEFAULT_TTL_EXTENSION_FACTOR;
             DirectoryCachingStrategy = DEFAULT_DIRECTORY_CACHING_STRATEGY;
             DirectoryLazyDeregistrationDelay = DEFAULT_UNREGISTER_RACE_DELAY;
+            ClientRegistrationRefresh = DEFAULT_CLIENT_REGISTRATION_REFRESH;
 
             PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
             reminderServiceType = ReminderServiceProviderType.NotSpecified;
@@ -448,6 +452,7 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("      Directory Caching Strategy: {0}", DirectoryCachingStrategy).AppendLine();
             sb.AppendFormat("   Grain directory:").AppendLine();
             sb.AppendFormat("      Lazy deregistration delay: {0}", DirectoryLazyDeregistrationDelay).AppendLine();
+            sb.AppendFormat("      Client registration refresh: {0}", ClientRegistrationRefresh).AppendLine();
             sb.AppendFormat("   Reminder Service:").AppendLine();
             sb.AppendFormat("       ReminderServiceType: {0}", ReminderServiceType).AppendLine();
             if (ReminderServiceType == ReminderServiceProviderType.MockTable)
@@ -653,6 +658,11 @@ namespace Orleans.Runtime.Configuration
                             DirectoryLazyDeregistrationDelay = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DirectoryLazyDeregistrationDelay"),
                                 "Invalid time span value for Directory.DirectoryLazyDeregistrationDelay");
                         }
+                        if (child.HasAttribute("ClientRegistrationRefresh"))
+                        {
+                            ClientRegistrationRefresh = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ClientRegistrationRefresh"),
+                                "Invalid time span value for Directory.ClientRegistrationRefresh");
+                        }
                         break;
 
                     default:
@@ -685,8 +695,10 @@ namespace Orleans.Runtime.Configuration
                 foreach (string provType in providerConfigurations.Keys)
                 {
                     ProviderCategoryConfiguration provTypeConfigs = providerConfigurations[provType];
-                    sb.AppendFormat("       {0}Providers:\n{1}", provType, provTypeConfigs.ToString())
-                      .AppendLine();
+                    sb.AppendFormat("       {0}Providers:", provType)
+                        .AppendLine();
+                    sb.AppendFormat(provTypeConfigs.ToString())
+                        .AppendLine();
                 }
             }
             else

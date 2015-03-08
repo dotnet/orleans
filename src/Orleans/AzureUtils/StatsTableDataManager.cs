@@ -28,17 +28,17 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
+
 
 namespace Orleans.AzureUtils
 {
     [Serializable]
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class StatsTableData : TableServiceEntity
+    internal class StatsTableData: TableEntity
     {
         public string DeploymentId { get; set; }
-        public DateTime Time { get; set; }
+        public string Time { get; set; }
         public string Address { get; set; }
         public string Name { get; set; }
         public string HostName { get; set; }
@@ -76,7 +76,8 @@ namespace Orleans.AzureUtils
         private readonly long clientEpoch;
         private int counter;
         private readonly string myHostName;
-        private const string DATE_FORMAT = "yyyy-MM-dd";
+        private const string DATE_TIME_FORMAT = "yyyy-MM-dd-" + "HH:mm:ss.fff 'GMT'"; // Example: 2010-09-02 09:50:43.341 GMT - Variant of UniversalSorta­bleDateTimePat­tern
+
 
         private readonly AzureTableDataManager<StatsTableData> tableManager;
         private readonly TraceLogger logger;
@@ -136,29 +137,40 @@ namespace Orleans.AzureUtils
         private StatsTableData PopulateStatsTableDataEntry(ICounter statsCounter)
         {
             string statValue = statsCounter.IsValueDelta ? statsCounter.GetDeltaString() : statsCounter.GetValueString();
-            var entry = new StatsTableData { StatValue = statValue };
-
-            if ("0".Equals(entry.StatValue))
+            if ("0".Equals(statValue))
             {
                 // Skip writing empty records
                 return null;
             }
 
             counter++;
-            var time = DateTime.UtcNow;
-            var timeStr = time.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
-            entry.PartitionKey = deploymentId + ":" + timeStr;
+            var entry = new StatsTableData { StatValue = statValue };
+            
+            // We store the statistics grouped by an hour in the same partition and sorted by reverse ticks within the partition.
+            // Since by default Azure table stores Entities in ascending order based on the Row Key - if we just used the current ticks
+            // it would return the oldest entry first.
+            // If we store the rows in the reverse order (some max value - current ticks), it will return the latest most recent entry first.
+            // More details here:
+            // http://gauravmantri.com/2012/02/17/effective-way-of-fetching-diagnostics-data-from-windows-azure-diagnostics-table-hint-use-partitionkey/
+            // https://alexandrebrisebois.wordpress.com/2014/06/16/using-time-based-partition-keys-in-azure-table-storage/
+            // https://stackoverflow.com/questions/1004698/how-to-truncate-milliseconds-off-of-a-net-datetime
+            
+            // Our format:
+            // PartitionKey:  DeploymentId$ReverseTimestampToTheNearestHour 
+            // RowKey:  ReverseTimestampToTheNearestSecond$Name$counter 
+
+            var now = DateTime.UtcNow;
+            // number of ticks remaining until the year 9683
+            var ticks = DateTime.MaxValue.Ticks - now.Ticks;
+
+            // partition the table according to the deployment id and hour
+            entry.PartitionKey = string.Join("$", deploymentId, string.Format("{0:d19}", ticks - ticks % TimeSpan.TicksPerHour));
             var counterStr = String.Format("{0:000000}", counter);
-            if (isSilo)
-            {
-                entry.RowKey = name + ":" + counterStr;
-            }
-            else
-            {
-                entry.RowKey = name + ":" + clientEpoch + ":" + counterStr;
-            }
+            
+            // order the rows latest-first in the table 
+            entry.RowKey = string.Join("$", string.Format("{0:d19}", ticks), name, counterStr);
             entry.DeploymentId = deploymentId;
-            entry.Time = time;
+            entry.Time = now.ToString(DATE_TIME_FORMAT, CultureInfo.InvariantCulture); ;
             entry.Address = address;
             entry.Name = name;
             entry.HostName = myHostName;

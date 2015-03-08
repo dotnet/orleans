@@ -27,15 +27,15 @@ using System.Data.Services.Common;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+
 
 namespace Orleans.AzureUtils
 {
     [Serializable]
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class ClientMetricsData : TableServiceEntity
+    internal class ClientMetricsData : TableEntity
     {
         public string DeploymentId { get; set; }
         public string Address { get; set; }
@@ -88,10 +88,10 @@ namespace Orleans.AzureUtils
         private readonly TraceLogger logger;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        private ClientMetricsTableDataManager(ClientConfiguration config, IPAddress address, Guid clientId)
+        private ClientMetricsTableDataManager(ClientConfiguration config, IPAddress address, GrainId clientId)
         {
             deploymentId = config.DeploymentId;
-            this.clientId = clientId.ToString();
+            this.clientId = clientId.ToParsableString();
             this.address = address;
             myHostName = config.DNSHostName;
             logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
@@ -99,7 +99,7 @@ namespace Orleans.AzureUtils
                 INSTANCE_TABLE_NAME, config.DataConnectionString, logger);
         }
 
-        public static async Task<ClientMetricsTableDataManager> GetManager(ClientConfiguration config, IPAddress address, Guid clientId)
+        public static async Task<ClientMetricsTableDataManager> GetManager(ClientConfiguration config, IPAddress address, GrainId clientId)
         {
             var instance = new ClientMetricsTableDataManager(config, address, clientId);
             await instance.storage.InitTableAsync().WithTimeout(initTimeout);

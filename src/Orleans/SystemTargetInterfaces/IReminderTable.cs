@@ -55,7 +55,7 @@ namespace Orleans
         Task<string> UpsertRow(ReminderEntry entry);
 
         /// <summary>
-        /// Remove a row from the table
+        /// Remove a row from the table.
         /// </summary>
         /// <param name="grainRef"></param>
         /// <param name="reminderName"></param>

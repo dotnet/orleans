@@ -44,14 +44,14 @@ namespace Orleans.CodeGeneration
 
         void StartNewLine()
         {
-            generatedCode.Append('\n');
+            generatedCode.Append(Environment.NewLine);
             generatedCode.Append(' ', indentLevel);
         }
 
         readonly StringBuilder generatedCode = new StringBuilder();
 
         public FSharpCodeGenerator(Assembly grainAssembly, string nameSpace)
-            : base(grainAssembly, nameSpace)
+            : base(grainAssembly, nameSpace, Language.FSharp)
         {
             indentLevel = 0;
             generatedCode.AppendFormat(@"namespace {0}", nameSpace);
@@ -70,7 +70,7 @@ namespace Orleans.CodeGeneration
                 noNamespace = t => true;
 
             referred(type);
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.FSharp);
 
             if (!type.IsGenericType)
             {

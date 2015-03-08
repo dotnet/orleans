@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 ﻿using System;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+﻿using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -313,6 +314,19 @@ namespace Orleans.Runtime
 
             var key = UniqueKey.Parse(str);
             return FindOrCreateGrainId(key);
+        }
+
+        internal byte[] ToByteArray()
+        {
+            var writer = new BinaryTokenStreamWriter();
+            writer.Write(this);
+            return writer.ToByteArray();
+        }
+
+        internal static GrainId FromByteArray(byte[] byteArray)
+        {
+            var reader = new BinaryTokenStreamReader(byteArray);
+            return reader.ReadGrainId();
         }
     }
 }

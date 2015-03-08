@@ -42,16 +42,6 @@ namespace Orleans.CodeGeneration
     /// </summary>
     public class GrainClientGenerator : MarshalByRefObject
     {
-        internal enum Language
-        {
-            Unknown,
-            Inconsistent,
-            CSharp,
-            FSharp,
-            VisualBasic,
-        }
-
-
         [Serializable]
         internal class CodeGenOptions
         {
@@ -59,7 +49,8 @@ namespace Orleans.CodeGeneration
             public FileInfo InputLib = null;
             public FileInfo SigningKey = null;
 
-            public Language TargetLanguage = Language.Unknown;
+            public bool LanguageConflict = false;
+            public Language? TargetLanguage;
 
             public List<string> ReferencedAssemblies = new List<string>();
             public List<string> SourceFiles = new List<string>();
@@ -165,7 +156,7 @@ namespace Orleans.CodeGeneration
 
             if (namespaceDictionary.Keys.Count == 0)
             {
-                ConsoleText.WriteStatus("This {0} does not contain any public and non-abstract grain class\n", options.InputLib);
+                ConsoleText.WriteStatus("This {0} does not contain any public and non-abstract grain class" + Environment.NewLine, options.InputLib);
                 return true;
             }
             // Create sources directory
@@ -190,7 +181,7 @@ namespace Orleans.CodeGeneration
                     
                     var cgOptions = new CodeGeneratorOptions {BracingStyle = "C"};
 
-                    using (var codeProvider = CodeGeneratorBase.GetCodeProvider(options.TargetLanguage))
+                    using (var codeProvider = CodeGeneratorBase.GetCodeProvider(options.TargetLanguage.Value))
                         codeProvider.GenerateCodeFromCompileUnit(unit, sourceWriter, cgOptions);
                 }
                 else
@@ -337,12 +328,12 @@ namespace Orleans.CodeGeneration
 
                 if (!options.ServerGen && GrainInterfaceData.IsGrainInterface(type))
                 {
-                    NamespaceGenerator grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage);
+                    NamespaceGenerator grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage.Value);
                     processedGrainTypes.Add(type.FullName);
 
                     try
                     {
-                        var grainInterfaceData = new GrainInterfaceData(type);
+                        var grainInterfaceData = new GrainInterfaceData(options.TargetLanguage.Value, type);
                         grainNamespace.AddReferenceClass(grainInterfaceData);
                     }
                     catch (GrainInterfaceData.RulesViolationException rve)
@@ -356,8 +347,8 @@ namespace Orleans.CodeGeneration
 
                 if (options.ServerGen && !type.IsAbstract && (TypeUtils.IsGrainClass(type) || TypeUtils.IsSystemTargetClass(type)))
                 {
-                    var grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage);
-                    var grainInterfaceData = GrainInterfaceData.FromGrainClass(type);
+                    var grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage.Value);
+                    var grainInterfaceData = GrainInterfaceData.FromGrainClass(type, options.TargetLanguage.Value);
                     grainNamespace.AddStateClass(grainInterfaceData);
                 }
             }
@@ -369,7 +360,7 @@ namespace Orleans.CodeGeneration
                 ConsoleText.WriteStatus("\t" + name);
 
             // Generate serializers for types we encountered along the way
-            SerializerGenerationManager.GenerateSerializers(inputAssembly, namespaceDictionary, outputAssemblyName, options.TargetLanguage);
+            SerializerGenerationManager.GenerateSerializers(inputAssembly, namespaceDictionary, outputAssemblyName, options.TargetLanguage.Value);
             return true;
         }
 
@@ -478,9 +469,9 @@ namespace Orleans.CodeGeneration
             unit.Namespaces.Add(referenceNameSpace);
         }
 
-        private const string CodeGenFileRelativePathCSharp = "Properties\\orleans.codegen.cs";
-        private const string CodeGenFileRelativePathFSharp = "GeneratedFiles\\orleans.codegen.fs";
-        private const string CodeGenFileRelativePathVB = "GeneratedFiles\\orleans.codegen.vb";
+        private static readonly string CodeGenFileRelativePathCSharp = Path.Combine("Properties", "orleans.codegen.cs");
+        private static readonly string CodeGenFileRelativePathFSharp =  Path.Combine("GeneratedFiles", "orleans.codegen.fs");
+        private static readonly string CodeGenFileRelativePathVB =  Path.Combine("GeneratedFiles", "orleans.codegen.vb");
 
         internal static void BuildInputAssembly(CodeGenOptions options)
         {
@@ -524,7 +515,7 @@ namespace Orleans.CodeGeneration
                     break;
 
                 case Language.FSharp:
-                    newArgs.AppendFormat(" -o:{0} ", options.InputLib.FullName);
+                    newArgs.AppendFormat(" -o:\"{0}\" ", options.InputLib.FullName);
                     newArgs.AppendFormat(" -g ");
                     newArgs.AppendFormat(" --debug:full ");
                     newArgs.AppendFormat(" --noframework ");
@@ -567,7 +558,7 @@ namespace Orleans.CodeGeneration
                 // There is no CodeDom provider for F#, so we have to take an entirely different approach
                 // to code generation for that language.
                 var cmdLine = newArgs.ToString();
-                ConsoleText.WriteStatus(string.Format("{0} {1}", options.FSharpCompilerPath, cmdLine));
+                ConsoleText.WriteStatus("{0} {1}", options.FSharpCompilerPath, cmdLine);
 
                 if (!options.InputLib.Directory.Exists)
                     options.InputLib.Directory.Create();
@@ -613,7 +604,7 @@ namespace Orleans.CodeGeneration
 
             compilerParams.CompilerOptions += string.Format(" /define:EXCLUDE_CODEGEN ");
 
-            using (CodeDomProvider codeProvider = CodeGeneratorBase.GetCodeProvider(options.TargetLanguage, true))
+            using (CodeDomProvider codeProvider = CodeGeneratorBase.GetCodeProvider(options.TargetLanguage.Value, true))
             {
                 CompilerResults results = codeProvider.CompileAssemblyFromFile(compilerParams);
                 //Check compile errors
@@ -624,10 +615,10 @@ namespace Orleans.CodeGeneration
                 foreach (CompilerError error in results.Errors)
                 {
                     Console.WriteLine(error.ToString());
-                    errorString += error.ErrorText + "\n";
+                    errorString += error.ErrorText + Environment.NewLine;
                 }
 
-                throw new Exception(String.Format("Could not compile and generate {0}\n", errorString));
+                throw new Exception(String.Format("Could not compile and generate {0}", errorString));
             }
         }
 
@@ -712,6 +703,10 @@ namespace Orleans.CodeGeneration
                             options.FSharpCompilerPath = path;
                             if (!string.IsNullOrEmpty(path))
                                 Console.WriteLine("F# compiler path = '{0}' ", options.FSharpCompilerPath);
+                            else
+                            {
+                                Console.Error.WriteLine("F# compiler path not set!");
+                            }
                         }
                         else if (arg.StartsWith("/rootns:") || arg.StartsWith("/rns:"))
                         {
@@ -779,7 +774,7 @@ namespace Orleans.CodeGeneration
 
                             string[] sources = sourcesStr.Split(';');
                             foreach (var source in sources)
-                                AddSourceFile(options.SourceFiles, ref options.TargetLanguage, ref options.CodeGenFile, source);
+                                AddSourceFile(options.SourceFiles, ref options.LanguageConflict, ref options.TargetLanguage, ref options.CodeGenFile, source);
                         }
                     }
                     else
@@ -788,11 +783,11 @@ namespace Orleans.CodeGeneration
                         if (arg.ToLowerInvariant().EndsWith(".snk", StringComparison.InvariantCultureIgnoreCase))
                             options.SigningKey = new FileInfo(arg);
                         else
-                            AddSourceFile(options.SourceFiles, ref options.TargetLanguage, ref options.CodeGenFile, arg);
+                            AddSourceFile(options.SourceFiles, ref options.LanguageConflict, ref options.TargetLanguage, ref options.CodeGenFile, arg);
                     }
                 }
 
-                if (options.TargetLanguage == Language.Unknown || options.TargetLanguage == Language.Inconsistent)
+                if (!options.TargetLanguage.HasValue)
                 {
                     ConsoleText.WriteError("Error: unable to determine source code language to use for code generation.");
                     return 2;
@@ -808,8 +803,9 @@ namespace Orleans.CodeGeneration
                 if (string.IsNullOrEmpty(options.CodeGenFile))
                 {
                     ConsoleText.WriteError(string.Format("Error: no codegen file. Add a file '{0}' to your project",
-                        (options.TargetLanguage == Language.CSharp) ? "Properties\\orleans.codegen.cs" :
-                        (options.TargetLanguage == Language.FSharp) ? "GeneratedFiles\\orleans.codegen.fs" : "GeneratedFiles\\orleans.codegen.vb"));
+                        (options.TargetLanguage == Language.CSharp) ? Path.Combine("Properties", "orleans.codegen.cs") :
+                        (options.TargetLanguage == Language.FSharp) ? Path.Combine("GeneratedFiles", "orleans.codegen.fs") 
+                                                                    : Path.Combine("GeneratedFiles", "orleans.codegen.vb")));
                     return 2;
                 }
 
@@ -823,7 +819,11 @@ namespace Orleans.CodeGeneration
                 options.SourcesDir = Path.Combine(options.InputLib.DirectoryName, "Generated");
 
                 // STEP 4 : Dump useful info for debugging
-                Console.WriteLine("Orleans-CodeGen - Options \n\tInputLib={0} \n\tSigningKey={1} \n\tServerGen={2} \n\tCodeGenFile={3}",
+                Console.WriteLine("Orleans-CodeGen - Options "  + Environment.NewLine 
+                    + "\tInputLib={0} " + Environment.NewLine 
+                    + "\tSigningKey={1} " + Environment.NewLine 
+                    + "\tServerGen={2} "  + Environment.NewLine 
+                    + "\tCodeGenFile={3}",
                     options.InputLib.FullName,
                     options.SigningKey != null ? options.SigningKey.FullName : "",
                     options.ServerGen,
@@ -854,28 +854,35 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        private static void AddSourceFile(List<string> sourceFiles, ref Language language, ref string codeGenFile, string arg)
+        private static void SetLanguageIfMatchNoConflict(string arg, string extension, Language value, ref Language? language, ref bool conflict)
+        {
+            if (conflict) return;
+
+            if (arg.EndsWith(extension, StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (language.HasValue && language != value)
+                {
+                    language = null;
+                    conflict = true;
+                }
+                else
+                {
+                    language = value;
+                }
+            }
+        }
+
+        private static void AddSourceFile(List<string> sourceFiles, ref bool conflict, ref Language? language, ref string codeGenFile, string arg)
         {
             AssertWellFormed(arg, true);
             sourceFiles.Add(arg);
 
-            if (arg.EndsWith(".cs", StringComparison.InvariantCultureIgnoreCase))
-            {
-                language = language != Language.Unknown && language != Language.CSharp
-                    ? Language.Inconsistent : Language.CSharp;
-            }
-            else if (arg.EndsWith(".vb", StringComparison.InvariantCultureIgnoreCase))
-            {
-                language = language != Language.Unknown && language != Language.VisualBasic
-                    ? Language.Inconsistent : Language.VisualBasic;
-            }
-            else if (arg.EndsWith(".fs", StringComparison.InvariantCultureIgnoreCase))
-            {
-                language = language != Language.Unknown && language != Language.FSharp
-                    ? Language.Inconsistent : Language.FSharp;
-            }
 
-            if (language == Language.Inconsistent) return;
+            SetLanguageIfMatchNoConflict(arg, ".cs", Language.CSharp, ref language, ref conflict);
+            SetLanguageIfMatchNoConflict(arg, ".vb", Language.VisualBasic,  ref language, ref conflict);
+            SetLanguageIfMatchNoConflict(arg, ".fs", Language.FSharp, ref language, ref conflict);
+
+            if (conflict || !language.HasValue) return;
 
             if (GrainClientGeneratorFlags.Verbose)
                 Console.WriteLine("Orleans-CodeGen - Added source file={0}", arg);
@@ -1010,7 +1017,7 @@ namespace Orleans.CodeGeneration
                     if (!loaded.ContainsKey(assemblyName))
                         loaded.Add(assemblyName, assembly.Location);
                     else
-                        throw new Exception(string.Format("Assembly already loaded.Possible internal error !!!. \n\t{0}\n\t{1}",
+                        throw new Exception(string.Format("Assembly already loaded.Possible internal error !!!. " + Environment.NewLine + "\t{0}"  + Environment.NewLine + "\t{1}",
                             assembly.Location, loaded[assemblyName]));
                 }
             }

@@ -57,8 +57,8 @@ namespace Orleans.Runtime.MembershipService
             // so we always have a first table version row, before this silo starts working.
             if (tryInitTableVersion)
             {
-                var entry = table.tableManager.CreateTableVersionEntry(0);
-                await table.tableManager.InsertSiloEntryConditionally(entry, null, null, false).WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);   // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                await table.tableManager.TryCreateTableVersionEntryAsync().WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
             }
             return table;
         }
@@ -74,7 +74,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=\n{1}", key.ToLongString(), data.ToString());
+                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=" + Environment.NewLine + "{1}", key.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -91,7 +91,7 @@ namespace Orleans.Runtime.MembershipService
              {
                 var entries = await tableManager.FindAllSiloEntries();   
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=\n{0}", data.ToString());
+                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data; 
             }

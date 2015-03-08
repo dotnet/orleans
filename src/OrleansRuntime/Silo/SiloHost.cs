@@ -360,6 +360,16 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
+        /// Set expected deployment size.
+        /// </summary>
+        /// <param name="size">The expected deployment size.</param>
+        public void SetExpectedClusterSize(int size)
+        {
+            logger.Info(ErrorCode.SetSiloLivenessType, "Setting Expected Cluster Size to={0}", size);
+            Config.Globals.ExpectedClusterSize = size;
+        }
+
+        /// <summary>
         /// Report an error during silo startup.
         /// </summary>
         /// <remarks>
@@ -373,7 +383,7 @@ namespace Orleans.Runtime.Host
             if (string.IsNullOrWhiteSpace(Name))
                 Name = "Silo";
 
-            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + exc;
+            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + TraceLogger.PrintException(exc);
             if (logger != null) logger.Error(ErrorCode.Runtime_Error_100105, errMsg, exc);
 
             // Dump Startup error to a log file
@@ -384,7 +394,7 @@ namespace Orleans.Runtime.Host
 
             try
             {
-                File.AppendAllText(startupLog, dateString + "Z" + "\r\n" + errMsg);
+                File.AppendAllText(startupLog, dateString + "Z" + Environment.NewLine + errMsg);
             }
             catch (Exception exc2)
             {

@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebRole", "WebRole\WebRole.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldInterfaces", "..\HelloWorld\HelloWorldInterfaces\HelloWorldInterfaces.csproj", "{163CCE80-C506-468C-9B28-E2FF198097E3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWordGrains", "..\HelloWorld\HelloWordGrains\HelloWordGrains.csproj", "{98D4DB83-175E-44D5-A14B-9C66EE89F037}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldGrains", "..\HelloWorld\HelloWorldGrains\HelloWorldGrains.csproj", "{98D4DB83-175E-44D5-A14B-9C66EE89F037}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

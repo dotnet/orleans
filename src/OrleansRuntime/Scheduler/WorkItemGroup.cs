@@ -450,7 +450,7 @@ namespace Orleans.Runtime.Scheduler
         {
             var st = new StackTrace();
             var msg = string.Format("{0} {1}", what, DumpStatus());
-            log.Warn(errorCode, msg + " \nCalled from " + st);
+            log.Warn(errorCode, msg + Environment.NewLine + " Called from " + st);
         }
     }
 }

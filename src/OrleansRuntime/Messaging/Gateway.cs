@@ -47,12 +47,13 @@ namespace Orleans.Runtime.Messaging
         // Any client currently in the system appears in this collection. 
         // In addition, we use clientSockets and proxiedGrains collections for fast retrival of ClientState. 
         // Anything that appears in those 2 collections should also appear in the main clients collection.
-        private readonly ConcurrentDictionary<Guid, ClientState> clients;
+        private readonly ConcurrentDictionary<GrainId, ClientState> clients;
         private readonly ConcurrentDictionary<Socket, ClientState> clientSockets;
         private readonly ConcurrentDictionary<GrainId, ClientState> proxiedGrains;
         private readonly SiloAddress gatewayAddress;
         private int nextGatewaySenderToUseForRoundRobin;
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
+        private ClientObserverRegistrar clientRegistrar;
         private readonly object lockable;
         private static readonly TraceLogger logger = TraceLogger.GetLogger("Orleans.Messaging.Gateway");
         
@@ -65,7 +66,7 @@ namespace Orleans.Runtime.Messaging
             senders = new Lazy<GatewaySender>[messageCenter.MessagingConfiguration.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this);
-            clients = new ConcurrentDictionary<Guid, ClientState>();
+            clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
             proxiedGrains = new ConcurrentDictionary<GrainId, ClientState>();
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messageCenter.MessagingConfiguration);
@@ -73,8 +74,10 @@ namespace Orleans.Runtime.Messaging
             lockable = new object();
         }
 
-        internal void Start()
+        internal void Start(ClientObserverRegistrar clientRegistrar)
         {
+            this.clientRegistrar = clientRegistrar;
+            this.clientRegistrar.SetGateway(this);
             acceptor.Start();
             for (int i = 0; i < senders.Length; i++)
             {
@@ -100,7 +103,12 @@ namespace Orleans.Runtime.Messaging
             acceptor.Stop();
         }
 
-        internal void RecordOpenedSocket(Socket sock, Guid clientId)
+        internal ICollection<GrainId> GetConnectedClients()
+        {
+            return clients.Keys;
+        }
+
+        internal void RecordOpenedSocket(Socket sock, GrainId clientId)
         {
             lock (lockable)
             {
@@ -115,7 +123,6 @@ namespace Orleans.Runtime.Messaging
                         ClientState ignore;
                         clientSockets.TryRemove(oldSocket, out ignore);
                     }
-                    clientState.RecordConnection(sock);
                     QueueRequest(clientState, null);
                 }
                 else
@@ -124,10 +131,11 @@ namespace Orleans.Runtime.Messaging
                     nextGatewaySenderToUseForRoundRobin++; // under Gateway lock
                     clientState = new ClientState(clientId, gatewayToUse);
                     clients[clientId] = clientState;
-                    clientState.RecordConnection(sock);
                     MessagingStatisticsGroup.ConnectedClientCount.Increment();
                 }
+                clientState.RecordConnection(sock);
                 clientSockets[sock] = clientState;
+                clientRegistrar.ClientAdded(clientId);
                 NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
             }
         }
@@ -140,21 +148,21 @@ namespace Orleans.Runtime.Messaging
                 ClientState cs = null;
                 if (!clientSockets.TryGetValue(sock, out cs)) return;
 
-                    EndPoint endPoint = null;
-                    try
-                    {
-                        endPoint = sock.RemoteEndPoint;
-                    }
-                    catch (Exception) { } // guard against ObjectDisposedExceptions
-                    logger.Info(ErrorCode.GatewayClientClosedSocket, "Recorded closed socket from endpoint {0}, client ID {1}.", endPoint != null ? endPoint.ToString() : "null", cs.Id);
-
-                    ClientState ignore;
-                    clientSockets.TryRemove(sock, out ignore);
-                    cs.RecordDisconnection();
+                EndPoint endPoint = null;
+                try
+                {
+                    endPoint = sock.RemoteEndPoint;
                 }
-            }
+                catch (Exception) { } // guard against ObjectDisposedExceptions
+                logger.Info(ErrorCode.GatewayClientClosedSocket, "Recorded closed socket from endpoint {0}, client ID {1}.", endPoint != null ? endPoint.ToString() : "null", cs.Id);
 
-        internal void RecordProxiedGrain(GrainId grainId, Guid clientId)
+                ClientState ignore;
+                clientSockets.TryRemove(sock, out ignore);
+                cs.RecordDisconnection();
+            }
+        }
+
+        internal void RecordProxiedGrain(GrainId grainId, GrainId clientId)
         {
             lock (lockable)
             {
@@ -228,6 +236,7 @@ namespace Orleans.Runtime.Messaging
 
             ClientState ignore;
             clients.TryRemove(client.Id, out ignore);
+            clientRegistrar.ClientDropped(client.Id);
 
             Socket oldSocket = client.Socket;
             if (oldSocket != null)
@@ -310,12 +319,12 @@ namespace Orleans.Runtime.Messaging
             internal Queue<List<Message>> PendingBatchesToSend { get; private set; }
             internal Socket Socket { get; private set; }
             internal DateTime DisconnectedSince { get; private set; }
-            internal Guid Id { get; private set; }
+            internal GrainId Id { get; private set; }
             internal int GatewaySenderNumber { get; private set; }
 
             internal bool IsConnected { get { return Socket != null; } }
 
-            internal ClientState(Guid id, int gatewaySenderNumber)
+            internal ClientState(GrainId id, int gatewaySenderNumber)
             {
                 Id = id;
                 GatewaySenderNumber = gatewaySenderNumber;

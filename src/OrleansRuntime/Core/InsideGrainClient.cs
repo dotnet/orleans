@@ -375,8 +375,8 @@ namespace Orleans.Runtime
                 {
                     if (invokeExceptionLogger.IsVerbose || message.Direction == Message.Directions.OneWay)
                     {
-                        invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException, 
-                            "Exception during Grain method call of message: {0}.", message, exc1);
+                        invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
+                            "Exception during Grain method call of message: " + message, exc1);
                     }
                     if (message.Direction != Message.Directions.OneWay)
                     {
@@ -391,7 +391,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc2)
             {
-                logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: {0}.", message, exc2);
+                logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
                 if (message.Direction != Message.Directions.OneWay)
                     SafeSendExceptionResponse(message, exc2);             
             }
@@ -406,7 +406,7 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 logger.Warn(ErrorCode.IGC_SendResponseFailed,
-                    "Exception trying to send a response: {0}", exc);
+                    "Exception trying to send a response: " + exc.Message, exc);
                 SendResponse(message, Response.ExceptionResponse(exc)); 
             }
         }
@@ -422,13 +422,13 @@ namespace Orleans.Runtime
                 try
                 {
                     logger.Warn(ErrorCode.IGC_SendExceptionResponseFailed,
-                        "Exception trying to send an exception response: {0}", exc1);
+                        "Exception trying to send an exception response: " + exc1.Message, exc1);
                     SendResponse(message, Response.ExceptionResponse(exc1));
                 }
                 catch (Exception exc2)
                 {
                     logger.Warn(ErrorCode.IGC_UnhandledExceptionInInvoke,
-                        "Exception trying to send an exception. Ignoring and not trying to send again. Exc: {0}", exc2);
+                        "Exception trying to send an exception. Ignoring and not trying to send again. Exc: " + exc2.Message, exc2);
                 }
             }
         }
@@ -707,7 +707,14 @@ namespace Orleans.Runtime
         public string CaptureRuntimeEnvironment()
         {
             var callStack = new System.Diagnostics.StackTrace(1); // Don't include this method in stack trace
-            return String.Format("   TaskScheduler={0}\n   RuntimeContext={1}\n   WorkerPoolThread={2}\n   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}\n   Thread.CurrentThread.ManagedThreadId={4}\n   StackTrace=\n{5}",
+            return String.Format(
+                  "   TaskScheduler={0}" + Environment.NewLine 
+                + "   RuntimeContext={1}" + Environment.NewLine
+                + "   WorkerPoolThread={2}" + Environment.NewLine
+                + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
+                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
+                + "   StackTrace=" + Environment.NewLine 
+                + "   {5}",
                     TaskScheduler.Current,
                     RuntimeContext.Current,
                     WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,

@@ -42,11 +42,11 @@
     <Reference Include="System.Xml" />
     <Reference Include="Orleans">
       <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
-      <Private>False</Private>
+      <Private>True</Private>
     </Reference>
     <Reference Include="OrleansRuntime">
       <HintPath>$(OrleansSDK)\Binaries\OrleansServer\OrleansRuntime.dll</HintPath>
-      <Private>False</Private>
+      <Private>True</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>

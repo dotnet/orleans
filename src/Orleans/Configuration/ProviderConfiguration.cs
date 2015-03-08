@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Configuration
     public class ProviderConfiguration : IProviderConfiguration
     {
         private IDictionary<string, string> properties;
-        private IList<ProviderConfiguration> childConfigurations;
+        private readonly IList<ProviderConfiguration> childConfigurations = new List<ProviderConfiguration>();
         private IList<IProvider> childProviders;
         [NonSerialized]
         private IProviderManager providerManager;
@@ -71,8 +71,6 @@ namespace Orleans.Runtime.Configuration
         // Load from an element with the format <Provider Type="..." Name="...">...</Provider>
         internal void Load(XmlElement child, IDictionary<string, IProviderConfiguration> alreadyLoaded, XmlNamespaceManager nsManager)
         {
-            childConfigurations = new List<ProviderConfiguration>();
-
             if (nsManager == null)
             {
                 nsManager = new XmlNamespaceManager(new NameTable());
@@ -144,7 +142,7 @@ namespace Orleans.Runtime.Configuration
                 child.SetProviderManager(manager);
         }
 
-        internal void SetProperty(string key, string val)
+        public void SetProperty(string key, string val)
         {
             if (!properties.ContainsKey(key))
             {

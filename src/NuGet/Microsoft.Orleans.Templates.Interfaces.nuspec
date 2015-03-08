@@ -18,21 +18,14 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="Microsoft.Orleans.Development" version="1.0.0.0" />
+      <dependency id="Microsoft.Orleans.Development" version="1.0.3" />
     </dependencies>
   </metadata>
   <files>
-    <file src="Orleans.dll" target="lib\net45" />
-
-    <file src="ClientGenerator.exe" target="tools" />
-    <file src="Orleans.dll" target="tools" />
-
-    <file src="EmptyFile.cs" target="content\Properties\Orleans.codegen.cs" />
-
     <!-- Auto-import MSBuild targets and props files into target project.
            http://docs.nuget.org/docs/creating-packages/creating-and-publishing-a-package#Import_MSBuild_targets_and_props_files_into_project_(Requires_NuGet_2.5_or_above)
       -->
-    <file src="Orleans.SDK.targets" target="build\Orleans.Interfaces.targets" />
-    <file src="Orleans.Interfaces.props" target="build\Orleans.Interfaces.props" />
+    <file src="Orleans.SDK.targets" target="build\Microsoft.Orleans.Templates.Interfaces.targets" />
+    <file src="Orleans.Interfaces.props" target="build\Microsoft.Orleans.Templates.Interfaces.props" />
   </files>
 </package>

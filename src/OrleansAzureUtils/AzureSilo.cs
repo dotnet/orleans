@@ -86,6 +86,15 @@ namespace Orleans.Runtime.Host
         #region Azure RoleEntryPoint methods
 
         /// <summary>
+        /// Initialize this Orleans silo for execution with the current Azure deploymentId and role instance
+        /// </summary>
+        /// <returns><c>true</c> is the silo startup was successfull</returns>
+        public bool Start()
+        {
+            return Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance, null);
+        }
+
+        /// <summary>
         /// Initialize this Orleans silo for execution with the specified Azure deploymentId and role instance
         /// </summary>
         /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
@@ -115,7 +124,7 @@ namespace Orleans.Runtime.Host
             Trace.TraceInformation("Starting {0} v{1}", this.GetType().FullName, RuntimeVersion.Current);
 
             // Read endpoint info for this instance from Azure config
-            string instanceName = AzureConfigUtils.GetInstanceName(deploymentId, myRoleInstance);
+            string instanceName = AzureConfigUtils.GetInstanceName(myRoleInstance);
 
             // Configure this Orleans silo instance
 
@@ -176,6 +185,7 @@ namespace Orleans.Runtime.Host
             // Always use Azure table for membership when running silo in Azure
             host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
             host.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
+            host.SetExpectedClusterSize(RoleEnvironment.CurrentRoleInstance.Role.Instances.Count);
             siloInstanceManager.RegisterSiloInstance(myEntry);
 
             // Initialise this Orleans silo instance
