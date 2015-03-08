@@ -193,18 +193,8 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class ProviderCategoryConfiguration
     {
-        public ProviderCategoryConfiguration()
-        {
-            Providers = new Dictionary<string, IProviderConfiguration>();
-        }
-
-        internal ProviderCategoryConfiguration(string name) : this()
-        {
-            Name = name;
-        }
-
-        public string Name { get; private set; }
-        public IDictionary<string, IProviderConfiguration> Providers { get; private set; }
+        public string Name { get; set; }
+        public IDictionary<string, IProviderConfiguration> Providers { get; set; }
 
         // Load from an element with the format <NameProviders>...</NameProviders>
         // that contains a sequence of Provider elements (see the ProviderConfiguration type)

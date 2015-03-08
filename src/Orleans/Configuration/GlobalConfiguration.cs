@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
- using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -715,10 +715,15 @@ namespace Orleans.Runtime.Configuration
 
             const string bootstrapCategoryKey = "Bootstrap";
 
-            var category = ProviderConfigurations.Find(bootstrapCategoryKey);
+            ProviderCategoryConfiguration category;
+            ProviderConfigurations.TryGetValue(bootstrapCategoryKey, out category);
             if (category == null)
             {
-                category = new ProviderCategoryConfiguration(bootstrapCategoryKey);
+                category = new ProviderCategoryConfiguration()
+                {
+                    Name = bootstrapCategoryKey,
+                    Providers = new Dictionary<string, IProviderConfiguration>()
+                };
                 ProviderConfigurations.Add(category.Name, category);
             }
 

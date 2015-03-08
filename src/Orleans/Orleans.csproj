@@ -203,7 +203,6 @@
     <Compile Include="Streams\Core\StreamSequenceToken.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
     <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
-    <Compile Include="Utils\DictionaryExtensions.cs" />
     <Compile Include="Utils\SetExtensions.cs" />
     <Compile Include="Placement\ActivationCountBasedPlacement.cs" />
     <Compile Include="Placement\StatelessWorkerPlacement.cs" />
