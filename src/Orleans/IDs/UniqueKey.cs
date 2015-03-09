@@ -46,7 +46,6 @@ namespace Orleans.Runtime
             Grain = 3,
             ClientGrain = 4,
             KeyExtGrain = 6,
-            ClientAddressableObject = 7,
         }
 
         public UInt64 N0 { get; private set; }

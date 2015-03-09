@@ -368,12 +368,19 @@ namespace Orleans
         private void DispatchToLocalObject(Message message)
         {
             LocalObjectData objectData;
+            GuidId observerId = message.TargetObserverId;
+            if (observerId == null)
+            {                
+                logger.Error(
+                    ErrorCode.ProxyClient_OGC_TargetNotFound_2,
+                    String.Format("Did not find TargetObserverId header in the message = {1}. A request message to a client is expected to have an observerId.", message));
+                return;
+            }
+
             bool found = false;
             lock (localObjects)
             {
-                //found = localObjects.TryGetValue(message.TargetGrain, out objectData);
-                // TODO: fix to extract the correct observerId from the message
-                found = localObjects.TryGetValue(GuidId.GetNewGuidId(), out objectData);
+                found = localObjects.TryGetValue(observerId, out objectData);
             }
 
             if (found)
@@ -830,12 +837,9 @@ namespace Orleans
 
             var reference = (GrainReference) obj;
 
-            LocalObjectData objData;
             lock (localObjects)
             {
-                if (localObjects.TryGetValue(reference.ObserverId, out objData))
-                    localObjects.Remove(reference.ObserverId);
-                else
+                if (!localObjects.Remove(reference.ObserverId))
                     throw new ArgumentException("Reference is not associated with a local object.", "reference");
             }
         }

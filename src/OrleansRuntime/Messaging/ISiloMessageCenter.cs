@@ -34,8 +34,6 @@ namespace Orleans.Runtime.Messaging
 
         void RerouteMessage(Message message);
 
-        Action<List<GrainId>> ClientDropHandler { set; }
-
         bool IsProxying { get; }
 
         bool TryDeliverToProxy(Message msg);
