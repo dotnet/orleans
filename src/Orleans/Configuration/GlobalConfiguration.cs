@@ -688,38 +688,46 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Registers given type of <typeparamref name="T"/> as bootstrap provider
+        /// Registers given type of <typeparamref name="T"/> where <typeparamref name="T"/> is bootstrap provider
         /// </summary>
         /// <typeparam name="T">
         ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
         /// </typeparam>
+        /// <param name="name">
+        ///     Name of bootstrap provider
+        /// </param>
         /// <param name="properties">
         ///     Properties that will be passed to bootstrap provider upon initialization
         /// </param>
-        public void RegisterBootstrapProvider<T>(IDictionary<string, string> properties = null)
+        public void RegisterBootstrapProvider<T>(string name, IDictionary<string, string> properties = null)
         {
-            RegisterBootstrapProvider(typeof(T), properties);
+            RegisterBootstrapProvider(typeof(T), name, properties);
         }
 
         /// <summary>
         /// Registers given type as bootstrap provider
         /// </summary>
-        /// <param name="boostrapProviderType">
+        /// <param name="type">
         ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
+        /// </param>
+        /// <param name="name">
+        ///     Name of bootstrap provider
         /// </param>
         /// <param name="properties">
         ///     Properties that will be passed to bootstrap provider upon initialization
         /// </param>
-        public void RegisterBootstrapProvider(Type boostrapProviderType, IDictionary<string, string> properties = null) 
+        public void RegisterBootstrapProvider(Type type, string name, IDictionary<string, string> properties = null) 
         {
-            if (boostrapProviderType == null)
-                throw new ArgumentNullException("boostrapProviderType");
+            if (type == null)
+                throw new ArgumentNullException("type");
 
-            if (boostrapProviderType.IsAbstract ||
-                boostrapProviderType.IsGenericType ||
-                !typeof(IBootstrapProvider).IsAssignableFrom(boostrapProviderType))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", 
-                                            "boostrapProviderType");
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentException("Bootstrap provider name cannot be null or empty string", "name");
+
+            if (type.IsAbstract ||
+                type.IsGenericType ||
+                !typeof(IBootstrapProvider).IsAssignableFrom(type))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "type");
 
             const string bootstrapCategoryKey = "Bootstrap";
 
@@ -735,15 +743,13 @@ namespace Orleans.Runtime.Configuration
                 ProviderConfigurations.Add(category.Name, category);
             }
 
-            var fullName = boostrapProviderType.FullName;
-            if (category.Providers.ContainsKey(fullName))
+            if (category.Providers.ContainsKey(name))
                 throw new InvalidOperationException(
-                    string.Format("Bootstrap provider of type {0} has been already registered", 
-                                   boostrapProviderType));
+                    string.Format("Bootstrap provider with name '{0}' has been already registered", name));
 
             var config = new ProviderConfiguration(
                 properties ?? new Dictionary<string, string>(), 
-                fullName, fullName);
+                type.FullName, name);
 
             category.Providers.Add(config.Name, config);
         } 

@@ -201,7 +201,8 @@ namespace Orleans.Runtime.Configuration
         internal void Load(XmlElement child)
         {
             Name = child.LocalName.Substring(0, child.LocalName.Length - 9);
-            
+            Providers = new Dictionary<string, IProviderConfiguration>();
+
             var nsManager = new XmlNamespaceManager(new NameTable());
             nsManager.AddNamespace("orleans", "urn:orleans");
 
