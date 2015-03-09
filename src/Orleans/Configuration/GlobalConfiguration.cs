@@ -690,18 +690,26 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Registers given type of <typeparamref name="T"/> as bootstrap provider
         /// </summary>
-        /// <typeparam name="T">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</typeparam>
-        /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
+        /// <typeparam name="T">
+        ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
+        /// </typeparam>
+        /// <param name="properties">
+        ///     Properties that will be passed to bootstrap provider upon initialization
+        /// </param>
         public void RegisterBootstrapProvider<T>(IDictionary<string, string> properties = null)
         {
             RegisterBootstrapProvider(typeof(T), properties);
         }
 
         /// <summary>
-        /// Registers given type of <typeparamref name="T"/> as bootstrap provider
+        /// Registers given type as bootstrap provider
         /// </summary>
-        /// <param name="boostrapProviderType">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</param>
-        /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
+        /// <param name="boostrapProviderType">
+        ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
+        /// </param>
+        /// <param name="properties">
+        ///     Properties that will be passed to bootstrap provider upon initialization
+        /// </param>
         public void RegisterBootstrapProvider(Type boostrapProviderType, IDictionary<string, string> properties = null) 
         {
             if (boostrapProviderType == null)
