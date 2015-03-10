@@ -400,7 +400,7 @@ namespace Orleans.Runtime
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc)
         {
-            return assembly.IsDynamic ? null : assembly.GetTypes().Where(type => !type.IsNestedPrivate && whereFunc(type));
+            return assembly.IsDynamic ? Enumerable.Empty<Type>() : assembly.GetTypes().Where(type => !type.IsNestedPrivate && whereFunc(type));
         }
 
         public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc)
@@ -411,10 +411,20 @@ namespace Orleans.Runtime
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
                 var types = GetTypes(assembly, whereFunc);
-                if (null != types) 
-                {
-                    result.AddRange(types);
-                }
+                result.AddRange(types);
+            }
+            return result;
+        }
+
+        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc)
+        {
+            var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            var result = new List<Type>();
+            foreach (var assembly in currentAssemblies.Where(loaded => assemblies.Contains(loaded.Location)))
+            {
+                // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
+                var types = GetTypes(assembly, whereFunc);
+                result.AddRange(types);
             }
             return result;
         }

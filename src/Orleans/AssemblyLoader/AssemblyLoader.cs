@@ -73,8 +73,9 @@ namespace Orleans.Runtime
         ///     assemblies to be loaded based on examination of their ReflectionOnly type
         ///     information (e.g. AssemblyLoaderCriteria.LoadTypesAssignableFrom).</param>
         /// <param name="logger">A logger to provide feedback to.</param>
+        /// <returns>List of discovered assembly locations</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.Reflection.Assembly.LoadFrom")]
-        public static void LoadAssemblies(
+        public static List<string> LoadAssemblies(
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
@@ -88,7 +89,8 @@ namespace Orleans.Runtime
                     logger);
 
             int count = 0;
-            foreach (var pathName in loader.DiscoverAssemblies())
+            List<string> discoveredAssemblyLocations = loader.DiscoverAssemblies();
+            foreach (var pathName in discoveredAssemblyLocations)
             {
                 loader.logger.Info("Loading assembly {0}...", pathName);
                 // It is okay to use LoadFrom here because we are loading application assemblies deployed to the specific directory.
@@ -97,6 +99,7 @@ namespace Orleans.Runtime
                 ++count;
             }
             loader.logger.Info("{0} assemblies loaded.", count);
+            return discoveredAssemblyLocations;
         }
 
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
