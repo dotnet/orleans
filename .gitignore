@@ -8,3 +8,5 @@ Thumbs.db
 
 .rbenv-version
 .rvmrc
+Binaries/
+src/
