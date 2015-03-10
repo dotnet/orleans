@@ -420,7 +420,7 @@ namespace Orleans.Runtime
         {
             var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();
-            foreach (var assembly in currentAssemblies.Where(loaded => assemblies.Contains(loaded.Location)))
+            foreach (var assembly in currentAssemblies.Where(loaded => !loaded.IsDynamic && assemblies.Contains(loaded.Location)))
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
                 var types = GetTypes(assembly, whereFunc);
