@@ -1,9 +1,5 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
  
 MIT License
 
@@ -21,13 +17,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Threading.Tasks;
-﻿using Orleans.Providers;
-
 namespace Orleans.Streams
 {
-    public interface IStreamProviderImpl : IStreamProvider, IProvider
+    internal interface IInternalStreamProvider : IStreamProviderImpl
     {
-        Task Start();
+        IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId);
+        IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId);
     }
 }

@@ -28,7 +28,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    public class SimpleMessageStreamProvider : IStreamProviderImpl
+    public class SimpleMessageStreamProvider : IInternalStreamProvider
     {
         public string                       Name { get; private set; }
 
@@ -37,10 +37,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private bool                        fireAndForgetDelivery;
         internal const string               FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
         internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = true;
-
-        public SimpleMessageStreamProvider()
-        {
-        }
 
         public bool IsRewindable { get { return false; } }
 

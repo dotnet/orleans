@@ -155,6 +155,7 @@
     <Compile Include="Providers\ILocalDataStore.cs" />
     <Compile Include="Streams\Core\AsyncObservableExtensions.cs" />
     <Compile Include="Streams\Internal\GenericAsyncObserver.cs" />
+    <Compile Include="Streams\Internal\IInternalStreamProvider.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
     <Compile Include="Streams\PersistentStreams\PersistentStreamProvider.cs" />
     <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />

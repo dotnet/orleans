@@ -37,7 +37,7 @@ namespace Orleans.Streams
         private readonly StreamId                               streamId;
         private readonly bool                                   isRewindable;
         [NonSerialized]
-        private IStreamProviderImpl                             provider;
+        private IInternalStreamProvider                         provider;
         [NonSerialized]
         private volatile IAsyncBatchObserver<T>                 producerInterface;
         [NonSerialized]
@@ -59,7 +59,7 @@ namespace Orleans.Streams
             initLock = new object();
         }
 
-        internal StreamImpl(StreamId streamId, IStreamProviderImpl provider, bool isRewindable)
+        internal StreamImpl(StreamId streamId, IInternalStreamProvider provider, bool isRewindable)
         {
             if (null == streamId)
                 throw new ArgumentNullException("streamId");
@@ -161,9 +161,9 @@ namespace Orleans.Streams
             return consumerInterface;
         }
 
-        private IStreamProviderImpl GetStreamProvider()
+        private IInternalStreamProvider GetStreamProvider()
         {
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IStreamProviderImpl;
+            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IInternalStreamProvider;
         }
 
         #region IComparable<IAsyncStream<T>> Members
