@@ -1,0 +1,44 @@
+---
+layout: page
+title: Contributors
+---
+<script src="http://code.jquery.com/jquery.min.js" type="text/javascript"></script>
+<script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery.templates/beta1/jquery.tmpl.js"></script>
+
+
+<script type="text/javascript">
+// It looks like I owe @Grumpydev and @TheCodeJunkie a beer cake
+$(function() {
+  $.ajax({
+      url: 'https://api.github.com/orgs/WindowsAzure-Contrib/public_members',
+      dataType: 'jsonp',
+      success: function(result) {
+        $("#contributorTemplate").tmpl(result).appendTo("#contributors");
+      }
+  });
+});
+</script>
+
+<div class="row">
+  <div class="container">
+    <p>Windows Azure Contrib is supported by these great people</p>
+
+    <div id="contributors">
+    </div>
+  </div>
+</div>
+
+
+<script id="contributorTemplate" type="text/x-jQuery-tmpl">
+  {{ "{{each data"}}}}
+    {{ "{{if login != 'invalid-email-address'"}}}}  
+      <div style="clear:both; margin: 8px; height: 80px; width: 600px;">
+          <img src="${avatar_url}" alt="${name || login}" style="float:left; width:80px;" />
+          <div style="float:left; margin-left: 12px;">
+            <h2>${name ? name.replace(" ", " '" + login + "' ") + "!" : login}</h2>
+            <a href="https://github.com/${login}">https://github.com/${login}</a>
+          </div>
+      </div>
+    {{ "{{/if"}}}}
+  {{ "{{/each "}}}}
+</script>
