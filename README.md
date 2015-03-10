@@ -17,7 +17,7 @@ Alternatively, you can clone the sources, run build.cmd to build and install orl
 
 Documentation 
 =======
-Documentation is located [here][Orleans Documentation]
+Documentation is located [here][http://dotnet.github.io/orleans/]
 
 Contributing To This Project
 =======
@@ -38,8 +38,8 @@ This project is licensed under the [MIT license](https://github.com/dotnet/orlea
 
 
 [MSR-ProjectOrleans]: http://research.microsoft.com/projects/orleans/
-[Orleans Documentation]: https://github.com/dotnet/orleans/wiki
-[Ideas for Contributions]: https://github.com/dotnet/orleans/wiki/Ideas-for-Contributions
+[Orleans Documentation]: http://dotnet.github.io/orleans/
+[Ideas for Contributions]: http://dotnet.github.io/orleans/Ideas-for-Contributions
 [Contributing Guide]: https://github.com/dotnet/corefx/wiki/Contributing
 [CLA]: https://github.com/dotnet/corefx/wiki/Contribution-License-Agreement-%28CLA%29
 [DotNet Framework Design Guidelines]: https://github.com/dotnet/corefx/wiki/Framework-Design-Guidelines-Digest
