@@ -277,7 +277,7 @@ namespace Orleans.Runtime
         /// Return the name of the interface for this GrainReference. 
         /// Implemented in Orleans generated code.
         /// </summary>
-        protected virtual string InterfaceName
+        public virtual string InterfaceName
         {
             get
             {

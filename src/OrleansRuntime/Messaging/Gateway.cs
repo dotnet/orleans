@@ -53,6 +53,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloAddress gatewayAddress;
         private int nextGatewaySenderToUseForRoundRobin;
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
+        private ClientObserverRegistrar clientRegistrar;
         private readonly object lockable;
         private static readonly TraceLogger logger = TraceLogger.GetLogger("Orleans.Messaging.Gateway");
         
@@ -73,8 +74,10 @@ namespace Orleans.Runtime.Messaging
             lockable = new object();
         }
 
-        internal void Start()
+        internal void Start(ClientObserverRegistrar clientRegistrar)
         {
+            this.clientRegistrar = clientRegistrar;
+            this.clientRegistrar.SetGateway(this);
             acceptor.Start();
             for (int i = 0; i < senders.Length; i++)
             {
@@ -100,6 +103,11 @@ namespace Orleans.Runtime.Messaging
             acceptor.Stop();
         }
 
+        internal ICollection<GrainId> GetConnectedClients()
+        {
+            return clients.Keys;
+        }
+
         internal void RecordOpenedSocket(Socket sock, GrainId clientId)
         {
             lock (lockable)
@@ -115,7 +123,6 @@ namespace Orleans.Runtime.Messaging
                         ClientState ignore;
                         clientSockets.TryRemove(oldSocket, out ignore);
                     }
-                    clientState.RecordConnection(sock);
                     QueueRequest(clientState, null);
                 }
                 else
@@ -124,10 +131,11 @@ namespace Orleans.Runtime.Messaging
                     nextGatewaySenderToUseForRoundRobin++; // under Gateway lock
                     clientState = new ClientState(clientId, gatewayToUse);
                     clients[clientId] = clientState;
-                    clientState.RecordConnection(sock);
                     MessagingStatisticsGroup.ConnectedClientCount.Increment();
                 }
+                clientState.RecordConnection(sock);
                 clientSockets[sock] = clientState;
+                clientRegistrar.ClientAdded(clientId);
                 NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
             }
         }
@@ -140,19 +148,19 @@ namespace Orleans.Runtime.Messaging
                 ClientState cs = null;
                 if (!clientSockets.TryGetValue(sock, out cs)) return;
 
-                    EndPoint endPoint = null;
-                    try
-                    {
-                        endPoint = sock.RemoteEndPoint;
-                    }
-                    catch (Exception) { } // guard against ObjectDisposedExceptions
-                    logger.Info(ErrorCode.GatewayClientClosedSocket, "Recorded closed socket from endpoint {0}, client ID {1}.", endPoint != null ? endPoint.ToString() : "null", cs.Id);
-
-                    ClientState ignore;
-                    clientSockets.TryRemove(sock, out ignore);
-                    cs.RecordDisconnection();
+                EndPoint endPoint = null;
+                try
+                {
+                    endPoint = sock.RemoteEndPoint;
                 }
+                catch (Exception) { } // guard against ObjectDisposedExceptions
+                logger.Info(ErrorCode.GatewayClientClosedSocket, "Recorded closed socket from endpoint {0}, client ID {1}.", endPoint != null ? endPoint.ToString() : "null", cs.Id);
+
+                ClientState ignore;
+                clientSockets.TryRemove(sock, out ignore);
+                cs.RecordDisconnection();
             }
+        }
 
         internal void RecordProxiedGrain(GrainId grainId, GrainId clientId)
         {
@@ -228,6 +236,7 @@ namespace Orleans.Runtime.Messaging
 
             ClientState ignore;
             clients.TryRemove(client.Id, out ignore);
+            clientRegistrar.ClientDropped(client.Id);
 
             Socket oldSocket = client.Socket;
             if (oldSocket != null)

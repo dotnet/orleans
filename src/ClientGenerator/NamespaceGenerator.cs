@@ -213,7 +213,7 @@ namespace Orleans.CodeGeneration
             {
                 Name = "InterfaceName",
                 Type = new CodeTypeReference(typeof (string)),
-                Attributes = MemberAttributes.Family | MemberAttributes.Override,
+                Attributes = MemberAttributes.Public | MemberAttributes.Override,
                 HasSet = false,
                 HasGet = true
             };

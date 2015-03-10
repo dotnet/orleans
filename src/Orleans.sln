@@ -41,10 +41,19 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansProviders", "Orleans
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrainInterfaces", "TestGrainInterfaces\TestGrainInterfaces.csproj", "{3972213F-189B-41D4-90FE-38D513C1106D}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrains", "TestGrains\TestGrains.csproj", "{EACE28AE-F301-472A-B633-02B55434871B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "Tester\Tester.csproj", "{591EF75B-D3B0-403D-830C-39D032A73404}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{856B8FB9-194E-4F5C-9D9D-A35EB82387FC}"
 	ProjectSection(SolutionItems) = preProject
@@ -114,6 +123,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Bitmaps", "Bitmaps", "{0BB4
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterInternal", "TesterInternal\TesterInternal.csproj", "{09610024-F5B9-4065-9557-BD9E36A32421}"
 	ProjectSection(ProjectDependencies) = postProject
+		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
 		{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0} = {6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}
 	EndProjectSection
 EndProject

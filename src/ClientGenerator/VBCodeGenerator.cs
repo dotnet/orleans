@@ -175,7 +175,7 @@ End If", pair.Key, pair.Value);
             methodImpl = String.Format(@"
         Public Shared Function DeleteObjectReference(reference As {0}) As System.Threading.Tasks.Task
             Return Global.Orleans.Runtime.GrainReference.DeleteObjectReference(reference)
-        End Sub",
+        End Function",
             grainInterfaceData.TypeName);
             var deleteObjectReferenceMethod = new CodeSnippetTypeMember(methodImpl);
             factoryClass.Members.Add(deleteObjectReferenceMethod);

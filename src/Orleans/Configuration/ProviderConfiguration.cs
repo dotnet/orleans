@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Configuration
     public class ProviderConfiguration : IProviderConfiguration
     {
         private IDictionary<string, string> properties;
-        private readonly IList<ProviderConfiguration> childConfigurations;
+        private readonly IList<ProviderConfiguration> childConfigurations = new List<ProviderConfiguration>();
         private IList<IProvider> childProviders;
         [NonSerialized]
         private IProviderManager providerManager;
@@ -52,7 +52,6 @@ namespace Orleans.Runtime.Configuration
         internal ProviderConfiguration()
         {
             properties = new Dictionary<string, string>();
-            childConfigurations = new List<ProviderConfiguration>();
         }
 
         public ProviderConfiguration(IDictionary<string, string> properties, string type, string name)
@@ -60,7 +59,6 @@ namespace Orleans.Runtime.Configuration
             this.properties = properties;
             Type = type;
             Name = name;
-            childConfigurations = new List<ProviderConfiguration>();
         }
 
         // for testing purposes
@@ -68,7 +66,6 @@ namespace Orleans.Runtime.Configuration
         {
             this.properties = properties;
             this.childProviders = childProviders;
-            childConfigurations = new List<ProviderConfiguration>();
         }
 
         // Load from an element with the format <Provider Type="..." Name="...">...</Provider>
