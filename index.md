@@ -23,6 +23,8 @@ Orleans is a framework that provides a straightforward approach to building dist
 
 * **[Step-by-step Tutorials](Step-by-step-Tutorials)** - Complementing the "Getting Started" guide, this section will take you through a series of samples and hands-on tutorials that teach you the core concepts, as well as some advanced ones through hands-on experience.
 
+* **[Orleans Streams](Orleans-Streams)** - This section describes the reactive programming with Orleans streams and the extensibility model for implementing new stream types.
+
 * **[Frequently Asked Questions](Frequently-Asked-Questions)**
 
 ## Advanced Documentation
