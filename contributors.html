@@ -10,7 +10,7 @@ title: Contributors
 // It looks like I owe @Grumpydev and @TheCodeJunkie a beer cake
 $(function() {
   $.ajax({
-      url: 'https://api.github.com/orgs/WindowsAzure-Contrib/public_members',
+      url: '',
       dataType: 'jsonp',
       success: function(result) {
         $("#contributorTemplate").tmpl(result).appendTo("#contributors");
@@ -21,8 +21,7 @@ $(function() {
 
 <div class="row">
   <div class="container">
-    <p>Windows Azure Contrib is supported by these great people</p>
-
+    <p>Orleans Contrib is supported by these great people</p>
     <div id="contributors">
     </div>
   </div>

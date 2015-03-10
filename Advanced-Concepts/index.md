@@ -26,4 +26,3 @@ This section covers a number of topics that are intended for the advanced user o
 
 [Configuring .NET Garbage Collection](Configuring-.NET-Garbage-Collection)
 
-[Orleans Streams](Orleans-Streams)
