@@ -17,7 +17,7 @@ Alternatively, you can clone the sources, run build.cmd to build and install orl
 
 Documentation 
 =======
-Documentation is located [here][http://dotnet.github.io/orleans/]
+Documentation is located [here][Orleans Documentation]
 
 Contributing To This Project
 =======
