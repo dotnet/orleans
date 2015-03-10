@@ -52,7 +52,7 @@ namespace Orleans
         private readonly ClientConfiguration config;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private readonly Dictionary<GuidId, LocalObjectData> localObjects;
+        private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
 
         private readonly ProxiedMessageCenter transport;
         private bool listenForMessages;
@@ -126,7 +126,7 @@ namespace Orleans
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
         {
-            this.clientId = GrainId.NewClientGrainId();
+            this.clientId = GrainId.NewClientId();
 
             if (cfg == null)
             {
@@ -149,7 +149,7 @@ namespace Orleans
                 PlacementStrategy.Initialize();
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-                localObjects = new Dictionary<GuidId, LocalObjectData>();
+                localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
                 CallbackData.Config = config;
 
                 if (!secondary)
@@ -377,13 +377,7 @@ namespace Orleans
                 return;
             }
 
-            bool found = false;
-            lock (localObjects)
-            {
-                found = localObjects.TryGetValue(observerId, out objectData);
-            }
-
-            if (found)
+            if (localObjects.TryGetValue(observerId, out objectData))
                 this.InvokeLocalObjectAsync(objectData, message);
             else
             {
@@ -404,11 +398,10 @@ namespace Orleans
                 //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
                 logger.Warn(ErrorCode.Runtime_Error_100162,
                     String.Format("Object associated with Observer ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.ObserverId, message));
-                lock (localObjects)
-                {    
-                    // Try to remove. If it's not there, we don't care.
-                    localObjects.Remove(objectData.ObserverId);
-                }
+
+                LocalObjectData ignore;
+                // Try to remove. If it's not there, we don't care.
+                localObjects.TryRemove(objectData.ObserverId, out ignore);
                 return;
             }
 
@@ -823,9 +816,9 @@ namespace Orleans
                 throw new ArgumentException("Argument obj is already a grain reference.");
 
             GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId());
-            lock (localObjects)
+            if (!localObjects.TryAdd(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker)))
             {
-                localObjects.Add(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker));
+                throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
             }
             return gr;
         }
@@ -836,12 +829,9 @@ namespace Orleans
                 throw new ArgumentException("Argument reference is not a grain reference.");
 
             var reference = (GrainReference) obj;
-
-            lock (localObjects)
-            {
-                if (!localObjects.Remove(reference.ObserverId))
-                    throw new ArgumentException("Reference is not associated with a local object.", "reference");
-            }
+            LocalObjectData ignore;
+            if (!localObjects.TryRemove(reference.ObserverId, out ignore))
+                throw new ArgumentException("Reference is not associated with a local object.", "reference");
         }
 
         public void DeactivateOnIdle(ActivationId id)

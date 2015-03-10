@@ -68,10 +68,8 @@ namespace Orleans
         /// In this case, the existing subscription is unaffected.</para></returns>
         public void Subscribe(T observer)
         {
-            if (observers.Contains(observer))
+            if (!observers.Add(observer))
                 throw new OrleansException(String.Format("Cannot subscribe already subscribed observer {0}.", observer));
-
-            observers.Add(observer);
         }
 
 
@@ -83,10 +81,8 @@ namespace Orleans
         /// This promise will be broken if the observer is not a subscriber.</returns>
         public void Unsubscribe(T observer)
         {
-            if (!observers.Contains(observer))
+            if (!observers.Remove(observer))
                 throw new OrleansException(String.Format("Observer {0} is not subscribed.", observer));
-
-            observers.Remove(observer);
         }
         
         /// <summary>
@@ -105,8 +101,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public void Notify(Action<T> notification)
         {
-            var failed = new List<T>();
-
+            List<T> failed = null;
             foreach (var observer in observers)
             {
                 try
@@ -115,12 +110,20 @@ namespace Orleans
                 }
                 catch (Exception)
                 {
+                    if (failed == null)
+                    {
+                        failed = new List<T>();
+                    }
                     failed.Add(observer);
                 }
             }
-            foreach (var key in failed)
+            if (failed != null)
             {
-                observers.Remove(key);
+                foreach (var key in failed)
+                {
+                    observers.Remove(key);
+                }
+                throw new OrleansException(String.Format("Failed to notify the following observers: {0}", Utils.EnumerableToString(failed)));
             }
         }
     }

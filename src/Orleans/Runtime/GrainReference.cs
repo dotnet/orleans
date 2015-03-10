@@ -82,12 +82,12 @@ namespace Orleans.Runtime
         private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId)
         {
             GrainId = grainId;
-            this.genericArguments = genericArgument;
+            genericArguments = genericArgument;
             SystemTargetSilo = systemTargetSilo;
             this.observerId = observerId;
             if (String.IsNullOrEmpty(genericArgument))
             {
-                this.genericArguments = null; // always keep it null instead of empty.
+                genericArguments = null; // always keep it null instead of empty.
             }
 
             // SystemTarget checks
@@ -97,17 +97,15 @@ namespace Orleans.Runtime
             }
             if (grainId.IsSystemTarget && genericArguments != null)
             {
-                throw new ArgumentException("genericArguments",
-                    String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
             }
             if (grainId.IsSystemTarget && observerId != null)
             {
-                throw new ArgumentException("genericArguments",
-                    String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null observerId {1}.", grainId, observerId));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null observerId {1}.", grainId, observerId), "genericArgument");
             }
             if (!grainId.IsSystemTarget && systemTargetSilo != null)
             {
-                throw new ArgumentException("systemTargetSilo", String.Format("Trying to create a GrainReference for non-SystemTarget grain id {0}, but passing a non-null systemTargetSilo {1}.", grainId, systemTargetSilo));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for non-SystemTarget grain id {0}, but passing a non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "systemTargetSilo");
             }
 
             // ObserverId checks
@@ -117,17 +115,15 @@ namespace Orleans.Runtime
             }
             if (grainId.IsClient && genericArguments != null)
             {
-                throw new ArgumentException("genericArguments",
-                    String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
             }
             if (grainId.IsClient && systemTargetSilo != null)
             {
-                throw new ArgumentException("genericArguments",
-                    String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null systemTargetSilo {1}.", grainId, systemTargetSilo));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "genericArgument");
             }
             if (!grainId.IsClient && observerId != null)
             {
-                throw new ArgumentException("observerId", String.Format("Trying to create a GrainReference with non null Observer {0}, but non Client grain id {1}.", observerId, grainId));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference with non null Observer {0}, but non Client grain id {1}.", observerId, grainId), "observerId");
             }
 
             isUnordered = GetUnordered();

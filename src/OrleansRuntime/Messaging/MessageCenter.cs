@@ -90,18 +90,6 @@ namespace Orleans.Runtime.Messaging
             Gateway = new Gateway(this, gatewayAddress);
         }
 
-        //public void RecordProxiedGrain(GrainId grainId, GrainId clientId)
-        //{
-        //    if (Gateway != null)
-        //        Gateway.RecordProxiedGrain(grainId, clientId);
-        //}
-
-        //public void RecordUnproxiedGrain(GrainId grainId)
-        //{
-        //    if (Gateway != null)
-        //        Gateway.RecordUnproxiedGrain(grainId);
-        //}
-
         public void Start()
         {
             IsBlockingApplicationMessages = false;

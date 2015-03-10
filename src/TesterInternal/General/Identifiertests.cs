@@ -512,7 +512,7 @@ namespace UnitTests.General
             grainRef = GrainReference.FromGrainId(systemTragetGrainId, null, SiloAddress.NewLocalAddress(1));
             TestGrainReference(grainRef);
 
-            GrainId observerGrainId = GrainId.NewClientGrainId();
+            GrainId observerGrainId = GrainId.NewClientId();
             grainRef = GrainReference.NewObserverGrainReference(observerGrainId, GuidId.GetNewGuidId());
             TestGrainReference(grainRef);
         }
