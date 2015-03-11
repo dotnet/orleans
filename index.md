@@ -41,6 +41,8 @@ Orleans is a framework that provides a straightforward approach to building dist
 
 * **[Repository of community add-ons to Orleans](https://github.com/OrleansContrib)**
 
+* **[Orleans Virtual Meetups](https://github.com/OrleansContrib/meetups)**
+
 * **[Ideas for Contributions](Ideas-for-Contributions)**
 
 * **[Student Projects](Student-Projects)**
