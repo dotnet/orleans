@@ -8,6 +8,9 @@
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
     <Liveness LivenessType="AzureTable" />
+    <StorageProviders>
+      <Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="UseDevelopmentStorage=true" />
+    </StorageProviders>
   </Globals>
   <Defaults>
     <!--
