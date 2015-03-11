@@ -47,7 +47,7 @@ Orleans is a framework that provides a straightforward approach to building dist
 
 ## Other Documentation Resources
 
-* **[Orleans Best Practices](https://orleans.codeplex.com/downloads/get/1010231#)** - A collection of tips and trick to help design, build, and run an Orleans-based application.
+* **[Orleans Best Practices](files/Orleans Best Practices.pptx)** - A collection of tips and trick to help design, build, and run an Orleans-based application.
 
 * **[Latest Orleans technical report](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf)**
 

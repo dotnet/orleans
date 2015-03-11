@@ -22,18 +22,18 @@ Steps to to change Orleans Grain Interface project:
 
 1. Do Build->Clean on the project to remove any old binaries.
 2. Remove old v0.9 assembly references for any Orleans binaries.
-``` xml
+```
 <ItemGroup>
-  <Reference Include="Orleans">
-    <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
-    <Private>False</Private>
-  </Reference>
+    <Reference Include="Orleans">
+          <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
+          <Private>False</Private>
+     </Reference>
 </ItemGroup>
 ```
 3. Remove old v0.9 Orleans code-gen metadata and script trigger.
-``` xml
+```
 <PropertyGroup>
-  <OrleansProjectType>Server</OrleansProjectType>
+      <OrleansProjectType>Server</OrleansProjectType>
 </PropertyGroup>
 <Import Project="$(OrleansSDK)\Binaries\OrleansClient\Orleans.SDK.targets" />
 ```

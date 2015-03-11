@@ -15,7 +15,9 @@ There are five ways Orleans deployment can be monitored by an external operator 
 **OrleansSiloStatistics** table - this table includes a much larger number of performance statistics (hundreds of counters) which provide a much more detailed and in-depth view of the internal silo state. This table is currently not recommended for use by external operators. It is mainly for Orleans developers to help them troubleshoot complex production problems, if they occur. The Orleans team is building tools to analyze this data automatically and provide compact recommendations to operators based on it. Such tools can also be built by anyone independently. 
 
 **Watching error codes in MDS** - Orleans automatically writes different error messages into logger. This logger can be configured to output its data to various destinations. For example, the Halo team redirects all logs in production to MDS. They have written custom alerts in MDS to watch for specific error codes and count their occurrences, and alert them when those reach a certain threshold. The list of important error codes to watch is specified here: 
-* [Silo Error Code Monitoring] (https://orleans.codeplex.com/wikipage?title=Silo%20Error%20Code%20Monitoring&referringTitle=Runtime%20Monitoring)
-* [Client Error Code Monitoring] (https://orleans.codeplex.com/wikipage?title=Client%20Error%20Code%20Monitoring&referringTitle=Runtime%20Monitoring)
+
+* [Silo Error Code Monitoring](Silo-Error-Code-Monitoring)
+
+* [Client Error Code Monitoring](Client-Error-Code-Monitoring)
 
 **Windows performance counters** - The Orleans runtime continually updates a number of them. CounterControl.exe helps register the counters, and needs to run with elevated privileges. Obviously, the performance counters can be monitored using any of the standard monitoring tools. 

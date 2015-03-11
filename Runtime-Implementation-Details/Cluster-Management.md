@@ -10,9 +10,9 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 ### The Protocol:
 
-1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage] (http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (ip:port:epoch) as row key (epoch is just time in ticks when this silo started). Thus ip:port:epoch is guaranteed to be unique in a given Orleans deployment.
+1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (ip:port:epoch) as row key (epoch is just time in ticks when this silo started). Thus ip:port:epoch is guaranteed to be unique in a given Orleans deployment.
 
-2. Silos monitor each other directly, via application pings (“are you alive" heartbeats). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing] (http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT] (http://en.wikipedia.org/wiki/Chord_(peer-to-peer)) ).
+2. Silos monitor each other directly, via application pings (“are you alive" heartbeats). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer)) ).
 
 3. If a silo S does not get Y ping replies from a monitored servers P, it suspects it by writing its timestamped suspicion into P’s row in the Azure table.
 
@@ -22,7 +22,7 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 	* Suspicion is written to the Azure table, in a special column in the row corresponding to P. When S suspects P it writes: “at time TTT S suspected P”.
 
-	* One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control based on [Azure Table ETags] (http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
+	* One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
 
         * The suspecting silo S reads the row of P.
 
@@ -44,13 +44,13 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 ### Properties of the membership protocol and FAQ:
 
-10. **Can handle any number of failures ** – our algorithm can handle any number of failures (that is, f<=n), including full cluster restart. This is in contrast with “traditional” [Paxos] (http://en.wikipedia.org/wiki/Paxos_(computer_science)#Number_of_processors) based solutions, which require quorum, which is usually a majority. We have seen in production situations when more than half of the silos were down. Our system stayed functional, while Paxos based membership would not be able to make progress.
+10. **Can handle any number of failures ** – our algorithm can handle any number of failures (that is, f<=n), including full cluster restart. This is in contrast with “traditional” [Paxos](http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, which require quorum, which is usually a majority. We have seen in production situations when more than half of the silos were down. Our system stayed functional, while Paxos based membership would not be able to make progress.
 
 12. **Traffic to the table is very light** - The actual pings go directly between servers and not to the table. This would generate a lot of traffic plus would be less accurate from the failure detection perspective - if a silo could not reach the table, it would miss to write its I am alive heartbeat and others would kill him. 
 
-13. **Tunable accuracy vs. completeness** – [both perfect and accurate failure detection is not possible in general] (http://www.cs.yale.edu/homes/aspnes/pinewiki/FailureDetectors.html). One usually wants an ability to tradeoff accuracy (don’t want to declare a silo that is really alive as dead) with completeness (want to declare dead a silo that is indeed dead as soon as possible). The configurable #votes to declare dead and  #missed pings allows to trade those two.
+13. **Tunable accuracy vs. completeness** – [both perfect and accurate failure detection is not possible in general](http://www.cs.yale.edu/homes/aspnes/pinewiki/FailureDetectors.html). One usually wants an ability to tradeoff accuracy (don’t want to declare a silo that is really alive as dead) with completeness (want to declare dead a silo that is indeed dead as soon as possible). The configurable #votes to declare dead and  #missed pings allows to trade those two.
 
-15. **Scale** - the basic protocol can handle thousands and probably even tens of thousands of servers. This is in contrast with traditional [Paxos] (http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, such as group communication protocols, which are known not to scale beyond tens.
+15. **Scale** - the basic protocol can handle thousands and probably even tens of thousands of servers. This is in contrast with traditional [Paxos](http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, such as group communication protocols, which are known not to scale beyond tens.
 
 16. **Diagnostics** - the table is also very convenient for diagnostics and troubleshooting. System administrator can instantaneously find in the table the current list of alive silos, as well as see the history of all killed silos and suspicions. This is especially useful when diagnosing problems.
 
@@ -70,7 +70,7 @@ The basic membership protocol described above was later extended to support tota
 
 **Protocol:**
 
-1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table] (http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or transactions in SQL server.
+1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or transactions in SQL server.
 
 2. We add a membership-version row to the table that tracks table changes.
 
@@ -97,7 +97,7 @@ The default values were tuned in years of production usage in Azure and we belie
 
 Sample config element:
 
-    <Liveness ProbeTimeout = "5s" TableRefreshTimeout ="10s  DeathVoteExpirationTimeout ="80s" NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" />    
+    <Liveness ProbeTimeout = "5s" TableRefreshTimeout ="10s  DeathVoteExpirationTimeout ="80s" NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" />
 
 
 There are 3 types of liveness implemented. The type of the liveness protocol is configured via the SystemStoreType attribute of the
@@ -157,7 +157,7 @@ Default is 20.
 	
 ### Acknowledgements:
 
-We would to acknowledge the contribution of [Alex Kogan] (https://www.linkedin.com/pub/alex-kogan/4/b52/3a2) to the design and implementation of the first version of this protocol. This work was done as part of summer internship in Microsoft Research in the Summer of 2011.
+We would to acknowledge the contribution of [Alex Kogan](https://www.linkedin.com/pub/alex-kogan/4/b52/3a2) to the design and implementation of the first version of this protocol. This work was done as part of summer internship in Microsoft Research in the Summer of 2011.
 
 
 
