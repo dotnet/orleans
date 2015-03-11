@@ -50,8 +50,11 @@ namespace Orleans.Streams
             var providers = appStreamProviders.GetProviders();
             foreach (IStreamProvider streamProvider in providers)
             {
-                var provider = (IStreamProviderImpl) streamProvider;
-                await provider.Start();   
+                var provider = streamProvider as IStreamProviderImpl;
+                if (provider != null)
+                {
+                    await provider.Start();   
+                }
             }
         }
 
