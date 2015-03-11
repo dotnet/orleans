@@ -60,6 +60,6 @@ The goal of this project was to analyze prior art on this topic, propose a solut
 
       c. Ways to help individual developers perform real-time debugging of run-time issues with their applications.
 
-     This project was performed successfully and result in a published paper [PAD: Performance Anomaly Detection in Multi-Server Distributed Systems] (http://research.microsoft.com/apps/pubs/?id=217109) and a proof of concept implementation of a distributed log analysis tool.
+     This project was performed successfully and result in a published paper [PAD: Performance Anomaly Detection in Multi-Server Distributed Systems](http://research.microsoft.com/apps/pubs/?id=217109) and a proof of concept implementation of a distributed log analysis tool.
 
-2. **Horton - Distributed Graph Database**. Horton was a research project with a goal to build a system to store, manage and query large-scale distributed graphs. It was implemented entirely as an Orleans application. The project resulted in a number of [publications] (http://research.microsoft.com/en-us/projects/ldg/) and a number of very successful student projects.
+2. **Horton - Distributed Graph Database**. Horton was a research project with a goal to build a system to store, manage and query large-scale distributed graphs. It was implemented entirely as an Orleans application. The project resulted in a number of [publications](http://research.microsoft.com/en-us/projects/ldg/) and a number of very successful student projects.
