@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Orleans: Thinking Big and Small
+title: Orleans - Thinking Big and Small
 ---
 {% include JB/setup %}
 
