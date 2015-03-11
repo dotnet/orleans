@@ -77,8 +77,9 @@ namespace Orleans.Runtime
         private IDisposable gcTimer;
         private readonly GlobalConfiguration config;
         private readonly string localSiloName;
-                private readonly CounterStatistic activationsCreated;
+        private readonly CounterStatistic activationsCreated;
         private readonly CounterStatistic acticationDestroyed;
+        private readonly CounterStatistic acticationFailedToActivate;
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
 
@@ -113,6 +114,7 @@ namespace Orleans.Runtime
             IntValueStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COUNT, () => activations.Count);
             activationsCreated = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CREATED);
             acticationDestroyed = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DESTROYED);
+            acticationFailedToActivate = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
             collectionCounter = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
             inProcessRequests = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, () =>
             {
@@ -971,6 +973,8 @@ namespace Orleans.Runtime
                     string.Format("Error calling grain's AsyncActivate method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
 
                 activation.SetState(ActivationState.Invalid); // Mark this activation as unusable
+
+                acticationFailedToActivate.Increment();
 
                 throw;
             }
