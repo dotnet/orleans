@@ -194,22 +194,29 @@ namespace Orleans.Runtime.Configuration
     public class ProviderCategoryConfiguration
     {
         public string Name { get; set; }
-
         public IDictionary<string, IProviderConfiguration> Providers { get; set; }
 
         // Load from an element with the format <NameProviders>...</NameProviders>
         // that contains a sequence of Provider elements (see the ProviderConfiguration type)
         internal void Load(XmlElement child)
         {
-            if (!child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
-                throw new FormatException("Providers node name is not correct at element " + child.LocalName);
-
             Name = child.LocalName.Substring(0, child.LocalName.Length - 9);
-
             Providers = new Dictionary<string, IProviderConfiguration>();
+
             var nsManager = new XmlNamespaceManager(new NameTable());
             nsManager.AddNamespace("orleans", "urn:orleans");
-            ProviderConfiguration.LoadProviderConfigurations(child, nsManager, Providers, c => Providers.Add(c.Name, c));
+
+            ProviderConfiguration.LoadProviderConfigurations(
+                child, nsManager, Providers, 
+                c => Providers.Add(c.Name, c));
+        }
+
+        internal void Merge(ProviderCategoryConfiguration other)
+        {
+            foreach (var provider in other.Providers)
+            {
+                Providers.Add(provider);
+            }
         }
 
         internal void SetConfiguration(string key, string val)

@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -29,6 +29,7 @@ using System.Text;
 using System.Net;
 using System.Xml;
 using Orleans.AzureUtils;
+﻿using Orleans.Providers;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -670,12 +671,88 @@ namespace Orleans.Runtime.Configuration
                         {
                             var providerConfig = new ProviderCategoryConfiguration();
                             providerConfig.Load(child);
-                            ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+
+                            if (ProviderConfigurations.ContainsKey(providerConfig.Name))
+                            {
+                                var existingProviderConfig = ProviderConfigurations[providerConfig.Name];
+                                existingProviderConfig.Merge(providerConfig);
+                            }
+                            else
+                            {
+                                ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                            }
                         }
                         break;
                 }
             }
         }
+
+        /// <summary>
+        /// Registers given type of <typeparamref name="T"/> where <typeparamref name="T"/> is bootstrap provider
+        /// </summary>
+        /// <typeparam name="T">
+        ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
+        /// </typeparam>
+        /// <param name="name">
+        ///     Name of bootstrap provider
+        /// </param>
+        /// <param name="properties">
+        ///     Properties that will be passed to bootstrap provider upon initialization
+        /// </param>
+        public void RegisterBootstrapProvider<T>(string name, IDictionary<string, string> properties = null)
+        {
+            RegisterBootstrapProvider(typeof(T), name, properties);
+        }
+
+        /// <summary>
+        /// Registers given type as bootstrap provider
+        /// </summary>
+        /// <param name="type">
+        ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
+        /// </param>
+        /// <param name="name">
+        ///     Name of bootstrap provider
+        /// </param>
+        /// <param name="properties">
+        ///     Properties that will be passed to bootstrap provider upon initialization
+        /// </param>
+        public void RegisterBootstrapProvider(Type type, string name, IDictionary<string, string> properties = null) 
+        {
+            if (type == null)
+                throw new ArgumentNullException("type");
+
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentException("Bootstrap provider name cannot be null or empty string", "name");
+
+            if (type.IsAbstract ||
+                type.IsGenericType ||
+                !typeof(IBootstrapProvider).IsAssignableFrom(type))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "type");
+
+            const string bootstrapCategoryKey = "Bootstrap";
+
+            ProviderCategoryConfiguration category;
+            ProviderConfigurations.TryGetValue(bootstrapCategoryKey, out category);
+            if (category == null)
+            {
+                category = new ProviderCategoryConfiguration()
+                {
+                    Name = bootstrapCategoryKey,
+                    Providers = new Dictionary<string, IProviderConfiguration>()
+                };
+                ProviderConfigurations.Add(category.Name, category);
+            }
+
+            if (category.Providers.ContainsKey(name))
+                throw new InvalidOperationException(
+                    string.Format("Bootstrap provider with name '{0}' has been already registered", name));
+
+            var config = new ProviderConfiguration(
+                properties ?? new Dictionary<string, string>(), 
+                type.FullName, name);
+
+            category.Providers.Add(config.Name, config);
+        } 
 
         internal static void AdjustConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string deploymentId)
         {
