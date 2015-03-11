@@ -16,16 +16,18 @@ The Orleans Team often uses the phrase “Activation Garbage Collection” but t
 * Memory-per-grain
 * Available memory
 
- in order to set the age-out limits.
+in order to set the age-out limits.
 
 ## How Activation-GC Works
 The most common approach is to configure the silo to periodically scan for activations that have not been used at all for some period of time (CollectionAgeLimit). The silo then proactively ages-out those non-active activations by calling the grain’s Deactivate method and remove them from the silo memory. 
 
 **What counts as “being active” for the purpose of grain activation collection**
+
 * receiving a call 
 * receiving a reminder
 
 **What does NOT count as “being active” for the purpose of grain activation collection**
+
 * performing a call (to another grain or to an Orleans client)
 * timer events 
 * arbitrary IO operations or external calls not involving Orleans framework

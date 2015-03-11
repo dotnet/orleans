@@ -10,4 +10,5 @@ Orleans can be used in a variety of configurations that fit different usage scen
 
  Orleans is a framework for building and running high scale services. A typical deployment of an Orleans application spans a cluster of servers. The instances of the Orleans runtime, called silos, running on each of the servers need to be configured to connect to each other. In addition to that, there is always a client component that connects to the Orleans deployment, most typically a web frontend, that needs to be configured to connect to the silos. The [Server Configuration](Server-Configuration) and [Client Configuration](Client-Configuration) sections of the guide cover those aspects, respectively. The section on [Typical Configurations](Typical-Configurations) provides a summary of a few common configurations.
 
-**Important**: Make sure you properly configure .NET Garbage Collection as detailed in [Configuring .NET Garbage Collection](Configuring-.NET-Garbage-Collection).
+**Important**: Make sure you properly configure .NET Garbage Collection as detailed in [Configuring .NET Garbage Collection](http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-.NET-Garbage-Collection).
+
