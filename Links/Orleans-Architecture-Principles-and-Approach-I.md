@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Orleans Architecture: Principles and Approach I
+title: Orleans Architecture - Principles and Approach I
 ---
 {% include JB/setup %}
 
