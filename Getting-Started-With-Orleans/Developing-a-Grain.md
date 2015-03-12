@@ -34,7 +34,7 @@ A grain type is defined by an interface that inherits from the IGrain marker int
 
 After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate client proxy and factory classes corresponding to the user-defined grain interfaces, and to merge this additional code back into the interface DLL. The code generation tool, ClientGenerator.exe, can also be invoked directly as a part of post-build processing. However this should be used with caution and is generally not recommended.
 
- The most important class in the generated proxy code is the grain factory class, which is named after the grain interface by stripping off the initial “I” and appending “Factory”. For instance, if your grain interface is IPlayerGrain, then your grain factory class will be called IPlayerGrainFactory. The namespace for this factory class is the same as that of the grain interface.
+ The most important class in the generated proxy code is the grain factory class, which is named after the grain interface by stripping off the initial “I” and appending “Factory”. For instance, if your grain interface is IPlayerGrain, then your grain factory class will be called PlayerGrainFactory. The namespace for this factory class is the same as that of the grain interface.
 
 ## The Implementation Class
 
