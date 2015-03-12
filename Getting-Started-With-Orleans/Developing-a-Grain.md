@@ -155,7 +155,7 @@ Grain state will automatically be READ when the grain is activated, but grains a
 
  During any grain method or timer callback handler in the grain, the grain can request the Orleans runtime to REREAD the current grain state data for that activation from the designated storage provider by calling IGrainState.ReadStateAsync. This will completely overwrite any current state data currently stored in the grain state object with the latest values read from persistent store. 
 
- An opaque provider-specific “Etag” value (String) MAY be set by a storage provider as part of the grain state metadata populated when state was read. Some providers MAY choose to leave this as Null if they do not use Etag’s. 
+ An opaque provider-specific “Etag” value (String) MAY be set by a storage provider as part of the grain state metadata populated when state was read. Some providers MAY choose to leave this as Null if they do not use Etags. 
 
  Conceptually, the Orleans Runtime will take a DEEP COPY of the grain state data object for its own use during any WRITE operations. Under the covers, the runtime MAY use optimization rules and heuristics to avoid performing some or all of the deep copy in some circumstances, provided that the expected logical isolation semantics are preserved. 
 
