@@ -78,8 +78,8 @@ namespace Orleans.Runtime
         private readonly GlobalConfiguration config;
         private readonly string localSiloName;
         private readonly CounterStatistic activationsCreated;
-        private readonly CounterStatistic acticationsDestroyed;
-        private readonly CounterStatistic acticationsFailedToActivate;
+        private readonly CounterStatistic activationsDestroyed;
+        private readonly CounterStatistic activationsFailedToActivate;
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
 
@@ -113,8 +113,8 @@ namespace Orleans.Runtime
             config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);
             IntValueStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COUNT, () => activations.Count);
             activationsCreated = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CREATED);
-            acticationsDestroyed = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DESTROYED);
-            acticationsFailedToActivate = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
+            activationsDestroyed = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DESTROYED);
+            activationsFailedToActivate = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
             collectionCounter = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
             inProcessRequests = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, () =>
             {
@@ -265,7 +265,7 @@ namespace Orleans.Runtime
 
             // this should be removed once we've refactored the deactivation code path. For now safe to keep.
             ActivationCollector.TryCancelCollection(activation);
-            acticationsDestroyed.Increment();
+            activationsDestroyed.Increment();
 
             scheduler.UnregisterWorkContext(new SchedulingContext(activation));
 
@@ -974,7 +974,7 @@ namespace Orleans.Runtime
 
                 activation.SetState(ActivationState.Invalid); // Mark this activation as unusable
 
-                acticationsFailedToActivate.Increment();
+                activationsFailedToActivate.Increment();
 
                 throw;
             }
