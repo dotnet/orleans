@@ -6,7 +6,7 @@ title: Asynchrony and Tasks
 
 ## Asynchrony
 
-Grains interact by invoking asynchronous method calls. Asynchronous methods are built on top the Task Parallel Library and return either a Task (for void methods) or a Task<T> (for methods returning values of type T and properties of type T).
+Grains interact by invoking asynchronous method calls. Asynchronous methods are built on top the Task Parallel Library and return either a Task (for void methods) or a Task&lt;T&gt; (for methods returning values of type T and properties of type T).
 
 The primary way of using a Task is to wait for its completion with the await keyword of C# 5.0 (.NET 4.5).
 
