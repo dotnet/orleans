@@ -74,6 +74,7 @@ A grain type is materialized by a class that implements the grain type’s inter
 This section provides details on the Orleans runtime mechanisms available to support “Grain Persistence”.
 
 Goals:
+
 1. Allow different grain types to use different types of storage providers (e.g., one uses Azure table, and one uses SQL Azure) or the same type of storage provider but with different configurations (e.g., both use Azure table, but one uses storage account #1 and one uses storage account #2) 
 2. Allow configuration of a storage provider instance to be swapped (e.g., Dev-Test-Prod) with just config file changes, and no code changes required. 
 3. Provide a framework to allow additional storage providers to be written later, either by the Orleans team or others. 
