@@ -40,7 +40,7 @@ After the grain interface has been defined, building the project originally crea
 
 A grain type is materialized by a class that implements the grain type’s interface and inherits directly or indirectly from Orleans.Grain. 
 
- The PlayerGrain grain class implements IPlayerGrain interface. 
+ The PlayerGrain grain class implements the IPlayerGrain interface. 
 
     public class PlayerGrain : Grain, IPlayerGrain 
     { 
