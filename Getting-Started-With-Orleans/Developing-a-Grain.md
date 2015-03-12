@@ -12,7 +12,7 @@ In this section we walk through the steps involved in defining and using a new P
 
  A grain cannot be explicitly created or deleted. It always exists “virtually” and is activated automatically when a request is sent to it. A grain has either a GUID or a long integer key within the grain type. Application code creates a reference to a grain by calling the GetGrain(Guid id) or GetGrain(long id) static factory methods for a specific grain identity. GetGrain() call is a purely local operation to create a grain reference. It does not trigger creation of a grain activation and has not impact on its lifecycle. A grain activation is automatically created by the Orleans runtime upon a first request sent to the grain.
 
- A grain interface must inherit from IGrain. The GUID or long integer key of a grain can later be retrieved via the IGrain.GetPrimaryKey()IGrain.GetPrimaryKeyLong() extension methods respectively.
+ A grain interface must inherit from IGrain. The GUID or long integer key of a grain can later be retrieved via the IGrain.GetPrimaryKey() or IGrain.GetPrimaryKeyLong() extension methods respectively.
 
 ## Defining the Grain Interface
 
