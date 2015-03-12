@@ -18,7 +18,7 @@ In this section we walk through the steps involved in defining and using a new P
 
 A grain type is defined by an interface that inherits from the IGrain marker interface.
 
- All of the methods in the grain interface must return a Task or a Task<T> for .NET 4.5. The underlying type T for value Task must be serializable.
+ All of the methods in the grain interface must return a Task or a Task&lt;T&gt; for .NET 4.5. The underlying type T for value Task must be serializable.
 
  Example:
 
