@@ -86,14 +86,14 @@ Goals:
 Grain types can be declared in one of two ways:
 
 * Extend Grain if they do not have any persistent state, or if they will handle all persistent state themselves, or 
-* Extend Grain<T> if they have some persistent state that they want the Orleans runtime to handle. 
-Stated another way, by extending Grain<T> a grain type is automatically opted-in to the Orleans system managed persistence framework.
+* Extend Grain&lt;T&gt; if they have some persistent state that they want the Orleans runtime to handle. 
+Stated another way, by extending Grain&lt;T&gt; a grain type is automatically opted-in to the Orleans system managed persistence framework.
 
- For the remainder of this section, we will only be considering Option #2 / Grain<T> because Option #1 grains will continue to run as now without any behavior changes.
+ For the remainder of this section, we will only be considering Option #2 / Grain&lt;T&gt; because Option #1 grains will continue to run as now without any behavior changes.
 
 ## Grain State Stores
 
-Grain classes that inherit from Grain<T> (where T is an application-specific state data type derived from IGrainState) will have their state loaded automatically from a specified storage. 
+Grain classes that inherit from Grain&lt;T&gt; (where T is an application-specific state data type derived from IGrainState) will have their state loaded automatically from a specified storage. 
 
  Grains will be marked with a [Storage] attribute that specifies a named instance of a storage provider to use for reading / writing the state data for this grain. 
 
@@ -117,7 +117,7 @@ Grain classes that inherit from Grain<T> (where T is an application-specific sta
 
  Note: storage provider Type= "Orleans.Storage.AzureTableStorage" and "Orleans.Storage.DevStorage" are two standard storage providers built in to the Orleans runtime.
 
- If there is no [Storage] attribute specified for a Grain<T> grain class, then a provider named “Default” will be searched for instead. If not found then this is treated as a missing storage provider.
+ If there is no [Storage] attribute specified for a Grain&lt;T&gt; grain class, then a provider named “Default” will be searched for instead. If not found then this is treated as a missing storage provider.
 
  If there is only one provider in the silo config file, it will be considered to be the “Default” provider for this silo.
 
