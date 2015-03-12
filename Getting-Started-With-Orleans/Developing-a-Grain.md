@@ -84,6 +84,7 @@ Goals:
 ## Grain Persistence API
 
 Grain types can be declared in one of two ways:
+
 * Extend Grain if they do not have any persistent state, or if they will handle all persistent state themselves, or 
 * Extend Grain<T> if they have some persistent state that they want the Orleans runtime to handle. 
 Stated another way, by extending Grain<T> a grain type is automatically opted-in to the Orleans system managed persistence framework.
