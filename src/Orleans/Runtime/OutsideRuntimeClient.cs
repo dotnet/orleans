@@ -373,7 +373,7 @@ namespace Orleans
             {                
                 logger.Error(
                     ErrorCode.ProxyClient_OGC_TargetNotFound_2,
-                    String.Format("Did not find TargetObserverId header in the message = {1}. A request message to a client is expected to have an observerId.", message));
+                    String.Format("Did not find TargetObserverId header in the message = {0}. A request message to a client is expected to have an observerId.", message));
                 return;
             }
 
@@ -628,6 +628,11 @@ namespace Orleans
                 {
                     message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, target.SystemTargetSilo);
                 }
+            }
+            // Client sending messages to another client (observer). Yes, we support that.
+            if (target.IsObserverReference)
+            {
+                message.TargetObserverId = target.ObserverId;
             }
             
             if (debugContext != null)
