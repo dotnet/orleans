@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,22 +21,22 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace TestGrainInterfaces
 {
-    public interface IStreamProvider
+    public interface IMultipleSubscriptionConsumerGrain : IGrain
     {
-        /// <summary>Name of the stream provider.</summary>
-        string Name { get; }
+        Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
-        IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace);
+        Task StopConsuming(StreamSubscriptionHandle<int> handle);
 
-        /// <summary>
-        /// Determines whether this is a rewindable provider - supports creating rewindable streams 
-        /// (streams that allow subscribing from previous point in time).
-        /// </summary>
-        /// <returns>True if this is a rewindable provider, false otherwise.</returns>
-        bool IsRewindable { get; }
+        Task<Dictionary<StreamSubscriptionHandle<int>, int>> GetNumberConsumed();
+
+        Task ClearNumberConsumed();
     }
 }

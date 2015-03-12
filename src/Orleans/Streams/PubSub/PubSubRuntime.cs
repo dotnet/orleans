@@ -43,16 +43,16 @@ namespace Orleans.Streams
             return streamRendezvous.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.RegisterConsumer(streamId, streamConsumer, token, filter);
+            return streamRendezvous.RegisterConsumer(subscriptionId, streamId, streamConsumer, token, filter);
         }
 
-        public Task UnregisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer)
+        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.UnregisterConsumer(streamId, streamConsumer);
+            return streamRendezvous.UnregisterConsumer(subscriptionId, streamId);
         }
 
         public Task<int> ProducerCount(Guid guidId, string streamProvider, string streamNamespace)
@@ -78,6 +78,12 @@ namespace Orleans.Streams
                 new Type[] { typeof(Guid), typeof(string) },
                 new object[] { streamId.Guid, streamId.ProviderName + "_" + streamId.Namespace });
         }
+
+        public GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId)
+        {
+            return GuidId.GetNewGuidId();
+        }
+
     }
     
     internal class StreamPubSubImpl : IStreamPubSub
@@ -110,7 +116,8 @@ namespace Orleans.Streams
             foreach (var consumer in implicitSet)
             {
                 // we ignore duplicate entries-- there's no way a programmer could prevent the duplicate entry from being added if we threw an exception to communicate the problem. 
-                result.Add(new PubSubSubscriptionState(streamId, consumer, null, null));
+                GuidId subscriptionId = GuidId.GetGuidId(GrainExtensions.GetGrainId(consumer).GetPrimaryKey());
+                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, consumer, null, null));
             }
             return result;
         }
@@ -121,16 +128,18 @@ namespace Orleans.Streams
                 explicitPubSub.UnregisterProducer(streamId, streamProvider, streamProducer);
         }
 
-        public Task RegisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
-            return IsImplicitSubscriber(streamConsumer, streamId) ? TaskDone.Done : 
-                explicitPubSub.RegisterConsumer(streamId, streamProvider, streamConsumer, token, filter);
+            return IsImplicitSubscriber(streamConsumer, streamId)
+                ? TaskDone.Done
+                : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamProvider, streamConsumer, token, filter);
         }
 
-        public Task UnregisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer)
+        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
         {
-            return IsImplicitSubscriber(streamConsumer, streamId) ? TaskDone.Done : 
-                explicitPubSub.UnregisterConsumer(streamId, streamProvider, streamConsumer);
+            return IsImplicitSubscriber(subscriptionId, streamId)
+                ? TaskDone.Done
+                : explicitPubSub.UnregisterConsumer(subscriptionId, streamId, streamProvider);
         }
 
         public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)
@@ -146,6 +155,21 @@ namespace Orleans.Streams
         private bool IsImplicitSubscriber(IAddressable addressable, StreamId streamId)
         {
             return implicitPubSub.IsImplicitSubscriber(GrainExtensions.GetGrainId(addressable), streamId);
+        }
+        private bool IsImplicitSubscriber(GuidId subscriptionId, StreamId streamId)
+        {
+            return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId);
+        }
+
+        public GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId)
+        {
+            GrainId grainId = GrainExtensions.GetGrainId(requesterAddress);
+            // If there is an implicit subscription setup for the provided grain on this provided stream, subscription should match the stream Id.
+            // If there is no implicit subscription setup, generate new random unique subscriptionId.
+            // TODO: Replace subscription id with statically generated subscriptionId instead of getting it from the streamId.
+            return implicitPubSub.IsImplicitSubscriber(grainId, streamId)
+                ? GuidId.GetGuidId(grainId.GetPrimaryKey())
+                : GuidId.GetNewGuidId();
         }
     }
 }

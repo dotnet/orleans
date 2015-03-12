@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿using System;
+﻿using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -44,5 +45,11 @@ namespace Orleans.Streams
         public abstract bool Equals(StreamSubscriptionHandle<T> other);
 
         #endregion
+    }
+
+    [Serializable]
+    internal abstract class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>
+    {
+        public abstract GuidId SubscriptionId { get; }
     }
 }

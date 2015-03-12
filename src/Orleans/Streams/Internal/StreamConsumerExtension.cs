@@ -23,7 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Threading.Tasks;
+﻿using System.Linq;
+﻿using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -50,22 +51,22 @@ namespace Orleans.Streams
         [Serializable]
         private class ObserversCollection<T> : IStreamObservers
         {
-            private readonly ConcurrentDictionary<Guid, ObserverWrapper<T>> localObservers;
+            private readonly ConcurrentDictionary<GuidId, ObserverWrapper<T>> localObservers;
 
             internal ObserversCollection()
             {
-                localObservers = new ConcurrentDictionary<Guid, ObserverWrapper<T>>();
+                localObservers = new ConcurrentDictionary<GuidId, ObserverWrapper<T>>();
             }
 
             internal void AddObserver(ObserverWrapper<T> observer)
             {
-                localObservers.TryAdd(observer.ObserverGuid, observer);
+                localObservers.TryAdd(observer.SubscriptionId, observer);
             }
 
             internal void RemoveObserver(ObserverWrapper<T> observer)
             {
                 ObserverWrapper<T> ignore;
-                localObservers.TryRemove(observer.ObserverGuid, out ignore);
+                localObservers.TryRemove(observer.SubscriptionId, out ignore);
             }
 
             internal bool IsEmpty
@@ -99,9 +100,9 @@ namespace Orleans.Streams
                     await DeliverItem(itemTuple.Item1, itemTuple.Item2);
             }
 
-            internal int Count
+            internal int GetObserverCountForStream(StreamId streamId)
             {
-                get { return localObservers.Count; }
+                return localObservers.Values.Count(o => o.StreamId.Equals(streamId));
             }
 
             public async Task CompleteStream()
@@ -118,18 +119,18 @@ namespace Orleans.Streams
         }
 
         private readonly IStreamProviderRuntime providerRuntime;
-        private readonly ConcurrentDictionary<StreamId, IStreamObservers> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
+        private readonly ConcurrentDictionary<GuidId, IStreamObservers> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
         private readonly Logger logger;
 
 
         internal StreamConsumerExtension(IStreamProviderRuntime providerRt)
         {
             providerRuntime = providerRt;
-            allStreamObservers = new ConcurrentDictionary<StreamId, IStreamObservers>();
+            allStreamObservers = new ConcurrentDictionary<GuidId, IStreamObservers>();
             logger = providerRuntime.GetLogger(this.GetType().Name);
         }
 
-        internal StreamSubscriptionHandle<T> AddObserver<T>(StreamImpl<T> stream, IAsyncObserver<T> observer, IStreamFilterPredicateWrapper filter)
+        internal StreamSubscriptionHandle<T> AddObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, IStreamFilterPredicateWrapper filter)
         {
             if (null == stream) throw new ArgumentNullException("stream");
             if (null == observer) throw new ArgumentNullException("observer");
@@ -139,8 +140,8 @@ namespace Orleans.Streams
                 if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                IStreamObservers obs = allStreamObservers.GetOrAdd(stream.StreamId, new ObserversCollection<T>());
-                var wrapper = new ObserverWrapper<T>(observer, stream, filter);
+                IStreamObservers obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>());
+                var wrapper = new ObserverWrapper<T>(subscriptionId, observer, stream, filter);
                 ((ObserversCollection<T>)obs).AddObserver(wrapper);
                 return wrapper;
             }
@@ -157,7 +158,7 @@ namespace Orleans.Streams
             var observerWrapper = (ObserverWrapper<T>)handle;
             IStreamObservers obs;
             // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-            if (!allStreamObservers.TryGetValue(observerWrapper.StreamId, out obs)) return true;
+            if (!allStreamObservers.TryGetValue(observerWrapper.SubscriptionId, out obs)) return true;
 
             var observersCollection = (ObserversCollection<T>)obs;
             observersCollection.RemoveObserver(observerWrapper);
@@ -165,67 +166,67 @@ namespace Orleans.Streams
             if (!observersCollection.IsEmpty) return false;
 
             IStreamObservers ignore;
-            allStreamObservers.TryRemove(observerWrapper.StreamId, out ignore);
+            allStreamObservers.TryRemove(observerWrapper.SubscriptionId, out ignore);
             // if we don't have any more subsribed streams, unsubscribe the extension.
             return true;
         }
 
-        public Task DeliverItem(StreamId streamId, Immutable<object> item, StreamSequenceToken token)
+        public Task DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token)
         {
-            if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for stream {1}", item.Value, streamId);
+            if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for subscription {1}", item.Value, subscriptionId);
 
             IStreamObservers observers;
-            if (allStreamObservers.TryGetValue(streamId, out observers))
+            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
                 return observers.DeliverItem(item.Value, token);
-           
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for stream {1}, but I don't have any subscriber for that stream. Dropping on the floor.", 
-                providerRuntime.ExecutingEntityIdentity(), streamId);
+
+            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
         }
 
-        public Task DeliverBatch(StreamId streamId, Immutable<IBatchContainer> batch)
+        public Task DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch)
         {
-            if (logger.IsVerbose3) logger.Verbose3("DeliverBatch {0} for stream {1}", batch.Value, streamId);
+            if (logger.IsVerbose3) logger.Verbose3("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
             IStreamObservers observers;
-            
-            if (allStreamObservers.TryGetValue(streamId, out observers))
+
+            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
                 return observers.DeliverBatch(batch.Value);
-            
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for stream {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), streamId);
+
+            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
         }
 
-        public Task CompleteStream(StreamId streamId)
+        public Task CompleteStream(GuidId subscriptionId)
         {
-            if (logger.IsVerbose3) logger.Verbose3("CompleteStream for stream {0}", streamId);
+            if (logger.IsVerbose3) logger.Verbose3("CompleteStream for subscription {0}", subscriptionId);
 
             IStreamObservers observers;
-            if (allStreamObservers.TryGetValue(streamId, out observers))
+            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
                 return observers.CompleteStream();
-            
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got a Complete for stream {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), streamId);
+
+            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got a Complete for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
         }
 
-        public Task ErrorInStream(StreamId streamId, Exception exc)
+        public Task ErrorInStream(GuidId subscriptionId, Exception exc)
         {
-            if (logger.IsVerbose3) logger.Verbose3("ErrorInStream {0} for stream {1}", exc, streamId);
+            if (logger.IsVerbose3) logger.Verbose3("ErrorInStream {0} for subscription {1}", exc, subscriptionId);
 
             IStreamObservers observers;
-            if (allStreamObservers.TryGetValue(streamId, out observers))
+            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
                 return observers.ErrorInStream(exc);
-            
-            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an Error for stream {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), streamId);
+
+            logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an Error for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
+                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
@@ -233,33 +234,38 @@ namespace Orleans.Streams
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)
         {
-            return ((ObserversCollection<T>) allStreamObservers[streamId]).Count;
+            return allStreamObservers.Values
+                                     .OfType<ObserversCollection<T>>()
+                                     .Aggregate(0, (count,o) => count + o.GetObserverCountForStream(streamId));
         }
-
-
 
         /// <summary>
         /// Wraps a single application observer object, mainly to add Dispose fuctionality.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         [Serializable]
-        internal class ObserverWrapper<T> : StreamSubscriptionHandle<T>, IAsyncObserver<T>, IStreamFilterPredicateWrapper
+        internal class ObserverWrapper<T> : StreamSubscriptionHandleImpl<T>, IAsyncObserver<T>, IStreamFilterPredicateWrapper
         {
             [NonSerialized]
             private IAsyncObserver<T> observer;
             private readonly StreamImpl<T> streamImpl;
-            internal readonly Guid ObserverGuid;
+            private readonly GuidId subscriptionId;
             private readonly IStreamFilterPredicateWrapper filterWrapper;
 
             internal StreamId StreamId { get { return streamImpl.StreamId; } }
             public object FilterData { get { return filterWrapper != null ? filterWrapper.FilterData : null; } }
             public override IAsyncStream<T> Stream { get { return streamImpl; } }
 
-            public ObserverWrapper(IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper)
+            public override GuidId SubscriptionId
+            {
+                get { return subscriptionId; }
+            }
+
+            public ObserverWrapper(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper)
             {
                 this.observer = observer;
                 streamImpl = stream;
-                ObserverGuid = Guid.NewGuid();
+                this.subscriptionId = subscriptionId;
                 this.filterWrapper = filterWrapper;
             }
 
@@ -306,24 +312,24 @@ namespace Orleans.Streams
             public override bool Equals(StreamSubscriptionHandle<T> other)
             {
                 var o = other as ObserverWrapper<T>;
-                return o != null && ObserverGuid == o.ObserverGuid;
+                return o != null && subscriptionId.Equals(o.subscriptionId);
             }
 
             #endregion
 
             public override bool Equals(object obj)
             {
-                return Equals(obj as ObserverWrapper<T>);
+                return Equals(obj as StreamSubscriptionHandle<T>);
             }
 
             public override int GetHashCode()
             {
-                return ObserverGuid.GetHashCode();
+                return subscriptionId.GetHashCode();
             }
 
             public override string ToString()
             {
-                return String.Format("StreamSubscriptionHandle:Stream={0},ObserverId={1}", Stream, ObserverGuid);
+                return String.Format("StreamSubscriptionHandle:Stream={0},Subscription={1}", Stream, subscriptionId);
             }
         }
     }

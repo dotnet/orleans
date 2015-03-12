@@ -39,7 +39,6 @@ namespace Orleans.Streams
         private readonly IStreamPubSub              pubSub;
         private StreamConsumerExtension             myExtension;
         private IStreamConsumerExtension            myGrainReference;
-        private bool                                connectedToRendezvous;
         [NonSerialized]
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
@@ -59,7 +58,6 @@ namespace Orleans.Streams
             IsRewindable = isRewindable;
             myExtension = null;
             myGrainReference = null;
-            connectedToRendezvous = false;
             bindExtLock = new AsyncLock();
         }
 
@@ -83,21 +81,13 @@ namespace Orleans.Streams
             if (filterFunc != null)
                 filterWrapper = new FilterPredicateWrapperData(filterData, filterFunc);
             
-            if (!connectedToRendezvous)
-            {
-                if (logger.IsVerbose) logger.Verbose("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
-                    pubSub, myGrainReference, token);
+            if (logger.IsVerbose) logger.Verbose("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
+                pubSub, myGrainReference, token);
 
-                await pubSub.RegisterConsumer(stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
-                connectedToRendezvous = true;
-            }
-            else if (filterWrapper != null)
-            {
-                // Already connected and registered this grain, but also need to register this additional filter too. 
-                await pubSub.RegisterConsumer(stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
-            }
-                
-            return myExtension.AddObserver(stream, observer, filterWrapper);
+            GuidId subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId);
+            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
+
+            return myExtension.AddObserver(subscriptionId, stream, observer, filterWrapper);
         }
 
         public async Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
@@ -108,17 +98,11 @@ namespace Orleans.Streams
             bool shouldUnsubscribe = myExtension.RemoveObserver(handle);
             if (!shouldUnsubscribe) return;
 
-            try
-            {
-                if (logger.IsVerbose) logger.Verbose("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
-                    pubSub, myGrainReference);
+            if (logger.IsVerbose) logger.Verbose("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
+                pubSub, myGrainReference);
 
-                await pubSub.UnregisterConsumer(stream.StreamId, streamProviderName, myGrainReference);
-            }
-            finally
-            {
-                connectedToRendezvous = false;
-            }
+            var handleImpl = (StreamSubscriptionHandleImpl<T>) handle;
+            await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
         }
 
         public Task UnsubscribeAllAsync()

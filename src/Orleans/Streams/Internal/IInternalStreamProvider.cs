@@ -1,9 +1,5 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
  
 MIT License
 
@@ -21,22 +17,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
-
 namespace Orleans.Streams
 {
-    public interface IStreamProvider
+    internal interface IInternalStreamProvider : IStreamProviderImpl
     {
-        /// <summary>Name of the stream provider.</summary>
-        string Name { get; }
-
-        IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace);
-
-        /// <summary>
-        /// Determines whether this is a rewindable provider - supports creating rewindable streams 
-        /// (streams that allow subscribing from previous point in time).
-        /// </summary>
-        /// <returns>True if this is a rewindable provider, false otherwise.</returns>
-        bool IsRewindable { get; }
+        IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId);
+        IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId);
     }
 }
