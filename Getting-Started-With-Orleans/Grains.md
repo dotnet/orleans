@@ -16,7 +16,7 @@ Grains are building blocks of an Orleans application. Grains are the atomic unit
 
 ## Grain Interfaces
 
-Grains interact with each other by invoking methods declared as part of the respective grain interfaces. A grain implements one or more previously declared grain interfaces. All methods of a grain interface are required to be asynchronous. That is, their return types have to be Tasks (see Asynchrony and Tasks for more details). 
+Grains interact with each other by invoking methods declared as part of the respective grain interfaces. A grain implements one or more previously declared grain interfaces. All methods of a grain interface are required to be asynchronous. That is, their return types have to be `Task`s (see Asynchrony and Tasks for more details). 
 
 Example:
 
@@ -32,4 +32,4 @@ Example:
 
 ## Grain Reference
 
-A grain reference is a logical endpoint that allows other grains, as well as non-grain client code, to invoke methods and properties of a particular grain interface implemented by a grain. A grain reference is a proxy object that implements the corresponding grain interface. A grain reference can be constructed by passing the identity of the grain to the GetGrain() method of the factory class auto-generated at compile time for the corresponding grain interface, or receiving the return value of a method or property. A grain reference can be passed as an argument to a method call.
+A grain reference is a logical endpoint that allows other grains, as well as non-grain client code, to invoke methods and properties of a particular grain interface implemented by a grain. A grain reference is a proxy object that implements the corresponding grain interface. A grain reference can be constructed by passing the identity of the grain to the `GetGrain()` method of the factory class auto-generated at compile time for the corresponding grain interface, or receiving the return value of a method or property. A grain reference can be passed as an argument to a method call.

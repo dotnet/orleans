@@ -15,11 +15,11 @@ To allow applications to communicate with grains from outside Orleans, the frame
 
 ## Connecting to a Gateway
 
-To establish a connection, a client calls OrleansClient.Initialize(). This will connect to the gateway silo at the IP address and port specified in the ClientConfiguration.xml file. This file must be placed in the same directory as the Orleans.dll library used by the client. As an alternative, a configuration object can be passed to OrleansClient.Initialize programmatically instead of loading it from a file.
+To establish a connection, a client calls `OrleansClient.Initialize()`. This will connect to the gateway silo at the IP address and port specified in the `ClientConfiguration.xml` file. This file must be placed in the same directory as the `Orleans.dll` library used by the client. As an alternative, a configuration object can be passed to `OrleansClient.Initialize()` programmatically instead of loading it from a file.
 
 ## Configuring the Client
 
-In ClientConfiguration.xml, the Gateway element specifies the address and port of the gateway endpoint that need to match those in OrleansConfiguration.xml on the silo side:
+In `ClientConfiguration.xml`, the Gateway element specifies the address and port of the gateway endpoint that need to match those in `OrleansConfiguration.xml` on the silo side:
 
     <ClientConfiguration xmlns="urn:orleans">
        <Gateway Address="<IP address or host name of silo>" Port="30000" />
@@ -29,7 +29,7 @@ If an Orleans-based application runs in Windows Azure, the client automatically 
 
 ## Configuring Silos
 
-In OrleansConfiguration.xml, the ProxyingGateway element specifies the gateway endpoint of the silo, which is separate from the inter-silo endpoint defined by the Networking element and must have a different port number:
+In `OrleansConfiguration.xml`, the `ProxyingGateway` element specifies the gateway endpoint of the silo, which is separate from the inter-silo endpoint defined by the Networking element and must have a different port number:
 
     <?xml version="1.0" encoding="utf-8"?>
     <OrleansConfiguration xmlns="urn:orleans">
