@@ -1,5 +1,6 @@
 @REM NOTE: This script must be run from a Visual Studio command prompt window
 
+@setlocal
 @ECHO on
 
 SET CMDHOME=%~dp0.
