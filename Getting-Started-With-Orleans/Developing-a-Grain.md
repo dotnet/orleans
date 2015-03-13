@@ -161,7 +161,7 @@ Grain state will automatically be READ when the grain is activated, but grains a
 
 ## Sample Code for Grain State Read / Write Operations
 
-Grains must extend the Grain<T> class in order to participate in the Orleans grain state persistence mechanisms. The ‘T’ in the above definition will be replaced by an application-specific grain state interface type for this grain; see the example below.
+Grains must extend the Grain&lt;T&gt; class in order to participate in the Orleans grain state persistence mechanisms. The ‘T’ in the above definition will be replaced by an application-specific grain state interface type for this grain; see the example below.
 
  The grain class will also implement its specific grain interface, as with any other Orleans grain.
 
