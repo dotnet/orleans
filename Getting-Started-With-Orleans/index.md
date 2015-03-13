@@ -18,7 +18,7 @@ This section provides an introduction to Orleans for developers planning to writ
 
 [Clients](Clients)
 
-[Observers](Observers)
+[Client Observers](Observers)
 
 [Developing a Grain](Developing-a-Grain)
 
