@@ -96,7 +96,6 @@ namespace Orleans.Messaging
         private readonly MethodInfo typeManagerGetSystemTarget;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
-        private readonly HashSet<GrainId> registeredLocalObjects;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
         // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
         // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
@@ -122,7 +121,6 @@ namespace Orleans.Messaging
             typeManagerGetSystemTarget = GrainClient.GetStaticMethodThroughReflection("Orleans", "Orleans.Runtime.TypeManagerFactory", "GetSystemTarget", null);
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
-            registeredLocalObjects = new HashSet<GrainId>();
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
             logger = TraceLogger.GetLogger("Messaging.ProxiedMessageCenter", TraceLogger.LoggerType.Runtime);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
@@ -151,19 +149,7 @@ namespace Orleans.Messaging
 
         public void PrepareToStop()
         {
-            var results = new List<Task>();
-            List<GrainId> observers = registeredLocalObjects.ToList();
-            foreach (var observer in observers)
-            {
-                var promise = UnregisterObserver(observer);
-                results.Add(promise);
-                promise.Ignore(); // Avoids some funky end-of-process race conditions
-            }
-            Utils.SafeExecute(() =>
-            {
-                bool ok = Task.WhenAll(results).Wait(TimeSpan.FromSeconds(5));
-                if (!ok) throw new TimeoutException("Unregistering Observers");
-            }, logger, "Unregistering Observers");
+            // put any pre stop logic here.
         }
 
         public void Stop()
@@ -277,22 +263,7 @@ namespace Orleans.Messaging
             {
                 gatewayConnection.Start();
 
-                if (gatewayConnection.IsLive)
-                {
-                    // Register existing client observers with the new gateway
-                    List<GrainId> localObjects;
-                    lock (lockable)
-                    {
-                        localObjects = registeredLocalObjects.ToList();
-                    }
-
-                    var registrar = GetRegistrar(gatewayConnection.Silo);
-                    foreach (var obj in localObjects)
-                    {
-                        registrar.RegisterClientObserver(obj, ClientId).Ignore();
-                    }
-                }
-                else
+                if (!gatewayConnection.IsLive)
                 {
                     // if failed to start Gateway connection (failed to connect), try sending this msg to another Gateway.
                     RejectOrResend(msg);
@@ -323,56 +294,6 @@ namespace Orleans.Messaging
             {
                 SendMessage(msg);
             }
-        }
-
-        public async Task RegisterObserver(GrainId grainId)
-        {
-            List<GatewayConnection> connections;
-            lock (lockable)
-            {
-                connections = gatewayConnections.Values.Where(conn => conn.IsLive).ToList();
-                registeredLocalObjects.Add(grainId);
-            }
-
-            if (connections.Count <= 0)
-            {
-                return;
-            }
-
-            var tasks = new List<Task<ActivationAddress>>();
-            foreach (var connection in connections)
-            {
-                tasks.Add(GetRegistrar(connection.Silo).RegisterClientObserver(grainId, ClientId));
-            }
-
-            // We should re-think if this should be WhenAny vs. WhenAll
-            // It was originally WhenAny, we are now changing it to be WhenAll.
-
-            await Task.WhenAll(tasks);
-
-            //Task<ActivationAddress> addrTask = await Task.WhenAny(tasks);
-            //ActivationAddress addr = await addrTask;
-            // Task.WhenAny returns Task<Task<T>> but then you await which takes off the outer Task to get just Task<T>. 
-            // The semantics of Task.WhenAny are that when the outer Task is resolved when one of the input tasks collection is resolved, and it returns that matching Task.
-            // http://msdn.microsoft.com/en-us/library/hh194858(v=vs.110).aspx
-            // "The returned task will complete when any of the supplied tasks has completed. 
-            //  The returned task will always end in the RanToCompletion state with its Result set to the first task to complete. 
-            //  This is true even if the first task to complete ended in the Canceled or Faulted state."
-            // So, from WhenAny semantics, we know that addrTask will already be resolved, so .Result will fast-path to return the ActivationAddress from that Task.
-        }
-
-        public Task UnregisterObserver(GrainId id)
-        {
-            List<GatewayConnection> connections;
-            lock (lockable)
-            {
-                connections = gatewayConnections.Values.Where(conn => conn.IsLive).ToList();
-                registeredLocalObjects.Remove(id);
-            }
-
-            var results = connections.Select(connection => GetRegistrar(connection.Silo).UnregisterClientObserver(id));
-
-            return Task.WhenAll(results);
         }
 
         public Task<GrainInterfaceMap> GetTypeCodeMap()

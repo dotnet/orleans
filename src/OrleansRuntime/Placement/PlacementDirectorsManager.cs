@@ -32,7 +32,8 @@ namespace Orleans.Runtime.Placement
     internal class PlacementDirectorsManager
     {
         private readonly Dictionary<Type, PlacementDirector> directors = new Dictionary<Type, PlacementDirector>();
-        private static PlacementStrategy defaultPlacementStrategy;
+        private PlacementStrategy defaultPlacementStrategy;
+        private ClientObserversPlacementDirector clientObserversPlacementDirector;
 
         public static PlacementDirectorsManager Instance { get; private set; }
 
@@ -50,7 +51,8 @@ namespace Orleans.Runtime.Placement
             var acDirector = (ActivationCountPlacementDirector)Instance.directors[typeof(ActivationCountBasedPlacement)];
             acDirector.Initialize(globalConfig);
 
-            defaultPlacementStrategy = PlacementStrategy.GetDefault();
+            Instance.defaultPlacementStrategy = PlacementStrategy.GetDefault();
+            Instance.clientObserversPlacementDirector = new ClientObserversPlacementDirector();
         }
 
         private void Register<TStrategy, TDirector>()
@@ -71,6 +73,16 @@ namespace Orleans.Runtime.Placement
                 IPlacementContext context,
                 PlacementStrategy strategy)
         {
+            if (targetGrain.IsClient)
+            {
+                var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, targetGrain, context);
+                if (res == null)
+                {
+                    throw new KeyNotFoundException("No activation for client " + targetGrain);
+                }
+                return res;
+            }
+
             var actualStrategy = strategy ?? defaultPlacementStrategy;
             var result = await SelectActivation(targetGrain, context, actualStrategy);
             if (result != null) return result;

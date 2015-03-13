@@ -86,6 +86,9 @@
     <Reference Include="OrleansRuntime">
       <HintPath>$(OrleansSDK)\Binaries\OrleansServer\OrleansRuntime.dll</HintPath>
     </Reference>
+    <Reference Include="OrleansProviders">
+      <HintPath>$(OrleansSDK)\Binaries\OrleansServer\OrleansProviders.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data.Services.Client" />
@@ -139,7 +142,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\HelloWorld\HelloWorldGrains\HelloWorldGrains.csproj">
       <Project>{98d4db83-175e-44d5-a14b-9c66ee89f037}</Project>
-      <Name>HelloWordGrains</Name>
+      <Name>HelloWorldGrains</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\HelloWorld\HelloWorldInterfaces\HelloWorldInterfaces.csproj">
       <Project>{163cce80-c506-468c-9b28-e2ff198097e3}</Project>

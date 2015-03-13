@@ -169,6 +169,10 @@ namespace Orleans.Runtime
                 message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ? 
                     Message.Categories.Ping : Message.Categories.System;
             }
+            if (target.IsObserverReference)
+            {
+                message.TargetObserverId = target.ObserverId;
+            }
 
             if (debugContext != null)
                 message.DebugContext = debugContext;
@@ -639,12 +643,12 @@ namespace Orleans.Runtime
             ResponseTimeout = timeout;
         }
 
-        public Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             throw new InvalidOperationException("Cannot create a local object reference from a grain.");
         }
 
-        public Task DeleteObjectReference(IAddressable obj)
+        public void DeleteObjectReference(IAddressable obj)
         {
             throw new InvalidOperationException("Cannot delete a local object reference from a grain.");
         }

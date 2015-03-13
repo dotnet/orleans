@@ -43,10 +43,7 @@ namespace Orleans.Runtime
 
         public bool IsGrain { get { return Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain; } }
 
-        public bool IsClient { get { return Category == UniqueKey.Category.ClientGrain || Category == UniqueKey.Category.ClientAddressableObject; } }
-
-        internal bool IsClientGrain { get { return Category == UniqueKey.Category.ClientGrain; } }
-        internal bool IsClientAddressableObject { get { return Category == UniqueKey.Category.ClientAddressableObject; } }
+        public bool IsClient { get { return Category == UniqueKey.Category.Client; } }
 
         private GrainId(UniqueKey key)
             : base(key)
@@ -58,14 +55,9 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
         }
 
-        public static GrainId NewClientGrainId()
+        public static GrainId NewClientId()
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.ClientGrain));
-        }
-
-        public static GrainId NewClientAddressableGrainId()
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.ClientAddressableObject));
+            return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Client));
         }
 
         internal static GrainId GetGrainId(UniqueKey key)
@@ -240,11 +232,8 @@ namespace Orleans.Runtime
                     if (!detailed) typeString = typeString.Tail(8);
                     fullString = String.Format("*grn/{0}/{1}", typeString, idString);
                     break;
-                case UniqueKey.Category.ClientGrain:
+                case UniqueKey.Category.Client:
                     fullString = "*cli/" + idString;
-                    break;
-                case UniqueKey.Category.ClientAddressableObject:
-                    fullString =  "*cliObj/" + idString;
                     break;
                 case UniqueKey.Category.SystemTarget:
                     string explicitName = Constants.SystemTargetName(this);

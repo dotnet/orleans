@@ -103,6 +103,7 @@
     <Compile Include="Messaging\IOutboundMessageQueue.cs" />
     <Compile Include="Placement\ISiloStatisticsChangeListener.cs" />
     <Compile Include="Placement\PlacementDirectorsManager.cs" />
+    <Compile Include="Placement\ClientObserversPlacementDirector.cs" />
     <Compile Include="Placement\PreferLocalPlacementDirector.cs" />
     <Compile Include="Placement\StatelessWorkerDirector.cs" />
     <Compile Include="Placement\PlacementDirector.cs" />
