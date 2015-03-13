@@ -33,11 +33,11 @@ See the Key Concepts section for more details on the various ways to use Tasks f
 
 After establishing a connection by calling OrleansClient.Initialize(), static methods in the generated factory classes may be used to get a reference to a grain, such as PlayerGrainFactory.GetGrain() for the PlayerGrain.
 
-Starting with the September 2014 preview update, there is also a static class 'GrainFactory' in the Orleans namespace, which can be used to create grain references without using the generated classes. The grain interface is passed as an type argument to GrainFactory.GetGrain<T>() when using this methodology.
+Starting with the September 2014 preview update, there is also a static class 'GrainFactory' in the Orleans namespace, which can be used to create grain references without using the generated classes. The grain interface is passed as a type argument to GrainFactory.GetGrain&lt;T&gt;() when using this methodology.
 
 ## Sending messages to grains
 
-The programming model for communicating with grains from a client is almost the same as from a grain. The client holds grain references which implement a grain interface like IPlayerGrain. It invokes methods on that grain reference, and these return asynchronous values: Task/Task<T>, or another grain interface inheriting from IGrain. The client can use await keyword or ContinueWith() method to queue continuations to be executed when these asynchronous values resolve, or Wait() method to block the current thread. 
+The programming model for communicating with grains from a client is almost the same as from a grain. The client holds grain references which implement a grain interface like IPlayerGrain. It invokes methods on that grain reference, and these return asynchronous values: Task/Task&lt;T&gt;, or another grain interface inheriting from IGrain. The client can use await keyword or ContinueWith() method to queue continuations to be executed when these asynchronous values resolve, or Wait() method to block the current thread. 
 
 The one key difference between communicating with a grain from within a client or from within another grain is the single-threaded execution model. Grains are constrained to be single-threaded by the Orleans scheduler, while clients may be multi-threaded. The client library uses the TPL thread pool to manage continuations and callbacks, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, TPL tasks, etc.
 
