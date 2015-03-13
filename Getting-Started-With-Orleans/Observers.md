@@ -1,13 +1,13 @@
 ---
 layout: page
-title: Observers
+title: Client Observers
 ---
 {% include JB/setup %}
 
-Because the standard .NET event facility is explicitly synchronous, it doesn’t fit into an asynchronous framework such as Orleans. Instead, Orleans uses the Observer pattern.
+There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications. For example, a user might want to be notified when a new message has been published by someone that she is following.
 
-A grain type that allows observation will define an observer interface that inherits from the IGrainObserver interface. Methods on an observer interface correspond to events that the observed grain type makes available. An observer would implement this interface and then subscribe to notifications from a particular grain. The observed grain would call back to the observer through the observer interface methods when an event has occurred.
+Client observers is a mechanism that allows notifying clients asynchronously. An observer is a one-way asynchronous interface that inherits from `IGrainObserver`, and all its methods must be void. The grain sends a notification to the observer by invoking it like a grain interface method, except that it has no return value, and so the grain need not depend on the result. The Orleans runtime will ensure one-way delivery of the notifications. A grain that publishes such notifications should provide an API to add or remove observers.  In addition, it is usually convenient to expose a method that allows an existing subscription to be cancelled. Grain developers may use the Orleans ObserverSubscriptionManager<T> generic class to simplify development of observed grain types.
 
-Methods on observer interfaces must be void since event messages are one-way. If the observer needs to interact with the observed grain as a result of a notification, it must do so by invoking normal methods on the observed grain.
+To subscribe to a notification, the client must first create a local C# object that implements the observer interface. It then calls a static method on the observer factory, 'CreateObjectReference()', to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.
 
-The observed grain type must expose a method to allow observers to subscribe to event notifications from a grain. In addition, it is usually convenient to expose a method that allows an existing subscription to be cancelled. Grain developers may use the Orleans ObserverSubscriptionManager<T> generic class to simplify development of observed grain types.
+This model can also be used by other grains to receive asynchronous notifications. Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `MyGrainFactory.Cast(this)`.
