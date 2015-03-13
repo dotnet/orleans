@@ -53,6 +53,7 @@ This model can also be used by other grains to receive asynchronous notification
 
 
 > Note: starting with the September 2014 refresh, there is also a generic method 'Cast&lt;T&gt;()' in the static class 'GrainFactory.'
+
 Example
 
 Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of, and prints out notifications until the program is manually terminated.
