@@ -177,7 +177,7 @@ Grains must extend the Grain&lt;T&gt; class in order to participate in the Orlea
     public class MyPersistenceGrain : Grain<IMyGrainState>, IMyPersistenceGrain
     {
        ...
-     }
+    }
 
 ## Grain State Read
 
