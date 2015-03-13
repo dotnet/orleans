@@ -52,7 +52,7 @@ To subscribe to a notification, the client must first create a local C# object t
 This model can also be used by other grains to receive asynchronous notifications. Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. ChirperViewerFactory.Cast(this).
 
 
-> Note: starting with the September 2014 refresh, there's is also a generic method 'Cast<T>()' in the static class 'GrainFactory.'
+> Note: starting with the September 2014 refresh, there is also a generic method 'Cast&lt;T&gt;()' in the static class 'GrainFactory.'
 Example
 
 Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of, and prints out notifications until the program is manually terminated.
