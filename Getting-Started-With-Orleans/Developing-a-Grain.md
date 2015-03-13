@@ -12,13 +12,13 @@ In this section we walk through the steps involved in defining and using a new P
 
  A grain cannot be explicitly created or deleted. It always exists “virtually” and is activated automatically when a request is sent to it. A grain has either a GUID or a long integer key within the grain type. Application code creates a reference to a grain by calling the GetGrain(Guid id) or GetGrain(long id) static factory methods for a specific grain identity. GetGrain() call is a purely local operation to create a grain reference. It does not trigger creation of a grain activation and has not impact on its lifecycle. A grain activation is automatically created by the Orleans runtime upon a first request sent to the grain.
 
- A grain interface must inherit from IGrain. The GUID or long integer key of a grain can later be retrieved via the IGrain.GetPrimaryKey()IGrain.GetPrimaryKeyLong() extension methods respectively.
+ A grain interface must inherit from IGrain. The GUID or long integer key of a grain can later be retrieved via the IGrain.GetPrimaryKey() or IGrain.GetPrimaryKeyLong() extension methods respectively.
 
 ## Defining the Grain Interface
 
 A grain type is defined by an interface that inherits from the IGrain marker interface.
 
- All of the methods in the grain interface must return a Task or a Task<T> for .NET 4.5. The underlying type T for value Task must be serializable.
+ All of the methods in the grain interface must return a Task or a Task&lt;T&gt; for .NET 4.5. The underlying type T for value Task must be serializable.
 
  Example:
 
@@ -34,13 +34,13 @@ A grain type is defined by an interface that inherits from the IGrain marker int
 
 After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate client proxy and factory classes corresponding to the user-defined grain interfaces, and to merge this additional code back into the interface DLL. The code generation tool, ClientGenerator.exe, can also be invoked directly as a part of post-build processing. However this should be used with caution and is generally not recommended.
 
- The most important class in the generated proxy code is the grain factory class, which is named after the grain interface by stripping off the initial “I” and appending “Factory”. For instance, if your grain interface is IPlayerGrain, then your grain factory class will be called IPlayerGrainFactory. The namespace for this factory class is the same as that of the grain interface.
+ The most important class in the generated proxy code is the grain factory class, which is named after the grain interface by stripping off the initial “I” and appending “Factory”. For instance, if your grain interface is IPlayerGrain, then your grain factory class will be called PlayerGrainFactory. The namespace for this factory class is the same as that of the grain interface.
 
 ## The Implementation Class
 
 A grain type is materialized by a class that implements the grain type’s interface and inherits directly or indirectly from Orleans.Grain. 
 
- The PlayerGrain grain class implements IPlayerGrain interface. 
+ The PlayerGrain grain class implements the IPlayerGrain interface. 
 
     public class PlayerGrain : Grain, IPlayerGrain 
     { 
@@ -74,6 +74,7 @@ A grain type is materialized by a class that implements the grain type’s inter
 This section provides details on the Orleans runtime mechanisms available to support “Grain Persistence”.
 
 Goals:
+
 1. Allow different grain types to use different types of storage providers (e.g., one uses Azure table, and one uses SQL Azure) or the same type of storage provider but with different configurations (e.g., both use Azure table, but one uses storage account #1 and one uses storage account #2) 
 2. Allow configuration of a storage provider instance to be swapped (e.g., Dev-Test-Prod) with just config file changes, and no code changes required. 
 3. Provide a framework to allow additional storage providers to be written later, either by the Orleans team or others. 
@@ -83,15 +84,16 @@ Goals:
 ## Grain Persistence API
 
 Grain types can be declared in one of two ways:
-* Extend Grain if they do not have any persistent state, or if they will handle all persistent state themselves, or 
-* Extend Grain<T> if they have some persistent state that they want the Orleans runtime to handle. 
-Stated another way, by extending Grain<T> a grain type is automatically opted-in to the Orleans system managed persistence framework.
 
- For the remainder of this section, we will only be considering Option #2 / Grain<T> because Option #1 grains will continue to run as now without any behavior changes.
+* Extend Grain if they do not have any persistent state, or if they will handle all persistent state themselves, or 
+* Extend Grain&lt;T&gt; if they have some persistent state that they want the Orleans runtime to handle. 
+Stated another way, by extending Grain&lt;T&gt; a grain type is automatically opted-in to the Orleans system managed persistence framework.
+
+ For the remainder of this section, we will only be considering Option #2 / Grain&lt;T&gt; because Option #1 grains will continue to run as now without any behavior changes.
 
 ## Grain State Stores
 
-Grain classes that inherit from Grain<T> (where T is an application-specific state data type derived from IGrainState) will have their state loaded automatically from a specified storage. 
+Grain classes that inherit from Grain&lt;T&gt; (where T is an application-specific state data type derived from IGrainState) will have their state loaded automatically from a specified storage. 
 
  Grains will be marked with a [Storage] attribute that specifies a named instance of a storage provider to use for reading / writing the state data for this grain. 
 
@@ -115,7 +117,7 @@ Grain classes that inherit from Grain<T> (where T is an application-specific sta
 
  Note: storage provider Type= "Orleans.Storage.AzureTableStorage" and "Orleans.Storage.DevStorage" are two standard storage providers built in to the Orleans runtime.
 
- If there is no [Storage] attribute specified for a Grain<T> grain class, then a provider named “Default” will be searched for instead. If not found then this is treated as a missing storage provider.
+ If there is no [Storage] attribute specified for a Grain&lt;T&gt; grain class, then a provider named “Default” will be searched for instead. If not found then this is treated as a missing storage provider.
 
  If there is only one provider in the silo config file, it will be considered to be the “Default” provider for this silo.
 
@@ -153,13 +155,13 @@ Grain state will automatically be READ when the grain is activated, but grains a
 
  During any grain method or timer callback handler in the grain, the grain can request the Orleans runtime to REREAD the current grain state data for that activation from the designated storage provider by calling IGrainState.ReadStateAsync. This will completely overwrite any current state data currently stored in the grain state object with the latest values read from persistent store. 
 
- An opaque provider-specific “Etag” value (String) MAY be set by a storage provider as part of the grain state metadata populated when state was read. Some providers MAY choose to leave this as Null if they do not use Etag’s. 
+ An opaque provider-specific “Etag” value (String) MAY be set by a storage provider as part of the grain state metadata populated when state was read. Some providers MAY choose to leave this as Null if they do not use Etags. 
 
  Conceptually, the Orleans Runtime will take a DEEP COPY of the grain state data object for its own use during any WRITE operations. Under the covers, the runtime MAY use optimization rules and heuristics to avoid performing some or all of the deep copy in some circumstances, provided that the expected logical isolation semantics are preserved. 
 
 ## Sample Code for Grain State Read / Write Operations
 
-Grains must extend the Grain<T> class in order to participate in the Orleans grain state persistence mechanisms. The ‘T’ in the above definition will be replaced by an application-specific grain state interface type for this grain; see the example below.
+Grains must extend the Grain&lt;T&gt; class in order to participate in the Orleans grain state persistence mechanisms. The ‘T’ in the above definition will be replaced by an application-specific grain state interface type for this grain; see the example below.
 
  The grain class will also implement its specific grain interface, as with any other Orleans grain.
 
@@ -175,7 +177,7 @@ Grains must extend the Grain<T> class in order to participate in the Orleans gra
     public class MyPersistenceGrain : Grain<IMyGrainState>, IMyPersistenceGrain
     {
        ...
-     }
+    }
 
 ## Grain State Read
 

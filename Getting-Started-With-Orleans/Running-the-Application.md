@@ -7,10 +7,11 @@ title: Running the Application
 ## Configuring Connections to Orleans
 
 To allow applications to communicate with grains from outside Orleans, the framework includes a client library. This client library might be used by a desktop or mobile application, or by a frontend server that renders interactive web pages or exposes a web services API. The client library provides a subset of the Orleans programming model for writing asynchronous clients that can find, create, and communicate with Orleans grains. This requires a few simple steps:
-Connect to an Orleans gateway 
-Find existing grains or create new ones 
-Send messages to grains and receive responses 
-Receive asynchronous notifications from grains via observers 
+
+1. Connect to an Orleans gateway 
+2. Find existing grains or create new ones 
+3. Send messages to grains and receive responses 
+4. Receive asynchronous notifications from grains via observers 
 
 ## Connecting to a Gateway
 
@@ -24,7 +25,7 @@ In ClientConfiguration.xml, the Gateway element specifies the address and port o
        <Gateway Address="<IP address or host name of silo>" Port="30000" />
     </ClientConfiguration>
 
-If an Orleans-based application runs in Windows Azure, the client automatically discovers silo gateways and shouldn't be statically configure. Refer to the Azure application sample for an example of how to configure the client.
+If an Orleans-based application runs in Windows Azure, the client automatically discovers silo gateways and shouldn't be statically configured. Refer to the Azure application sample for an example of how to configure the client.
 
 ## Configuring Silos
 

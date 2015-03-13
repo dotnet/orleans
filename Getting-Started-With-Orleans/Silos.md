@@ -10,4 +10,4 @@ A number of silos can work together to form an Orleans cluster.
 
 More silos can be added to a cluster dynamically in order to scale-out that cluster.
 
-The Orleans runtime managed resilience in case of a silo being removed from the cluster due to machine crash or similar failure mode.
+The Orleans runtime manages resilience in case a silo is removed from the cluster due to a machine crash or similar failure mode.
