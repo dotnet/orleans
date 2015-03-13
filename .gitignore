@@ -3,6 +3,7 @@
 
 # Orleans code-gen files
 orleans.codegen.cs
+orleans.codegen.vb
 
 # User-specific files
 *.suo
