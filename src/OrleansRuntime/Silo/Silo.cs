@@ -248,17 +248,6 @@ namespace Orleans.Runtime
                 typeManager);
             messageCenter.RerouteHandler = InsideRuntimeClient.Current.RerouteMessage;
             messageCenter.SniffIncomingMessage = InsideRuntimeClient.Current.SniffIncomingMessage;
-            messageCenter.ClientDropHandler = grainIds =>
-            {
-                catalog.DeleteGrainsLocal(grainIds).Ignore();
-                scheduler.RunOrQueueAction(() =>
-                {
-                    // Consider: batch delete
-                    foreach (var id in grainIds)
-                        LocalGrainDirectory.DeleteGrain(id).Ignore();
-                    
-                }, catalog.SchedulingContext);
-            };
 
             siloStatistics.MetricsTable.Scheduler = scheduler;
             siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;

@@ -91,7 +91,6 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            gateway.RecordSendingProxiedGrain(msg.SendingGrain, receivedOnSocket);
             SiloAddress targetAddress = gateway.TryToReroute(msg);
             msg.SendingSilo = MessageCenter.MyAddress;
 

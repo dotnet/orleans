@@ -577,7 +577,7 @@ namespace Orleans.Runtime
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {
                 logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, String.Format("AddressMessage could not find target for client pseudo-grain {0}", message));
-                throw new KeyNotFoundException("Attempting to send a message to an unregistered client pseudo-grain");
+                throw new KeyNotFoundException(String.Format("Attempting to send a message {0} to an unregistered client pseudo-grain {1}", message, targetAddress.Grain));
             }
 
             message.SetTargetPlacement(placementResult);

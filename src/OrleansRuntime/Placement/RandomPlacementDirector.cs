@@ -37,8 +37,6 @@ namespace Orleans.Runtime.Placement
             List<ActivationAddress> places = await context.Lookup(target);
             if (places.Count <= 0)
             {
-                if (target.IsClient)
-                    throw new KeyNotFoundException("No client activation for " + target);
                 // we return null to indicate that we were unable to select a target from places activations.
                 return null;
             }
@@ -54,8 +52,6 @@ namespace Orleans.Runtime.Placement
                 return PlacementResult.IdentifySelection(local[random.Next(local.Count)]);
             if (places.Count > 0)
                 return PlacementResult.IdentifySelection(places[random.Next(places.Count)]);
-            if (target.IsClient)
-                throw new KeyNotFoundException("No client activation for grain " + target.ToString());
             // we return null to indicate that we were unable to select a target from places activations.
             return null;
         }

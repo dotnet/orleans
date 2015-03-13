@@ -21,23 +21,23 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Orleans;
+using System;
+﻿using System.Threading.Tasks;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime.Placement
 {
     /// <summary>
-    /// Client gateway interface for forwarding client requests to silos.
+    /// ClientObserversPlacementDirector is a director for routing requests to client observers.
+    /// It uses RandomPlacementDirector.OnSelectActivation for looking up the activation in the directory 
+    /// (looking up the gateway address that can forward that request to the client).
+    /// It does not allow placing client observer activations.
     /// </summary>
-    internal interface IClientObserverRegistrar : ISystemTarget
+    internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
-        /// <summary>
-        /// Start this system target.
-        /// </summary>
-        Task Start();
+        internal override Task<PlacementResult> 
+            OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+        {
+            throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + grain);
+        }
     }
 }

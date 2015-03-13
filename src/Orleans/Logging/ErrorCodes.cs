@@ -659,6 +659,7 @@ namespace Orleans
         ProxyClient_OGC_UnhandledExceptionInOneWayInvoke = ProxyClientBase + 27,
         ProxyClient_ClientInvokeCallback_Error      = ProxyClientBase + 28,
         ProxyClient_StartDone                       = ProxyClientBase + 29,
+        ProxyClient_OGC_TargetNotFound_2            = ProxyClientBase + 30,
 
         MessagingBase                           = Runtime + 1000,
         Messaging_IMA_DroppingConnection        = MessagingBase + 1,

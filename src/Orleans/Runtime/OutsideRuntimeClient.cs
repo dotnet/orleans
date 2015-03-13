@@ -52,7 +52,7 @@ namespace Orleans
         private readonly ClientConfiguration config;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private readonly Dictionary<GrainId, LocalObjectData> localObjects;
+        private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
 
         private readonly ProxiedMessageCenter transport;
         private bool listenForMessages;
@@ -126,7 +126,7 @@ namespace Orleans
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
         {
-            this.clientId = GrainId.NewClientGrainId();
+            this.clientId = GrainId.NewClientId();
 
             if (cfg == null)
             {
@@ -149,7 +149,7 @@ namespace Orleans
                 PlacementStrategy.Initialize();
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-                localObjects = new Dictionary<GrainId, LocalObjectData>();
+                localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
                 CallbackData.Config = config;
 
                 if (!secondary)
@@ -368,13 +368,16 @@ namespace Orleans
         private void DispatchToLocalObject(Message message)
         {
             LocalObjectData objectData;
-            bool found = false;
-            lock (localObjects)
-            {
-                found = localObjects.TryGetValue(message.TargetGrain, out objectData);
+            GuidId observerId = message.TargetObserverId;
+            if (observerId == null)
+            {                
+                logger.Error(
+                    ErrorCode.ProxyClient_OGC_TargetNotFound_2,
+                    String.Format("Did not find TargetObserverId header in the message = {0}. A request message to a client is expected to have an observerId.", message));
+                return;
             }
 
-            if (found)
+            if (localObjects.TryGetValue(observerId, out objectData))
                 this.InvokeLocalObjectAsync(objectData, message);
             else
             {
@@ -393,14 +396,12 @@ namespace Orleans
             if (obj == null)
             {
                 //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                logger.Warn(ErrorCode.Runtime_Error_100162, 
-                    String.Format("Object associated with Grain ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.Grain, message));
-                lock (localObjects)
-                {    
-                    // Try to remove. If it's not there, we don't care.
-                    localObjects.Remove(objectData.Grain);
-                }
-                UnregisterObjectReference(objectData.Grain).Ignore();
+                logger.Warn(ErrorCode.Runtime_Error_100162,
+                    String.Format("Object associated with Observer ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.ObserverId, message));
+
+                LocalObjectData ignore;
+                // Try to remove. If it's not there, we don't care.
+                localObjects.TryRemove(objectData.ObserverId, out ignore);
                 return;
             }
 
@@ -628,6 +629,11 @@ namespace Orleans
                     message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, target.SystemTargetSilo);
                 }
             }
+            // Client sending messages to another client (observer). Yes, we support that.
+            if (target.IsObserverReference)
+            {
+                message.TargetObserverId = target.ObserverId;
+            }
             
             if (debugContext != null)
             {
@@ -670,16 +676,6 @@ namespace Orleans
             }
             transport.SendMessage(message);
             return true;
-        }
-
-        public bool ProcessOutgoingMessage(Message message)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool ProcessIncomingMessage(Message message)
-        {
-            throw new NotImplementedException();
         }
 
         public void ReceiveResponse(Message response)
@@ -819,57 +815,28 @@ namespace Orleans
             await Task.Run(asyncFunction); // No grain context on client - run on .NET thread pool
         }
 
-        public async Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.");
 
-            GrainId target = GrainId.NewClientAddressableGrainId();
-            await transport.RegisterObserver(target);
-            lock (localObjects)
+            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId());
+            if (!localObjects.TryAdd(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker)))
             {
-                localObjects.Add(target, new LocalObjectData(obj, target, invoker));
+                throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
             }
-            return GrainReference.FromGrainId(target);
+            return gr;
         }
 
-        public Task DeleteObjectReference(IAddressable obj)
+        public void DeleteObjectReference(IAddressable obj)
         {
             if (!(obj is GrainReference))
                 throw new ArgumentException("Argument reference is not a grain reference.");
 
             var reference = (GrainReference) obj;
-
-            return DeleteResolvedObjectReference(reference);
-        }
-
-        private Task DeleteResolvedObjectReference(GrainReference reference)
-        {
-            LocalObjectData objData;
-
-            lock (localObjects)
-            {
-                if (localObjects.TryGetValue(reference.GrainId, out objData))
-                    localObjects.Remove(reference.GrainId);
-                else
-                    throw new ArgumentException("Reference is not associated with a local object.", "reference");
-            }
-            return UnregisterObjectReference(objData.Grain);
-        }
-
-        private async Task UnregisterObjectReference(GrainId grain)
-        {
-            try
-            {
-
-                await transport.UnregisterObserver(grain);
-                if (logger.IsVerbose) 
-                    logger.Verbose(ErrorCode.Runtime_Error_100315, "Successfully unregistered client target {0}", grain);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.Runtime_Error_100012, String.Format("Failed to unregister client target {0}.", grain), exc);
-            }
+            LocalObjectData ignore;
+            if (!localObjects.TryRemove(reference.ObserverId, out ignore))
+                throw new ArgumentException("Reference is not associated with a local object.", "reference");
         }
 
         public void DeactivateOnIdle(ActivationId id)
@@ -883,14 +850,14 @@ namespace Orleans
         {
             internal WeakReference LocalObject { get; private set; }
             internal IGrainMethodInvoker Invoker { get; private set; }
-            internal GrainId Grain { get; private set; }
+            internal GuidId ObserverId { get; private set; }
             internal Queue<Message> Messages { get; private set; }
             internal bool Running { get; set; }
 
-            internal LocalObjectData(IAddressable obj, GrainId grain, IGrainMethodInvoker invoker)
+            internal LocalObjectData(IAddressable obj, GuidId observerId, IGrainMethodInvoker invoker)
             {
                 LocalObject = new WeakReference(obj);
-                Grain = grain;
+                ObserverId = observerId;
                 Invoker = invoker;
                 Messages = new Queue<Message>();
                 Running = false;

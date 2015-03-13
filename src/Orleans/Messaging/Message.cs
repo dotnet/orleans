@@ -61,6 +61,7 @@ namespace Orleans.Runtime
             public const string TARGET_ACTIVATION = "#TA";
             public const string TARGET_GRAIN = "#TG";
             public const string TARGET_SILO = "#TS";
+            public const string TARGET_OBSERVER = "#TO";
             public const string TIMESTAMPS = "Times";
             public const string IS_UNORDERED = "#UO";
 
@@ -231,6 +232,16 @@ namespace Orleans.Runtime
                 TargetActivation = value.Activation;
                 TargetSilo = value.Silo;
                 targetAddress = value;
+            }
+        }
+
+        public GuidId TargetObserverId
+        {
+            get { return GetSimpleHeader<GuidId>(Header.TARGET_OBSERVER); }
+            set
+            {
+                SetHeader(Header.TARGET_OBSERVER, value);
+                targetAddress = null;
             }
         }
 
@@ -1010,8 +1021,8 @@ namespace Orleans.Runtime
                 IsNewPlacement ? "NewPlacement " : "", // 2
                 response,  //3
                 Direction, //4
-                String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5  //SendingAddress.ToString() - this may throw
-                String.Format("{0}{1}{2}", TargetSilo, TargetGrain, TargetActivation), //6  //TargetAddress.ToString() - this may throw 
+                String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
+                String.Format("{0}{1}{2}{3}", TargetSilo, TargetGrain, TargetActivation, TargetObserverId), //6
                 Id, //7
                 ResendCount > 0 ? "[ResendCount=" + ResendCount + "]" : "", //8
                 ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //9

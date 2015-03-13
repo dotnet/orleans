@@ -46,17 +46,17 @@ namespace Orleans
 
         /// <summary>
         /// The set of currently-subscribed observers.
-        /// This is implemented as a dictionary keyed by GrainID so that if the same obsever subscribes multiple times,
+        /// This is implemented as a HashSet of IGrainObserver so that if the same observer subscribes multiple times,
         /// it will still only get invoked once per notification.
         /// </summary>
-        private readonly Dictionary<GrainId,T> observers;
+        private readonly HashSet<T> observers;
 
         /// <summary>
         /// Constructs an empty subscription manager.
         /// </summary>
         public ObserverSubscriptionManager()
         {
-            observers = new Dictionary<GrainId, T>();
+            observers = new HashSet<T>();
         }
 
         /// <summary>
@@ -68,12 +68,8 @@ namespace Orleans
         /// In this case, the existing subscription is unaffected.</para></returns>
         public void Subscribe(T observer)
         {
-            GrainId id = ((GrainReference)((IGrainObserver)observer)).GrainId; // for some reason can't cast directly to GrainReference
-            
-            if (observers.ContainsKey(id))
+            if (!observers.Add(observer))
                 throw new OrleansException(String.Format("Cannot subscribe already subscribed observer {0}.", observer));
-
-            observers.Add(id, observer);
         }
 
 
@@ -85,11 +81,8 @@ namespace Orleans
         /// This promise will be broken if the observer is not a subscriber.</returns>
         public void Unsubscribe(T observer)
         {
-            GrainId id = ((GrainReference)((IGrainObserver)observer)).GrainId; // for some reason can't cast directly to GrainReference
-            if (!observers.ContainsKey(id))
+            if (!observers.Remove(observer))
                 throw new OrleansException(String.Format("Observer {0} is not subscribed.", observer));
-
-            observers.Remove(id);
         }
         
         /// <summary>
@@ -108,22 +101,29 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public void Notify(Action<T> notification)
         {
-            var failed = new List<GrainId>();
-
-            foreach (var pair in observers)
+            List<T> failed = null;
+            foreach (var observer in observers)
             {
                 try
                 {
-                    notification(pair.Value);
+                    notification(observer);
                 }
                 catch (Exception)
                 {
-                    failed.Add(pair.Key);
+                    if (failed == null)
+                    {
+                        failed = new List<T>();
+                    }
+                    failed.Add(observer);
                 }
             }
-            foreach (var key in failed)
+            if (failed != null)
             {
-                observers.Remove(key);
+                foreach (var key in failed)
+                {
+                    observers.Remove(key);
+                }
+                throw new OrleansException(String.Format("Failed to notify the following observers: {0}", Utils.EnumerableToString(failed)));
             }
         }
     }
