@@ -25,7 +25,7 @@ In ClientConfiguration.xml, the Gateway element specifies the address and port o
        <Gateway Address="<IP address or host name of silo>" Port="30000" />
     </ClientConfiguration>
 
-If an Orleans-based application runs in Windows Azure, the client automatically discovers silo gateways and shouldn't be statically configure. Refer to the Azure application sample for an example of how to configure the client.
+If an Orleans-based application runs in Windows Azure, the client automatically discovers silo gateways and shouldn't be statically configured. Refer to the Azure application sample for an example of how to configure the client.
 
 ## Configuring Silos
 
