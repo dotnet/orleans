@@ -4,10 +4,20 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldNuget", "HelloWorldNuget\HelloWorldNuget.csproj", "{E4EE0184-1DC6-4528-9463-987B3BE57752}"
+	ProjectSection(ProjectDependencies) = postProject
+		{943794E3-F54E-4678-B225-B45018344AEC} = {943794E3-F54E-4678-B225-B45018344AEC}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldNugetInterfaces", "HelloWorldNugetInterfaces\HelloWorldNugetInterfaces.csproj", "{3BD01348-ACC3-4378-A49E-4D62FB0BD3D0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldNugetGrains", "HelloWorldNugetGrains\HelloWorldNugetGrains.csproj", "{943794E3-F54E-4678-B225-B45018344AEC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{2F22D6D3-D176-4B66-B637-A5375EDE0D63}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
