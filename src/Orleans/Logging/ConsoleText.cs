@@ -83,17 +83,22 @@ namespace Orleans.Runtime
                 Console.WriteLine("Ignoring error from Console.ForegroundColor : " + errorIgnored);
             }
 
-            Console.WriteLine(msg);
-
-            if (doResetColor)
+            try
             {
-                try
+                Console.WriteLine(msg);
+            }
+            finally
+            {
+                if (doResetColor)
                 {
-                    Console.ResetColor();
-                }
-                catch (Exception errorIgnored)
-                {
-                    Console.WriteLine("Ignoring error from Console.ResetColor : " + errorIgnored);
+                    try
+                    {
+                        Console.ResetColor();
+                    }
+                    catch (Exception errorIgnored)
+                    {
+                        Console.WriteLine("Ignoring error from Console.ResetColor : " + errorIgnored);
+                    }
                 }
             }
         }
