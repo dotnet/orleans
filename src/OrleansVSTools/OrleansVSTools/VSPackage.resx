@@ -129,7 +129,7 @@
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
   <data name="110" xml:space="preserve">
-    <value>OrleansVSTools11</value>
+    <value>OrleansVSTools</value>
   </data>
   <data name="112" xml:space="preserve">
     <value>Orleans Tools for Visual Studio 2012</value>

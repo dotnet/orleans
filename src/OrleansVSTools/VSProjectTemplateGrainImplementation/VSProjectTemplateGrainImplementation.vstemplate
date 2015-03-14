@@ -11,7 +11,7 @@
     <TemplateGroupID>Orleans</TemplateGroupID>
     <ShowByDefault>false</ShowByDefault>
     <CreateNewFolder>true</CreateNewFolder>
-    <DefaultName>GrainCollection</DefaultName>
+    <DefaultName>Grain1</DefaultName>
     <ProvideDefaultName>true</ProvideDefaultName>
   </TemplateData>
   <TemplateContent>
@@ -19,6 +19,7 @@
       <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" TargetFileName="Properties\orleans.codegen.cs">orleans.codegen.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" OpenInEditor="true">Grain1.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="false" TargetFileName="packages.config">packages.config.txt</ProjectItem>
     </Project>
   </TemplateContent>
 </VSTemplate>

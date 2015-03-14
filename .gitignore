@@ -3,7 +3,9 @@
 
 # Orleans code-gen files
 orleans.codegen.cs
+orleans.codegen.fs
 orleans.codegen.vb
+src/SDK/VSIX/
 
 # User-specific files
 *.suo
