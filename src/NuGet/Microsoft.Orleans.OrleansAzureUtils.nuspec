@@ -29,6 +29,5 @@
   </metadata>
   <files>
     <file src="OrleansAzureUtils.dll" target="lib\net45" />
-    <file src="OrleansAzureUtils.xml" target="lib\net45" />
   </files>
 </package>
