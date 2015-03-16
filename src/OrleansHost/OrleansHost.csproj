@@ -79,7 +79,7 @@
   <ItemGroup>
     <Content Include="OrleansLocal.xml" />
     <Content Include="StartOrleans.cmd">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <ItemGroup>
