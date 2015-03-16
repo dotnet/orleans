@@ -113,7 +113,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="SQLServer\CreateTables.sql">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <ItemGroup />
