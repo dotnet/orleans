@@ -25,5 +25,6 @@
   <files>
     <file src="ClientGenerator.exe" target="lib\net45" />
     <file src="ClientGenerator.exe.config" target="lib\net45" />
+    <file src="Orleans.dll" target="lib\net45" />
   </files>
 </package>
