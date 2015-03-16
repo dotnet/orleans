@@ -577,7 +577,6 @@ namespace Orleans.AzureUtils
                     entityBatch.Insert(entry);
                 }
 
-                bool fallbackToInsertOneByOne = false;
                 try
                 {
                     // http://msdn.microsoft.com/en-us/library/hh452241.aspx
@@ -593,28 +592,7 @@ namespace Orleans.AzureUtils
                 {
                     Logger.Warn(ErrorCode.AzureTable_37, String.Format("Intermediate error bulk inserting {0} entries in the table {1}",
                         collection.Count, TableName), exc);
-
-                    var dsre = exc.GetBaseException() as DataServiceRequestException;
-                    if (dsre != null)
-                    {
-                        var dsce = dsre.GetBaseException() as DataServiceClientException;
-                        if (dsce != null)
-                        {
-                            // Fallback to insert rows one by one
-                            fallbackToInsertOneByOne = true;
-                        }
-                    }
-
-                    if (!fallbackToInsertOneByOne) throw;
                 }
-
-                // Bulk insert failed, so try to insert rows one by one instead
-                var promises = new List<Task>();
-                foreach (T entry in collection)
-                {
-                    promises.Add(CreateTableEntryAsync(entry));
-                }
-                await Task.WhenAll(promises);
             }
             finally
             {
