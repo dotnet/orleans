@@ -4,7 +4,6 @@ title: Adventure
 ---
 {% include JB/setup %}
 
-## Adventure
 A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.
 
 ### Instructions:
