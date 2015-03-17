@@ -33,7 +33,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using Orleans.Runtime.Configuration;
+﻿using Microsoft.WindowsAzure.Storage;
+﻿using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -940,11 +941,40 @@ namespace Orleans.Runtime
             {
                 stack = String.Format(Environment.NewLine + exception.StackTrace);
             }
+            string message = exception.Message;
+            if (exception is StorageException)
+            {
+                message = PrintStorageException(exception as StorageException);
+            }
             return String.Format(Environment.NewLine + "Exc level {0}: {1}: {2}{3}",
                 level,
                 exception.GetType(),
-                exception.Message,
+                message,
                 stack);
+        }
+
+        private static string PrintStorageException(StorageException storeExc)
+        {
+            var result = storeExc.RequestInformation;
+            if (result == null) return storeExc.Message;
+            var extendedError = storeExc.RequestInformation.ExtendedErrorInformation;
+            if (extendedError==null)
+            {
+                return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage);
+
+            }
+            return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}, " +
+                                   "ExtendedErrorInformation.ErrorCode = {3}, ExtendedErrorInformation.ErrorMessage = {4}{5}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage,
+                        extendedError.ErrorCode,
+                        extendedError.ErrorMessage,
+                        (extendedError.AdditionalDetails != null && extendedError.AdditionalDetails.Count > 0) ?
+                            String.Format(", ExtendedErrorInformation.AdditionalDetails = {0}", Utils.DictionaryToString(extendedError.AdditionalDetails)) : String.Empty);
         }
 
         internal void Assert(ErrorCode errorCode, bool condition, string message = null)
