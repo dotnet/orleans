@@ -6,6 +6,18 @@ title: Frequently Asked Questions
 
 These questions pertain to Project "Orleans," not the samples project on CodePlex.
 
+## Does Microsoft support Orleans?
+
+Source code of Orleans has been released under an MIT license on [GitHub](https://github.com/dotnet/orleans). Microsoft continues to invest in Orleans and accepts community contributions to the codebase.
+
+## Can I get a "Go Live" License?
+
+The source code has been releases under the [MIT license](https://github.com/dotnet/orleans/blob/master/LICENSE).
+
+## When will Orleans be production ready?
+
+Orleans has been production ready and used in production for several years. 
+ 
 ## When should I use a grain and when should I use a plain old object?
 
 There are two ways to answer this, from a runtime behavior perspective, and from a modeling perspective.
