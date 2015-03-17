@@ -4,7 +4,6 @@ title: Twitter Sentiment
 ---
 {% include JB/setup %}
 
-## Twitter Sentiment
 The Twitter Sentiment application records Twitter sentiment by consuming the Twitter streaming API, calulates a sentiment score for each tweet (i.e. is it a positive/negative/neutral tone of lanuage), and then records that sentiment against each hashtag in the tweet using an Orleans grain to maintain a total score for each unique hashtag.
 
 The sample illustrates using Orleans to manipulate data with high volumes of input traffic, where each grain owns a row in a table (or a key in a key/value store, or a document in a document store) and all updates go through one single grain, reducing contention for individual rows, keys, or documents.
@@ -12,7 +11,7 @@ The sample illustrates using Orleans to manipulate data with high volumes of inp
 ![](Twitter-Sentiment.png)
 
 ### Client 
-The sentiment processing on each tweet is performed in a Node.js application, in server.js, and uses the sentiment library https://github.com/thisandagain/sentiment to perform the analysis, which uses key words to determine sentiment. The sentiment score and the actual tweet are posted to the ASP.NET MVC program for processing.
+The sentiment processing on each tweet is performed in a Node.js application, in server.js, and uses the [sentiment library](https://github.com/thisandagain/sentiment) to perform the analysis, which uses key words to determine sentiment. The sentiment score and the actual tweet are posted to the ASP.NET MVC program for processing.
 
 The ASP.NET MVC application serves two main roles. It acts as the end point to post sentiment scores into Orleans, and it provides the UI to view hashtag sentiment scores from Orleans. When updating a sentiment score, the SetScore function in GrainContoller.cs gets a handle for a stateless TweetDispatcher grain, and calls its AddScore method. The GetScores method retrieves the score for an arbitrary list of hashtags, each score being expressed as a combination of the overall positive sentiment score, the overall negative sentiment score, and the total number of tweets tracked containing that hashtag.
 
@@ -56,6 +55,7 @@ To increase performance, the counter grain only persists its internal state peri
 
 ### Prerequisites
 The following must be installed prior to running the sample:
+
 * Visual Studio 2013 
 * Orleans SDK 
 * [Node.js Tools for Visual Studio](https://nodejstools.codeplex.com/). Make sure to read the instructions and also install
@@ -68,14 +68,12 @@ The following must be installed prior to running the sample:
 * Enter the details from Twitter into the TwitterClient\app.js file. 
 * Edit the [Orleans SDK]\LocalSilo\OrleansConfiguration.xml file to include a storage provider called `store1`, using the account name and key of your Windows Azure Storage account:
 
-
     <?xml version="1.0" encoding="utf-8"?>
     <OrleansConfiguration xmlns="urn:orleans">
       <Globals>
         <StorageProviders>
            <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"            DataConnectionString="DefaultEndpointsProtocol=https;AccountName=ACCCOUNT_NAME;AccountKey=ACCOUNT_KEY" />
         </StorageProviders>
-    ...
 
 * Start the local Orleans Silo by running the `StartLocalSilo.cmd` in the Orleans SDK directory. 
 * In Visual Studio, right click on the solution file, go to properties, select 'Multiple startup projects' and set the action for `TwitterWebApplication` and `TwitterClient` as `Start`. 
