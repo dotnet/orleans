@@ -94,8 +94,8 @@ namespace Orleans.Streams
         /// accept and notify only Active producers.
         private static bool IsActiveProducer(IStreamProducerExtension producer)
         {
-            var grainRef = producer.AsReference();
-            if (grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
+            var grainRef = producer as GrainReference;
+            if (grainRef !=null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
                 return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo).Equals(SiloStatus.Active);
             
             return true;
@@ -103,8 +103,8 @@ namespace Orleans.Streams
 
         private static bool IsDeadProducer(IStreamProducerExtension producer)
         {
-            var grainRef = producer.AsReference();
-            if (grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
+            var grainRef = producer as GrainReference;
+            if (grainRef != null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
                 return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo).Equals(SiloStatus.Dead);
             
             return false;
