@@ -31,38 +31,32 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerCollection
     {
-        private readonly Dictionary<GrainReference, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
+        private readonly Dictionary<IStreamConsumerExtension, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
 
         public StreamConsumerCollection()
         {
-            queueData = new Dictionary<GrainReference, StreamConsumerData>();
+            queueData = new Dictionary<IStreamConsumerExtension, StreamConsumerData>();
         }
 
         public StreamConsumerData AddConsumer(StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
             var consumerData = new StreamConsumerData(streamId, streamConsumer, filter);
-            queueData.Add(streamConsumer.AsReference(), consumerData);
+            queueData.Add(streamConsumer, consumerData);
             return consumerData;
         }
 
-        public bool RemoveConsumer(IAddressable consumerAddress)
+        public bool RemoveConsumer(IStreamConsumerExtension streamConsumer)
         {
             StreamConsumerData consumer;
-            var consumerReference = consumerAddress.AsReference();
-            if (!queueData.TryGetValue(consumerReference, out consumer)) return false;
+            if (!queueData.TryGetValue(streamConsumer, out consumer)) return false;
 
             consumer.Cursor = null; // kill cursor activity and ensure it does not start again on this consumer data.
-            return queueData.Remove(consumerReference);
+            return queueData.Remove(streamConsumer);
         }
 
-        public bool Contains(IAddressable consumer)
+        public bool TryGetConsumer(IStreamConsumerExtension streamConsumer, out StreamConsumerData data)
         {
-            return queueData.ContainsKey(consumer.AsReference());
-        }
-
-        public bool TryGetConsumer(IAddressable consumer, out StreamConsumerData data)
-        {
-            return queueData.TryGetValue(consumer.AsReference(), out data);
+            return queueData.TryGetValue(streamConsumer, out data);
         }
 
         public IEnumerable<StreamConsumerData> AllConsumersForStream(StreamId streamId)
