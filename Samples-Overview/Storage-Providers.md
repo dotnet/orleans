@@ -15,7 +15,7 @@ The sample solution consists of four projects -- the storage provider library, a
 
 ![](ProvidersSample.png)
 
-1. Edit the `DevTestServerConfiguration.xml` file in the Test.Client project, uncommenting the element of the file-storage provider.
+Edit the `DevTestServerConfiguration.xml` file in the Test.Client project, uncommenting the element of the file-storage provider.
 
                <!-- To test the sample storage providers, uncomment one of the following two lines:
                <Provider Type="Samples.StorageProviders.MongoDBStorage" 
@@ -28,9 +28,9 @@ The sample solution consists of four projects -- the storage provider library, a
                          RootDirectory=".\Samples.FileStorage"/>
 
 
-2. Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.
+Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.
 
-3. Set the 'Test.Client' project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:
+Set the 'Test.Client' project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:
 
     Successfully started Orleans silo 'host-001' as a Primary node.
 
@@ -40,7 +40,7 @@ The sample solution consists of four projects -- the storage provider library, a
     Press Enter to terminate...
 
 
-4. Stop the program and open a command line windows, move to the folder containing the Orleans SDK, then to the LocalSilo folder. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:
+Stop the program and open a command line windows, move to the folder containing the Orleans SDK, then to the LocalSilo folder. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:
 
     >>dir
          Directory: C:\Microsoft Codename Orleans SDK v0.9\SDK\LocalSilo\Samples.FileStorage
@@ -50,13 +50,13 @@ The sample solution consists of four projects -- the storage provider library, a
     -a---         3/26/2014     19:50         48 0000...003ffffffc0950639.PersonState
 
 
-5. If you look at the contents of that file, you should see some JSON text:
+If you look at the contents of that file, you should see some JSON text:
 
     >> 
     more .\Samples.FileStorage\0000000000000000000000000000000003ffffffc0950639.PersonState
     {"FirstName":"John","LastName":"Doe","Gender":0}
 
-6. Now, run the program again. It's written to detect that state already exists, so this time, it will have something else to say:
+Now, run the program again. It's written to detect that state already exists, so this time, it will have something else to say:
 
     Successfully started Orleans silo host-001' as a Primary node.
 
@@ -66,7 +66,7 @@ The sample solution consists of four projects -- the storage provider library, a
     Press Enter to terminate...
 
 
-7. If you have [MongoDB installed](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/), you can repeat this procedure to test the other storage provider. Just change which XML element in the configuration file that is uncommented and ensure that the mongod.exe process is running. When you inspect the data with the MongoDB shell (mongo.exe), it should look something like this:
+If you have [MongoDB installed](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/), you can repeat this procedure to test the other storage provider. Just change which XML element in the configuration file that is uncommented and ensure that the mongod.exe process is running. When you inspect the data with the MongoDB shell (mongo.exe), it should look something like this:
 
     MongoDB shell version: 2.4.6
     connecting to: test
