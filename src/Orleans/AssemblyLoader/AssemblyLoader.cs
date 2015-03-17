@@ -177,7 +177,7 @@ namespace Orleans.Runtime
 
                 // This is a workaround for the behavior of ReflectionOnlyLoad/ReflectionOnlyLoadFrom
                 // that appear not to automatically resolve dependencies.
-                // We are trying to preload all dlls we find in the folder, so that if one of these
+                // We are trying to pre-load all dlls we find in the folder, so that if one of these
                 // assemblies happens to be a dependency of an assembly we later on call 
                 // Assembly.GetTypes() on, the dependency will be already loaded and will get
                 // automatically resolved. Ugly, but seems to solve the problem.
@@ -191,7 +191,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception exc)
                     {
-                        if (logger.IsVerbose) logger.Verbose("Failed to pload assembly {0} in reflection-only context.", exc);
+                        if (logger.IsVerbose) logger.Verbose("Failed to pre-load assembly {0} in reflection-only context.", exc);
                     }
                 }
 
