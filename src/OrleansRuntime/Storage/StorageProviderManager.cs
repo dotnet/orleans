@@ -42,11 +42,11 @@ namespace Orleans.Runtime.Storage
         {
             storageProviderLoader = new ProviderLoader<IStorageProvider>();
             providerRuntime = SiloProviderRuntime.Instance;
-            
-            if(!configs.ContainsKey("Storage"))
+
+            if (!configs.ContainsKey(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
                 return TaskDone.Done;
 
-            storageProviderLoader.LoadProviders(configs["Storage"].Providers, this);
+            storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME].Providers, this);
             return storageProviderLoader.InitProviders(providerRuntime);
         }
 
