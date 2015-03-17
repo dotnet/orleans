@@ -27,6 +27,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Text;
 using Orleans;
+﻿using Orleans.Providers;
 
 namespace $rootnamespace$
 {
