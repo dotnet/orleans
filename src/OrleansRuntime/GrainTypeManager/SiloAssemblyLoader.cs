@@ -37,15 +37,12 @@ namespace Orleans.Runtime
     internal class SiloAssemblyLoader
     {
         private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoader.Silo");
+        private List<string> discoveredAssemblyLocations;
 
         public SiloAssemblyLoader()
         {
             LoadApplicationAssemblies();
         }
-
-        public IDictionary<string, GrainTypeData> GrainClassTypeData { get { return GetGrainClassTypes(); } }
-
-        public IEnumerable<KeyValuePair<int, Type>> GrainMethodInvokerTypes { get { return GetGrainMethodInvokerTypes(); } }
 
         private void LoadApplicationAssemblies()
         {
@@ -71,14 +68,16 @@ namespace Orleans.Runtime
                         typeof(IProvider))
                 };
 
-            AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
+            discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
         }
 
-        private IDictionary<string, GrainTypeData> GetGrainClassTypes()
+        public IDictionary<string, GrainTypeData> GetGrainClassTypes(bool strict)
         {
             var result = new Dictionary<string, GrainTypeData>();
-            IDictionary<string, Type> grainStateTypes = GetGrainStateTypes();
-            Type[] grainTypes = TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass).ToArray();
+            IDictionary<string, Type> grainStateTypes = GetGrainStateTypes(strict);
+            Type[] grainTypes = strict
+                ? TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass).ToArray()
+                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsConcreteGrainClass).ToArray();
 
             foreach (var grainType in grainTypes)
             {
@@ -98,10 +97,12 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private static IDictionary<string, Type> GetGrainStateTypes()
+        private IDictionary<string, Type> GetGrainStateTypes(bool strict)
         {
             var result = new Dictionary<string, Type>();
-            Type[] types = TypeUtils.GetTypes(TypeUtils.IsGrainStateType).ToArray();
+            Type[] types = strict
+                ? TypeUtils.GetTypes(TypeUtils.IsGrainStateType).ToArray()
+                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainStateType).ToArray();
 
             foreach (var type in types)
             {
@@ -115,10 +116,12 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private IEnumerable<KeyValuePair<int, Type>> GetGrainMethodInvokerTypes()
+        public IEnumerable<KeyValuePair<int, Type>> GetGrainMethodInvokerTypes(bool strict)
         {
             var result = new Dictionary<int, Type>();
-            Type[] types = TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType).ToArray();
+            Type[] types = strict
+                ? TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType).ToArray()
+                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainMethodInvokerType).ToArray();
 
             foreach (var type in types)
             {
