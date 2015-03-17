@@ -4,8 +4,6 @@ title: Storage Providers
 ---
 {% include JB/setup %}
 
-## Storage Providers
-
 **Note**: This sample requires the "Official MongoDB C# Driver" NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to [download](https://www.mongodb.org/) and install MongoDB. 
 
 Custom storage providers allow you to extend the capabilities of Orleans to store application data in new storage services. In this sample, we have code to store data in a file system (presumably networked) and in MongoDB.
@@ -13,22 +11,21 @@ Custom storage providers allow you to extend the capabilities of Orleans to stor
 While binary formatting is almost always better to use for persistent storage, this sample chooses to use JSON as the external format for one reason: it's easier to read and verify, which is a good thing in a sample. As you adopt the sample code for more realistic use, you will probably want to switch to something else than JSON as the external format.
 
 ### Running the sample
-The sample solution consists of four projects -- the storage provider library, and three test libraries, with the same client+server structure that the  Hello World sample has.
+The sample solution consists of four projects -- the storage provider library, and three test libraries, with the same client+server structure that the [Hello World](Hello-World) sample has.
 
 ![](ProvidersSample.png)
 
 1. Edit the `DevTestServerConfiguration.xml` file in the Test.Client project, uncommenting the element of the file-storage provider.
 
-
-      <!-- To test the sample storage providers, uncomment one of the following two lines:
-      <Provider Type="Samples.StorageProviders.MongoDBStorage" 
-                Name="TestStore"
-                Database="orleanssamples"
-                ConnectionString="mongodb://localhost:27017/" />
-      -->
-      <Provider Type="Samples.StorageProviders.OrleansFileStorage" 
-                Name="TestStore"
-                RootDirectory=".\Samples.FileStorage"/>
+               <!-- To test the sample storage providers, uncomment one of the following two lines:
+               <Provider Type="Samples.StorageProviders.MongoDBStorage" 
+                         Name="TestStore"
+                         Database="orleanssamples"
+                         ConnectionString="mongodb://localhost:27017/" />
+               -->
+               <Provider Type="Samples.StorageProviders.OrleansFileStorage" 
+                         Name="TestStore"
+                         RootDirectory=".\Samples.FileStorage"/>
 
 
 Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.
@@ -76,7 +73,7 @@ If you have [MongoDB installed](http://docs.mongodb.org/manual/tutorial/install-
     > use orleanssamples
     switched to db orleanssamples
     > db.PersonState.find()
-    { "_id" : ObjectId("533391afcf20b011307a82bf"), "FirstName" : "John", "LastName" :            "Doe", "Gender" : 0, "key" : "0000000000000000000000000000000003ffffffc0950639" }
+    { "_id" : ObjectId("533391afcf20b011307a82bf"), "FirstName" : "John", "LastName" : "Doe", "Gender" : 0, "key" : "0000000000000000000000000000000003ffffffc0950639" }
     >
 
 ### Design
