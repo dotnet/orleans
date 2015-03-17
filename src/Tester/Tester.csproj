@@ -109,6 +109,10 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
+      <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
+      <Name>ClientGenerator</Name>
+    </ProjectReference>
     <ProjectReference Include="..\CounterControl\CounterControl.csproj">
       <Project>{f88449a1-8964-4eb9-9efc-b913afebd7d1}</Project>
       <Name>CounterControl</Name>
