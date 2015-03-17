@@ -174,6 +174,27 @@ namespace Orleans.Runtime
                     .Select(Path.GetFullPath)
                     .Distinct()
                     .ToArray();
+
+                // This is a workaround for the behavior of ReflectionOnlyLoad/ReflectionOnlyLoadFrom
+                // that appear not to automatically resolve dependencies.
+                // We are trying to preload all dlls we find in the folder, so that if one of these
+                // assemblies happens to be a dependency of an assembly we later on call 
+                // Assembly.GetTypes() on, the dependency will be already loaded and will get
+                // automatically resolved. Ugly, but seems to solve the problem.
+
+                foreach (var j in candidates)
+                {
+                    try
+                    {
+                        if(logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.");
+                        Assembly.ReflectionOnlyLoadFrom(j);
+                    }
+                    catch (Exception exc)
+                    {
+                        if (logger.IsVerbose) logger.Verbose("Failed to pload assembly {0} in reflection-only context.", exc);
+                    }
+                }
+
                 foreach (var j in candidates)
                 {
                     if (AssemblyPassesLoadCriteria(j))

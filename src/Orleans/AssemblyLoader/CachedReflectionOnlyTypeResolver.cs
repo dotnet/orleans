@@ -68,7 +68,7 @@ namespace Orleans.Runtime
                 var name = AppDomain.CurrentDomain.ApplyPolicy(args.Name);
                 return Assembly.ReflectionOnlyLoad(name);
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 if (logger.IsVerbose2)
                 {
