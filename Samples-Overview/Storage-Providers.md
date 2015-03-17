@@ -28,9 +28,9 @@ The sample solution consists of four projects -- the storage provider library, a
                          RootDirectory=".\Samples.FileStorage"/>
 
 
-Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.
+2. Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.
 
-Set the 'Test.Client' project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:
+3. Set the 'Test.Client' project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:
 
     Successfully started Orleans silo 'host-001' as a Primary node.
 
@@ -40,7 +40,7 @@ Set the 'Test.Client' project as the startup project and hit F5. Right before it
     Press Enter to terminate...
 
 
-Stop the program and open a command line windows, move to the folder containing the Orleans SDK, then to the LocalSilo folder. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:
+4. Stop the program and open a command line windows, move to the folder containing the Orleans SDK, then to the LocalSilo folder. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:
 
     >>dir
          Directory: C:\Microsoft Codename Orleans SDK v0.9\SDK\LocalSilo\Samples.FileStorage
@@ -50,13 +50,13 @@ Stop the program and open a command line windows, move to the folder containing 
     -a---         3/26/2014     19:50         48 0000...003ffffffc0950639.PersonState
 
 
-If you look at the contents of that file, you should see some JSON text:
+5. If you look at the contents of that file, you should see some JSON text:
 
     >> 
     more .\Samples.FileStorage\0000000000000000000000000000000003ffffffc0950639.PersonState
     {"FirstName":"John","LastName":"Doe","Gender":0}
 
-Now, run the program again. It's written to detect that state already exists, so this time, it will have something else to say:
+6. Now, run the program again. It's written to detect that state already exists, so this time, it will have something else to say:
 
     Successfully started Orleans silo host-001' as a Primary node.
 
@@ -66,7 +66,7 @@ Now, run the program again. It's written to detect that state already exists, so
     Press Enter to terminate...
 
 
-If you have [MongoDB installed](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/), you can repeat this procedure to test the other storage provider. Just change which XML element in the configuration file that is uncommented and ensure that the mongod.exe process is running. When you inspect the data with the MongoDB shell (mongo.exe), it should look something like this:
+7. If you have [MongoDB installed](http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/), you can repeat this procedure to test the other storage provider. Just change which XML element in the configuration file that is uncommented and ensure that the mongod.exe process is running. When you inspect the data with the MongoDB shell (mongo.exe), it should look something like this:
 
     MongoDB shell version: 2.4.6
     connecting to: test
