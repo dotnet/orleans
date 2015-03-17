@@ -9,6 +9,8 @@ To productively use the Orleans samples, you need to have a copy of Visual Studi
 
 An Azure subscription will help with some of the samples, but is not required. Azure is available as a [free trial](http://www.windowsazure.com/en-us/pricing/free-trial/). For the Azure-based samples, you will need to install the [Azure SDK 2.4 or 2.5 for .NET](http://www.windowsazure.com/en-us/downloads). 
 
+The samples themselves can be downloaded from [GitHub](https://github.com/dotnet/orleans/tree/master/Samples).
+
 
 ### [Hello World](Hello-World)
 
