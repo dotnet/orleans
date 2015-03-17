@@ -31,11 +31,11 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerCollection
     {
-        private readonly Dictionary<IGrain, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
+        private readonly Dictionary<IStreamConsumerExtension, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
 
         public StreamConsumerCollection()
         {
-            queueData = new Dictionary<IGrain, StreamConsumerData>();
+            queueData = new Dictionary<IStreamConsumerExtension, StreamConsumerData>();
         }
 
         public StreamConsumerData AddConsumer(StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
