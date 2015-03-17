@@ -4,8 +4,6 @@ title: Chirper
 ---
 {% include JB/setup %}
 
-## Chirper
-
 A simple social network pub/sub system, with short text messages being sent between users. Publishers send out short "Chirp" messages (not to be confused with "Tweets", for a variety of legal reasons! ;) to any other users that are following them.
 
 ### Instructions
@@ -17,7 +15,7 @@ A simple social network pub/sub system, with short text messages being sent betw
 6. Type a comment into the publisher client window, and see it displayed on the other client console window.
 
 ### Overview
-The NetworkLoader program reads a graphml data file containing a description of a network of Users and Followers. 
+The `NetworkLoader` program reads a graphml data file containing a description of a network of Users and Followers. 
 
 The `NetworkLoader` program sets up a network of  `ChirperAccount` (aka "users") grains based on the input data file, one grain for each user defined in the network. It then creates the follower links between those users by calling the FollowUserId method on the appropriate user grain.
 
@@ -43,9 +41,9 @@ These grains allow to distribute the load for handling the message throughput, w
 
 The grains implement three different grain interfaces to represent the three functional facets of those entities -- `IChirperPublisher`, `IChirperSubscriber` and `IChirperAccount`
 
-There is also an IChirperViewer observer interface for applications to subscribe for status changes from a particular Chirper user without becoming a Follower. This observer interface is typically used when writing client UI applications such as `ChirperClient`.
+There is also an `IChirperViewer` observer interface for applications to subscribe for status changes from a particular Chirper user without becoming a Follower. This observer interface is typically used when writing client UI applications such as `ChirperClient`.
 
-### Things for you to do if you are so inclined
+### Things for you to do if you are so inclined:
 
 1. Connect more clients to see the Chirper broadcast behavior.
 2. Make the network of users much bigger.
