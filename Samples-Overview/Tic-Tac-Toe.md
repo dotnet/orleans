@@ -4,7 +4,6 @@ title:  Tic Tac Toe
 ---
 {% include JB/setup %}
 
-## Tic Tac Toe
 TicTacToe is based on the classic board game, also known as "noughts and crosses." Its game logic is simple, which makes it an excellent sample for showing how a turn-based game could be easily implemented in Orleans. 
 
 A game like this may not at first sight seem a natural fit for Orleans, if you only think about it in terms of a single player game. However, within a social game context, such as a Facebook game, where thousands of players could be playing dozens of games at any one time - some games waiting for the opponent to join, others mid game, waiting for the next move to play out, then it is a much more natural fit. Orleans enables the developer to concentrate on expressing game logic as grains, letting the runtime handle the scale.
@@ -17,6 +16,7 @@ This sample also demonstrates how an Orleans application can be deployed to Wind
 The sample comes complete with a Windows Azure project, so it can be run locally in the Windows Azure local emulator, or deployed as a real cloud service. If running locally, you will need to create multiple "private" browsing sessions, to ensure each browser session is recognized as a new player. 
 
 To run locally without the emulator:
+
 1. Open the `TicTacToe.sln` file in Visual Studio and build the solution. 
 2. Set the TicTacToe.Grains project as the startup project. 
 3. Press F5 to start the application. 
@@ -24,6 +24,7 @@ To run locally without the emulator:
 5. Your browser should open, asking you to enter your name.
 
 To run locally using the Azure emulator:
+
 1. Open the `TicTacToe.sln` file in Visual Studio and build the solution. 
 2. Set the TicTacToe.Azure project as the startup project. 
 3. Start the Azure Compute Emulator if necessary. 
@@ -31,6 +32,7 @@ To run locally using the Azure emulator:
 5. Your browser should open, asking you to enter your name.
 
 To run in Windows Azure:
+
 1. Open the `TicTacToe.sln` file in Visual Studio and build the solution. 
 2. Expand the `TicTacToe.Azure` project, and in the `Roles` folder, open the properties for `TicTacToe.Web` and `TicTacToe.WorkerRole`. 
 3. Set the value for the `DataConnectionString` setting for both roles to a Windows Azure Storage Account. 
