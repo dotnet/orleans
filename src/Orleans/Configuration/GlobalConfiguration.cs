@@ -30,6 +30,8 @@ using System.Net;
 using System.Xml;
 using Orleans.AzureUtils;
 ﻿using Orleans.Providers;
+using Orleans.Streams;
+using Orleans.Storage;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -688,68 +690,118 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Registers given type of <typeparamref name="T"/> where <typeparamref name="T"/> is bootstrap provider
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is bootstrap provider
         /// </summary>
-        /// <typeparam name="T">
-        ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
-        /// </typeparam>
-        /// <param name="name">
-        ///     Name of bootstrap provider
-        /// </param>
-        /// <param name="properties">
-        ///     Properties that will be passed to bootstrap provider upon initialization
-        /// </param>
-        public void RegisterBootstrapProvider<T>(string name, IDictionary<string, string> properties = null)
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</typeparam>
+        /// <param name="providerName">Name of the bootstrap provider</param>
+        /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
+        public void RegisterBootstrapProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
         {
-            RegisterBootstrapProvider(typeof(T), name, properties);
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(IBootstrapProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "providerType");
+
+            RegisterProvider_Helper(ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>
-        /// Registers given type as bootstrap provider
+        /// Registers a given bootstrap provider.
         /// </summary>
-        /// <param name="type">
-        ///     Non-abstract type which implements <see cref="IBootstrapProvider"/> interface
-        /// </param>
-        /// <param name="name">
-        ///     Name of bootstrap provider
-        /// </param>
-        /// <param name="properties">
-        ///     Properties that will be passed to bootstrap provider upon initialization
-        /// </param>
-        public void RegisterBootstrapProvider(Type type, string name, IDictionary<string, string> properties = null) 
+        /// <param name="providerTypeFullName">Full name of the bootstrap provider type</param>
+        /// <param name="providerName">Name of the bootstrap provider</param>
+        /// <param name="properties">Properties that will be passed to the bootstrap provider upon initialization </param>
+        public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            if (type == null)
-                throw new ArgumentNullException("type");
+            RegisterProvider_Helper(ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
 
-            if (string.IsNullOrEmpty(name))
-                throw new ArgumentException("Bootstrap provider name cannot be null or empty string", "name");
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IStreamProvider"/> stream</typeparam>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
+        public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
+        {
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "providerType");
 
-            if (type.IsAbstract ||
-                type.IsGenericType ||
-                !typeof(IBootstrapProvider).IsAssignableFrom(type))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "type");
+            RegisterProvider_Helper(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
 
-            const string bootstrapCategoryKey = "Bootstrap";
+        /// <summary>
+        /// Registers a given stream provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
+        public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            RegisterProvider_Helper(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is storage provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IStorageProvider"/> storage</typeparam>
+        /// <param name="providerName">Name of the storage provider</param>
+        /// <param name="properties">Properties that will be passed to storage provider upon initialization</param>
+        public void RegisterStorageProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStorageProvider
+        {
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(IStorageProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "providerType");
+
+            RegisterProvider_Helper(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given storage provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the storage provider type</param>
+        /// <param name="providerName">Name of the storage provider</param>
+        /// <param name="properties">Properties that will be passed to the storage provider upon initialization </param>
+        public void RegisterStorageProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            RegisterProvider_Helper(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        private void RegisterProvider_Helper(string providerCategory, string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            if (string.IsNullOrEmpty(providerCategory))
+                throw new ArgumentException("Provider Category cannot be null or empty string", "providerCategory");
+
+            if (string.IsNullOrEmpty(providerTypeFullName))
+                throw new ArgumentException("Provider type full name cannot be null or empty string", "providerTypeFullName");
+
+            if (string.IsNullOrEmpty(providerName))
+                throw new ArgumentException("Provider name cannot be null or empty string", "providerName");
 
             ProviderCategoryConfiguration category;
-            ProviderConfigurations.TryGetValue(bootstrapCategoryKey, out category);
-            if (category == null)
+            if (!ProviderConfigurations.TryGetValue(providerCategory, out category))
             {
                 category = new ProviderCategoryConfiguration()
                 {
-                    Name = bootstrapCategoryKey,
+                    Name = providerCategory,
                     Providers = new Dictionary<string, IProviderConfiguration>()
                 };
                 ProviderConfigurations.Add(category.Name, category);
             }
 
-            if (category.Providers.ContainsKey(name))
+            if (category.Providers.ContainsKey(providerName))
                 throw new InvalidOperationException(
-                    string.Format("Bootstrap provider with name '{0}' has been already registered", name));
+                    string.Format("{0} provider of type {1} with name '{2}' has been already registered", providerCategory, providerTypeFullName, providerName));
 
             var config = new ProviderConfiguration(
-                properties ?? new Dictionary<string, string>(), 
-                type.FullName, name);
+                properties ?? new Dictionary<string, string>(),
+                providerTypeFullName, providerName);
 
             category.Providers.Add(config.Name, config);
         } 
@@ -758,11 +810,11 @@ namespace Orleans.Runtime.Configuration
         {
             if (String.IsNullOrEmpty(deploymentId)) return;
 
-                foreach (ProviderCategoryConfiguration providerConfig in providerConfigurations.Where(kv => kv.Key.Equals("Stream")).Select(kv => kv.Value))
-                {
-                    providerConfig.SetConfiguration("DeploymentId", deploymentId);
-                }
+            foreach (ProviderCategoryConfiguration providerConfig in providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)).Select(kv => kv.Value))
+            {
+                providerConfig.SetConfiguration("DeploymentId", deploymentId);
             }
+        }
 
         internal static string PrintProviderConfigurations(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations)
         {

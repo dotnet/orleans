@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         internal BootstrapProviderManager()
         {
             var logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
-            configCategoryName = BootstrapProviderConstants.CONFIG_CATEGORY_NAME;
+            configCategoryName = ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME;
             pluginManager = new PluginManager<IBootstrapProvider>(logger);
         }
 

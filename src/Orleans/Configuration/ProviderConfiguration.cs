@@ -193,6 +193,10 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class ProviderCategoryConfiguration
     {
+        public const string BOOTSTRAP_PROVIDER_CATEGORY_NAME = "Bootstrap";
+        public const string STORAGE_PROVIDER_CATEGORY_NAME = "Storage";
+        public const string STREAM_PROVIDER_CATEGORY_NAME = "Stream";
+
         public string Name { get; set; }
         public IDictionary<string, IProviderConfiguration> Providers { get; set; }
 
