@@ -68,11 +68,12 @@ The following must be installed prior to running the sample:
 * Enter the details from Twitter into the TwitterClient\app.js file. 
 * Edit the [Orleans SDK]\LocalSilo\OrleansConfiguration.xml file to include a storage provider called `store1`, using the account name and key of your Windows Azure Storage account:
 
-           <?xml version="1.0" encoding="utf-8"?>
+         <?xml version="1.0" encoding="utf-8"?>
              <OrleansConfiguration xmlns="urn:orleans">
                <Globals>
                  <StorageProviders>
-                    <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"            DataConnectionString="DefaultEndpointsProtocol=https;AccountName=ACCCOUNT_NAME;AccountKey=ACCOUNT_KEY" />
+                    <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"           
+                          DataConnectionString="DefaultEndpointsProtocol=https;AccountName=ACCCOUNT_NAME;AccountKey=ACCOUNT_KEY" />
                  </StorageProviders>
 
 * Start the local Orleans Silo by running the `StartLocalSilo.cmd` in the Orleans SDK directory. 
