@@ -14,6 +14,8 @@
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <NuGetPackageImportStamp>b7a6117c</NuGetPackageImportStamp>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -94,23 +96,11 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>
     </PostBuildEvent>
   </PropertyGroup>
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.3\build\Microsoft.Orleans.Templates.Interfaces.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.3\build\Microsoft.Orleans.Templates.Interfaces.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.3\build\Microsoft.Orleans.Templates.Interfaces.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.3\build\Microsoft.Orleans.Templates.Interfaces.targets'))" />
-  </Target>
   <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.3\build\Microsoft.Orleans.Templates.Interfaces.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.3\build\Microsoft.Orleans.Templates.Interfaces.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
@@ -120,3 +110,4 @@
   </Target>
   -->
 </Project>
+

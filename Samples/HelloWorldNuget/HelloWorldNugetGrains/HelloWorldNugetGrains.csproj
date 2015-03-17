@@ -13,7 +13,9 @@
     <AssemblyName>HelloWorldNugetGrains</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <NuGetPackageImportStamp>07da0a61</NuGetPackageImportStamp>
+    <NuGetPackageImportStamp>b448399c</NuGetPackageImportStamp>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
   </PropertyGroup>
   <PropertyGroup>
     <StartAction>Program</StartAction>
@@ -99,17 +101,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\HelloWorldNugetInterfaces\HelloWorldNugetInterfaces.csproj">
-      <Project>{163cce80-c506-468c-9b28-e2ff198097e3}</Project>
-      <Name>HelloWorldInterfaces</Name>
+      <Project>{3BD01348-ACC3-4378-A49E-4D62FB0BD3D0}</Project>
+      <Name>HelloWorldNugetInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
@@ -128,16 +125,10 @@
       )
     </PostBuildEvent>
   </PropertyGroup>
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.3\build\Microsoft.Orleans.Templates.Grains.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Grains.1.0.3\build\Microsoft.Orleans.Templates.Grains.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.3\build\Microsoft.Orleans.Templates.Grains.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Grains.1.0.3\build\Microsoft.Orleans.Templates.Grains.targets'))" />
-  </Target>
   <Import Project="..\packages\Microsoft.Orleans.Templates.Grains.1.0.3\build\Microsoft.Orleans.Templates.Grains.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.3\build\Microsoft.Orleans.Templates.Grains.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>-->
 </Project>
+
