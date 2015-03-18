@@ -310,7 +310,16 @@ namespace Orleans.Runtime.Configuration
                             {
                                 var providerConfig = new ProviderCategoryConfiguration();
                                 providerConfig.Load(child);
-                                ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+
+                                if (ProviderConfigurations.ContainsKey(providerConfig.Name))
+                                {
+                                    var existingProviderConfig = ProviderConfigurations[providerConfig.Name];
+                                    existingProviderConfig.Merge(providerConfig);
+                                }
+                                else
+                                {
+                                    ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                                }
                             }
                             break;
                     }
@@ -340,12 +349,40 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IStreamProvider"/> stream</typeparam>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
+        public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
+        {
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given stream provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
+        public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
         /// This method may be called by the client host or test host to tweak a provider configuration after it has been already loaded.
         /// Its is optional and should NOT be automaticaly called by the runtime.
         /// </summary>
         internal void AdjustConfiguration()
         {
-            GlobalConfiguration.AdjustConfiguration(ProviderConfigurations, DeploymentId);
+            ProviderConfigurationUtility.AdjustConfiguration(ProviderConfigurations, DeploymentId);
         }
 
         /// <summary>
@@ -423,7 +460,7 @@ namespace Orleans.Runtime.Configuration
             }
             sb.AppendFormat(base.ToString());
             sb.AppendFormat("   Providers:").AppendLine();
-            sb.Append(GlobalConfiguration.PrintProviderConfigurations(ProviderConfigurations));
+            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();
         }
 

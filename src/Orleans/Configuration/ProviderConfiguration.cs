@@ -23,7 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+﻿using System.Linq;
+﻿using System.Text;
 using System.Xml;
 using Orleans.Providers;
 
@@ -263,6 +264,73 @@ namespace Orleans.Runtime.Configuration
             foreach (var kv in Providers)
             {
                 sb.AppendFormat("           {0}", kv.Value).AppendLine();
+            }
+            return sb.ToString();
+        }
+    }
+
+    internal class ProviderConfigurationUtility
+    {
+        internal static void RegisterProvider(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string providerCategory, string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            if (string.IsNullOrEmpty(providerCategory))
+                throw new ArgumentException("Provider Category cannot be null or empty string", "providerCategory");
+
+            if (string.IsNullOrEmpty(providerTypeFullName))
+                throw new ArgumentException("Provider type full name cannot be null or empty string", "providerTypeFullName");
+
+            if (string.IsNullOrEmpty(providerName))
+                throw new ArgumentException("Provider name cannot be null or empty string", "providerName");
+
+            ProviderCategoryConfiguration category;
+            if (!providerConfigurations.TryGetValue(providerCategory, out category))
+            {
+                category = new ProviderCategoryConfiguration()
+                {
+                    Name = providerCategory,
+                    Providers = new Dictionary<string, IProviderConfiguration>()
+                };
+                providerConfigurations.Add(category.Name, category);
+            }
+
+            if (category.Providers.ContainsKey(providerName))
+                throw new InvalidOperationException(
+                    string.Format("{0} provider of type {1} with name '{2}' has been already registered", providerCategory, providerTypeFullName, providerName));
+
+            var config = new ProviderConfiguration(
+                properties ?? new Dictionary<string, string>(),
+                providerTypeFullName, providerName);
+
+            category.Providers.Add(config.Name, config);
+        }
+
+        internal static void AdjustConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string deploymentId)
+        {
+            if (String.IsNullOrEmpty(deploymentId)) return;
+
+            foreach (ProviderCategoryConfiguration providerConfig in providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)).Select(kv => kv.Value))
+            {
+                providerConfig.SetConfiguration("DeploymentId", deploymentId);
+            }
+        }
+
+        internal static string PrintProviderConfigurations(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations)
+        {
+            var sb = new StringBuilder();
+            if (providerConfigurations.Keys.Count > 0)
+            {
+                foreach (string provType in providerConfigurations.Keys)
+                {
+                    ProviderCategoryConfiguration provTypeConfigs = providerConfigurations[provType];
+                    sb.AppendFormat("       {0}Providers:", provType)
+                        .AppendLine();
+                    sb.AppendFormat(provTypeConfigs.ToString())
+                        .AppendLine();
+                }
+            }
+            else
+            {
+                sb.AppendLine("       No providers configured.");
             }
             return sb.ToString();
         }
