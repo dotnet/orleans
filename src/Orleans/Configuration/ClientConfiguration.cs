@@ -28,6 +28,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Xml;
+using Orleans.Providers;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -308,17 +309,16 @@ namespace Orleans.Runtime.Configuration
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                             {
-                                var providerConfig = new ProviderCategoryConfiguration();
-                                providerConfig.Load(child);
+                                var providerCategory = ProviderCategoryConfiguration.Load(child);
 
-                                if (ProviderConfigurations.ContainsKey(providerConfig.Name))
+                                if (ProviderConfigurations.ContainsKey(providerCategory.Name))
                                 {
-                                    var existingProviderConfig = ProviderConfigurations[providerConfig.Name];
-                                    existingProviderConfig.Merge(providerConfig);
+                                    var existingCategory = ProviderConfigurations[providerCategory.Name];
+                                    existingCategory.Merge(providerCategory);
                                 }
                                 else
                                 {
-                                    ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                                    ProviderConfigurations.Add(providerCategory.Name, providerCategory);
                                 }
                             }
                             break;
@@ -375,6 +375,27 @@ namespace Orleans.Runtime.Configuration
         {
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
+
+        /// <summary>
+        /// Retrieves an existing provider configuration
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="config">The provider configuration, if exists</param>
+        /// <returns>True if a configuration for this provider already exists, false otherwise.</returns>
+        public bool TryGetProviderConfiguration(string providerTypeFullName, string providerName, out IProviderConfiguration config)
+        {
+            return ProviderConfigurationUtility.TryGetProviderConfiguration(ProviderConfigurations, providerTypeFullName, providerName, out config);
+        }
+
+        /// <summary>
+        /// Retrieves an enumeration of all currently configured provider configurations.
+        /// </summary>
+        /// <returns>An enumeration of all currently configured provider configurations.</returns>
+        public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
+        {
+            return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
+        } 
 
         /// <summary>
         /// This method may be called by the client host or test host to tweak a provider configuration after it has been already loaded.
