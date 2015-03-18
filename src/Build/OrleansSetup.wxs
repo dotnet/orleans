@@ -6,7 +6,7 @@
            Language='1033' Codepage='1252' Version='$(var.ProductVersion)' Manufacturer='Microsoft Corporation'>
 
     <Package Id='*' Keywords='Installer' Description="Microsoft Project Orleans SDK Installer" Manufacturer='Microsoft Corporation'
-      InstallerVersion='300' Languages='1033' Compressed='yes' SummaryCodepage='1252'/>
+      InstallerVersion='300' Languages='1033' Compressed='yes' SummaryCodepage='1252' Platform="x64" />
 
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
 
@@ -177,8 +177,59 @@
         </Directory>
       </Directory>
 
+
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="MicrosoftSDKs" Name="Microsoft SDKs">
+          <Directory Id="Azure" Name="Azure">
+            <Directory Id="NETSDK" Name=".NET SDK">
+              <Directory Id="v25" Name="v2.5">
+                <Directory Id="bin" Name="bin">
+                  <Directory Id="plugins" Name="plugins">
+                    <Directory Id="AzurePlugin" Name="Orleans">
+                      <Component Id="Comp_AzurePlugin" DiskId="1" Guid="4e9d6016-e8f5-42b9-9f65-a11a53a76a44" Win64="yes">
+                        <File Id="File_Plugin_ClientGenerator.exe" Name="ClientGenerator.exe" Source="$(var.SDK_binaries_server_src)\ClientGenerator.exe" />
+                        <File Id="File_Plugin_ClientGenerator.exe.config" Name="ClientGenerator.exe.config" Source="$(var.SDK_binaries_server_src)\ClientGenerator.exe.config" />
+                        <File Id="File_Plugin_CounterControl.exe" Name="CounterControl.exe" Source="$(var.SDK_binaries_server_src)\CounterControl.exe" />
+                        <File Id="File_Plugin_CounterControl.exe.config" Name="CounterControl.exe.config" Source="$(var.SDK_binaries_server_src)\CounterControl.exe.config" />
+                        <File Id="File_Plugin_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
+                        <File Id="File_Plugin_Microsoft.WindowsAzure.ServiceRuntime.dll" Name="Microsoft.WindowsAzure.ServiceRuntime.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.ServiceRuntime.dll" />
+                        <File Id="File_Plugin_Microsoft.WindowsAzure.StorageClient.dll" Name="Microsoft.WindowsAzure.StorageClient.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.StorageClient.dll" />
+                        <File Id="File_Plugin_Orleans.dll" Name="Orleans.dll" Source="$(var.SDK_binaries_server_src)\Orleans.dll" />
+                        <File Id="File_Plugin_Orleans.SDK.targets" Name="Orleans.SDK.targets" Source="$(var.SDK_binaries_server_src)\Orleans.SDK.targets" />
+                        <File Id="File_Plugin_Orleans.xml" Name="Orleans.xml" Source="$(var.SDK_binaries_server_src)\Orleans.xml" />
+                        <File Id="File_Plugin_OrleansAzureUtils.dll" Name="OrleansAzureUtils.dll" Source="$(var.SDK_binaries_server_src)\OrleansAzureUtils.dll" />
+                        <File Id="File_Plugin_OrleansAzureUtils.xml" Name="OrleansAzureUtils.xml" Source="$(var.SDK_binaries_server_src)\OrleansAzureUtils.xml" />
+                        <File Id="File_Plugin_OrleansConfiguration.xml" Name="OrleansConfiguration.xml" Source="$(var.SDK_binaries_server_src)\OrleansConfiguration.xml" />
+                        <File Id="File_Plugin_OrleansConfiguration.xsd" Name="OrleansConfiguration.xsd" Source="$(var.OrleansDir)\Orleans\Configuration\OrleansConfiguration.xsd" />
+                        <File Id="File_Plugin_OrleansHost.exe" Name="OrleansHost.exe" Source="$(var.SDK_binaries_server_src)\OrleansHost.exe" />
+                        <File Id="File_Plugin_OrleansHost.exe.config" Name="OrleansHost.exe.config" Source="$(var.SDK_binaries_server_src)\OrleansHost.exe.config" />
+                        <File Id="File_Plugin_OrleansManager.exe" Name="OrleansManager.exe" Source="$(var.SDK_binaries_server_src)\OrleansManager.exe" />
+                        <File Id="File_Plugin_OrleansManager.exe.config" Name="OrleansManager.exe.config" Source="$(var.SDK_binaries_server_src)\OrleansManager.exe.config" />
+                        <File Id="File_Plugin_OrleansProviders.dll" Name="OrleansProviders.dll" Source="$(var.SDK_binaries_server_src)\OrleansProviders.dll" />
+                        <File Id="File_Plugin_OrleansRuntime.dll" Name="OrleansRuntime.dll" Source="$(var.SDK_binaries_server_src)\OrleansRuntime.dll" />
+                        <File Id="File_Plugin_Newtonsoft.Json.dll" Name="Newtonsoft.Json.dll" Source="$(var.SDK_binaries_server_src)\Newtonsoft.Json.dll" />
+                        <File Id="File_Plugin_StartOrleansPlugin.cmd" Name="StartOrleansPlugin.cmd" Source="$(var.SDK_binaries_server_src)\StartOrleansPlugin.cmd" />
+                        <File Id="File_Plugin_Orleans.csplugin" Name="Orleans.csplugin" Source="$(var.SDK_binaries_server_src)\Orleans.csplugin" />
+                        <File Id="File_Plugin_OrleansAzureHost.exe" Name="OrleansAzureHost.exe" Source="$(var.SDK_binaries_server_src)\OrleansAzureHost.exe" />
+                        <File Id="File_Plugin_OrleansAzureHost.exe.config" Name="OrleansAzureHost.exe.config" Source="$(var.SDK_binaries_server_src)\OrleansAzureHost.exe.config" />
+                        <RemoveFolder Id='AzurePlugin' On='uninstall'/>
+                        <RegistryValue Root='HKLM' Key='Software\Microsoft\OrleansSDK\Preview\v$(var.ProductVersion)\AzurePlugin' Type='string' Value='' KeyPath='yes' />
+                      </Component>
+                    </Directory>
+                  </Directory>
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+
+
     </Directory>
 
+
+
+    
     <!-- Features to install -->
 
     <Feature Id="ProductFeature1" Title="Orleans SDK" Description="Microsoft Orleans SDK" Display="expand" Level="1" AllowAdvertise="no" Absent="disallow"  >
@@ -191,6 +242,7 @@
       <ComponentRef Id="Comp_SDK" Primary="yes" />
       <ComponentRef Id="RegistryEntries" Primary="yes" />
       <ComponentRef Id="Comp_Samples" Primary="yes" />
+      <ComponentRef Id="Comp_AzurePlugin" Primary="yes" />
     </Feature>
     
     <CustomAction Id="UninstallVSIX" ExeCommand="/uninstall:462db41f-31a4-48f0-834c-1bdcc0578511 /q" Property="VSIX_PATH" Execute="deferred" Return="ignore"/>

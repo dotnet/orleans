@@ -1,0 +1,18 @@
+<?xml version="1.0" ?>
+<RoleModule 
+  xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition"
+  namespace="Microsoft.Orleans">
+  <Startup priority="-1">
+    <Task commandLine="StartOrleansPlugin.cmd" taskType="foreground" />
+  </Startup>
+  <ConfigurationSettings>
+    <Setting name="DataConnectionString" />  
+  </ConfigurationSettings>
+  <LocalResources>
+    <LocalStorage name="LocalStoreDirectory" cleanOnRoleRecycle="false" />
+  </LocalResources>  
+  <Endpoints>
+    <InternalEndpoint name="OrleansSiloEndpoint" protocol="tcp" port="11111" />
+    <InternalEndpoint name="OrleansProxyEndpoint" protocol="tcp" port="30000" />
+  </Endpoints>
+</RoleModule>

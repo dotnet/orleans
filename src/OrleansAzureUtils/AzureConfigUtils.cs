@@ -316,7 +316,7 @@ namespace Orleans.Runtime.Host
             if (!val.StartsWith("@"))
                 return val; // Use original value
             
-            // Assume this is a reference to a setting in the Aazure service configuration file, so substitute.
+            // Assume this is a reference to a setting in the Azure service configuration file, so substitute.
             var settingName = val.Substring(1);
             var subsVal = RoleEnvironment.GetConfigurationSettingValue(settingName);
             Trace.TraceInformation("Config value {0} replaced with {1} setting value from role config settings", name, subsVal);
