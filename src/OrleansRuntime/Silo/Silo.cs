@@ -351,8 +351,8 @@ namespace Orleans.Runtime
         {
             lock (lockable)
             {
-                if (SystemStatus.Current != SystemStatus.Created)
-                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Start state. This silo is in the {0} state.", SystemStatus.Current));
+                if (!SystemStatus.Current.Equals(SystemStatus.Created))
+                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", SystemStatus.Current));
                 
                 SystemStatus.Current = SystemStatus.Starting;
             }
@@ -527,7 +527,7 @@ namespace Orleans.Runtime
                     stopAlreadyInProgress = true;
                     // Drop through to wait below
                 }
-                else if (SystemStatus.Current != SystemStatus.Running)
+                else if (!SystemStatus.Current.Equals(SystemStatus.Running))
                 {
                     throw new InvalidOperationException(String.Format("Calling Silo.Stop() on a silo which is not in the Running state. This silo is in the {0} state.", SystemStatus.Current));
                 }
@@ -646,7 +646,7 @@ namespace Orleans.Runtime
             {
                 lock (lockable)
                 {
-                    if (SystemStatus.Current != SystemStatus.Running) return;
+                    if (!SystemStatus.Current.Equals(SystemStatus.Running)) return;
                     
                     SystemStatus.Current = SystemStatus.Stopping;
                 }
