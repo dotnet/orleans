@@ -205,7 +205,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         internal void AdjustConfiguration()
         {
-            GlobalConfiguration.AdjustConfiguration(Globals.ProviderConfigurations, Globals.DeploymentId);
+            ProviderConfigurationUtility.AdjustConfiguration(Globals.ProviderConfigurations, Globals.DeploymentId);
         }
 
         private void InitNodeSettingsFromGlobals(NodeConfiguration n)

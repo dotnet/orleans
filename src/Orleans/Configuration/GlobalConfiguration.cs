@@ -466,7 +466,7 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("       Use Virtual Buckets Consistent Ring: {0}", UseVirtualBucketsConsistentRing).AppendLine();
             sb.AppendFormat("       Num Virtual Buckets Consistent Ring: {0}", NumVirtualBucketsConsistentRing).AppendLine();
             sb.AppendFormat("   Providers:").AppendLine();
-            sb.Append(PrintProviderConfigurations(ProviderConfigurations));
+            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
 
             return sb.ToString();
         }
@@ -701,9 +701,9 @@ namespace Orleans.Runtime.Configuration
             if (providerType.IsAbstract ||
                 providerType.IsGenericType ||
                 !typeof(IBootstrapProvider).IsAssignableFrom(providerType))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "providerType");
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "typeof(T)");
 
-            RegisterProvider_Helper(ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>
@@ -714,7 +714,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to the bootstrap provider upon initialization </param>
         public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            RegisterProvider_Helper(ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
         /// <summary>
@@ -729,9 +729,9 @@ namespace Orleans.Runtime.Configuration
             if (providerType.IsAbstract ||
                 providerType.IsGenericType ||
                 !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "providerType");
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
-            RegisterProvider_Helper(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>
@@ -742,7 +742,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
         public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            RegisterProvider_Helper(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
         /// <summary>
@@ -757,9 +757,9 @@ namespace Orleans.Runtime.Configuration
             if (providerType.IsAbstract ||
                 providerType.IsGenericType ||
                 !typeof(IStorageProvider).IsAssignableFrom(providerType))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "providerType");
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "typeof(T)");
 
-            RegisterProvider_Helper(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>
@@ -770,71 +770,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to the storage provider upon initialization </param>
         public void RegisterStorageProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            RegisterProvider_Helper(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
-        }
-
-        private void RegisterProvider_Helper(string providerCategory, string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
-        {
-            if (string.IsNullOrEmpty(providerCategory))
-                throw new ArgumentException("Provider Category cannot be null or empty string", "providerCategory");
-
-            if (string.IsNullOrEmpty(providerTypeFullName))
-                throw new ArgumentException("Provider type full name cannot be null or empty string", "providerTypeFullName");
-
-            if (string.IsNullOrEmpty(providerName))
-                throw new ArgumentException("Provider name cannot be null or empty string", "providerName");
-
-            ProviderCategoryConfiguration category;
-            if (!ProviderConfigurations.TryGetValue(providerCategory, out category))
-            {
-                category = new ProviderCategoryConfiguration()
-                {
-                    Name = providerCategory,
-                    Providers = new Dictionary<string, IProviderConfiguration>()
-                };
-                ProviderConfigurations.Add(category.Name, category);
-            }
-
-            if (category.Providers.ContainsKey(providerName))
-                throw new InvalidOperationException(
-                    string.Format("{0} provider of type {1} with name '{2}' has been already registered", providerCategory, providerTypeFullName, providerName));
-
-            var config = new ProviderConfiguration(
-                properties ?? new Dictionary<string, string>(),
-                providerTypeFullName, providerName);
-
-            category.Providers.Add(config.Name, config);
-        } 
-
-        internal static void AdjustConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string deploymentId)
-        {
-            if (String.IsNullOrEmpty(deploymentId)) return;
-
-            foreach (ProviderCategoryConfiguration providerConfig in providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)).Select(kv => kv.Value))
-            {
-                providerConfig.SetConfiguration("DeploymentId", deploymentId);
-            }
-        }
-
-        internal static string PrintProviderConfigurations(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations)
-        {
-            var sb = new StringBuilder();
-            if (providerConfigurations.Keys.Count > 0)
-            {
-                foreach (string provType in providerConfigurations.Keys)
-                {
-                    ProviderCategoryConfiguration provTypeConfigs = providerConfigurations[provType];
-                    sb.AppendFormat("       {0}Providers:", provType)
-                        .AppendLine();
-                    sb.AppendFormat(provTypeConfigs.ToString())
-                        .AppendLine();
-                }
-            }
-            else
-            {
-                sb.AppendLine("       No providers configured.");
-            }
-            return sb.ToString();
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
     }
 }
