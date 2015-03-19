@@ -20,5 +20,6 @@
   </metadata>
   <files>
     <file src="Orleans.dll" target="lib\net45" />
+	<file src="Orleans.xml" target="lib\net45" />
   </files>
 </package>
