@@ -17,3 +17,57 @@ title: Links
 [Orleans: Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf)
 
 
+## **By others**
+[Two Reasons You May Want to Use Microsoft’s Project Orleans](http://www.bloggedbychris.com/2015/03/18/reasons-project-orleans/)
+
+[Hatay Tuna - Applied Actor Model with Orleans](https://github.com/hataytuna/Distributed/blob/master/Applied%20Actor%20Model%20with%20Orleans%20v1.1.pdf)
+
+[John Azariah & Mahesh Krishnan - Immutability, State and Scale - Functional, Distributed Applications in Azure](http://vimeo.com/97315938)
+
+[Project Orleans - Actor Model framework](http://www.slideshare.net/nmackenzie/project-orleans)
+
+[Orleans & Thinking Outside the Box](http://msdevshow.com/2014/05/orleans-and-thinking-outside-the-box/)
+
+[Aggregating Results in Orleans](http://coderead.wordpress.com/2014/06/10/aggregating-results-in-orleans/)
+
+[Orleans – a “cloud native” runtime built for #azure](http://www.slideee.com/slide/orleans-a-cloud-native-runtime-built-for-azure)
+
+[Using Codename “Orleans” in Enterprise Applications](http://blogs.msdn.com/b/msarchitecture/archive/2014/06/09/using-codename-orleans-in-enterprise-applications.aspx)
+
+[Introduction To Project Orleans](http://ideasof.andersaberg.com/development/Introduction-To-Orleans/)
+
+[Codename Orleans](http://www.two10degrees.com/codename-orleans)
+
+[Monitorable Grains](http://encloudify.blogspot.nl/2014/05/monitorable-grains.html)
+
+[Using Orleans for building scalable cloud applications](http://channel9.msdn.com/Events/TechDays/Techdays-2014-the-Netherlands/Using-Orleans-for-building-scalable-cloud-applications)
+
+[Introduction to Orleans](http://channel9.msdn.com/Events/TechDays/Techdays-2014-the-Netherlands/Introduction-to-Orleans)
+
+[Saving state only once in a while in #ProjectOrleans](http://blog.geuer-pollmann.de/blog/2014/05/14/saving-state-only-once-in-a-while-in-project-orleans/)
+
+[Grains, Grains and more Grains](http://encloudify.blogspot.nl/2014/05/grains-grains-and-more-grains.html)
+
+[Fine-graining your Orleans Grains inside the IoT universe](http://encloudify.blogspot.nl/2014/05/fine-graining-your-orleans-grains.html)
+
+[Orleans in an IoT universe](http://encloudify.blogspot.nl/2014/05/orleans-in-iot-universe.html)
+
+[A Second Look at Project Orleans](http://convective.wordpress.com/2014/04/28/a-second-look-at-project-orleans/)
+
+[Project Orleans: An Introduction](http://haishibai.blogspot.com/2014/04/project-orleans-introduction.html)
+
+[A First Look at Project Orleans](http://convective.wordpress.com/2014/04/20/a-first-look-at-project-orleans/)
+
+[Orleans Preview & Halo 4](http://caitiem.com/2014/04/03/orleans-preview-halo-4/)
+
+[Using Project “Orleans” in Halo](http://hoopsomuah.com/2014/04/06/using-project-orleans-in-halo/)
+
+[Creating RESTful Services using Orleans](http://caitiem.com/2014/04/04/creating-restful-services-using-orleans/)
+
+[Microsoft Orleans – Why it’s cool & useful](http://daprlabs.com/blog/blog/2014/04/03/microsoft-orleans-why-its-cool-useful/)
+
+[Tackle Distribution, High Throughput and Low-Latency with Orleans – A “cloud native” Runtime Built for #Azure](http://alexandrebrisebois.wordpress.com/2014/04/05/tackle-distribution-high-throughput-and-low-latency-with-orleans-a-cloud-native-runtime-built-for-azure/)
+
+[Orleans & OWIN: A Trivial Configuration Middleware](http://daprlabs.com/blog/blog/2014/04/05/orleans-owin-a-trivial-configuration-middleware/)
+
+[Actor Programming with Orleans: What’s Different?](http://www.postsharp.net/blog/post/Actor-Programming-with-Orleans-Whats-Different)
