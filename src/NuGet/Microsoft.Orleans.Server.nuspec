@@ -18,17 +18,19 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="Microsoft.Orleans.Core" version="1.0.3" />
-      <dependency id="Microsoft.Orleans.OrleansRuntime" version="1.0.3" />
-      <dependency id="Microsoft.Orleans.OrleansAzureUtils" version="1.0.3" />
-      <dependency id="Microsoft.Orleans.OrleansHost" version="1.0.3" />
-      <dependency id="Microsoft.Orleans.CounterControl" version="1.0.3" />
-      <dependency id="Microsoft.Orleans.OrleansProviders" version="1.0.3" />
+      <dependency id="Microsoft.Orleans.Core" version="1.0.5" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="1.0.5" />
+      <dependency id="Microsoft.Orleans.OrleansAzureUtils" version="1.0.5" />
+      <dependency id="Microsoft.Orleans.OrleansHost" version="1.0.5" />
+      <dependency id="Microsoft.Orleans.CounterControl" version="1.0.5" />
+      <dependency id="Microsoft.Orleans.OrleansProviders" version="1.0.5" />
+      <dependency id="WindowsAzure.Storage" version="4.2.0.0" />
+      <dependency id="Microsoft.WindowsAzure.ConfigurationManager" version="2.0.0.0" />
     </dependencies>
   </metadata>
   <files>
     <file src="OrleansConfiguration.xml" target="content" />
-    <file src="Configuration\OrleansConfiguration.xsd" target="content" />
+    <file src="Configuration\OrleansConfiguration.xsd" target="tools" />
     <file src="ServerInstall.ps1" target="tools\install.ps1" />
   </files>
 </package>
