@@ -351,7 +351,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
         /// </summary>
-        /// <typeparam name="T">Non-abstract type which implements <see cref="IStreamProvider"/> stream</typeparam>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="Orleans.Streams.IStreamProvider"/> stream</typeparam>
         /// <param name="providerName">Name of the stream provider</param>
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
