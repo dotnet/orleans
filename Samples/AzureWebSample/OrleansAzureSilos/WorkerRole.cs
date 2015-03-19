@@ -70,9 +70,9 @@ namespace Orleans.Azure.Silos
             config.StandardLoad();
 
             // First example of how to configure an existing provider
-            ConfigureExistingStorageProvider(config);
-            ConfigureNewStorageProvider(config);
-            ConfigureNewBootstrapProvider(config);
+            //ConfigureExistingStorageProvider(config);
+            //ConfigureNewStorageProvider(config);
+            //ConfigureNewBootstrapProvider(config);
 
             // It is IMPORTANT to start the silo not in OnStart but in Run.
             // Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.
@@ -150,90 +150,81 @@ namespace Orleans.Azure.Silos
         // Below is an example of how to set the storage key in the ProviderConfiguration and how to add a new custom configuration property.
         private void ConfigureExistingStorageProvider(ClusterConfiguration config)
         {
-            ProviderCategoryConfiguration storageConfiguration;
-            if (config.Globals.ProviderConfigurations.TryGetValue(STORAGE_KEY, out storageConfiguration))
-            {
-                // Modify the specific "AzureStore" provider
-                IProviderConfiguration iProviderConfig = null;
-                if (storageConfiguration.Providers.TryGetValue("AzureStore", out iProviderConfig))
-                {
-                    ProviderConfiguration storageProvider = iProviderConfig as ProviderConfiguration;
-                    storageProvider.SetProperty("MyCustomProperty1", "MyCustomPropertyValue1");
-                }
+            IProviderConfiguration storageProvider = null;
 
-                // Alternatively, find all storage providers and modify them as necessary
-                foreach (ProviderConfiguration providerConfig in storageConfiguration.Providers.Values.Where(provider => provider is ProviderConfiguration).Cast<ProviderConfiguration>())
+            const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage"; // Alternatively, can be something like typeof(AzureTableStorage).FullName
+            const string myProviderName = "AzureStore"; // what ever arbitrary name you want to give to your provider
+            if (config.Globals.TryGetProviderConfiguration(myProviderFullTypeName, myProviderName, out storageProvider))
+            {
+                // provider configuration already exists, modify it.
+                string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
+                storageProvider.SetProperty(DATA_CONNECTION_STRING_KEY, connectionString);
+                storageProvider.SetProperty("MyCustomProperty1", "MyCustomPropertyValue1");
+            }
+            else
+            {
+                // provider configuration does not exists, add a new one.
+                var properties = new Dictionary<string, string>();
+                string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
+                properties.Add(DATA_CONNECTION_STRING_KEY, connectionString);
+                properties.Add("MyCustomProperty2", "MyCustomPropertyValue2");
+
+                config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
+            }
+
+            // Alternatively, find all storage providers and modify them as necessary
+            foreach (IProviderConfiguration providerConfig in config.Globals.GetAllProviderConfigurations())//storageConfiguration.Providers.Values.Where(provider => provider is ProviderConfiguration).Cast<ProviderConfiguration>())
+            {
+                if (providerConfig.Type.Equals(myProviderFullTypeName))
                 {
                     string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
                     providerConfig.SetProperty(DATA_CONNECTION_STRING_KEY, connectionString);
-                    providerConfig.SetProperty("MyCustomProperty2", "MyCustomPropertyValue2");
-
+                    providerConfig.SetProperty("MyCustomProperty3", "MyCustomPropertyValue3");
                 }
-                
-                // Once silo starts you can see that it prints in the log:
-                //   Providers:
-                    // StorageProviders:
-                        // Name=AzureStore, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty, MyCustomProperty2]
             }
+
+            // Once silo starts you can see that it prints in the log:
+            //   Providers:
+            //      StorageProviders:
+            //          Name=AzureStore, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty, MyCustomProperty1, MyCustomProperty3]
         }
 
         // Below is an example of how to define a full configuration for a new storage provider that is not already specified in the config file.
         private void ConfigureNewStorageProvider(ClusterConfiguration config)
         {
-            ProviderCategoryConfiguration categoryConfiguration;
-            if (!config.Globals.ProviderConfigurations.TryGetValue(STORAGE_KEY, out categoryConfiguration))
-            {
-                categoryConfiguration = new ProviderCategoryConfiguration()
-                {
-                    Name = STORAGE_KEY,
-                    Providers = new Dictionary<string, IProviderConfiguration>()
-                };
-                config.Globals.ProviderConfigurations.Add(STORAGE_KEY, categoryConfiguration);
-            }
+            const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage"; // Alternatively, can be something like typeof(AzureTableStorage).FullName
+            const string myProviderName = "MyNewAzureStoreProvider"; // what ever arbitrary name you want to give to your provider
 
-            string myProviderName = "MyNewAzureStoreProvider"; // what ever arbitrary name you want to give to your provider
-            // Alternatively, the 2nd argument, type, can be something like typeof(EventStoreInitBootstrapProvider).FullName
-            ProviderConfiguration providerConfig = new ProviderConfiguration(new Dictionary<string, string>(), "Orleans.Storage.AzureTableStorage", myProviderName);
-            categoryConfiguration.Providers.Add(myProviderName, providerConfig);
-
+            var properties = new Dictionary<string, string>();
             string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
-            providerConfig.SetProperty(DATA_CONNECTION_STRING_KEY, connectionString);
-            providerConfig.SetProperty("MyCustomProperty3", "MyCustomPropertyValue3");
+            properties.Add(DATA_CONNECTION_STRING_KEY, connectionString);
+            properties.Add("MyCustomProperty3", "MyCustomPropertyValue3");
+
+            config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
 
             // Once silo starts you can see that it prints in the log:
-                //   Providers:
-                    // StorageProviders:
-                        // Name=MyNewAzureStoreProvider, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty3]
+            //  Providers:
+            //      StorageProviders:
+            //          Name=MyNewAzureStoreProvider, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty3]
         }
 
         // Below is an example of how to define a full configuration for a new Bootstrap provider that is not already specified in the config file.
         private void ConfigureNewBootstrapProvider(ClusterConfiguration config)
         {
-            ProviderCategoryConfiguration categoryConfiguration;
-            if (!config.Globals.ProviderConfigurations.TryGetValue(BOOTSTRAP_KEY, out categoryConfiguration))
-            {
-                categoryConfiguration = new ProviderCategoryConfiguration()
-                {
-                    Name = BOOTSTRAP_KEY,
-                    Providers = new Dictionary<string, IProviderConfiguration>()
-                };
-                config.Globals.ProviderConfigurations.Add(BOOTSTRAP_KEY, categoryConfiguration);
-            }
+            const string myProviderFullTypeName = "FullNameSpace.NewBootstrapProviderType"; // Alternatively, can be something like typeof(EventStoreInitBootstrapProvider).FullName
+            const string myProviderName = "MyNewBootstrapProvider"; // what ever arbitrary name you want to give to your provider
+            var properties = new Dictionary<string, string>();
+            config.Globals.RegisterBootstrapProvider(myProviderFullTypeName, myProviderName, properties);
 
-            string myProviderName = "MyNewBootstrapProvider"; // what ever arbitrary name you want to give to your provider
-            // Alternatively, the 2nd argument, type, can be something like typeof(EventStoreInitBootstrapProvider).FullName
-            ProviderConfiguration providerConfig = new ProviderConfiguration(new Dictionary<string, string>(), "FullNameSpace.NewBootstrapProviderType", myProviderName);
-            //categoryConfiguration.Providers.Add(myProviderName, providerConfig);
-
-            // The last line, categoryConfiguration.Providers.Add, is commented out because the assembly with "FullNameSpace.NewBootstrapProviderType" is not added to the project,
+            // The last line, config.Globals.RegisterBootstrapProvider, is commented out because the assembly with "FullNameSpace.NewBootstrapProviderType" is not added to the project,
             // this the silo will fail to load the new bootstrap provider upon startup.
             // !!!!!!!!!! Provider of type FullNameSpace.NewBootstrapProviderType name MyNewBootstrapProvider was not loaded.
             // Once you add your new provider to the project, uncommnet this line.
 
             // Once silo starts you can see that it prints in the log:
-            //   Providers:
-            // BootstrapProviders:
-            // Name=MyNewBootstrapProvider, Type=FullNameSpace.NewBootstrapProviderType, Properties=[]
+            // Providers:
+            //      BootstrapProviders:
+            //          Name=MyNewBootstrapProvider, Type=FullNameSpace.NewBootstrapProviderType, Properties=[]
         }
     }
 }
