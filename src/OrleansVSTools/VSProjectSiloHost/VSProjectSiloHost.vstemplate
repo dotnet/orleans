@@ -7,7 +7,7 @@
     <ProjectType>CSharp</ProjectType>
     <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
     <SortOrder>1000</SortOrder>
-    <TemplateID>ba427b09-614a-41ef-ac5e-49c47909f209</TemplateID>
+    <TemplateID>Orleans.Templates.Project.SiloHost.DevTest</TemplateID>
     <CreateNewFolder>true</CreateNewFolder>
     <DefaultName>SiloHost</DefaultName>
     <ProvideDefaultName>true</ProvideDefaultName>
@@ -20,6 +20,7 @@
       <ProjectItem ReplaceParameters="true" TargetFileName="DevTestServerConfiguration.xml">DevTestServerConfiguration.xml</ProjectItem>
       <ProjectItem ReplaceParameters="true" TargetFileName="OrleansHostWrapper.cs">OrleansHostWrapper.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" OpenInEditor="true">Program.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="false" TargetFileName="packages.config">packages.config.txt</ProjectItem>
     </Project>
   </TemplateContent>
 </VSTemplate>

@@ -4,10 +4,6 @@
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">11.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
-    <SccProjectName></SccProjectName>
-    <SccLocalPath></SccLocalPath>
-    <SccAuxPath></SccAuxPath>
-    <SccProvider></SccProvider>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject />
@@ -62,24 +58,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Properties\AssemblyInfo.cs" />
     <None Include="OrleansHostWrapper.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="App.config" />
     <None Include="AssemblyInfo.cs" />
     <None Include="Program.cs" />
-    <None Include="ProjectTemplate.csproj">
-      <SubType>Designer</SubType>
-    </None>
+    <None Include="packages.config.txt" />
+    <None Include="ProjectTemplate.csproj" />
+    <None Include="DevTestServerConfiguration.xml" />
+    <None Include="DevTestClientConfiguration.xml" />
   </ItemGroup>
   <ItemGroup>
     <VSTemplate Include="VSProjectSiloHost.vstemplate" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="DevTestClientConfiguration.xml" />
     <Content Include="Orleans.ico" />
-    <Content Include="DevTestServerConfiguration.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />

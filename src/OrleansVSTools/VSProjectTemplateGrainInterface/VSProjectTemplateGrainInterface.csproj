@@ -3,8 +3,6 @@
   <PropertyGroup>
     <DownloadNuGetExe>true</DownloadNuGetExe>
   </PropertyGroup>
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.props')" />
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -27,14 +25,6 @@
     <CopyVsixManifestToOutput>false</CopyVsixManifestToOutput>
     <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
     <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
-    <SccProjectName>
-    </SccProjectName>
-    <SccLocalPath>
-    </SccLocalPath>
-    <SccAuxPath>
-    </SccAuxPath>
-    <SccProvider>
-    </SccProvider>
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <TargetFrameworkProfile />
     <PublishUrl>publish\</PublishUrl>
@@ -85,41 +75,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="AssemblyInfo.cs" />
     <None Include="IGrain1.cs" />
-    <None Include="ProjectTemplate.csproj">
-      <SubType>Designer</SubType>
-    </None>
+    <None Include="AssemblyInfo.cs" />
+    <None Include="orleans.codegen.cs" />
+    <None Include="packages.config.txt" />
+    <None Include="ProjectTemplate.csproj" />
   </ItemGroup>
   <ItemGroup>
     <VSTemplate Include="VSProjectTemplateGrainInterface.vstemplate" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="ClientConfiguration.xml" />
     <Content Include="Orleans.ico" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="orleans.codegen.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <BootstrapperPackage Include=".NETFramework,Version=v4.5">
-      <Visible>False</Visible>
-      <ProductName>Microsoft .NET Framework 4.5 %28x86 and x64%29</ProductName>
-      <Install>true</Install>
-    </BootstrapperPackage>
-    <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
-      <Visible>False</Visible>
-      <ProductName>.NET Framework 3.5 SP1 Client Profile</ProductName>
-      <Install>false</Install>
-    </BootstrapperPackage>
-    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
-      <Visible>False</Visible>
-      <ProductName>.NET Framework 3.5 SP1</ProductName>
-      <Install>false</Install>
-    </BootstrapperPackage>
-  </ItemGroup>
-  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
@@ -131,14 +98,8 @@
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.targets'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.targets'))" />
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.0\build\Orleans.Interfaces.targets')" />
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.0\build\Orleans.Grains.targets')" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
