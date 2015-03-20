@@ -27,7 +27,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal class StreamConsumer<T> : IAsyncObservable<T>
+    internal class StreamConsumer<T> : IInternalAsyncObservable<T>
     {
         internal bool                               IsRewindable { get; private set; }
 
@@ -39,7 +39,6 @@ namespace Orleans.Streams
         private readonly IStreamPubSub              pubSub;
         private StreamConsumerExtension             myExtension;
         private IStreamConsumerExtension            myGrainReference;
-        private bool                                connectedToRendezvous;
         [NonSerialized]
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
@@ -59,19 +58,19 @@ namespace Orleans.Streams
             IsRewindable = isRewindable;
             myExtension = null;
             myGrainReference = null;
-            connectedToRendezvous = false;
             bindExtLock = new AsyncLock();
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
         {
-            return SubscribeAsync(observer, null, null, null);
+            return SubscribeAsync(observer, null);
         }
 
         public async Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncObserver<T> observer,
             StreamSequenceToken token,
-            StreamFilterPredicate filterFunc, object filterData)
+            StreamFilterPredicate filterFunc = null,
+            object filterData = null)
         {
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
@@ -83,47 +82,83 @@ namespace Orleans.Streams
             if (filterFunc != null)
                 filterWrapper = new FilterPredicateWrapperData(filterData, filterFunc);
             
-            if (!connectedToRendezvous)
-            {
-                if (logger.IsVerbose) logger.Verbose("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
-                    pubSub, myGrainReference, token);
+            if (logger.IsVerbose) logger.Verbose("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
+                pubSub, myGrainReference, token);
 
-                await pubSub.RegisterConsumer(stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
-                connectedToRendezvous = true;
-            }
-            else if (filterWrapper != null)
+            GuidId subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId);
+            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
+
+            return myExtension.SetObserver(subscriptionId, stream, observer, filterWrapper);
+        }
+
+        public async Task<StreamSubscriptionHandle<T>> ResumeAsync(
+            StreamSubscriptionHandle<T> handle,
+            IAsyncObserver<T> observer,
+            StreamSequenceToken token = null)
+        {
+            StreamSubscriptionHandleImpl<T> oldHandleImpl = CheckHandleValidity(handle);
+
+            if (token != null && !IsRewindable)
+                throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
+
+            if (logger.IsVerbose) logger.Verbose("Resume Observer={0} Token={1}", observer, token);
+            await BindExtensionLazy();
+
+            if (logger.IsVerbose) logger.Verbose("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
+                pubSub, myGrainReference, token);
+
+            GuidId subscriptionId;
+            if (token != null)
             {
-                // Already connected and registered this grain, but also need to register this additional filter too. 
-                await pubSub.RegisterConsumer(stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
+                subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId); // otherwise generate a new subscriptionId
+                await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, token, null);
+                try
+                {
+                    await UnsubscribeAsync(handle);
+                }
+                catch (Exception exc)
+                {
+                    // best effort cleanup of newly established subscription
+                    pubSub.UnregisterConsumer(subscriptionId, stream.StreamId, streamProviderName)
+                          .LogException(logger, ErrorCode.StreamProvider_FailedToUnsubscribeFromPubSub, 
+                                        String.Format("Stream consumer could not clean up subscription {0} while recovering from errors renewing subscription {1} on stream {2}.",
+                                        subscriptionId, oldHandleImpl.SubscriptionId, stream.StreamId))
+                          .Ignore();
+                    logger.Error(ErrorCode.StreamProvider_FailedToUnsubscribeFromPubSub,
+                                 String.Format("Stream consumer failed to unsubscrive from subscription {0} while renewing subscription on stream {1}.", oldHandleImpl.SubscriptionId, stream.StreamId),
+                                 exc);
+                    throw;
+                }
             }
-                
-            return myExtension.AddObserver(stream, observer, filterWrapper);
+            else
+            {
+                subscriptionId = oldHandleImpl.SubscriptionId;
+            }
+            
+            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(subscriptionId, stream, observer, null);
+
+            // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.  
+            oldHandleImpl.Invalidate();
+
+            return newHandle;
         }
 
         public async Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
         {
             await BindExtensionLazy();
 
+            StreamSubscriptionHandleImpl<T> handleImpl = CheckHandleValidity(handle);
+
             if (logger.IsVerbose) logger.Verbose("Unsubscribe StreamSubscriptionHandle={0}", handle);
             bool shouldUnsubscribe = myExtension.RemoveObserver(handle);
             if (!shouldUnsubscribe) return;
 
-            try
-            {
-                if (logger.IsVerbose) logger.Verbose("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
-                    pubSub, myGrainReference);
+            if (logger.IsVerbose) logger.Verbose("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
+                pubSub, myGrainReference);
 
-                await pubSub.UnregisterConsumer(stream.StreamId, streamProviderName, myGrainReference);
-            }
-            finally
-            {
-                connectedToRendezvous = false;
-            }
-        }
+            await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
 
-        public Task UnsubscribeAllAsync()
-        {
-            throw new NotImplementedException("UnsubscribeAllAsync not implemented yet.");
+            handleImpl.Invalidate();
         }
 
         internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle)
@@ -153,6 +188,20 @@ namespace Orleans.Streams
                     }
                 }
             }
+        }
+
+        private StreamSubscriptionHandleImpl<T> CheckHandleValidity(StreamSubscriptionHandle<T> handle)
+        {
+            if (handle == null)
+                throw new ArgumentNullException("handle");
+            if (!handle.StreamIdentity.Equals(stream))
+                throw new ArgumentException("Handle is not for this stream.", "handle");
+            var handleImpl = handle as StreamSubscriptionHandleImpl<T>;
+            if (handleImpl == null)
+                throw new ArgumentException("Handle type not supported.", "handle");
+            if (!handleImpl.IsValid)
+                throw new ArgumentException("Handle is no longer valid.  It has been used to unsubscribe or resume.", "handle");
+            return handleImpl;
         }
     }
 }

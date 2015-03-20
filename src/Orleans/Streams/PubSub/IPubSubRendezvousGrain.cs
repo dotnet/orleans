@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System.Threading.Tasks;
 using System.Collections.Generic;
+﻿using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -33,9 +34,9 @@ namespace Orleans.Streams
 
         Task UnregisterProducer(StreamId streamId, IStreamProducerExtension streamProducer);
 
-        Task RegisterConsumer(StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
+        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
 
-        Task UnregisterConsumer(StreamId streamId, IStreamConsumerExtension streamConsumer);
+        Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId);
 
         Task<int> ProducerCount(StreamId streamId);
 

@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿using System;
+﻿using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -35,6 +36,7 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerData
     {
+        public GuidId SubscriptionId;
         public StreamId StreamId;
         public IStreamConsumerExtension StreamConsumer;
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
@@ -42,8 +44,9 @@ namespace Orleans.Streams
         public StreamSequenceToken Token;
         public IStreamFilterPredicateWrapper Filter;
 
-        public StreamConsumerData(StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
+            SubscriptionId = subscriptionId;
             StreamId = streamId;
             StreamConsumer = streamConsumer;
             Filter = filter;

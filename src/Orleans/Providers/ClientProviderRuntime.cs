@@ -33,7 +33,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
-    internal class ClientProviderRuntime : IProviderRuntime, IStreamProviderRuntime
+    internal class ClientProviderRuntime : IStreamProviderRuntime
     { 
         private IStreamPubSub pubSub;
         private StreamDirectory streamDirectory;

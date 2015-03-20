@@ -31,13 +31,13 @@ namespace Orleans.Streams
 {
     internal class StreamProviderManager : IStreamProviderManager
     {
-        private ProviderLoader<IStreamProvider> appStreamProviders;
+        private ProviderLoader<IStreamProviderImpl> appStreamProviders;
 
         internal async Task LoadStreamProviders(
             IDictionary<string, ProviderCategoryConfiguration> configs,
             IStreamProviderRuntime providerRuntime)
         {
-            appStreamProviders = new ProviderLoader<IStreamProvider>();
+            appStreamProviders = new ProviderLoader<IStreamProviderImpl>();
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)) return;
 
@@ -48,13 +48,10 @@ namespace Orleans.Streams
         internal async Task StartStreamProviders()
         {
             var providers = appStreamProviders.GetProviders();
-            foreach (IStreamProvider streamProvider in providers)
+            foreach (IStreamProviderImpl streamProvider in providers)
             {
-                var provider = streamProvider as IStreamProviderImpl;
-                if (provider != null)
-                {
-                    await provider.Start();   
-                }
+                var provider = streamProvider;
+                await provider.Start();   
             }
         }
 

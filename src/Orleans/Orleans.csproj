@@ -71,6 +71,7 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.Data.Edm">
       <HintPath>..\packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
     </Reference>
@@ -154,7 +155,11 @@
     <Compile Include="Messaging\SqlMembershipTable.cs" />
     <Compile Include="Providers\ILocalDataStore.cs" />
     <Compile Include="Streams\Core\AsyncObservableExtensions.cs" />
+    <Compile Include="Streams\Core\StreamSubscriptionHandleExtensions.cs" />
     <Compile Include="Streams\Internal\GenericAsyncObserver.cs" />
+    <Compile Include="Streams\Internal\IInternalAsyncObservable.cs" />
+    <Compile Include="Streams\Internal\IInternalStreamProvider.cs" />
+    <Compile Include="Streams\Internal\StreamSubscriptionHandleImpl.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
     <Compile Include="Streams\PersistentStreams\PersistentStreamProvider.cs" />
     <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />

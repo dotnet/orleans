@@ -1024,7 +1024,10 @@ namespace Orleans
         PersistentStreamPullingManager_09 = PersistentStreamPullingManagerBase + 9,
         PersistentStreamPullingManager_10 = PersistentStreamPullingManagerBase + 10,
         PersistentStreamPullingManager_11 = PersistentStreamPullingManagerBase + 11,
-        PersistentStreamPullingManager_12 = PersistentStreamPullingManagerBase + 12
+        PersistentStreamPullingManager_12 = PersistentStreamPullingManagerBase + 12,
+
+        StreamProviderBase = Runtime + 3600,
+        StreamProvider_FailedToUnsubscribeFromPubSub = StreamProviderBase + 1,
     }
 }
 // ReSharper restore InconsistentNaming

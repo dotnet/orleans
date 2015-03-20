@@ -33,7 +33,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [Immutable]
-    public class GuidId : IEquatable<GuidId>, IComparable<GuidId>
+    public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>
     {
         private static readonly Lazy<Interner<Guid, GuidId>> guidIdInternCache = new Lazy<Interner<Guid, GuidId>>(
                     () => new Interner<Guid, GuidId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
@@ -72,7 +72,7 @@ namespace Orleans.Runtime
 
         #region IEquatable<GuidId> Members
 
-        public virtual bool Equals(GuidId other)
+        public bool Equals(GuidId other)
         {
             return other != null && this.Guid.Equals(other.Guid);
         }
@@ -120,5 +120,23 @@ namespace Orleans.Runtime
             Guid guid = stream.ReadGuid();
             return GuidId.GetGuidId(guid);
         }
+
+        #region Operators
+
+        public static bool operator ==(GuidId a, GuidId b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (ReferenceEquals(a, null)) return false;
+            if (ReferenceEquals(b, null)) return false;
+            return a.Guid.Equals(b.Guid);
+        }
+
+        public static bool operator !=(GuidId a, GuidId b)
+        {
+            return !(a == b);
+        }
+
+        #endregion
+
     }
 }

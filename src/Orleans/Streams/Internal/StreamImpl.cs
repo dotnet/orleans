@@ -37,11 +37,11 @@ namespace Orleans.Streams
         private readonly StreamId                               streamId;
         private readonly bool                                   isRewindable;
         [NonSerialized]
-        private IStreamProviderImpl                             provider;
+        private IInternalStreamProvider                         provider;
         [NonSerialized]
         private volatile IAsyncBatchObserver<T>                 producerInterface;
         [NonSerialized]
-        private IAsyncObservable<T>                             consumerInterface;
+        private IInternalAsyncObservable<T>                         consumerInterface;
         [NonSerialized]
         private readonly object                                 initLock; // need the lock since the same code runs in the provider on the client and in the silo.
         
@@ -59,7 +59,7 @@ namespace Orleans.Streams
             initLock = new object();
         }
 
-        internal StreamImpl(StreamId streamId, IStreamProviderImpl provider, bool isRewindable)
+        internal StreamImpl(StreamId streamId, IInternalStreamProvider provider, bool isRewindable)
         {
             if (null == streamId)
                 throw new ArgumentNullException("streamId");
@@ -76,22 +76,14 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
         {
-            return GetConsumerInterface().SubscribeAsync(observer, null, null, null);
+            return GetConsumerInterface().SubscribeAsync(observer, null);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token, StreamFilterPredicate filterFunc, object filterData)
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
+            StreamFilterPredicate filterFunc = null,
+            object filterData = null)
         {
             return GetConsumerInterface().SubscribeAsync(observer, token, filterFunc, filterData);
-        }
-
-        public Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
-        {
-            return GetConsumerInterface().UnsubscribeAsync(handle);
-        }
-
-        public Task UnsubscribeAllAsync()
-        {
-            return GetConsumerInterface().UnsubscribeAllAsync();
         }
 
         public async Task Cleanup()
@@ -126,6 +118,19 @@ namespace Orleans.Streams
             return GetProducerInterface().OnErrorAsync(ex);
         }
 
+        internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
+            StreamSubscriptionHandle<T> handle,
+            IAsyncObserver<T> observer,
+            StreamSequenceToken token)
+        {
+            return GetConsumerInterface().ResumeAsync(handle, observer, token);
+        }
+
+        internal Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
+        {
+            return GetConsumerInterface().UnsubscribeAsync(handle);
+        }
+
         internal IAsyncBatchObserver<T> GetProducerInterface()
         {
             if (producerInterface != null) return producerInterface;
@@ -143,7 +148,7 @@ namespace Orleans.Streams
             return producerInterface;
         }
 
-        internal IAsyncObservable<T> GetConsumerInterface()
+        internal IInternalAsyncObservable<T> GetConsumerInterface()
         {
             if (consumerInterface == null)
             {
@@ -161,9 +166,9 @@ namespace Orleans.Streams
             return consumerInterface;
         }
 
-        private IStreamProviderImpl GetStreamProvider()
+        private IInternalStreamProvider GetStreamProvider()
         {
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IStreamProviderImpl;
+            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IInternalStreamProvider;
         }
 
         #region IComparable<IAsyncStream<T>> Members

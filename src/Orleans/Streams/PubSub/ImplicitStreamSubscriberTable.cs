@@ -116,6 +116,23 @@ namespace Orleans.Streams
         }
 
         /// <summary>
+        /// Determines whether the specified subscription is an implicit subscriber of a given stream.
+        /// </summary>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <returns>true if the subscription id describes an implicit subscriber of the stream described by the stream id.</returns>
+        internal bool IsImplicitSubscriber(GuidId subscriptionId, StreamId streamId)
+        {
+            if (String.IsNullOrWhiteSpace(streamId.Namespace))
+            {
+                return false;
+            }
+
+            // TODO: Get from table once static subscriptionId generation is added. Until then, implicit subscriptionIds can be recognized by having the same value as the streamId.
+            return subscriptionId.Equals(GuidId.GetGuidId(streamId.Guid));
+        }
+
+        /// <summary>
         /// Add an implicit subscriber to the table.
         /// </summary>
         /// <param name="grainClass">Type of the grain class whose instances subscribe to the specified namespaces.</param>
