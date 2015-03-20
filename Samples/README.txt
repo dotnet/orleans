@@ -1,7 +1,6 @@
 HelloWorldNuget uses Orleans Nuget packages available at https://www.nuget.org/packages?q=microsoft.orleans.
 
-In order to run the rest of the samples you need first to install the Orleans installer msi, as described here:
-http://dotnet.github.io/orleans/Installation
+In order to run the rest of the samples you need first to install the Orleans installer msi, as described here: http://dotnet.github.io/orleans/Installation
 
 Samples are always runnable against the latest officially published SDK located here: https://github.com/dotnet/orleans/releases/latest
 
@@ -12,4 +11,4 @@ You can then build and run the samples.
 
 We recommend running Azure Samples (AzureWebSample, TicTacToe) in elevated mode in Visual studio.
 
-All other non-Orleans dependencies, suhc as Azure Storage, Azure Service Runtime, etc... are consumed via Nuget packages.
+All other non-Orleans dependencies, such as Azure Storage, Azure Service Runtime, etc... are consumed via Nuget packages.
