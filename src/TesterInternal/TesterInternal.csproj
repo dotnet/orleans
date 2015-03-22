@@ -109,7 +109,8 @@
     </PropertyGroup>
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
-  <PropertyGroup>
+  <PropertyGroup Condition=" '$(OS)' == 'Windows_NT' ">
+    <!-- PostBuild.cmd script is platform specific, so for now we only want to run it on Windows -->
     <PostBuildEvent>@echo Tester - Start Post-Build script
 
 set TEST_INPUT_DIR=$(TargetDir)TestInput
