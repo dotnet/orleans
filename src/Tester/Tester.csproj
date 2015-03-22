@@ -159,36 +159,7 @@
     </None>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <PreBuildEvent>
-    </PreBuildEvent>
-  </PropertyGroup>
-  <PropertyGroup>
-    <PostBuildEvent>@echo Tester - Start Post-Build script
-
-set TEST_INPUT_DIR=$(TargetDir)TestInput
-if not exist "%25TEST_INPUT_DIR%25" ( mkdir "%25TEST_INPUT_DIR%25" )
-copy /y "$(ProjectDir)*.xml"  "%25TEST_INPUT_DIR%25\"
-
-if "$(BuildingInsideVisualStudio)" == "true" (
-  copy /y "$(SolutionDir)TestGrains\bin\$(ConfigurationName)\TestGrains.*"  "%25TEST_INPUT_DIR%25\"
-  copy /y "$(SolutionDir)TestGrainInterfaces\bin\$(ConfigurationName)\TestGrainInterfaces.*"  "%25TEST_INPUT_DIR%25\"
-) else (
-  copy /y "%25TargetDir%25TestGrains.*"  "%25TEST_INPUT_DIR%25\"
-  copy /y "%25TargetDir%25TestGrainInterfaces.*"  "%25TEST_INPUT_DIR%25\"
-)
-
-set SolutionDir=$(SolutionDir)
-set OutDir=$(OutDir)
-set TargetDir=$(TargetDir)
-set BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)
-set Configuration=$(Configuration)
-
-@echo Calling Build\PostBuild.cmd
-call "$(SolutionDir)Build\PostBuild.cmd"</PostBuildEvent>
-  </PropertyGroup>
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
