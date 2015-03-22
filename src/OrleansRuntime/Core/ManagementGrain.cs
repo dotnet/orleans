@@ -184,13 +184,18 @@ namespace Orleans.Runtime.Management
                     parent.AppendChild(child);
                 }
             }
-            var sw = new StringWriter();
-            document.WriteTo(new XmlTextWriter(sw));
-            var xml = sw.ToString();
-            // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
-            await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
-            await Task.WhenAll(silos.Skip(1).Select(s =>
-                GetSiloControlReference(s).UpdateConfiguration(xml)));
+            
+            using(var sw = new StringWriter())
+            { 
+                using(var xw = new XmlTextWriter(sw))
+                { 
+                    document.WriteTo(xw);
+                    var xml = sw.ToString();
+                    // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
+                    await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
+                    await Task.WhenAll(silos.Skip(1).Select(s => GetSiloControlReference(s).UpdateConfiguration(xml)));
+                }
+            }
         }
 
         public async Task<int> GetTotalActivationCount()
