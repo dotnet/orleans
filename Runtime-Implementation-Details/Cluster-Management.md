@@ -8,7 +8,7 @@ Orleans provides cluster management via a built-in membership protocol, which we
 
 We describe the internal implementation of the Orleans's membership protocol below.
 
-### The Protocol:
+### The Basic Membership Protocol:
 
 1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (ip:port:epoch) as row key (epoch is just time in ticks when this silo started). Thus ip:port:epoch is guaranteed to be unique in a given Orleans deployment.
 
@@ -42,7 +42,7 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 9. **Optimization  to reduce the frequency of periodical table reads and speed up all silos learning about new joining silos and dead silos**. Every time any silo writes anything successfully to the table (suspicion, new join, …) it also broadcasts to all other silos – “go and reread the table now”. The silo does NOT tell others what it wrote in the table (since this information could already be outdated/wrong), it just tells them to re-read the table. That way we learn very quickly about membership changes without the need to wait for the full periodic read cycle. We still need the periodic read, in case the “re-read the table” message gets lost.
 
-### Properties of the membership protocol and FAQ:
+### Properties of the Basic Membership Protocol and FAQ:
 
 10. **Can handle any number of failures ** – our algorithm can handle any number of failures (that is, f<=n), including full cluster restart. This is in contrast with “traditional” [Paxos](http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, which require quorum, which is usually a majority. We have seen in production situations when more than half of the silos were down. Our system stayed functional, while Paxos based membership would not be able to make progress.
 
@@ -68,7 +68,7 @@ The basic membership protocol described above was later extended to support tota
 
 * Higher level protocols in the silo, such as distributed grain directory, can utilize the fact that membership views are ordered and use this information to perform smarter duplicate activations resolution. In particular, when directory finds out that 2 activations were created when membership was in flux, it may decide to deactivate the older activation that was created based on the now-outdated membership information (this is currently not implemented).
 
-**Protocol:**
+**Extended Membership Protocol:**
 
 1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or transactions in SQL server.
 
@@ -86,9 +86,9 @@ The basic membership protocol described above was later extended to support tota
 
 4. All writes to the table modify and increment the version row. That way all writes to the table are serialized (via serializing the updates to the version row) and since silos only increment the version number, the writes are also totally ordered in increasing order.
 
-**Scale:**
+**Scalability of the Extended Membership Protocol:**
 
-In the extended version of the protocol all writes are serialized via one row. This it can potentially heart the scalability of the cluster managemenet protocol, since it increases the risk of conflicts between concurrent table writes. To partially mitigate this problem silos retry all their writes to the table by using exponential backoff. We have observed the extended protocols to work smoothly in production environment in Azure with up to 200 silos. However, we do think the protocol might have problems to scale beyond a thousand silos. In such large setups the updates to version row may be easily disabled, essentially maintaining the rest of the cluster managemenet protocol and giving up on the total ordering property. Please also note that we refer here to the scalability of the cluster management protocol, not the rest of Orleans. We believe that other parts of the Orleans runtime (messaging, distributed directory, grain hosting, client to gateway connectivity) are scalable way beyond hundreds of silos (although we have not yet validated that via actual production usage).
+In the extended version of the protocol all writes are serialized via one row. This can potentially heart the scalability of the cluster managemenet protocol, since it increases the risk of conflicts between concurrent table writes. To partially mitigate this problem silos retry all their writes to the table by using exponential backoff. We have observed the extended protocols to work smoothly in production environment in Azure with up to 200 silos. However, we do think the protocol might have problems to scale beyond a thousand silos. In such large setups the updates to version row may be easily disabled, essentially maintaining the rest of the cluster managemenet protocol and giving up on the total ordering property. Please also note that we refer here to the scalability of the cluster management protocol, not the rest of Orleans. We believe that other parts of the Orleans runtime (messaging, distributed directory, grain hosting, client to gateway connectivity) are scalable way beyond hundreds of silos.
 
 ### Configuration:
 
