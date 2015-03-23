@@ -22,25 +22,27 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Orleans;
-
+﻿
 namespace UnitTests.SampleStreaming
 {
     public interface ISampleStreaming_ProducerGrain : IGrain
     {
-        Task BecomeProducer(Guid streamId, string providerToUse);
+        Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
 
         Task StartPeriodicProducing();
 
         Task StopPeriodicProducing();
 
         Task<int> GetNumberProduced();
+
+        Task ClearNumberProduced();
     }
 
     public interface ISampleStreaming_ConsumerGrain : IGrain
     {
-        Task BecomeConsumer(Guid streamId, string providerToUse);
+        Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
         Task StopConsuming();
 

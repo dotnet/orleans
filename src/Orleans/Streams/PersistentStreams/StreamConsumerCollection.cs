@@ -31,32 +31,37 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerCollection
     {
-        private readonly Dictionary<IStreamConsumerExtension, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
+        private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
 
         public StreamConsumerCollection()
         {
-            queueData = new Dictionary<IStreamConsumerExtension, StreamConsumerData>();
+            queueData = new Dictionary<GuidId, StreamConsumerData>();
         }
 
-        public StreamConsumerData AddConsumer(StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
-            var consumerData = new StreamConsumerData(streamId, streamConsumer, filter);
-            queueData.Add(streamConsumer, consumerData);
+            var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filter);
+            queueData.Add(subscriptionId, consumerData);
             return consumerData;
         }
 
-        public bool RemoveConsumer(IStreamConsumerExtension streamConsumer)
+        public bool RemoveConsumer(GuidId subscriptionId)
         {
             StreamConsumerData consumer;
-            if (!queueData.TryGetValue(streamConsumer, out consumer)) return false;
+            if (!queueData.TryGetValue(subscriptionId, out consumer)) return false;
 
             consumer.Cursor = null; // kill cursor activity and ensure it does not start again on this consumer data.
-            return queueData.Remove(streamConsumer);
+            return queueData.Remove(subscriptionId);
         }
 
-        public bool TryGetConsumer(IStreamConsumerExtension streamConsumer, out StreamConsumerData data)
+        public bool Contains(GuidId subscriptionId)
         {
-            return queueData.TryGetValue(streamConsumer, out data);
+            return queueData.ContainsKey(subscriptionId);
+        }
+
+        public bool TryGetConsumer(GuidId subscriptionId, out StreamConsumerData data)
+        {
+            return queueData.TryGetValue(subscriptionId, out data);
         }
 
         public IEnumerable<StreamConsumerData> AllConsumersForStream(StreamId streamId)

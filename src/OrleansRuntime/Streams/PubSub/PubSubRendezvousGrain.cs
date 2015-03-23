@@ -141,25 +141,21 @@ namespace Orleans.Streams
         }
 
         public async Task RegisterConsumer(
+            GuidId subscriptionId,
             StreamId streamId, 
             IStreamConsumerExtension streamConsumer, 
             StreamSequenceToken token, 
             IStreamFilterPredicateWrapper filter)
         {
-            // This Where clause will return either zero or one PubSubSubscriptionState
-            var found = State.Consumers.Where(s => s.Equals(streamId, streamConsumer)).ToArray();
-            PubSubSubscriptionState pubSubState;
-            if (found.Length == 0)
+            PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
+            if (pubSubState == null)
             {
-                pubSubState = new PubSubSubscriptionState(streamId, streamConsumer, token, filter);
+                pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer, token, filter);
                 State.Consumers.Add(pubSubState);
             }
-            else
-            {
-                pubSubState = found[0];
-                if (filter != null)
-                    pubSubState.AddFilter(filter);
-            }
+
+            if (filter != null)
+                pubSubState.AddFilter(filter);
             
             counterConsumersAdded.Increment();
             counterConsumersTotal.Increment();
@@ -190,7 +186,7 @@ namespace Orleans.Streams
                         continue;
                     }
 
-                    Task addSubscriberPromise = producer.Producer.AddSubscriber(streamId, streamConsumer, token, filter)
+                    Task addSubscriberPromise = producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, token, filter)
                         .ContinueWith(t =>
                         {
                             if (t.IsFaulted)
@@ -237,13 +233,13 @@ namespace Orleans.Streams
             }
         }
 
-        public async Task UnregisterConsumer(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId)
         {
-            int numRemoved = State.Consumers.RemoveWhere(c => c.Equals(streamId, streamConsumer));
+            int numRemoved = State.Consumers.RemoveWhere(c => c.Equals(subscriptionId));
             counterConsumersRemoved.Increment();
             counterConsumersTotal.DecrementBy(numRemoved);
 
-            LogPubSubCounts("UnregisterConsumer {0} NumRemoved={1}", streamConsumer, numRemoved);
+            LogPubSubCounts("UnregisterSubscription {0} NumRemoved={1}", subscriptionId, numRemoved);
             await State.WriteStateAsync();
 
             int numProducers = State.Producers.Count;
@@ -253,9 +249,8 @@ namespace Orleans.Streams
                 
                 // Notify producers about unregistered consumer.
                 var tasks = new List<Task>();
-                foreach (var producerState in State.Producers
-                    .Where(producerState => IsActiveProducer(producerState.Producer)))
-                        tasks.Add(producerState.Producer.RemoveSubscriber(streamId, streamConsumer));
+                foreach (var producerState in State.Producers.Where(producerState => IsActiveProducer(producerState.Producer)))
+                    tasks.Add(producerState.Producer.RemoveSubscriber(subscriptionId, streamId));
                 
                 await Task.WhenAll(tasks);
             }

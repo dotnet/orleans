@@ -22,13 +22,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿using System.Threading.Tasks;
+﻿using Orleans.Providers;
 
 namespace Orleans.Streams
 {
-    internal interface IStreamProviderImpl
+    public interface IStreamProviderImpl : IStreamProvider, IProvider
     {
         Task Start();
-        IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId);
-        IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId);
     }
 }

@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
     /// <typeparam name="TAdapterFactory"></typeparam>
-    public class PersistentStreamProvider<TAdapterFactory> : IStreamProvider, IStreamProviderImpl
+    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider
         where TAdapterFactory : IQueueAdapterFactory, new()
     {
         private Logger                  logger;
@@ -115,7 +115,12 @@ namespace Orleans.Providers.Streams.Common
             return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable);
         }
 
-        public IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
+        {
+            return GetConsumerInterfaceImpl(streamId);
+        }
+
+        private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
         }

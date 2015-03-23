@@ -178,18 +178,20 @@ namespace Orleans.Streams
         }
 
         public Task AddSubscriber(
+            GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
             StreamSequenceToken token,
             IStreamFilterPredicateWrapper filter)
         {
             if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1} Token={2}.", streamId, streamConsumer, token);
-            AddSubscriber_Impl(streamId, streamConsumer, token, filter);
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, token, filter);
             return TaskDone.Done;
         }
 
         // Called by rendezvous when new remote subscriber subscribes to this stream.
         private void AddSubscriber_Impl(
+            GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
             StreamSequenceToken token,
@@ -203,8 +205,8 @@ namespace Orleans.Streams
             }
 
             StreamConsumerData data;
-            if (!streamDataCollection.TryGetConsumer(streamConsumer, out data))
-                data = streamDataCollection.AddConsumer(streamId, streamConsumer, token, filter);
+            if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, token, filter);
             
             // Set cursor if not cursor is set, or if subscription provides new token
             if (data.Cursor == null || token != null)
@@ -214,20 +216,20 @@ namespace Orleans.Streams
                 RunConsumerCursor(data, filter).Ignore(); // Start delivering events if not actively doing so
         }
 
-        public Task RemoveSubscriber(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
         {
-            RemoveSubscriber_Impl(streamId, streamConsumer);
+            RemoveSubscriber_Impl(subscriptionId, streamId);
             return TaskDone.Done;
         }
 
-        public void RemoveSubscriber_Impl(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public void RemoveSubscriber_Impl(GuidId subscriptionId, StreamId streamId)
         {
             StreamConsumerCollection streamData;
             if (!pubSubCache.TryGetValue(streamId, out streamData)) return;
 
             // remove consumer
-            bool removed = streamData.RemoveConsumer(streamConsumer);
-            if (removed && logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscriber={0}, for stream {1}.", streamConsumer, streamId);
+            bool removed = streamData.RemoveConsumer(subscriptionId);
+            if (removed && logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
             
             if (streamData.Count == 0)
                 pubSubCache.Remove(streamId);
@@ -342,15 +344,15 @@ namespace Orleans.Streams
                     if (batch != null)
                     {
                         deliveryTask = consumerData.StreamConsumer
-                            .DeliverBatch(consumerData.StreamId, batch.AsImmutable());
+                            .DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
                     }
                     else if (ex == null)
                     {
-                        deliveryTask = consumerData.StreamConsumer.CompleteStream(consumerData.StreamId);
+                        deliveryTask = consumerData.StreamConsumer.CompleteStream(consumerData.SubscriptionId);
                     }
                     else
                     {
-                        deliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.StreamId, ex);
+                        deliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, ex);
                     }
 
                     try
@@ -387,7 +389,7 @@ namespace Orleans.Streams
                 foreach (PubSubSubscriptionState item in streamData)
                 {
                     var token = item.StreamSequenceToken ?? streamStartToken;
-                    AddSubscriber_Impl(item.Stream, item.Consumer, token, item.FilterWrapper);
+                    AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, token, item.FilterWrapper);
                 }
             }
             catch (Exception exc)
