@@ -22,7 +22,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿using System;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+﻿using System.Linq;
+﻿using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -159,6 +161,15 @@ namespace Orleans.Streams
             await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
 
             handleImpl.Invalidate();
+        }
+
+        public async Task<List<StreamSubscriptionHandle<T>>> GetAllSubscriptions()
+        {
+            await BindExtensionLazy();
+
+            List<GuidId> subscriptionIds = await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
+            return subscriptionIds.Select(id => new StreamSubscriptionHandleImpl<T>(id, stream))
+                                  .ToList<StreamSubscriptionHandle<T>>();
         }
 
         internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle)

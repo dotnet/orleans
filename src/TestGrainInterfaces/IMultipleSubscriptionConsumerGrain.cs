@@ -37,6 +37,8 @@ namespace TestGrainInterfaces
 
         Task StopConsuming(StreamSubscriptionHandle<int> handle);
 
+        Task<List<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse);
+
         Task<Dictionary<StreamSubscriptionHandle<int>, int>> GetNumberConsumed();
 
         Task ClearNumberConsumed();

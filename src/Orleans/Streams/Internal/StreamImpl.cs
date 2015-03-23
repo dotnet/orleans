@@ -41,7 +41,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private volatile IAsyncBatchObserver<T>                 producerInterface;
         [NonSerialized]
-        private IInternalAsyncObservable<T>                         consumerInterface;
+        private IInternalAsyncObservable<T>                     consumerInterface;
         [NonSerialized]
         private readonly object                                 initLock; // need the lock since the same code runs in the provider on the client and in the silo.
         
@@ -51,7 +51,6 @@ namespace Orleans.Streams
         public Guid Guid                                        { get { return streamId.Guid; } }
         public string Namespace                                 { get { return streamId.Namespace; } }
         public string ProviderName                              { get { return streamId.ProviderName; } }
-
 
         // IMPORTANT: This constructor needs to be public for Json deserialization to work.
         public StreamImpl()
@@ -124,6 +123,11 @@ namespace Orleans.Streams
             StreamSequenceToken token)
         {
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
+        }
+
+        public Task<List<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles()
+        {
+            return GetConsumerInterface().GetAllSubscriptions();
         }
 
         internal Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)

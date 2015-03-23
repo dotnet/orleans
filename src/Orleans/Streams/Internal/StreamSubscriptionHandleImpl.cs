@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -42,8 +43,16 @@ namespace Orleans.Streams
         public GuidId SubscriptionId { get; protected set; }
         public bool IsValid { get; private set; }
 
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> stream)
+            : this(subscriptionId, null, stream, null)
+        {
+        }
+
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper)
         {
+            if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
+            if (stream == null) throw new ArgumentNullException("stream");
+
             IsValid = true;
             this.observer = observer;
             streamImpl = stream;

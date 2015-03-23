@@ -96,6 +96,18 @@ namespace TestGrains
             consumedMessageCounts.Remove(handle);
         }
 
+        public Task<List<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse)
+        {
+            logger.Info("GetAllSubscriptionHandles");
+
+            // get stream
+            IStreamProvider streamProvider = GetStreamProvider(providerToUse);
+            var stream = streamProvider.GetStream<int>(streamId, streamNamespace);
+
+            // get all active subscription handles for this stream.
+            return stream.GetAllSubscriptionHandles();
+        }
+
         public Task<Dictionary<StreamSubscriptionHandle<int>, int>> GetNumberConsumed()
         {
             return Task.FromResult(consumedMessageCounts.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Value));

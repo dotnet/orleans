@@ -329,5 +329,13 @@ namespace Orleans.Streams
                     throw new Exception(String.Format("State mismatch between PubSubRendezvousGrain and its persistent state. captureConsumers={0}, State.Consumers={1}",
                         Utils.EnumerableToString(captureConsumers), Utils.EnumerableToString(State.Consumers)));
         }
+
+        public Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        {
+            List<GuidId> subscriptionIds = State.Consumers.Where(c => c.Consumer.Equals(streamConsumer))
+                                                          .Select(c => c.SubscriptionId)
+                                                          .ToList();
+            return Task.FromResult(subscriptionIds);
+        }
     }
 }

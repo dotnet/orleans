@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -190,6 +191,56 @@ namespace Tester.StreamingTests
 
             // remove subscription
             await consumer.StopConsuming(resumeHandle);
+        }
+
+        public async Task ActiveSubscriptionTest(Guid streamGuid, string streamNamespace)
+        {
+            const int subscriptionCount = 10;
+
+            // get producer and consumer
+            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+
+            // create expected subscriptions
+            IEnumerable<Task<StreamSubscriptionHandle<int>>> subscriptionTasks =
+                Enumerable.Range(0, subscriptionCount)
+                    .Select(async i => await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName));
+            List<StreamSubscriptionHandle<int>> expectedSubscriptions = (await Task.WhenAll(subscriptionTasks)).ToList();
+
+            // query actuall subscriptions
+            List<StreamSubscriptionHandle<int>> actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
+
+            // validate
+            Assert.AreEqual(subscriptionCount, actualSubscriptions.Count, "Subscription Count");
+            Assert.AreEqual(subscriptionCount, expectedSubscriptions.Count, "Reported subscription Count");
+            foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
+            {
+                Assert.IsTrue(expectedSubscriptions.Contains(subscription), "Subscription Match");
+            }
+
+            // unsubscribe from one of the subscriptions
+            StreamSubscriptionHandle<int> firstHandle = expectedSubscriptions.First();
+            await consumer.StopConsuming(firstHandle);
+            expectedSubscriptions.Remove(firstHandle);
+
+            // query actuall subscriptions again
+            actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
+
+            // validate
+            Assert.AreEqual(subscriptionCount-1, actualSubscriptions.Count, "Subscription Count");
+            Assert.AreEqual(subscriptionCount-1, expectedSubscriptions.Count, "Reported subscription Count");
+            foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
+            {
+                Assert.IsTrue(expectedSubscriptions.Contains(subscription), "Subscription Match");
+            }
+
+            // unsubscribe from the rest of the subscriptions
+            expectedSubscriptions.ForEach( async h => await consumer.StopConsuming(h));
+
+            // query actuall subscriptions again
+            actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
+
+            // validate
+            Assert.AreEqual(0, actualSubscriptions.Count, "Subscription Count");
         }
 
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int consumerCount, bool assertIsTrue)
