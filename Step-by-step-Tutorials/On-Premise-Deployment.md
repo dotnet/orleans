@@ -12,7 +12,7 @@ While using Orleans to implement cloud-based services is a core scenario, there 
 * OrleansConfiguration.xml file with configuration for the deployment to replace the default placeholder from .\Binaries\OrleansServer 
 * Binaries with grain interfaces and grain implementation classes of the service along with any external dependencies to Application\<service name> subdirectory of the folder on the target with binaries from .\Binaries\OrleansServer 
 
-This simple task may be accomplished in many different ways and with different tools, but the Orleans SDK includes a set of PowerShell scripts that provide a way to deploy an Orleans based service to a cluster of machines and remote start the hosting processes on them. There are also scripts for removing a service, monitoring its performance, starting and stopping it, and collecting logs. These are the scripts we found useful for ourselves while building and testing Orleans.
+This simple task may be accomplished in many different ways and with different tools, but the Orleans GitHub repo includes a set of PowerShell scripts (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) that provide a way to deploy an Orleans based service to a cluster of machines and remote start the hosting processes on them. There are also scripts for removing a service, monitoring its performance, starting and stopping it, and collecting logs. These are the scripts we found useful for ourselves while building and testing Orleans.
 
 ## Prerequisites
 The following table lists the prerequisites for deploying and running Orleans on a remote machine:
@@ -54,7 +54,7 @@ The following table lists the prerequisites for deploying and running Orleans on
  Note that the user running the scripts must be a member of the Administrators Group on the remote machines. 
 
 ## Deployment Steps
-In this tutorial , we will deploy the HelloWorld sample to a set of servers. The SDK installation folder has a sub-folder called 'RemoteDeployment' where everything we need can be found. Start by building the  Hello World sample, commenting out (or removing) the silo initialization and shutdown code:
+In this tutorial , we will deploy the HelloWorld sample to a set of servers. The Orleans repo includes a 'RemoteDeployment' folder (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) where everything we need can be found. Start by building the  Hello World sample, commenting out (or removing) the silo initialization and shutdown code:
 
 
     static void Main(string[] args)
@@ -78,7 +78,7 @@ In this tutorial , we will deploy the HelloWorld sample to a set of servers. The
     }
 
 
- Also, start a new PowerShell window as Administrator and move to the RemoteDeployment folder in the Orleans installation.
+ Also, start a new PowerShell window as Administrator and move to the RemoteDeployment folder.
 
  The basic steps to deploy Orleans code are:
 * Setup a deployment manifest (Deployment.xml). 
@@ -200,7 +200,7 @@ To determine if Orleans is running on the servers in the deployment manifest, ru
 
  If everything works well, you should see something like this:
 
-    PS C:\Microsoft Codename Orleans SDK v0.9\SDK\RemoteDeployment> .\ShowOrleansSilos.ps1 .\Deployment.xml
+    PS C:\Orleans\misc\scripts\RemoteDeployment> .\ShowOrleansSilos.ps1 .\Deployment.xml
 
     OrleansHost running on host001:
          Process 1: 1340
