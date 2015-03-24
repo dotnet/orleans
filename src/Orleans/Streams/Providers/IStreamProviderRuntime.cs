@@ -134,6 +134,8 @@ namespace Orleans.Streams
 
         Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
 
+        Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
+
         GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId);
     }
 }

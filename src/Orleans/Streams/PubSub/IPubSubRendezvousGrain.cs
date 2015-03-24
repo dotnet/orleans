@@ -45,5 +45,7 @@ namespace Orleans.Streams
         Task<PubSubSubscriptionState[]> DiagGetConsumers(StreamId streamId);
 
         Task Validate();
+
+        Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
     }
 }

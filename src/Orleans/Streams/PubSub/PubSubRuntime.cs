@@ -69,6 +69,12 @@ namespace Orleans.Streams
             return streamRendezvous.ConsumerCount(streamId);
         }
 
+        public Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        {
+            var streamRendezvous = GetRendezvousGrain(streamId);
+            return streamRendezvous.GetAllSubscriptions(streamId, streamConsumer);
+        }
+
         private static IPubSubRendezvousGrain GetRendezvousGrain(StreamId streamId)
         {
             return (IPubSubRendezvousGrain)GrainClient.InvokeStaticMethodThroughReflection(
@@ -150,6 +156,13 @@ namespace Orleans.Streams
         public Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace)
         {
             return explicitPubSub.ConsumerCount(streamId, streamProvider, streamNamespace); 
+        }
+
+        public async Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        {
+            return IsImplicitSubscriber(streamConsumer, streamId)
+                ? new List<GuidId>( new [] { GuidId.GetGuidId(streamConsumer.GetPrimaryKey()) } )
+                : await explicitPubSub.GetAllSubscriptions(streamId, streamConsumer);
         }
 
         private bool IsImplicitSubscriber(IAddressable addressable, StreamId streamId)

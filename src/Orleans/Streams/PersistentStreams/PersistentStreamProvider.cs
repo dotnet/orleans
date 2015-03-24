@@ -25,7 +25,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
-using Orleans.Concurrency;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 

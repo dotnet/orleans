@@ -82,5 +82,12 @@ namespace Tester.StreamingTests
             logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        public async Task SMSActiveSubscriptionTest()
+        {
+            logger.Info("************************ SMSActiveSubscriptionTest *********************************");
+            await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+        }
     }
 }
