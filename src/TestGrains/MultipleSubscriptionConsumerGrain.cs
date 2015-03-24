@@ -96,7 +96,7 @@ namespace TestGrains
             consumedMessageCounts.Remove(handle);
         }
 
-        public Task<List<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse)
+        public Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info("GetAllSubscriptionHandles");
 

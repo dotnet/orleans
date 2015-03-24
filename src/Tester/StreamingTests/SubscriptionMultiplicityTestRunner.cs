@@ -207,7 +207,7 @@ namespace Tester.StreamingTests
             List<StreamSubscriptionHandle<int>> expectedSubscriptions = (await Task.WhenAll(subscriptionTasks)).ToList();
 
             // query actuall subscriptions
-            List<StreamSubscriptionHandle<int>> actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
+            IList<StreamSubscriptionHandle<int>> actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
             Assert.AreEqual(subscriptionCount, actualSubscriptions.Count, "Subscription Count");

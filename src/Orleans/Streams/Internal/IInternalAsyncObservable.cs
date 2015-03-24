@@ -35,6 +35,6 @@ namespace Orleans.Streams
 
         Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle);
 
-        Task<List<StreamSubscriptionHandle<T>>> GetAllSubscriptions();
+        Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptions();
     }
 }

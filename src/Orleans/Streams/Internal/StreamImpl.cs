@@ -125,7 +125,7 @@ namespace Orleans.Streams
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
         }
 
-        public Task<List<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles()
+        public Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles()
         {
             return GetConsumerInterface().GetAllSubscriptions();
         }

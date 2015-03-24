@@ -48,6 +48,6 @@ namespace Orleans.Streams
         /// Retrieves a list of all active subscriptions created by the caller for this stream.
         /// </summary>
         /// <returns></returns>
-        Task<List<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles();
+        Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles();
     }
 }

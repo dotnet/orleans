@@ -163,7 +163,7 @@ namespace Orleans.Streams
             handleImpl.Invalidate();
         }
 
-        public async Task<List<StreamSubscriptionHandle<T>>> GetAllSubscriptions()
+        public async Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptions()
         {
             await BindExtensionLazy();
 
