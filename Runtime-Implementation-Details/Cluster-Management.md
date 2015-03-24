@@ -12,7 +12,7 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment.
 
-2. Silos monitor each other directly, via application pings (“are you alive" heartbeats). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer)) ).
+2. Silos monitor each other directly, via application pings (“are you alive" `heartbeats`). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer)) ).
 
 3. If a silo S does not get Y ping replies from a monitored servers P, it suspects it by writing its timestamped suspicion into P’s row in the Azure table.
 
@@ -92,7 +92,7 @@ In the extended version of the protocol all writes are serialized via one row. T
 
 ### Configuration:
 
-Membership protocol is configured via the `Liveness` element in the `Globals` section in OrleansConfiguration.xml
+Membership protocol is configured via the `Liveness` element in the `Globals` section in `OrleansConfiguration.xml` file.
 The default values were tuned in years of production usage in Azure and we believe they represent good default settings. There is no need in general to change them.
 
 Sample config element:
@@ -100,15 +100,15 @@ Sample config element:
     <Liveness ProbeTimeout = "5s" TableRefreshTimeout ="10s  DeathVoteExpirationTimeout ="80s" NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" />
 
 
-There are 3 types of liveness implemented. The type of the liveness protocol is configured via the `SystemStoreType` attribute of the `SystemStore` element in the Globals section in OrleansConfiguration.xml
+There are 3 types of liveness implemented. The type of the liveness protocol is configured via the `SystemStoreType` attribute of the `SystemStore` element in the `Globals` section in `OrleansConfiguration.xml` file.
 
 1. `MembershipTableGrain` - membership table is stored in a grain on primary silo. This is development setup.
 
-2. `AzureTable` - membership table is stored in Azure table
+2. `AzureTable` - membership table is stored in Azure table.
 
-3. `SqlServer` - membership table is stored in SQL server
+3. `SqlServer` - membership table is stored in SQL server.
 	
-For all liveness types the common configuration variables are defined in 1Globals.Liveness1 element:
+For all liveness types the common configuration variables are defined in `Globals.Liveness` element:
 	
 1. `ProbeTimeout` - The number of seconds to probe other silos for their liveness or for the silo to send "I am alive" heartbeat messages about itself. Default is 10 seconds.
 
