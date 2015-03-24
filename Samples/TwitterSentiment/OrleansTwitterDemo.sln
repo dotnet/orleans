@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.21005.1
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwitterGrainInterfaces", "TwitterGrainInterfaces\TwitterGrainInterfaces.csproj", "{9CE33584-C97E-4059-9973-73BB396112A9}"
 EndProject
@@ -10,6 +10,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwitterWebApplication", "TwitterWebApplication\TwitterWebApplication.csproj", "{AD6F3781-83C1-4563-B3B0-ED6EAEAF6F2B}"
 EndProject
 Project("{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}") = "TwitterClient", "TwitterClient\TwitterClient.njsproj", "{379FC5D7-C70C-4414-AB28-3167CA48C76C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F3B01B56-F36F-41E6-BA3C-51BF6C7A03F3}"
+	ProjectSection(SolutionItems) = preProject
+		ReadMe.md = ReadMe.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
