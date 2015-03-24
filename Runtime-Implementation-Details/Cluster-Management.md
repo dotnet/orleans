@@ -10,7 +10,7 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 ### The Basic Membership Protocol:
 
-1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (ip:port:epoch) as row key (epoch is just time in ticks when this silo started). Thus ip:port:epoch is guaranteed to be unique in a given Orleans deployment.
+1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment.
 
 2. Silos monitor each other directly, via application pings (“are you alive" heartbeats). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer)) ).
 
@@ -92,7 +92,7 @@ In the extended version of the protocol all writes are serialized via one row. T
 
 ### Configuration:
 
-Membership protocol is configured via the Liveness element in the Globals section in OrleansConfiguration.xml
+Membership protocol is configured via the `Liveness` element in the `Globals` section in OrleansConfiguration.xml
 The default values were tuned in years of production usage in Azure and we believe they represent good default settings. There is no need in general to change them.
 
 Sample config element:
@@ -100,59 +100,37 @@ Sample config element:
     <Liveness ProbeTimeout = "5s" TableRefreshTimeout ="10s  DeathVoteExpirationTimeout ="80s" NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" />
 
 
-There are 3 types of liveness implemented. The type of the liveness protocol is configured via the SystemStoreType attribute of the
-SystemStore element in the Globals section in OrleansConfiguration.xml
+There are 3 types of liveness implemented. The type of the liveness protocol is configured via the `SystemStoreType` attribute of the `SystemStore` element in the Globals section in OrleansConfiguration.xml
 
-1. MembershipTableGrain - membership table is stored in a grain on primary silo. This is development setup.
+1. `MembershipTableGrain` - membership table is stored in a grain on primary silo. This is development setup.
 
-2. AzureTable - membership table is stored in Azure table
+2. `AzureTable` - membership table is stored in Azure table
 
-3. SqlServer - membership table is stored in SQL server
+3. `SqlServer` - membership table is stored in SQL server
 	
-For all liveness types the common configuration variables are defined in Globals.Liveness element:
+For all liveness types the common configuration variables are defined in 1Globals.Liveness1 element:
 	
-1. ProbeTimeout 
-The number of seconds to probe other silos for their liveness or for the silo to send "I am alive" heartbeat messages about itself.Default is 10 seconds.
+1. `ProbeTimeout` - The number of seconds to probe other silos for their liveness or for the silo to send "I am alive" heartbeat messages about itself. Default is 10 seconds.
 
-2. TableRefreshTimeout ="10" 
-The number of seconds to fetch updates from the membership table.
-Default is 60 seconds.
+2. `TableRefreshTimeout` - The number of seconds to fetch updates from the membership table. Default is 60 seconds.
 
-3. DeathVoteExpirationTimeout
-Expiration time in seconds for death vote in the membership table.
-Default is 120 seconds
+3. `DeathVoteExpirationTimeout` - Expiration time in seconds for death vote in the membership table. Default is 120 seconds
 
-4. NumMissedProbesLimit 
-The number of missed "I am alive" heartbeat messages from a silo or number of un-replied probes that lead to suspecting this silo as dead.
-Default is 3.
+4. `NumMissedProbesLimi`t - The number of missed "I am alive" heartbeat messages from a silo or number of un-replied probes that lead to suspecting this silo as dead. Default is 3.
 
-5. NumProbedSilos
-The number of silos each silo probes for liveness.
-Default is 3.
+5. `NumProbedSilos` - The number of silos each silo probes for liveness. Default is 3.
 
-6. NumVotesForDeathDeclaration
-The number of non-expired votes that are needed to declare some silo as dead (should be at most NumMissedProbesLimit)
-Default is 2.
+6. `NumVotesForDeathDeclaration` - The number of non-expired votes that are needed to declare some silo as dead (should be at most NumMissedProbesLimit). Default is 2.
 
-7. UseLivenessGossip
-Whether to use the gossip optimization to speed up spreading liveness information.
-Default is true.
+7. `UseLivenessGossip` - Whether to use the gossip optimization to speed up spreading liveness information. Default is true.
 
-8. IAmAliveTablePublishTimeout  
-The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics. 
-Default is 5 minutes.
+8. `IAmAliveTablePublishTimeout` - The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.  Default is 5 minutes.
 
-9. NumMissedTableIAmAliveLimit
-The number of missed "I am alive" updates  in the table from a silo that causes warning to be logged. Does not impact the liveness protocol.
-Default is 2.
+9. `NumMissedTableIAmAliveLimit` - The number of missed "I am alive" updates  in the table from a silo that causes warning to be logged. Does not impact the liveness protocol. Default is 2.
 
-10. MaxJoinAttemptTime
-The number of seconds to attempt to join a cluster of silos before giving up.
-Default is 5 minutes.
+10. `MaxJoinAttemptTime` - The number of seconds to attempt to join a cluster of silos before giving up. Default is 5 minutes.
 
-11. ExpectedClusterSize
-The expected size of a cluster. Need not be very accurate, can be an overestimate. Used to tune the exponential backoff algorithm of retries to write to Azure table.
-Default is 20.       
+11. `ExpectedClusterSize` - The expected size of a cluster. Need not be very accurate, can be an overestimate. Used to tune the exponential backoff algorithm of retries to write to Azure table. Default is 20.       
 
 	
 ### Acknowledgements:
