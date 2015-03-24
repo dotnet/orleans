@@ -50,7 +50,7 @@ namespace Tester.StreamingTests
 
         // Use ClassCleanup to run code after all tests in a class have run
         [ClassCleanup]
-        public static new void MyClassCleanup()
+        public static void MyClassCleanup()
         {
             StopAllSilos();
         }
