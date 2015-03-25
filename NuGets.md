@@ -21,18 +21,18 @@ Package   | Purpose
 
 <br>
 
-The below aditional 7 packages are included by either Microsoft.Orleans.Client or Microsoft.Orleans.Server and can also be used separately for rare use cases.
+The below aditional 7 packages are included by either [Microsoft.Orleans.Client](http://www.nuget.org/packages/Microsoft.Orleans.Client/) or [Microsoft.Orleans.Server](http://www.nuget.org/packages/Microsoft.Orleans.Server/), and can also be used separately for rare use cases.
 
 Package   | Purpose
 ------------- | -------------
-[Microsoft.Orleans.Core](http://www.nuget.org/packages/Microsoft.Orleans.Core/) | Contains Orleans.dll, which defines most of Orleans public types and Orleans Client. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server. Reference it for building libraries that use Orleans types but don't need any of the dependencies of code generation.
+[Microsoft.Orleans.Core](http://www.nuget.org/packages/Microsoft.Orleans.Core/) | Contains Orleans.dll, which defines most of Orleans public types and Orleans Client. Reference it for building libraries that use Orleans types but don't need any of the dependencies of code generation. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server.
 [<br>Microsoft.Orleans.OrleansRuntime](http://www.nuget.org/packages/Microsoft.Orleans.OrleansRuntime/) | <br>Contains the silo runtime. Included in Microsoft.Orleans.Server.
-[<br>Microsoft.Orleans.OrleansAzureUtils](http://www.nuget.org/packages/Microsoft.Orleans.OrleansAzureUtils/) | <br> Contains Orleans dependecies on Azure SDK libraries, such as Azure Runtime. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server. May become optional when we switch from static dependency on OrleansAzureUtils.dll to dynamic on-demand loading of it.
+[<br>Microsoft.Orleans.OrleansAzureUtils](http://www.nuget.org/packages/Microsoft.Orleans.OrleansAzureUtils/) | <br> Contains Orleans dependecies on Azure SDK libraries, such as Azure Runtime. May become optional when we switch from static dependency on OrleansAzureUtils.dll to dynamic on-demand loading of it. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server.
 [<br>Microsoft.Orleans.OrleansProviders](http://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/) | <br>Includes a set of built-in persistence and stream providers. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server.
-[<br>Microsoft.Orleans.OrleansHost](http://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/) | <br>Includes default silo host - OrleansHost.exe. Included in Microsoft.Orleans.Server. Can be used for on-premises deployments or as an out-of-process silo host in Azure Worker Role.
+[<br>Microsoft.Orleans.OrleansHost](http://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/) | <br>Includes a default silo host - OrleansHost.exe. Can be used for on-premises deployments or as an out-of-process silo host in Azure Worker Role. Included in Microsoft.Orleans.Server.
 [<br>Microsoft.Orleans.CounterControl](http://www.nuget.org/packages/Microsoft.Orleans.CounterControl/) | <br>Includes CounterControl.exe, which registers Windows performance counter categories for Orleans statistics and for deployed grain classes. Requires elevation. Can be executed in Azure as part of a role startup task. Included in Microsoft.Orleans.Server.
-[<br>Microsoft.Orleans.OrleansManager](http://www.nuget.org/packages/Microsoft.Orleans.OrleansManager/) | <br>Includes Orleans management tool - OrleansManager.exe.
+[<br>Microsoft.Orleans.OrleansManager](http://www.nuget.org/packages/Microsoft.Orleans.OrleansManager/) | <br>Includes Orleans management tool - OrleansManager.exe. Not included in any other package.
 
 <br>
 
-Packages Microsoft.Orleans.Development and Microsoft.Orleans.ClientGenerator that existed prior to v1.0.5 got deprecated with their content and functionality now included in Microsoft.Orleans.Templates.Interfaces and Microsoft.Orleans.Templates.Grains.
+Packages [Microsoft.Orleans.Development](http://www.nuget.org/packages/Microsoft.Orleans.Development/) and [Microsoft.Orleans.ClientGenerator](http://www.nuget.org/packages/Microsoft.Orleans.ClientGenerator/) that existed prior to v1.0.5 got deprecated with their content and functionality now included in [Microsoft.Orleans.Templates.Interfaces](http://www.nuget.org/packages/Microsoft.Orleans.Templates.Interfaces/) and [Microsoft.Orleans.Templates.Grains](http://www.nuget.org/packages/Microsoft.Orleans.Templates.Grains/).
