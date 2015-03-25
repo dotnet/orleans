@@ -3,8 +3,13 @@
 permalink: /:categories/:year/:month/:day/:title 
 
 exclude: [".rvmrc", ".rbenv-version", "README.md", "Rakefile", "changelog.md"]
-pygments: true
+highlighter: pygments
+markdown: redcarpet
 
+# Make redcarpet behave like GitHub Flavored Markdown
+redcarpet:
+  extensions: ["no_intra_emphasis", "fenced_code_blocks", "tables", "autolink", "strikethrough", "superscript", "with_toc_data"]
+  
 # Themes are encouraged to use these universal variables 
 # so be sure to set them if your theme uses them.
 #
