@@ -15,6 +15,8 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Installation of the SDK](Installation)**
 
+* **[Orleans NuGet Packages](NuGets.md)**
+
 * **[What's new in Orleans?](What's-new-in-Orleans)** - Coverage of the new and changed features in the September refresh of the preview binaries.
 
 ## Introduction and Tutorials
