@@ -12,7 +12,7 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment.
 
-2. Silos monitor each other directly, via application pings (“are you alive" `heartbeats`). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer)) ).
+2. Silos monitor each other directly, via application pings (“are you alive" `heartbeats`). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer))).
 
 3. If a silo S does not get Y ping replies from a monitored servers P, it suspects it by writing its timestamped suspicion into P’s row in the Azure table.
 
@@ -24,9 +24,11 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 	5.2 One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
 
-        5.3 The suspecting silo S reads the row of P.
 
+        5.3 The suspecting silo S reads P's row. 
+        
         5.4 If S is the last suspector (there have already been Z-1 suspectors within time period T, as written in the suspicion column), S decides to declare P as Dead. In this case, S adds itself to list of suspectors and also writes in P's Status column that P is Dead. 
+
 
         5.5 Otherwise, if S is not the last suspector, S just adds itself to the suspectors column. 
 
@@ -76,13 +78,13 @@ The basic membership protocol described above was later extended to support tota
 
 3. When silo S wants to write suspicion or death declaration for silo P:
  
-    * S reads the latest table content. If P is already dead, do nothing. Otherwise,
+    3.1 S reads the latest table content. If P is already dead, do nothing. Otherwise,
 
-    * In the same transaction, write the changes to P's row as well as increment the version number and write it back to the table.
+    3.2 In the same transaction, write the changes to P's row as well as increment the version number and write it back to the table.
 
-    * Both writes are conditioned with eTags.
+    3.3 Both writes are conditioned with eTags.
 
-    * If transaction aborts due to eTag mismatch on either P's row or on the version row, attempt again.
+    3.4 If transaction aborts due to eTag mismatch on either P's row or on the version row, attempt again.
 
 4. All writes to the table modify and increment the version row. That way all writes to the table are serialized (via serializing the updates to the version row) and since silos only increment the version number, the writes are also totally ordered in increasing order.
 
