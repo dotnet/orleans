@@ -20,19 +20,19 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 5. In more details:
 
-	* Suspicion is written to the Azure table, in a special column in the row corresponding to P. When S suspects P it writes: “at time TTT S suspected P”.
+	5.1 Suspicion is written to the Azure table, in a special column in the row corresponding to P. When S suspects P it writes: “at time TTT S suspected P”.
 
-	* One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
+	5.2 One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
 
-        * The suspecting silo S reads the row of P.
+        5.3 The suspecting silo S reads the row of P.
 
-        * If S is the last suspector (there have already been Z-1 suspectors within time period T, as written in the suspicion column), S decides to declare P as Dead. In this case, S adds itself to list of suspectors and also writes in P's Status column that P is Dead. 
+        5.4 If S is the last suspector (there have already been Z-1 suspectors within time period T, as written in the suspicion column), S decides to declare P as Dead. In this case, S adds itself to list of suspectors and also writes in P's Status column that P is Dead. 
 
-        * Otherwise, if S is not the last suspector, S just adds itself to the suspectors column. 
+        5.5 Otherwise, if S is not the last suspector, S just adds itself to the suspectors column. 
 
-	* In either case the write back uses the etag that was read, so the updates to this row are serialized. In case the write has failed due to etag mismatch, S retries (read again, and try to write, unless P was already marked dead).
+	5.6 In either case the write back uses the etag that was read, so the updates to this row are serialized. In case the write has failed due to etag mismatch, S retries (read again, and try to write, unless P was already marked dead).
 
-	* At a high level this sequence of “read, local modify, write back” is a transaction. However, we are not using storage transactions to do that. “Transaction” code executes locally on a server and we use optimistic concurrency control with etags to ensure isolation and atomicity.
+	5.7 At a high level this sequence of “read, local modify, write back” is a transaction. However, we are not using storage transactions to do that. “Transaction” code executes locally on a server and we use optimistic concurrency control with etags to ensure isolation and atomicity.
 
 6. Every silo periodically reads the entire membership table for its deployment. That way silos learn about new silos joining and about other silos being declared dead.
 
