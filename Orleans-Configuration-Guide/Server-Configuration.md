@@ -18,9 +18,9 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
 
 **Inter-silo Endpoint**
 
-
-    <Networking Address=" " Port="11111" />
-
+``` xml
+<Networking Address=" " Port="11111" />
+```
 
  Address: IP address or host name to use. If left empty, silo will pick the first available IPv4 address. Orleans supports IPv6 as well as IPv4.
 
@@ -31,16 +31,18 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
  For local development environment, you can simply use localhost as the host name:
 
 
-    <Networking Address="localhost" Port="11111" />
-
+``` xml
+<Networking Address="localhost" Port="11111" />
+```
 
 ## Client Gateway Endpoint
 
  The setting for client gateway endpoint is identical to the inter-silo endpoint except for the XML element name:
 
 
-     <ProxyingGateway Address="localhost" Port="30000" />
-
+``` xml
+<ProxyingGateway Address="localhost" Port="30000" />
+```
 
  You have to specify a port number different from the one used for the inter-silo endpoint.
 
@@ -53,26 +55,28 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
  For reliable management of cluster membership, Orleans uses the Azure Table or SQL Server for synchronization of nodes. The reliable membership setup requires configuring the 'SystemStore' element settings in the silo configuration file:
 
 
-     <SystemStore SystemStoreType ="AzureTable"
+``` xml
+<SystemStore SystemStoreType="AzureTable"
              DeploymentId="..."
              DataConnectionString="..."/>
-
+```
 
  or 
 
-
-     <SystemStore SystemStoreType ="SqlServer"
+``` xml
+<SystemStore SystemStoreType="SqlServer"
              DeploymentId="..."
              DataConnectionString="..."/>
-
+```
 
  DeploymentId is a unique string that defines a particular deployment. When deploying an Orleans based service to Azure it makes most sense to use the Azure deployment ID of the worker role.
 
  For development or if it’s not possible to use Azure Table, silos can be configured to use the membership grain instead. Such a configuration is unreliable as it will not survive a failure of the primary silo that hosts the membership grain. “MembershipTableGrain” is the default value of LivenessType.
 
 
-    <Liveness LivenessType ="MembershipTableGrain" />
-
+``` xml
+<Liveness LivenessType ="MembershipTableGrain" />
+```
 
 ## Primary Silo
 In a reliable deployment, one that is configured with membership using Azure Table, all silos are created equal, with no notion of primary or secondary silos. That is the configuration that is recommended for production that will survive a failure of any individual node or a combination of nodes. For example, Azure periodically rolls out OS patches and that causes all of the role instances to reboot eventually.
@@ -82,5 +86,7 @@ In a reliable deployment, one that is configured with membership using Azure Tab
  In a non-Azure environment, Primary is designated in the configuration file with the following setting within the Globals section.
 
 
-    <SeedNode Address="<host name or IP address of the primary node>" Port="11111" />
+``` xml
+<SeedNode Address="<host name or IP address of the primary node>" Port="11111" />
+```
 
