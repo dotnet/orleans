@@ -47,16 +47,17 @@ There are two main grain types in OrleansXO, one represents a player, the other 
 
 A `PlayerGrain` is activated for each player logging in to the system. A GUID is used to uniquely identify the user, which is stored in a cookie by the MVC web application. The IPlayer interface defines the operations a player can perform:
 
-    public interface IPlayer : IGrain 
-    {
-        Task<List<GameSummary>> GetGameSummaries();
-        Task<Guid> CreateGame();
-        Task<GameState> JoinGame(Guid gameId);
-        Task LeaveGame(Guid gameId, GameOutcome outcome);
-        Task SetUsername(string username);
-        Task<string> GetUsername(); 
-    }
-
+``` csharp
+public interface IPlayer : IGrain 
+{
+    Task<List<GameSummary>> GetGameSummaries();
+    Task<Guid> CreateGame();
+    Task<GameState> JoinGame(Guid gameId);
+    Task LeaveGame(Guid gameId, GameOutcome outcome);
+    Task SetUsername(string username);
+    Task<string> GetUsername(); 
+}
+```
 
 The player grain handles the creating of new games (so another player can then join), leaving a game (once it is over), and tracking the progress of all active games.
 
@@ -64,16 +65,17 @@ The player grain handles the creating of new games (so another player can then j
 
 Each game is also represented by a `GameGrain`. They are also uniquely identify using a GUID.
 
-    public interface IGame : Orleans.IGrain 
-    {
-        Task<GameState> AddPlayerToGame(Guid player);
-        Task<GameState> GetState();
-        Task<List<GameMove>> GetMoves();
-        Task<GameState> MakeMove(GameMove move);
-        Task<GameSummary> GetSummary(Guid player);
-        Task SetName(string name);  
-    }
-
+``` csharp
+public interface IGame : Orleans.IGrain 
+{
+    Task<GameState> AddPlayerToGame(Guid player);
+    Task<GameState> GetState();
+    Task<List<GameMove>> GetMoves();
+    Task<GameState> MakeMove(GameMove move);
+    Task<GameSummary> GetSummary(Guid player);
+    Task SetName(string name);  
+}
+```
 
 Once a user grain creates a game, that user is automatically added as one of the players. Once a game is joined by a second player, the game can start. The players make their turns until the game ends with either a draw or a winner. 
 

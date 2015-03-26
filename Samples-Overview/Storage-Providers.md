@@ -87,48 +87,51 @@ In both cases, the name of the grain type is used as name for the collection of 
 
 In the MongoDB case, the JSON structure is augmented during a write operation with another element, key, which contains the Orleans grain key and allows us to query for that document when reading. Care is also taken to maintain the Mongo-internal _id document identity.
 
+``` csharp
+public Task Write(string collectionName, string key, string entityData)
+{
+    var collection = GetOrCreateCollection(collectionName);
 
-        public Task Write(string collectionName, string key, string entityData)
-        {
-            var collection = GetOrCreateCollection(collectionName);
+    var query = Query.EQ("key", key);
+    var existing = collection.FindOne(query);
 
-            var query = Query.EQ("key", key);
-            var existing = collection.FindOne(query);
+    var doc = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<BsonDocument>(entityData);
+    doc["key"] = key;
 
-            var doc = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<BsonDocument>(entityData);
-            doc["key"] = key;
-
-            if ( existing == null )
-            {
-                collection.Insert(doc);
-            }
-            else
-            {
-                doc["_id"] = existing["_id"];
-                collection.Update(query, Update.Replace(doc));
-            }
-            return TaskDone.Done;
-        }
+    if ( existing == null )
+    {
+        collection.Insert(doc);
+    }
+    else
+    {
+        doc["_id"] = existing["_id"];
+        collection.Update(query, Update.Replace(doc));
+    }
+    return TaskDone.Done;
+}
+```
 
 On read, the _id field is removed from the JSON document that is passed back to the caller, since that is not part of the Orleans data model.
 
-        public Task<string> Read(string collectionName, string key)
-        {
-            var collection = GetCollection(collectionName);
-            if (collection == null)
-                return Task.FromResult<string>(null);
+``` csharp
+public Task<string> Read(string collectionName, string key)
+{
+    var collection = GetCollection(collectionName);
+    if (collection == null)
+        return Task.FromResult<string>(null);
 
-            var query = Query.EQ("key", key);
-            var existing = collection.FindOne(query);
+    var query = Query.EQ("key", key);
+    var existing = collection.FindOne(query);
 
-            if (existing == null)
-                return Task.FromResult<string>(null);
+    if (existing == null)
+        return Task.FromResult<string>(null);
 
-            existing.Remove("_id");
-            existing.Remove("key");
+    existing.Remove("_id");
+    existing.Remove("key");
 
-            var strwrtr = new System.IO.StringWriter();
-            var writer = new MongoDB.Bson.IO.JsonWriter(strwrtr, new MongoDB.Bson.IO.JsonWriterSettings());
-            MongoDB.Bson.Serialization.BsonSerializer.Serialize<BsonDocument>(writer, existing);
-            return Task.FromResult(strwrtr.ToString());
-        }
+    var strwrtr = new System.IO.StringWriter();
+    var writer = new MongoDB.Bson.IO.JsonWriter(strwrtr, new MongoDB.Bson.IO.JsonWriterSettings());
+    MongoDB.Bson.Serialization.BsonSerializer.Serialize<BsonDocument>(writer, existing);
+    return Task.FromResult(strwrtr.ToString());
+}
+```

@@ -59,18 +59,19 @@ Reminders, being persistent, rely upon storage to function. You must specify whi
 ## Usage
 A grain that uses reminders must implement the **IRemindable.RecieveReminder **method.
 
-
-    Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
-    {
-        Console.WriteLine("Thanks for reminding me-- I almost forgot!");
-        return TaskDone.Done;
-    }
-
+``` csharp
+Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
+{
+    Console.WriteLine("Thanks for reminding me-- I almost forgot!");
+    return TaskDone.Done;
+}
+```
 
  To start a reminder, use the **GrainBase.RegisterOrUpdateReminder** method, which returns an **IOrleansReminder** object:
 
-
-     protected Task<IOrleansReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+``` csharp
+protected Task<IOrleansReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+```
 
 * reminderName is a string that must uniquely identify the reminder within the scope of the contextual grain. 
 * dueTime specifies a quantity of time to wait before issuing the first timer tick. 
@@ -78,9 +79,9 @@ A grain that uses reminders must implement the **IRemindable.RecieveReminder **m
 
  Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling **Grain.UnregisterReminder**:
 
-
-     protected Task UnregisterReminder(IOrleansReminder reminder)
-
+``` csharp
+protected Task UnregisterReminder(IOrleansReminder reminder)
+```
 
 reminder is the handle object returned by **Grain.RegisterOrUpdateReminder**.
 
@@ -88,9 +89,9 @@ reminder is the handle object returned by **Grain.RegisterOrUpdateReminder**.
 
  If you only have the reminder's name and need the corresponding instance of  **IOrleansReminder**, call the **Grain.GetReminder** method:
 
-
-     protected Task<IOrleansReminder> GetReminder(string reminderName)
-
+``` csharp
+protected Task<IOrleansReminder> GetReminder(string reminderName)
+```
 
 ## Which Should I Use?
 The Orleans team recommends that you use timers in the following circumstances: 

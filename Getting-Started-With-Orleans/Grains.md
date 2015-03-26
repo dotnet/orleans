@@ -20,15 +20,17 @@ Grains interact with each other by invoking methods declared as part of the resp
 
 Example:
 
-    public interface IChirperPublisher : IGrain 
-    { 
-      Task<long> GetUserIdAsync(); 
-      Task<string> GetUserAliasAsync();
-      Task<string> GetDisplayNameAsync();
-      Task<List<ChirperMessage>> GetPublishedMessagesAsync(int n = 10, int start = 0); 
-      Task AddFollowerAsync(string userAlias, IChirperSubscriber follower); 
-      Task RemoveFollowerAsync(string userAlias, IChirperSubscriber follower); 
-    } 
+``` csharp
+public interface IChirperPublisher : IGrain 
+{ 
+  Task<long> GetUserIdAsync(); 
+  Task<string> GetUserAliasAsync();
+  Task<string> GetDisplayNameAsync();
+  Task<List<ChirperMessage>> GetPublishedMessagesAsync(int n = 10, int start = 0); 
+  Task AddFollowerAsync(string userAlias, IChirperSubscriber follower); 
+  Task RemoveFollowerAsync(string userAlias, IChirperSubscriber follower); 
+} 
+```
 
 ## Grain Reference
 

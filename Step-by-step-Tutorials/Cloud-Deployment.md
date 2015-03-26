@@ -48,24 +48,24 @@ The Worker Role initialization class is a normal Azure worker role - it needs to
 
  The worker role initialization class needs to create an instance of `Orleans.Host.Azure.OrleansAzureSilo` class, and call the appropriate Start/Run/Stop functions in the appropriate places:
 
+``` csharp
+public class WorkerRole : RoleEntryPoint 
+{ 
+    Orleans.Host.Azure.OrleansAzureSilo silo; 
 
-    public class WorkerRole : RoleEntryPoint 
+    public override bool OnStart() 
     { 
-        Orleans.Host.Azure.OrleansAzureSilo silo; 
- 
-        public override bool OnStart() 
-        { 
-            // Do other silo initialization – for example: Azure diagnostics, etc 
- 
-            silo = new OrleansAzureSilo(); 
- 
-            return silo.Start( 
-                RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance); 
-        } 
-        public override void OnStop() { silo.Stop(); } 
-        public override void Run()    { silo.Run(); } 
-    } 
+        // Do other silo initialization – for example: Azure diagnostics, etc 
 
+        silo = new OrleansAzureSilo(); 
+
+        return silo.Start( 
+            RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance); 
+    } 
+    public override void OnStop() { silo.Stop(); } 
+    public override void Run()    { silo.Run(); } 
+} 
+```
 
  Then, in the ServiceDefinition.csdef file for this role, add some required configuration items used by the Orleans Azure hosting library to the WorkerRole configuration:
 * Add a ConfigurationSettings declaration named 'DataConnectionString' This is the Azure storage location where Orleans Azure hosting library will place / look for its silo instance table. 
@@ -245,18 +245,18 @@ Note: You MUST ensure that all the referenced binaries for grain interfaces and 
 ## Initialize Client Connection to Orleans Silos 
 It is recommended to bootstrap and initialize the client connection to the Orleans silo worker roles, to ensure a connection is set up before use – either in the Page_Load method for each .aspx page, or in Global.asax initialization methods. 
 
-
-    protected void Page_Load(object sender, EventArgs e) 
+``` csharp
+protected void Page_Load(object sender, EventArgs e) 
+{ 
+    if (Page.IsPostBack) 
     { 
-        if (Page.IsPostBack) 
+        if (!OrleansAzureClient.IsInitialized) 
         { 
-            if (!OrleansAzureClient.IsInitialized) 
-            { 
-                OrleansAzureClient.Initialize(); 
-            } 
+            OrleansAzureClient.Initialize(); 
         } 
     } 
-
+} 
+```
 
  Repeated calls to OrleansAzureClient.Initialize()  will return and do nothing if the Orleans client connection is already set up.
 

@@ -13,38 +13,39 @@ In the second tutorial, we saw how grain state survived the client being shut do
 ## Getting Started
 We'll continue to build on our employee-and-manager sample.
 
- The first thing we need to do is make the identities of our workers and managers a little more predictable. In the sample, they were assigned Guids using Guid.NewGuid(), which is convenient, but doesn't let us find them in a subsequent run. Therefore, we'll create a set of guids first, then use them as the worker identities.
+The first thing we need to do is make the identities of our workers and managers a little more predictable. In the sample, they were assigned Guids using Guid.NewGuid(), which is convenient, but doesn't let us find them in a subsequent run. Therefore, we'll create a set of guids first, then use them as the worker identities.
 
- The modified Main program looks like this:
+The modified Main program looks like this:
 
-    static void Main(string[] args)
-    {
-         ...
-        Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+``` csharp
+static void Main(string[] args)
+{
+     ...
+    Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
 
-        var ids = new string[] { 
-            "42783519-d64e-44c9-9c29-399e3afaa625", 
-            "d694a4e0-1bc3-4c3f-a1ad-ba95103622bc", 
-            "9a72b0c6-33df-49db-ac05-14316edd332d", 
-            "6526a751-b9ac-4881-9bfb-836ecce2ca9f", 
-            "ae4b106f-3c96-464a-b48d-3583ed584b17", 
-            "b715c40f-d8d2-424d-9618-76afbc0a2a0a", 
-            "5ad92744-a0b1-487b-a9e7-e6b91e9a9826", 
-            "e23a55af-217c-4d76-8221-c2b447bf04c8", 
-            "2eef0ac5-540f-4421-b9a9-79d89400f7ab" 
-        };
+    var ids = new string[] { 
+        "42783519-d64e-44c9-9c29-399e3afaa625", 
+        "d694a4e0-1bc3-4c3f-a1ad-ba95103622bc", 
+        "9a72b0c6-33df-49db-ac05-14316edd332d", 
+        "6526a751-b9ac-4881-9bfb-836ecce2ca9f", 
+        "ae4b106f-3c96-464a-b48d-3583ed584b17", 
+        "b715c40f-d8d2-424d-9618-76afbc0a2a0a", 
+        "5ad92744-a0b1-487b-a9e7-e6b91e9a9826", 
+        "e23a55af-217c-4d76-8221-c2b447bf04c8", 
+        "2eef0ac5-540f-4421-b9a9-79d89400f7ab" 
+    };
 
-        var e0 = EmployeeFactory.GetGrain(Guid.Parse(ids[0]));
-        var e1 = EmployeeFactory.GetGrain(Guid.Parse(ids[1]));
-        var e2 = EmployeeFactory.GetGrain(Guid.Parse(ids[2]));
-        var e3 = EmployeeFactory.GetGrain(Guid.Parse(ids[3]));
-        var e4 = EmployeeFactory.GetGrain(Guid.Parse(ids[4]));
+    var e0 = EmployeeFactory.GetGrain(Guid.Parse(ids[0]));
+    var e1 = EmployeeFactory.GetGrain(Guid.Parse(ids[1]));
+    var e2 = EmployeeFactory.GetGrain(Guid.Parse(ids[2]));
+    var e3 = EmployeeFactory.GetGrain(Guid.Parse(ids[3]));
+    var e4 = EmployeeFactory.GetGrain(Guid.Parse(ids[4]));
 
-        var m0 = ManagerFactory.GetGrain(Guid.Parse(ids[5]));
-        var m1 = ManagerFactory.GetGrain(Guid.Parse(ids[6]));
-        ... 
-    }
-
+    var m0 = ManagerFactory.GetGrain(Guid.Parse(ids[5]));
+    var m1 = ManagerFactory.GetGrain(Guid.Parse(ids[6]));
+    ... 
+}
+```
 
  Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage. The silo host project includes a configuration file 'DevTestServerConfiguration.xml' which is where we find the following section:
 
@@ -81,55 +82,57 @@ We'll continue to build on our employee-and-manager sample.
 
 Identifying that a grain should use persistent state takes three steps: declaring an interface for the state, changing the grain base class, and identifying the storage provider.
 
- The first step, declaring an interface, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
+The first step, declaring an interface, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
 
- For employees, we want to persist all the state:
+For employees, we want to persist all the state:
 
-    public interface IEmployeeState : IGrainState
-    {
-        int Level { get; set; }
-        IManager Manager { get; set; }
-    }
-
+``` csharp
+public interface IEmployeeState : IGrainState
+{
+    int Level { get; set; }
+    IManager Manager { get; set; }
+}
+```
 
  and for managers, we must store the direct reports, but the "_me" reference may continue to be created during activation.
 
-
-    public interface IManagerState : IGrainState
-    {
-        List<IEmployee> Reports { get; set; }
-    }
-
+``` csharp
+public interface IManagerState : IGrainState
+{
+    List<IEmployee> Reports { get; set; }
+}
+```
 
  Then, we change the grain class declaration to identify the state interface and remove the variables that we want persisted. Make sure to remove level, and manager from the Employee class and _reports from the Manager class.
 
  We also add an attribute to identify the storage provider:
 
+``` csharp
+[StorageProvider(ProviderName = "AzureStore")]
+public class Employee : Orleans.Grain<IEmployeeState>, Interfaces.IEmployee
+```
 
-    [StorageProvider(ProviderName = "AzureStore")]
-    public class Employee : Orleans.Grain<IEmployeeState>, Interfaces.IEmployee
-
-
- and
-
-
-    [StorageProvider(ProviderName="AzureStore")]
-    public class Manager : Orleans.Grain<IManagerState>, IManager
+and
 
 
- At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file. This indirection is what allows you to delay choices around where to store grain state until deployment.
+``` csharp
+[StorageProvider(ProviderName="AzureStore")]
+public class Manager : Orleans.Grain<IManagerState>, IManager
+```
 
- Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager. Instead, the grain base class gives us access to the state via a 'State' property that is available to the grain.
+At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file. This indirection is what allows you to delay choices around where to store grain state until deployment.
 
- For example:
+Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager. Instead, the grain base class gives us access to the state via a 'State' property that is available to the grain.
 
+For example:
 
-     public Task SetManager(IManager manager)
-     {
-         State.Manager = manager;
-         return TaskDone.Done;
-     }
-
+``` csharp
+public Task SetManager(IManager manager)
+{
+   State.Manager = manager;
+   return TaskDone.Done;
+}
+```
 
 ## Controlling Checkpoints
 
@@ -141,36 +144,36 @@ The question that remains is when the persistent state gets saved to the storage
 
  Thus, the final version of the 'Promote()' and 'SetManager()' methods looks like this:
 
+``` csharp
+public Task Promote(int newLevel)
+{
+    State.Level = newLevel;
+    return State.WriteStateAsync();
+}
 
-    public Task Promote(int newLevel)
-    {
-        State.Level = newLevel;
-        return State.WriteStateAsync();
-    }
+public Task SetManager(IManager manager)
+{
+    State.Manager = manager;
+    return State.WriteStateAsync();
+}
+```
 
-    public Task SetManager(IManager manager)
-    {
-        State.Manager = manager;
-        return State.WriteStateAsync();
-    }
+In the Manager class, there's only one method that need to be modified to write out data, 'AddDirectReport().' It should look like this:
 
+``` csharp
+public async Task AddDirectReport(IEmployee employee)
+{
+    State.Reports.Add(employee);
+    await employee.SetManager(this);
+    var data = await employee.Greeting(
+        new GreetingData { From = _me, Message = "Welcome to my team!" });
+    Console.WriteLine("{0} said: {1}", 
+                        data.From.ToString(),
+                        data.Message);
 
- In the Manager class, there's only one method that need to be modified to write out data, 'AddDirectReport().' It should look like this:
-
-
-    public async Task AddDirectReport(IEmployee employee)
-    {
-        State.Reports.Add(employee);
-        await employee.SetManager(this);
-        var data = await employee.Greeting(
-            new GreetingData { From = _me, Message = "Welcome to my team!" });
-        Console.WriteLine("{0} said: {1}", 
-                            data.From.ToString(),
-                            data.Message);
-
-        await State.WriteStateAsync();
-    }
-
+    await State.WriteStateAsync();
+}
+```
 
  Let's try this out!
 

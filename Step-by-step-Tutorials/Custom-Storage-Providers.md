@@ -29,55 +29,56 @@ An Orleans storage provider is simply a class that implements IStorageProvider. 
 
  Our storage provider should implement the interface 'Orleans.Storage.IStorageProvider.' With a little bit of massaging of the code, it should look something like this:
 
-    using System;
-    using System.Threading.Tasks;
+``` csharp
+using System;
+using System.Threading.Tasks;
 
-    using Orleans;
-    using Orleans.Storage;
-    using Orleans.RuntimeCore;
+using Orleans;
+using Orleans.Storage;
+using Orleans.RuntimeCore;
 
-    namespace StorageProviders
+namespace StorageProviders
+{
+    public class FileStorageProvider : IStorageProvider
     {
-        public class FileStorageProvider : IStorageProvider
+        public OrleansLogger Log { get; set; }
+
+        public string Name { get; set; }
+
+        public Task Init(string name, Orleans.Providers.IProviderRuntime providerRuntime, 
+                      Orleans.Providers.IProviderConfiguration config)
         {
-            public OrleansLogger Log { get; set; }
+            throw new NotImplementedException();
+        }
 
-            public string Name { get; set; }
+        public Task Close()
+        {
+            throw new NotImplementedException();
+        }
 
-            public Task Init(string name, Orleans.Providers.IProviderRuntime providerRuntime, 
-                          Orleans.Providers.IProviderConfiguration config)
-            {
-                throw new NotImplementedException();
-            }
+        public Task ReadStateAsync(string grainType,
+                                   Orleans.GrainReference grainRef,
+                                   IGrainState grainState)
+        {
+            throw new NotImplementedException();
+        }
 
-            public Task Close()
-            {
-                throw new NotImplementedException();
-            }
+        public Task WriteStateAsync(string grainType,
+                                    Orleans.GrainReference grainRef,
+                                    IGrainState grainState)
+        {
+             throw new NotImplementedException();
+        }
 
-            public Task ReadStateAsync(string grainType,
-                                       Orleans.GrainReference grainRef,
-                                       IGrainState grainState)
-            {
-                throw new NotImplementedException();
-            }
-
-            public Task WriteStateAsync(string grainType,
-                                        Orleans.GrainReference grainRef,
-                                        IGrainState grainState)
-            {
-                 throw new NotImplementedException();
-            }
- 
-            public Task ClearStateAsync(string grainType,
-                                        Orleans.GrainReference grainRef,
-                                        IGrainState grainState)
-            {
-                throw new NotImplementedException();
-            }
+        public Task ClearStateAsync(string grainType,
+                                    Orleans.GrainReference grainRef,
+                                    IGrainState grainState)
+        {
+            throw new NotImplementedException();
         }
     }
-
+}
+```
 
  The first thing we have to figure out is what data we need to provider through configuration. The name is a required property, but we will also need the path to the root directory for our file store. That is, in fact, the only piece of information we need, so we'll add a 'RootDirectory' string property and edit the configuration file as in the previous section. In doing so, it's critical to pay attention to the namespace and class name of the provider. Add this to the 'StorageProviders' element in the configuration file:
 
@@ -92,24 +93,24 @@ An Orleans storage provider is simply a class that implements IStorageProvider. 
 ## Initializing the Provider
 There are four major functions to implement in the provider -- Close() is the only one we won't need to do anything with. As you may have guessed, the starting point is the call to Init(), which provides us with the configuration data and a chance to get things set up properly. In our case, we'll want to set the properties and create the root directory if it doesn't already exist:
 
+``` csharp
+public Task Init(string name,
+                 Orleans.Providers.IProviderRuntime providerRuntime,
+                 Orleans.Providers.IProviderConfiguration config)
+{
+    this.Name = name;
+    if (string.IsNullOrWhiteSpace(config.Properties["RootDirectory"]))
+        throw new ArgumentException("RootDirectory property not set");
 
-        public Task Init(string name,
-                         Orleans.Providers.IProviderRuntime providerRuntime,
-                         Orleans.Providers.IProviderConfiguration config)
-        {
-            this.Name = name;
-            if (string.IsNullOrWhiteSpace(config.Properties["RootDirectory"]))
-                throw new ArgumentException("RootDirectory property not set");
+    var directory = new System.IO.DirectoryInfo(config.Properties["RootDirectory"]);
+    if (!directory.Exists)
+        directory.Create();
 
-            var directory = new System.IO.DirectoryInfo(config.Properties["RootDirectory"]);
-            if (!directory.Exists)
-                directory.Create();
- 
-            this.RootDirectory = directory.FullName;
- 
-            return TaskDone.Done;
-        }
+    this.RootDirectory = directory.FullName;
 
+    return TaskDone.Done;
+}
+```
 
  Run the program again. This time, you will still crahs, but in ReadStateAsync(). After running the code, you should find a 'Storage' directory under the $(OrleansSDK)\LocalSilo directory. Make sure you have set the project up to build on F5, or you may not see the edits take effect.
 
@@ -117,58 +118,59 @@ There are four major functions to implement in the provider -- Close() is the on
 To store data in the file system (or anywhere, really), we have to devise a convention that generates a unique name for each grain. This is easiest done by combining the state type name with the grain id, which combines the grain type and GUID creating a globally unique key. Thus, ReadStateAsync() (which, by the way, should be declared as an async method), starts like this:
 
 
-            var collectionName = grainState.GetType().Name;
-            var key = grainRef.ToKeyString();
+``` csharp
+var collectionName = grainState.GetType().Name;
+var key = grainRef.ToKeyString();
 
-            var fName = key + "." + collectionName;
-            var path = System.IO.Path.Combine(RootDirectory, fName);
+var fName = key + "." + collectionName;
+var path = System.IO.Path.Combine(RootDirectory, fName);
 
-            var fileInfo = new System.IO.FileInfo(path);
-            if (!fileInfo.Exists)
-                return; 
-
+var fileInfo = new System.IO.FileInfo(path);
+if (!fileInfo.Exists)
+    return; 
+```
 
  We also need to decide how the data will be stored. To make it easy to inspect the data outside of the application, we're going to use JSON. A more space-conscious design may use a binary serialization format, instead, it's entirely a choice of the provider designer's. The JSON serializer is found in the System.Web.Extensions assembly, which you now need to add to the project's references. Also, add a using clause to the top of the file: "using System.Web.Script.Serialization;"
 
+``` csharp
+using (var stream = fileInfo.OpenText())
+{
+    var storedData = await stream.ReadToEndAsync();
 
-            using (var stream = fileInfo.OpenText())
-            {
-                var storedData = await stream.ReadToEndAsync();
- 
-                JavaScriptSerializer deserializer = new JavaScriptSerializer();
-                object data = deserializer.Deserialize(storedData, grainState.GetType());
-                var dict = ((IGrainState)data).AsDictionary();
-                grainState.SetAll(dict);
-            } 
-
+    JavaScriptSerializer deserializer = new JavaScriptSerializer();
+    object data = deserializer.Deserialize(storedData, grainState.GetType());
+    var dict = ((IGrainState)data).AsDictionary();
+    grainState.SetAll(dict);
+} 
+```
 
 ## Writing State
 The format decisions have already been made, so coding up the WriteStateAsync method should be straight-forward: serialize as JSON, construct the file name, then write to the file:
 
 
+``` csharp
+public async Task WriteStateAsync(string grainType, Orleans.GrainReference grainRef, IGrainState grainState)
+{
+    Dictionary<string, object> dataValues = grainState.AsDictionary();
+    JavaScriptSerializer serializer = new JavaScriptSerializer();
+    var storedData = serializer.Serialize(dataValues);
 
-        public async Task WriteStateAsync(string grainType, Orleans.GrainReference grainRef, IGrainState grainState)
-        {
-            Dictionary<string, object> dataValues = grainState.AsDictionary();
-            JavaScriptSerializer serializer = new JavaScriptSerializer();
-            var storedData = serializer.Serialize(dataValues);
- 
-            var collectionName = grainState.GetType().Name;
-            var key = grainRef.ToKeyString();
- 
-            var fName = key + "." + collectionName;
-            var path = System.IO.Path.Combine(RootDirectory, fName);
- 
-            var fileInfo = new System.IO.FileInfo(path);
+    var collectionName = grainState.GetType().Name;
+    var key = grainRef.ToKeyString();
 
-            using (var stream = new System.IO.StreamWriter(
-                       fileInfo.Open(System.IO.FileMode.Create,
-                                     System.IO.FileAccess.Write)))
-            {
-                await stream.WriteAsync(storedData);
-            }
-        } 
+    var fName = key + "." + collectionName;
+    var path = System.IO.Path.Combine(RootDirectory, fName);
 
+    var fileInfo = new System.IO.FileInfo(path);
+
+    using (var stream = new System.IO.StreamWriter(
+               fileInfo.Open(System.IO.FileMode.Create,
+                             System.IO.FileAccess.Write)))
+    {
+        await stream.WriteAsync(storedData);
+    }
+} 
+```
 
 ## Putting it Together
 

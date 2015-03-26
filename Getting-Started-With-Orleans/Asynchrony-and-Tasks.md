@@ -10,11 +10,13 @@ Grains interact by invoking asynchronous method calls. Asynchronous methods are 
 
 The primary way of using a `Task` is to wait for its completion with the `await` keyword of C# 5.0 (.NET 4.5).
 
-    Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
-    IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId) 
-    await player.JoinGame(this); 
-    players.Add(playerId); 
-    return; 
+``` csharp
+Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
+IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId) 
+await player.JoinGame(this); 
+players.Add(playerId); 
+return; 
+```    
 
 
 The `await` keyword effectively turns the remainder of the method into a closure that will asynchronously execute upon completion of the Task being awaited without blocking the executing thread. In the above example, lines 4 and 5 will be turned into a closure by the C# compiler.
@@ -23,15 +25,16 @@ The `await` keyword effectively turns the remainder of the method into a closure
 
  Example:
 
-    List<Task> tasks = new List<Task>(); 
-    ChirperMessage chirp = CreateNewChirpMessage(text); 
-    foreach (IChirperSubscriber subscriber in Followers.Values) 
-    { 
-       tasks.Add(subscriber.NewChirpAsync(chirp)); 
-    } 
-    Task joinedTask = Task.WhenAll(tasks); 
-    await joinedTask; 
-
+``` csharp
+List<Task> tasks = new List<Task>(); 
+ChirperMessage chirp = CreateNewChirpMessage(text); 
+foreach (IChirperSubscriber subscriber in Followers.Values) 
+{ 
+   tasks.Add(subscriber.NewChirpAsync(chirp)); 
+} 
+Task joinedTask = Task.WhenAll(tasks); 
+await joinedTask; 
+```
 
 ## Turns: Units of Execution
 

@@ -13,17 +13,18 @@ The following Orleans DLLs from either the `[SDK-ROOT]\Binaries\PresenceClient` 
 
  Almost any client will involve use of the grain factory class. The `GetGrain()` method is used for getting a grain reference for a particular ID. As was already mentioned, grains cannot be explicitly created or deleted.
 
-    OrleansClient.Initialize(); 
-  
-    // Hardcoded player ID 
-    Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
-    IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId); 
-  
-    IGameGrain game = player.CurrentGame.Result; 
-    var watcher = new GameObserver(); 
-    var observer = GameObserverFactory.CreateObjectReference(watcher); 
-    await game.SubscribeForGameUpdates(); 
+``` csharp
+OrleansClient.Initialize(); 
 
+// Hardcoded player ID 
+Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
+IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId); 
+
+IGameGrain game = player.CurrentGame.Result; 
+var watcher = new GameObserver(); 
+var observer = GameObserverFactory.CreateObjectReference(watcher); 
+await game.SubscribeForGameUpdates(); 
+```
 
 If this code is used from the main thread of a console application, you have to call `Wait()` on the task returned by `game.SubscribeForGameUpdates()` because `await` does not prevent the `Main()` function from returning, which will cause the client process to exit.
 
@@ -58,73 +59,74 @@ Example
 
 Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of, and prints out notifications until the program is manually terminated.
 
-
-    namespace PlayerWatcher 
+``` csharp
+namespace PlayerWatcher 
+{ 
+    class Program 
     { 
-        class Program 
+        /// <summary> 
+        /// Simulates a companion application that connects to the game 
+        /// that a particular player is currently part of, and subscribes 
+        /// to receive live notifications about its progress. 
+        /// </summary> 
+        static void Main(string[] args) 
         { 
-            /// <summary> 
-            /// Simulates a companion application that connects to the game 
-            /// that a particular player is currently part of, and subscribes 
-            /// to receive live notifications about its progress. 
-            /// </summary> 
-            static void Main(string[] args) 
+            try 
             { 
-                try 
+                OrleansClient.Initialize(); 
+  
+                // Hardcoded player ID 
+                Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
+                IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId);
+                // Alternatively: 
+                //  IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
+                IGameGrain game = null; 
+  
+                while (game == null) 
                 { 
-                    OrleansClient.Initialize(); 
-      
-                    // Hardcoded player ID 
-                    Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
-                    IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId);
-                    // Alternatively: 
-                    //  IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
-                    IGameGrain game = null; 
-      
-                    while (game == null) 
+                    Console.WriteLine("Getting current game for player {0}...", playerId); 
+  
+                    try 
                     { 
-                        Console.WriteLine("Getting current game for player {0}...", playerId); 
-      
-                        try 
-                        { 
-                            game = player.CurrentGame.Result; 
-                            if (game == null) // Wait until the player joins a game 
-                                Thread.Sleep(5000); 
-                        } 
-                        catch (Exception exc) 
-                        { 
-                            Console.WriteLine("Exception: ", exc.GetBaseException()); 
-                        } 
+                        game = player.CurrentGame.Result; 
+                        if (game == null) // Wait until the player joins a game 
+                            Thread.Sleep(5000); 
                     } 
-      
-                    Console.WriteLine("Subscribing to updates for game {0}...", game.GetPrimaryKey()); 
-      
-                    // Subscribe for updates 
-                    var watcher = new GameObserver(); 
-                    game.SubscribeForGameUpdates(GameObserverFactory.CreateObjectReference(watcher)).Wait(); 
-      
-                    // .Wait will block main thread so that the process doesn't exit. 
-                    // Updates arrive on thread pool threads. 
-                    Console.WriteLine("Subscribed successfully. Press <Enter> to stop."); 
-                    Console.ReadLine(); 
+                    catch (Exception exc) 
+                    { 
+                        Console.WriteLine("Exception: ", exc.GetBaseException()); 
+                    } 
                 } 
-                catch (Exception exc) 
-                { 
-                    Console.WriteLine("Unexpected Error: {0}", exc.GetBaseException()); 
-                } 
+  
+                Console.WriteLine("Subscribing to updates for game {0}...", game.GetPrimaryKey()); 
+  
+                // Subscribe for updates 
+                var watcher = new GameObserver(); 
+                game.SubscribeForGameUpdates(GameObserverFactory.CreateObjectReference(watcher)).Wait(); 
+  
+                // .Wait will block main thread so that the process doesn't exit. 
+                // Updates arrive on thread pool threads. 
+                Console.WriteLine("Subscribed successfully. Press <Enter> to stop."); 
+                Console.ReadLine(); 
             } 
-      
-            /// <summary> 
-            /// Observer class that implements the observer interface. 
-            /// Need to pass a grain reference to an instance of this class to subscribe for updates. 
-            /// </summary> 
-            private class GameObserver : IGameObserver 
+            catch (Exception exc) 
             { 
-                // Receive updates 
-                public void UpdateGameScore(string score) 
-                { 
-                    Console.WriteLine("New game score: {0}", score); 
-                } 
+                Console.WriteLine("Unexpected Error: {0}", exc.GetBaseException()); 
+            } 
+        } 
+  
+        /// <summary> 
+        /// Observer class that implements the observer interface. 
+        /// Need to pass a grain reference to an instance of this class to subscribe for updates. 
+        /// </summary> 
+        private class GameObserver : IGameObserver 
+        { 
+            // Receive updates 
+            public void UpdateGameScore(string score) 
+            { 
+                Console.WriteLine("New game score: {0}", score); 
             } 
         } 
     } 
+} 
+```

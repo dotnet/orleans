@@ -12,64 +12,68 @@ Code running in a grain is not prohibited from calling external systems or servi
 
 For this sample, let's create a grain which maintains the current price for a stock.
 
- Create a grain interface project, and add an interface for an  IStockGrain:
+Create a grain interface project, and add an interface for an  IStockGrain:
 
-    public interface IStockGrain : Orleans.IGrainWithStringKey
-    {
-        Task<string: GetPrice();
-    }
+``` csharp
+public interface IStockGrain : Orleans.IGrainWithStringKey
+{
+    Task<string> GetPrice();
+}
+```
 
 Note, we've opted for an string-based key for our grain, which is useful since the ticker symbol makes a natural key. The 'IGrainWithStringKey' interface is new in the September refresh.
 Now add a grain implementation project, and add a reference to the interface project. Add a reference to `System.Net.Http`.
 
  We'll implement the grain so it retrieves the price of the stock when it is activated:
 
+``` csharp
+public class StockGrain : Orleans.Grain, IStockGrain
+{
+    string price;
 
-    public class StockGrain : Orleans.Grain, IStockGrain
+    public override async Task ActivateAsync()
     {
-        string price;
+        string stock;
+        this.GetPrimaryKey(out stock);
+        await UpdatePrice(stock);
+        await base.ActivateAsync();
+    }
 
-        public override async Task ActivateAsync()
-        {
-            string stock;
-            this.GetPrimaryKey(out stock);
-            await UpdatePrice(stock);
-            await base.ActivateAsync();
-        }
+    async Task UpdatePrice(string stock)
+    {
+        price = await GetPriceFromYahoo(stock);
+    }
 
-        async Task UpdatePrice(string stock)
+    async Task<string: GetPriceFromYahoo(string stock)
+    {
+        var uri = "http://download.finance.yahoo.com/d/quotes.csv?f=snl1c1p2&e=.csv&s=" + stock;
+        using (var http = new HttpClient())
+        using (var resp = await http.GetAsync(uri))
         {
-            price = await GetPriceFromYahoo(stock);
-        }
-
-        async Task<string: GetPriceFromYahoo(string stock)
-        {
-            var uri = "http://download.finance.yahoo.com/d/quotes.csv?f=snl1c1p2&e=.csv&s=" + stock;
-            using (var http = new HttpClient())
-            using (var resp = await http.GetAsync(uri))
-            {
-                return await resp.Content.ReadAsStringAsync();
-            }
-        }
-
-        public Task<string: GetPrice()
-        {
-            return Task.FromResult(price);
+            return await resp.Content.ReadAsStringAsync();
         }
     }
+
+    public Task<string: GetPrice()
+    {
+        return Task.FromResult(price);
+    }
+}
+```
 
 
  Next create some client code to connect to the Orleans Silo, and retrieve the grain state:
 
-    OrleansClient.Initialize("LocalConfiguration.xml");
+``` csharp
+OrleansClient.Initialize("LocalConfiguration.xml");
 
-    // retrieve the MSFT stock
-    var grain = GrainFactory.GetGrain<IStockGrain>("MSFT");
-    var price = grain.GetPrice().Result;
-    Console.WriteLine(price);
+// retrieve the MSFT stock
+var grain = GrainFactory.GetGrain<IStockGrain>("MSFT");
+var price = grain.GetPrice().Result;
+Console.WriteLine(price);
 
-    Console.ReadKey();
-
+Console.ReadKey();
+```
 
  When we start the local silo, and run the application, we should see the stock value written out
 
@@ -87,32 +91,32 @@ The problem with the grain as it stands is that the value of the stock will chan
 
  Let's re-factor the ActivateAsync() method to introduce a timer which will call the UpdatePrice method in 1 minute, and then repeatedly every minute from then on, until the grain is deactivated:
 
+``` csharp
+public override async Task ActivateAsync()
+{
+    string stock;
+    this.GetPrimaryKey(out stock);
+    await UpdatePrice(stock);
 
-    public override async Task ActivateAsync()
-    {
-        string stock;
-        this.GetPrimaryKey(out stock);
-        await UpdatePrice(stock);
+    var timer = RegisterAsyncTimer(
+        UpdatePrice,
+        stock,
+        TimeSpan.FromMinutes(1),
+        TimeSpan.FromMinutes(1));
 
-        var timer = RegisterAsyncTimer(
-            UpdatePrice,
-            stock,
-            TimeSpan.FromMinutes(1),
-            TimeSpan.FromMinutes(1));
-
-        await base.ActivateAsync();
-    }
-
+    await base.ActivateAsync();
+}
+```
 
  We'll also have to slightly adjust the UpdatePrice method, as the stock argument must be an object rather than a string. We'll also add some logging so we can see what's happening:
 
-
-    async Task UpdatePrice(object stock)
-    {
-        price = await GetPriceFromYahoo(stock as string);
-        Console.WriteLine(price);
-    }
-
+``` csharp
+async Task UpdatePrice(object stock)
+{
+    price = await GetPriceFromYahoo(stock as string);
+    Console.WriteLine(price);
+}
+```
 
 RegisterAsyncTimer() takes four arguments:
 * callback A function to call. 
@@ -144,56 +148,57 @@ Running code in a single threaded execution model, does not prohibit you from aw
 
  Let's add a new function to retrieve the graph data for a stock:
 
-
-    async Task<string: GetYahooGraphData(string stock)
+``` csharp
+async Task<string> GetYahooGraphData(string stock)
+{
+    // retrieve the graph data from Yahoo finance
+    var uri = string.Format(
+        "http://chartapi.finance.yahoo.com/instrument/1.0/{0}/chartdata;type=quote;range=1d/csv/",stock);
+    using (var http = new HttpClient())
+    using (var resp = await http.GetAsync(uri))
     {
-        // retrieve the graph data from Yahoo finance
-        var uri = string.Format(
-            "http://chartapi.finance.yahoo.com/instrument/1.0/{0}/chartdata;type=quote;range=1d/csv/",stock);
-        using (var http = new HttpClient())
-        using (var resp = await http.GetAsync(uri))
-        {
-            return await resp.Content.ReadAsStringAsync();
-        }
+        return await resp.Content.ReadAsStringAsync();
     }
-
+}
+```
 
  We'll also add a new field to the grain to store this information:
 
+``` csharp
+string graphData;
+```
 
-    string graphData;
-
-
- Now we can retrieve the graph data and current price like this:
-
-
-    async Task UpdatePrice(object stock)
-    {
-        price = await GetPriceFromYahoo(stock as string);
-        graphData = await GetYahooGraphData(stock as string);
-        Console.WriteLine(price);
-    }
+Now we can retrieve the graph data and current price like this:
 
 
- However, by doing this we're waiting for the price from Yahoo, and after that's complete we request the graph data. This is inefficient, as we could be doing these at the same time. Fortunately, Task has a convenient  WhenAll method which allows us to await multiple tasks at once, allowing these tasks to complete in parallel.
+``` csharp
+async Task UpdatePrice(object stock)
+{
+    price = await GetPriceFromYahoo(stock as string);
+    graphData = await GetYahooGraphData(stock as string);
+    Console.WriteLine(price);
+}
+```
+
+However, by doing this we're waiting for the price from Yahoo, and after that's complete we request the graph data. This is inefficient, as we could be doing these at the same time. Fortunately, Task has a convenient  WhenAll method which allows us to await multiple tasks at once, allowing these tasks to complete in parallel.
 
 
-    async Task UpdatePrice(object stock)
-    {
-        // collect the task variables without awaiting
-        var priceTask = GetPriceFromYahoo(stock as string);
-        var graphDataTask = GetYahooGraphData(stock as string);
- 
-        // await both tasks 
-        await Task.WhenAll(priceTask, graphDataTask);
- 
-        // read the results
-        price = priceTask.Result;
-        graphData = graphDataTask.Result;
-        Console.WriteLine(price);
-    }
+``` csharp
+async Task UpdatePrice(object stock)
+{
+    // collect the task variables without awaiting
+    var priceTask = GetPriceFromYahoo(stock as string);
+    var graphDataTask = GetYahooGraphData(stock as string);
 
+    // await both tasks 
+    await Task.WhenAll(priceTask, graphDataTask);
 
+    // read the results
+    price = priceTask.Result;
+    graphData = graphDataTask.Result;
+    Console.WriteLine(price);
+}
+```
 
 Note: The Result of a Task will block execution if the task hasn't completed. This should be avoided in Orleans, tasks should always be awaited before Result is read.
 
@@ -207,8 +212,9 @@ It's tempting to use the Parallel Task Library for executing parallel tasks in O
 
  Should your grain code require a sub-task to be created, you should use  Task.Factory.StartNew:
 
-
-    await Task.Factory.StartNew(() =>{ /* logic */ });
+``` csharp
+await Task.Factory.StartNew(() =>{ /* logic */ });
+```
 
 
  This technique will use the current task scheduler, which will be the Orleans scheduler.
