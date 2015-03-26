@@ -28,25 +28,26 @@ After starting either Visual Studio 2012 or 2013, go to create a new project. Un
  The main code does three things: it creates a silo in a separate app domain, initializes the Orleans client runtime, and waits for user input before terminating:
 
 
-    static void Main(string[] args)
-    {
-        AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, 
-            new AppDomainSetup
-            {
-                AppDomainInitializer = InitSilo,
-                AppDomainInitializerArguments = args,
-            });
+``` csharp
+static void Main(string[] args)
+{
+    AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, 
+        new AppDomainSetup
+        {
+            AppDomainInitializer = InitSilo,
+            AppDomainInitializerArguments = args,
+        });
 
-        Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
+    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
 
-        // TODO: once the previous call returns, the silo is up and running.
-        //       This is the place your custom logic, for example calling client logic
-        //       or initializing an HTTP front end for accepting incoming requests.
+    // TODO: once the previous call returns, the silo is up and running.
+    //       This is the place your custom logic, for example calling client logic
+    //       or initializing an HTTP front end for accepting incoming requests.
 
-        Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
-        Console.ReadLine();
-    }
-
+    Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
+    Console.ReadLine();
+}
+```
 
 ## Adding Some Grains
 
@@ -65,11 +66,12 @@ At this point, we have everything we need except some actual Orleans-based code.
  Open the IGrain1.cs file and add a method 'SayHello()' to it. We should have something like this:
 
 
-    public interface IGrain1 : Orleans.IGrain
-    {
-        Task<string> SayHello();
-    }
-
+``` csharp
+public interface IGrain1 : Orleans.IGrain
+{
+    Task<string> SayHello();
+}
+```
 
 
 Note that we're relying on TPL tasks in the interface method's return type -- an essential means to achiving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so. Use Task or Task<T> as the return type of all methods of communication interfaces.
@@ -77,27 +79,31 @@ Next, we turn our attention to the grain implementation, which is found in Grain
 
  Then, we ask VS to generate the method stub for the one interface method we defined earlier:
 
-
-    public Task<string> SayHello()
-    {
-        throw new NotImplementedException();
-    }
+``` csharp
+public Task<string> SayHello()
+{
+    throw new NotImplementedException();
+}
+```
 
 
  We're finally ready to add the much-anticipated "Hello World!" code. Just return the string as the contents of a Task:
 
 
-    public Task<string> SayHello()
-    {
-        return Task.FromResult("Hello World!");
-    }
-
+``` csharp
+public Task<string> SayHello()
+{
+    return Task.FromResult("Hello World!");
+}
+```
 
  OK, we're nearly done. All we need is a bit of client code, which we will return to Program.cs in order to add. In place of the comment following the call to OrleansClient.Initialize(), add these two lines:
 
 
+``` csharp
     var hello = MyGrainInterfaces1.Grain1Factory.GetGrain(0);
     Console.WriteLine("\n\n{0}\n\n", hello.SayHello().Result);
+```
 
 
  That's it! Hit F5, let the silo initialization code take its time. This will take a few seconds, maybe as much as ten, and there will be a lot of log messages printed. At the very end, you should see the printout of the greeting.
