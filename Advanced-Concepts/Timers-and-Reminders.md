@@ -16,7 +16,9 @@ The Orleans runtime provides two mechanisms, called timers and reminders, that e
 ## Usage
 To start a timer, use the **Grain.RegisterTimer** method, which returns an  **IDisposable** reference:
 
-    protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+``` csharp
+protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+```    
 
 * asyncCallback is the function to be invoked when the timer ticks. 
 * state is an object that will be passed to asyncCallback when the timer ticks. 
@@ -46,15 +48,16 @@ To start a timer, use the **Grain.RegisterTimer** method, which returns an  **ID
 ## Configuration
 Reminders, being persistent, rely upon storage to function. You must specify which storage backing to use before the reminder subsystem will function. The reminder functionality is controlled by the SystemStore element in the server-side configuration. It works with either Azure Table or SQL Server as the store.
 
-     <SystemStore SystemStoreType="AzureTable" /> OR 
-     <SystemStore SystemStoreType="SqlServer" />
-
+``` xml
+<SystemStore SystemStoreType="AzureTable" /> OR 
+<SystemStore SystemStoreType="SqlServer" />
+```
 
  If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under 'Globals') will give you a development-only implementation of the reminder system:
 
-
-    <ReminderService ReminderServiceType="ReminderTableGrain"/>
-
+``` xml
+<ReminderService ReminderServiceType="ReminderTableGrain"/>
+```
 
 ## Usage
 A grain that uses reminders must implement the **IRemindable.RecieveReminder **method.

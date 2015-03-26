@@ -12,23 +12,27 @@ Some examples include, but are not limited to:
 
 We have now added support for this auto-run functionality through configuring "bootstrap providers" for Orleans silos. For example:
 
-    <OrleansConfiguration xmlns="urn:orleans">
-      <Globals>
-        <BootstrapProviders>
-          <Provider Type="My.App.BootstrapClass1" Name="bootstrap1" />
-          <Provider Type="My.App.BootstrapClass2" Name="bootstrap2" />
-        </BootstrapProviders>
-      </Globals>
-    </OrleansConfiguration>
+``` xml
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <BootstrapProviders>
+      <Provider Type="My.App.BootstrapClass1" Name="bootstrap1" />
+      <Provider Type="My.App.BootstrapClass2" Name="bootstrap2" />
+    </BootstrapProviders>
+  </Globals>
+</OrleansConfiguration>
+```
 
  These bootstrap providers are C# classes that implement the Orleans.IBootstrapProvider interface.
 
 When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.
 
-    Task Init(
-        string name, 
-        IProviderRuntime providerRuntime, 
-        IProviderConfiguration config)
+``` csharp
+Task Init(
+    string name, 
+    IProviderRuntime providerRuntime, 
+    IProviderConfiguration config)
+```
 
 Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted. 
 

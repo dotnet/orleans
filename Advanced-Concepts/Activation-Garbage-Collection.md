@@ -57,18 +57,18 @@ hr  | hour(s)
 
 The default collection age limit that applies to all grain types can be customized by adding the OrleansConfiguation/Globals/Application/Defaults/Deactivation element to the OrleansConfiguration.xml file. The following example specifies that all activations that have been idle for 10 minutes or more should be considered eligible for deactivation.
 
-
-    <?xml version="1.0" encoding="utf-8"?>
-    <OrleansConfiguration xmlns="urn:orleans">
-      <Globals>
-        <Application>
-          <Defaults>
-            <Deactivation AgeLimit="10m"/>
-          </Defaults>
-        </Application>
-      </Globals>
-    </OrleansConfiguration>
-
+``` xml
+<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <Application>
+      <Defaults>
+        <Deactivation AgeLimit="10m"/>
+      </Defaults>
+    </Application>
+  </Globals>
+</OrleansConfiguration>
+```
 
 ## Specifying per-Type Age Limits
 
@@ -77,20 +77,21 @@ Individual grain types may specify a collection age limit that is independent fr
  In the following example, activations that have been idle for 10 minutes are eligible for collection, except activations that are instantiations of the MyGrainAssembly.DoNotDeactivateMeOften class, which are not considered collectable unless idle for a full 24 hours:
 
 
-    <?xml version="1.0" encoding="utf-8"?>
-    <OrleansConfiguration xmlns="urn:orleans">
-      <Globals>
-        <Application>
-          <Defaults>
-            <Deactivation AgeLimit="10m"/>
-          </Defaults>
-          <GrainType Type="MyGrainAssembly.DoNotDeactivateMeOften">
-            <Deactivation AgeLimit="24hr"/>
-          </GrainType>
-        </Application>
-      </Globals>
-    </OrleansConfiguration>
-
+``` xml
+<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <Application>
+      <Defaults>
+        <Deactivation AgeLimit="10m"/>
+      </Defaults>
+      <GrainType Type="MyGrainAssembly.DoNotDeactivateMeOften">
+        <Deactivation AgeLimit="24hr"/>
+      </GrainType>
+    </Application>
+  </Globals>
+</OrleansConfiguration>
+```
 
  Any number of GrainType elements may be specified.
 
@@ -98,7 +99,9 @@ Individual grain types may specify a collection age limit that is independent fr
 
 An activation can also configure its own activation GC, by calling the method on the Orleans.Grain base class:
 
-       protected void DelayDeactivation(TimeSpan timeSpan)
+``` csharp
+protected void DelayDeactivation(TimeSpan timeSpan)
+```
 
 This call will delay deactivation of this activation for at least the specified time duration.
 
