@@ -22,21 +22,25 @@ Steps to to change Orleans Grain Interface project:
 
 1. Do Build->Clean on the project to remove any old binaries.
 2. Remove old v0.9 assembly references for any Orleans binaries.
-```
-<ItemGroup>
-    <Reference Include="Orleans">
-          <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
-          <Private>False</Private>
-     </Reference>
-</ItemGroup>
-```
+
+	``` xml
+	<ItemGroup>
+	    <Reference Include="Orleans">
+	          <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
+	          <Private>False</Private>
+	     </Reference>
+	</ItemGroup>
+	```
+
 3. Remove old v0.9 Orleans code-gen metadata and script trigger.
-```
-<PropertyGroup>
-      <OrleansProjectType>Server</OrleansProjectType>
-</PropertyGroup>
-<Import Project="$(OrleansSDK)\Binaries\OrleansClient\Orleans.SDK.targets" />
-```
+
+	``` xml
+	<PropertyGroup>
+	      <OrleansProjectType>Server</OrleansProjectType>
+	</PropertyGroup>
+	<Import Project="$(OrleansSDK)\Binaries\OrleansClient\Orleans.SDK.targets" />
+	```
+	
 4. **Make sure to re-save the .csproj to disk at this point, otherwise the next step will fail !**
 5. Use Visual Studio Package manager to add the `Microsoft.Orleans.Templates.Interfaces` package to the grain interfaces project.
   * Do this by right-click on project node in Solution Explorer, select "Manage NuGet Packages..." context menu item, then search for **Orleans** and select the `Microsoft.Orleans.Templates.Interfaces` package.
