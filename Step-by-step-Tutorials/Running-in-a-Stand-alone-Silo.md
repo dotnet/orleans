@@ -21,13 +21,15 @@ The first thing we need to do is get the grain code running in a silo that is in
 
  This is the result:
 
-    static void Main(string[] args)
-    {
-        Console.WriteLine("Waiting for Orleans Silo to start. Press Enter to proceed...");
-        Console.ReadLine();
+``` csharp
+static void Main(string[] args)
+{
+    Console.WriteLine("Waiting for Orleans Silo to start. Press Enter to proceed...");
+    Console.ReadLine();
 
-        Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
-    }
+    Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+}
+```
 
  If you set the grain collection project as a startup project and hit F5, you will notice that it's started and hosted by a silo called "OrleansHost." This is a ready-made host executable intended for running Orleans code on Windows Server (Azure has a different host). It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
 
@@ -39,26 +41,27 @@ The first thing we need to do is get the grain code running in a silo that is in
 
 To demonstrate keeping state around across client sessions, let's modify the 'SayHello()' method to take a string argument. Then, we will have our grain save each string it is sent and return the last one. Only at the first greeting will we see something we didn't send to the grain from the client.
 
+``` csharp
+private string text = "Hello World!";
 
-    private string text = "Hello World!";
-    
-    public Task<string> SayHello(string greeting)
-    {
-        var oldText = text;
-        text = greeting;
-        return Task.FromResult(oldText);
-    }
+public Task<string> SayHello(string greeting)
+{
+    var oldText = text;
+    text = greeting;
+    return Task.FromResult(oldText);
+}
+```
 
 
  We also change the client to send a greeting several times:
 
-
-    var hello = MyGrainInterfaces1.Grain1Factory.GetGrain(0);
-    Console.WriteLine(hello.SayHello("First").Result);
-    Console.WriteLine(hello.SayHello("Second").Result);
-    Console.WriteLine(hello.SayHello("Third").Result);
-    Console.WriteLine(hello.SayHello("Fourth").Result);
-
+``` csharp
+var hello = MyGrainInterfaces1.Grain1Factory.GetGrain(0);
+Console.WriteLine(hello.SayHello("First").Result);
+Console.WriteLine(hello.SayHello("Second").Result);
+Console.WriteLine(hello.SayHello("Third").Result);
+Console.WriteLine(hello.SayHello("Fourth").Result);
+```
 
  What we would expect to see here is four greetings, the first of which is "Hello World!" Let's check it out:
 

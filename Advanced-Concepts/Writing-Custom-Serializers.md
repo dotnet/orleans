@@ -38,93 +38,101 @@ All serializer routines should be implemented as static members of the class or 
 ## Copier
 Copier methods are flagged with the Orleans.CopierMethod attribute:
 
-
-    ["CopierMethod"]}
-    static private object Copy(object input)
-    {
-        …
-    }
+``` csharp
+[CopierMethod]}
+static private object Copy(object input)
+{
+    …
+}
+```
 
 
 Copiers are usually the simplest serializer routines to write. They take an object, guaranteed to be of the same type as the type the copier is defined in, and must return a semantically-equivalent copy of the object.
 
- If, as part of copying the object, a sub-object needs to be copied, the best way to do so is to use the SerializationManager's DeepCopyInner routine:
+If, as part of copying the object, a sub-object needs to be copied, the best way to do so is to use the SerializationManager's DeepCopyInner routine:
 
 
-     var fooCopy = SerializationManager.DeepCopyInner(foo);
+``` csharp
+var fooCopy = SerializationManager.DeepCopyInner(foo);
+```
 
-
- It is important to use DeepCopyInner, instead of DeepCopy, in order to maintain the object identity context for the full copy operation.
+It is important to use DeepCopyInner, instead of DeepCopy, in order to maintain the object identity context for the full copy operation.
 
 ## Maintaining Object Identity
 An important responsibility of a copy routine is to maintain object identity. The Orleans runtime provides a helper class for this: before copying a sub-object "by hand" (i.e., not by calling DeepCopyInner), check to see if it has already been referenced as follows:
 
 
-    var fooCopy = SerializationContext.Current.CheckObjectWhileCopying(foo);
+``` csharp
+var fooCopy = SerializationContext.Current.CheckObjectWhileCopying(foo);
 
-    if (fooCopy == null)
-    {
-        // Actually make a copy of foo
-        SerializationContext.Current.RecordObject(foo, fooCopy);
-    }
+if (fooCopy == null)
+{
+    // Actually make a copy of foo
+    SerializationContext.Current.RecordObject(foo, fooCopy);
+}
+```
 
 
- The last line, the call to RecordObject, is required so that possible future references to the same object as foo references will get found properly by CheckObjectWhileCopying.
+The last line, the call to RecordObject, is required so that possible future references to the same object as foo references will get found properly by CheckObjectWhileCopying.
 
- Note that this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums).
+Note that this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums).
 
- If you use DeepCopyInner to copy sub-objects, then object identity is handled for you.
+If you use DeepCopyInner to copy sub-objects, then object identity is handled for you.
 
 ## Serializer
 Serialization methods are flagged with the  SerializerMethod attribute:
 
 
-    [SerializerMethod]
-    static private void Serialize(object input, BinaryTokenStreamWriter stream, Type expected)
-    {
-        …
-    }
+``` csharp
+[SerializerMethod]
+static private void Serialize(object input, BinaryTokenStreamWriter stream, Type expected)
+{
+    …
+}
+```
 
 
 As with copiers, the "input" object passed to a serializer is guaranteed to be an instance of the defining type. The "expected" type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream.
 
- To serialize sub-objects, use the SerializationManager's SerializeInner routine:
+To serialize sub-objects, use the SerializationManager's SerializeInner routine:
 
 
-     SerializationManager.SerializeInner(foo, stream, typeof(FooType));
+``` csharp
+SerializationManager.SerializeInner(foo, stream, typeof(FooType));
+```
 
+If there is no particular expected type for foo, then you can pass null for the expected type.
 
- If there is no particular expected type for foo, then you can pass null for the expected type.
-
- The BinaryTokenStreamWriter class provides a wide variety of methods for writing data to the byte stream. See the class for documentation. 
+The BinaryTokenStreamWriter class provides a wide variety of methods for writing data to the byte stream. See the class for documentation. 
 
 **Maintaining Object Identity**
 
 As with copy routines, serialization routines must maintain object identity. If you use SerializerInner, then this is taken care of for you. If not, then before serializing a sub-object, you should do the following:
 
+``` csharp
+int reference = SerializationContext.Current.CheckObjectWhileSerializing(foo);
 
-    int reference = SerializationContext.Current.CheckObjectWhileSerializing(foo);
+if (reference >= 0)
+{
+    stream.WriteReference(reference);
+    return;
+}
 
-    if (reference >= 0)
-    {
-        stream.WriteReference(reference);
-        return;
-    }
-
-    SerializationContext.Current.RecordObject(foo, stream.CurrentOffset);
-
+SerializationContext.Current.RecordObject(foo, stream.CurrentOffset);
+```
 
  As for copiers, this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums), and if you use SerializeInner for sub-objects, then object identity is handled for you.
 
 ## Deserializer
 Deserialization methods are flagged with the DeserializerMethod attribute:
 
-
-    [DeserializerMethod]
-    static private object Deserialize(Type expected, BinaryTokenStreamReader stream)
-    {
-        …
-    }
+``` csharp
+[DeserializerMethod]
+static private object Deserialize(Type expected, BinaryTokenStreamReader stream)
+{
+    …
+}
+```
 
 
 The "expected" type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream. The actual type of the object to be created will always be the type of the class in which the deserializer is defined.
@@ -132,43 +140,44 @@ The "expected" type may be ignored; it is based on compile-time type information
  To deserialize sub-objects, use the SerializationManager's DeserializeInner routine:
 
 
-    var foo = SerializationManager.DeserializeInner(typeof(FooType), stream);
+``` csharp
+var foo = SerializationManager.DeserializeInner(typeof(FooType), stream);
+```
 
+Or, alternatively,
 
- Or, alternatively,
+``` csharp
+var foo = SerializationManager.DeserializeInner<FooType>(stream);
+```
 
+If there is no particular expected type for foo, use the first call pattern and pass null for the expected type.
 
-    var foo = SerializationManager.DeserializeInner<FooType>(stream);
-
-
- If there is no particular expected type for foo, use the first call pattern and pass null for the expected type.
-
- The BinaryTokenStreamReader class provides a wide variety of methods for reading data from the byte stream. See the class for documentation. 
+The BinaryTokenStreamReader class provides a wide variety of methods for reading data from the byte stream. See the class for documentation. 
 
 **Maintaining Object Identity**
 
 As with serializer routines, deserialization routines must maintain object identity. If you use DeserializerInner, then this is taken care of for you. If not, then before deserializing a sub-object, you should do the following:
 
-
-    // Token is the object introductory token read from the stream
-    // Typically this is done using stream.TryReadSimpleType
-    if (token == SerializationTokenType.Reference)
-    {
-        var offset = stream.ReadInt();
-        var foo = DeserializationContext.Current.FetchReferencedObject(offset);
-    }
-    else
-    {
-        // Deserialize foo
-    }
-
+``` csharp
+// Token is the object introductory token read from the stream
+// Typically this is done using stream.TryReadSimpleType
+if (token == SerializationTokenType.Reference)
+{
+    var offset = stream.ReadInt();
+    var foo = DeserializationContext.Current.FetchReferencedObject(offset);
+}
+else
+{
+    // Deserialize foo
+}
+```
 
  If you use DeserializeInner for sub-objects, then object identity is handled for you.
 
 ## Hints for Writing Serializers and Deserializers
 Often the simplest way to write a serializer/deserializer pair is to serialize by constructing a byte array and writing the array length to the stream, followed by the array itself, and then deserialize by reversing the process. If the array is fixed-length, you can omit it from the stream. This works well when you have a data type that you can represent compactly and that doesn't have sub-objects that might be duplicated (so you don't have to worry about object identity).
 
- Another approach, which is the approach the Orleans runtime takes for collections such as dictionaries, works well for classes with significant and complex internal structure: use instance methods to access the semantic content of the object, serialize that content, and deserialize by setting the semantic contents rather than the complex internal state. In this approach, inner objects are written using SerializeInner and read using DeserializeInner. In this case, it is common to write a custom copier, as well.
+Another approach, which is the approach the Orleans runtime takes for collections such as dictionaries, works well for classes with significant and complex internal structure: use instance methods to access the semantic content of the object, serialize that content, and deserialize by setting the semantic contents rather than the complex internal state. In this approach, inner objects are written using SerializeInner and read using DeserializeInner. In this case, it is common to write a custom copier, as well.
 
- If you write a custom serializer, and it winds up looking like a sequence of calls to SerializeInner for erach field in the class, you don't need a custom serializer for that class.
+If you write a custom serializer, and it winds up looking like a sequence of calls to SerializeInner for erach field in the class, you don't need a custom serializer for that class.
 

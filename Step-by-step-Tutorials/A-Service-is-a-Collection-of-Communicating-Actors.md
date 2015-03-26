@@ -17,26 +17,27 @@ This example will use the relationship of employees and managers to demonstrate 
  Change the first interface to `IEmployee` and add an interface called `IManager`. Add a couple of methods to describe relationships and employment level:
 
 
-    public interface IEmployee : Orleans.IGrain
-    {
-        Task<int> GetLevel();
-        Task Promote(int newLevel);
+``` csharp
+public interface IEmployee : Orleans.IGrain
+{
+    Task<int> GetLevel();
+    Task Promote(int newLevel);
 
-        Task<IManager> GetManager();
-        Task SetManager(IManager manager);
-    }
+    Task<IManager> GetManager();
+    Task SetManager(IManager manager);
+}
+```
 
+and
 
- and
-
-
-    public interface IManager : Orleans.IGrain
-    {
-        Task<IEmployee> AsEmployee();
-        Task<List<IEmployee>> GetDirectReports();
-        Task AddDirectReport(IEmployee employee);
-    }
-
+``` csharp
+public interface IManager : Orleans.IGrain
+{
+    Task<IEmployee> AsEmployee();
+    Task<List<IEmployee>> GetDirectReports();
+    Task AddDirectReport(IEmployee employee);
+}
+```
 
 
 Note that this looks a bit different to normal .NET interfaces: usually, you have a property with a setter and a getter, but when defining grain interfaces, you need to avoid using properties altogether, only methods are supported. This is because .NET property setters and getters aren't meant to do I/O.
@@ -46,141 +47,141 @@ With these two interfaces as our starting point, the implementation classes are 
 
  Here's what it looks like:
 
-
-    public class Employee : Orleans.Grain, Interfaces.IEmployee
+``` csharp
+public class Employee : Orleans.Grain, Interfaces.IEmployee
+{
+    public Task<int> GetLevel()
     {
-        public Task<int> GetLevel()
-        {
-            return Task.FromResult(_level);
-        }
-
-        public Task Promote(int newLevel)
-        {
-            _level = newLevel;
-            return TaskDone.Done;
-        }
-
-        public Task<IManager> GetManager()
-        {
-            return Task.FromResult(_manager);
-        }
-
-        public Task SetManager(IManager manager)
-        {
-            _manager = manager;
-            return TaskDone.Done;
-        }
-
-        private int _level;
-        private IManager _manager;
+        return Task.FromResult(_level);
     }
 
+    public Task Promote(int newLevel)
+    {
+        _level = newLevel;
+        return TaskDone.Done;
+    }
+
+    public Task<IManager> GetManager()
+    {
+        return Task.FromResult(_manager);
+    }
+
+    public Task SetManager(IManager manager)
+    {
+        _manager = manager;
+        return TaskDone.Done;
+    }
+
+    private int _level;
+    private IManager _manager;
+}
+```
 
  and
 
-
-    public class Manager : Orleans.Grain, IManager
+``` csharp
+public class Manager : Orleans.Grain, IManager
+{
+    public override Task ActivateAsync()
     {
-        public override Task ActivateAsync()
-        {
-            _me = EmployeeFactory.GetGrain(this.GetPrimaryKey());
-            return base.ActivateAsync();
-        }
-
-        public Task<List<IEmployee>> GetDirectReports()
-        {
-            return Task.FromResult(_reports);
-        }
-
-        public Task AddDirectReport(IEmployee employee)
-        {
-            _reports.Add(employee);
-            employee.SetManager(this);
-            return TaskDone.Done;
-        }
-
-        public Task<IEmployee> AsEmployee()
-        {
-            return Task.FromResult(_me);
-        }
-
-        private IEmployee _me;
-        private List<IEmployee> _reports = new List<IEmployee>();
+        _me = EmployeeFactory.GetGrain(this.GetPrimaryKey());
+        return base.ActivateAsync();
     }
 
+    public Task<List<IEmployee>> GetDirectReports()
+    {
+        return Task.FromResult(_reports);
+    }
+
+    public Task AddDirectReport(IEmployee employee)
+    {
+        _reports.Add(employee);
+        employee.SetManager(this);
+        return TaskDone.Done;
+    }
+
+    public Task<IEmployee> AsEmployee()
+    {
+        return Task.FromResult(_me);
+    }
+
+    private IEmployee _me;
+    private List<IEmployee> _reports = new List<IEmployee>();
+}
+```
 
  A manager is expressed as an employee through composition: the manager grain has a reference to an grain representing its "employeeness." The role of ActivateAsync() will be explained later on; for now, you may consider it a constructor.
 
  In the client (Program.cs), we can add a few lines to create a couple of employees and their manager:
 
+``` csharp
+Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
 
-            Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+var e0 = EmployeeFactory.GetGrain(Guid.NewGuid());
+var e1 = EmployeeFactory.GetGrain(Guid.NewGuid());
+var e2 = EmployeeFactory.GetGrain(Guid.NewGuid());
+var e3 = EmployeeFactory.GetGrain(Guid.NewGuid());
+var e4 = EmployeeFactory.GetGrain(Guid.NewGuid());
 
-            var e0 = EmployeeFactory.GetGrain(Guid.NewGuid());
-            var e1 = EmployeeFactory.GetGrain(Guid.NewGuid());
-            var e2 = EmployeeFactory.GetGrain(Guid.NewGuid());
-            var e3 = EmployeeFactory.GetGrain(Guid.NewGuid());
-            var e4 = EmployeeFactory.GetGrain(Guid.NewGuid());
+var m0 = ManagerFactory.GetGrain(Guid.NewGuid());
+var m1 = ManagerFactory.GetGrain(Guid.NewGuid());
+var m0e = m0.AsEmployee().Result;
+var m1e = m1.AsEmployee().Result;
 
-            var m0 = ManagerFactory.GetGrain(Guid.NewGuid());
-            var m1 = ManagerFactory.GetGrain(Guid.NewGuid());
-            var m0e = m0.AsEmployee().Result;
-            var m1e = m1.AsEmployee().Result;
+m0e.Promote(10);
+m1e.Promote(11);
 
-            m0e.Promote(10);
-            m1e.Promote(11);
- 
-            m0.AddDirectReport(e0).Wait();
-            m0.AddDirectReport(e1).Wait();
-            m0.AddDirectReport(e2).Wait();
+m0.AddDirectReport(e0).Wait();
+m0.AddDirectReport(e1).Wait();
+m0.AddDirectReport(e2).Wait();
 
-            m1.AddDirectReport(m0e).Wait();
-            m1.AddDirectReport(e3).Wait();
+m1.AddDirectReport(m0e).Wait();
+m1.AddDirectReport(e3).Wait();
 
-            m1.AddDirectReport(e4).Wait();
+m1.AddDirectReport(e4).Wait();
 
-            Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
-            Console.ReadLine();
-
+Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
+Console.ReadLine();
+```
 
  In the code we have seen so far, it is noteworthy that you can send grain references (interfaces) in messages. Thus, when a direct report is added to a manager, the manager can communicate directly with the employee without calling 'GetGrain().' This ability is essential in making the programming model a smooth transition from .NET.
 
  Let's add the ability for employees to send messages to each other:
 
+``` csharp
+public interface IEmployee : Orleans.IGrain
+{
+    ...
+    Task Greeting(IEmployee  from, string message);
+    ...
+}
+```
 
-    public interface IEmployee : Orleans.IGrain
+then:
+
+``` csharp
+public class Employee : Orleans.Grain, Interfaces.IEmployee
+{
+    public Task Greeting(IEmployee from, string message)
     {
-        ...
-        Task Greeting(IEmployee  from, string message);
-        ...
+        Console.WriteLine("{0} said: {1}", from.GetPrimaryKey().ToString(), message);
+        return TaskDone.Done;
     }
+```
 
+and
 
- then:
-
-
-    public class Employee : Orleans.Grain, Interfaces.IEmployee
+``` csharp
+public class Manager : Employee, IManager
+{
+    public Task AddDirectReport(IEmployee employee)
     {
-        public Task Greeting(IEmployee from, string message)
-        {
-            Console.WriteLine("{0} said: {1}", from.GetPrimaryKey().ToString(), message);
-            return TaskDone.Done;
-        }
-
-
- and
-
-
-    public class Manager : Employee, IManager
-    {
-        public Task AddDirectReport(IEmployee employee)
-        {
-            _reports.Add(employee);
-            employee.SetManager(this);
-            employee.Greeting(_me, "Welcome to my team!");
-            return TaskDone.Done;
-        }
-
+        _reports.Add(employee);
+        employee.SetManager(this);
+        employee.Greeting(_me, "Welcome to my team!");
+        return TaskDone.Done;
+    }
+```
 
  Executing it, you should see something like this:
 
@@ -197,14 +198,14 @@ TaskDone.Done, used in the code above, is a convenience object defined by Orlean
 
  A correct version of the method would look like this:
 
-
-        public async Task AddDirectReport(IEmployee employee)
-        {
-            _reports.Add(employee);
-            await employee.SetManager(this);
-            await employee.Greeting(_me, "Welcome to my team!");
-        }
-
+``` csharp
+public async Task AddDirectReport(IEmployee employee)
+{
+    _reports.Add(employee);
+    await employee.SetManager(this);
+    await employee.Greeting(_me, "Welcome to my team!");
+}
+```
 
 ## The Life of an Actor
 

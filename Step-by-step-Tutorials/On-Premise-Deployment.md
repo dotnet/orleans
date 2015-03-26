@@ -56,27 +56,27 @@ The following table lists the prerequisites for deploying and running Orleans on
 ## Deployment Steps
 In this tutorial , we will deploy the HelloWorld sample to a set of servers. The Orleans repo includes a 'RemoteDeployment' folder (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) where everything we need can be found. Start by building the  Hello World sample, commenting out (or removing) the silo initialization and shutdown code:
 
+``` csharp
+static void Main(string[] args)
+{
+    //AppDomain hostDomain = 
+    //    AppDomain.CreateDomain("OrleansHost", null, new AppDomainSetup
+    //{
+    //    AppDomainInitializer = InitSilo,
+    //    AppDomainInitializerArguments = args,
+    //});
 
-    static void Main(string[] args)
-    {
-        //AppDomain hostDomain = 
-        //    AppDomain.CreateDomain("OrleansHost", null, new AppDomainSetup
-        //{
-        //    AppDomainInitializer = InitSilo,
-        //    AppDomainInitializerArguments = args,
-        //});
+    Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
 
-        Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+    var friend = HelloWorldInterfaces.HelloFactory.GetGrain(0);
+    Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
 
-        var friend = HelloWorldInterfaces.HelloFactory.GetGrain(0);
-        Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
+    Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
+    Console.ReadLine();
 
-        Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
-        Console.ReadLine();
-
-        //hostDomain.DoCallBack(ShutdownSilo);
-    }
-
+    //hostDomain.DoCallBack(ShutdownSilo);
+}
+```
 
  Also, start a new PowerShell window as Administrator and move to the RemoteDeployment folder.
 

@@ -25,8 +25,10 @@ Applications interact with streams via APIs that are very similar to the well kn
 
 An application starts by using a stream provider to get a handle to a stream. We will see what a stream provider is later, but for now you can think of it as a stream factory that allows implementers to customize a streams' behavior and semantics:
 
-     IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
-     IAsyncStream<int> stream = streamProvider.GetStream<int>(Guid, "MyStreamNamespace"); 
+``` csharp
+IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
+IAsyncStream<int> stream = streamProvider.GetStream<int>(Guid, "MyStreamNamespace"); 
+```
 
 [`Orleans.Streams.IAsyncStream<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) is a logical, strongly-typed handle to a virtual stream. It is similar in spirit to Grain Reference. Calls to `GetStreamProvider` and `GetStream` are purely local. The arguments to `GetStream` are a GUID and an additional string, which can be null, that together comprise the stream identity (similar in sprit to the arguments to Factory.GetGrain). 
 

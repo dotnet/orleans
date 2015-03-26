@@ -57,19 +57,21 @@ A basic .NET API design guideline is that property implementations should not do
 
 For example:
 
-    public interface IGrain1 : Orleans.IGrain
-    {
-      Task<string> SayHelloAsync(string greeting);
-      Task<int> Count { get; }
-    }
+``` csharp
+public interface IGrain1 : Orleans.IGrain
+{
+  Task<string> SayHelloAsync(string greeting);
+  Task<int> Count { get; }
+}
 
 would have to be changed to:
 
-    public interface IGrain1 : Orleans.IGrain
-    {
-        Task<string> SayHelloAsync(string greeting);
-        Task<int> GetCountAsync();
-    }
+public interface IGrain1 : Orleans.IGrain
+{
+    Task<string> SayHelloAsync(string greeting);
+    Task<int> GetCountAsync();
+}
+```
 
 
 ### Public Type Names
@@ -98,25 +100,35 @@ In the April preview, the factory methods for remote grain references were code-
 
 For example, to create a reference to a grain of this interface:
 
-    public interface IGrain1 : Orleans.IGrain
+``` csharp
+public interface IGrain1 : Orleans.IGrain
+```
 
  you would use the factory method ‘GetGrain’ on a static class created by the compiler:
 
-    gref = Grain1Factory.GetGrain(0);
+``` csharp
+gref = Grain1Factory.GetGrain(0);
+```
 
 This method is still available (but it may go away based on your feedback), but we have added another way, which is not directly dependent on code generation. Instead, it relies on further specification of the grain as having either a GUID key, an integer key, or a string key. This is done by using one of three new interfaces in place of `IGrain` when declaring a grain interfaces:
 
-    public interface IGrainWithGuidKey : IGrain
-    public interface IGrainWithIntegerKey : IGrain
-    public interface IGrainWithStringKey : IGrain
+``` csharp
+public interface IGrainWithGuidKey : IGrain
+public interface IGrainWithIntegerKey : IGrain
+public interface IGrainWithStringKey : IGrain
+```
 
 For example, `IGrain1`, which uses an integer key (but there’s currently no type safety around it), would be declared this way:
 
-    public interface IGrain1 : Orleans. IGrainWithIntegerKey
+``` csharp
+public interface IGrain1 : Orleans. IGrainWithIntegerKey
+```
 
- Doing so will allow the following to be used to create a grain reference:
+Doing so will allow the following to be used to create a grain reference:
 
-    gref = GrainFactory.GetGrain<IGrain1>(0);
+``` csharp
+gref = GrainFactory.GetGrain<IGrain1>(0);
+```
 
 Note that the new factory methods cannot be used for grain interfaces using ‘IGrain.’ Also note that the new methodology does not allow you to use an extended primary key, i.e. a tuple of GUID/Int64 and string.
 

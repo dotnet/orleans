@@ -20,16 +20,19 @@ GUIDs are useful when there are several processes that could request a grain, su
 
  Referencing a grain by GUID in client code:
 
-    var grain = ExampleGrainFactor.GetGrain(Guid.NewGuid());
+``` csharp
+var grain = ExampleGrainFactor.GetGrain(Guid.NewGuid());
+```
 
- Retrieving the primary key form grain code:
+Retrieving the primary key form grain code:
 
-    public override Task ActivateAsync()
-    {
-        Guid primaryKey = this.GetPrimaryKey();
-        return base.ActivateAsync();
-    }
-
+``` csharp
+public override Task ActivateAsync()
+{
+    Guid primaryKey = this.GetPrimaryKey();
+    return base.ActivateAsync();
+}
+```
 
 ## Using Longs
 
@@ -37,16 +40,19 @@ A long integer is also available, which would make sense if the grain is persist
 
  Referencing a grain by GUID in client code:
 
-    var grain = ExampleGrainFactor.GetGrain(1);
+``` csharp
+var grain = ExampleGrainFactor.GetGrain(1);
+```
 
- Retrieving the primary key form grain code:
+Retrieving the primary key form grain code:
 
-    public override Task ActivateAsync()
-    {
-        long primaryKey = this.GetPrimaryKeyLong();
-        return base.ActivateAsync();
-    }
-
+``` csharp
+public override Task ActivateAsync()
+{
+    long primaryKey = this.GetPrimaryKeyLong();
+    return base.ActivateAsync();
+}
+```
 
 ## Using Extended Primary Key
 
@@ -54,34 +60,38 @@ If you have a system that doesn't fit well with either GUIDs or longs, you can o
 
  You can mark a grain interface with an [ExtendedPrimaryKey] attribute like this:
 
-    [ExtendedPrimaryKey]
-    public interface IExampleGrain : Orleans.IGrain
-    {
-        Task Hello();
-    }
+``` csharp
+[ExtendedPrimaryKey]
+public interface IExampleGrain : Orleans.IGrain
+{
+    Task Hello();
+}
+```
 
- In client code, this adds a second argument to the GetGrain method on the grain factory.
+In client code, this adds a second argument to the GetGrain method on the grain factory.
 
+``` csharp
+var grain = ExampleGrainFactory.GetGrain(0, "a string!");
+```
 
-    var grain = ExampleGrainFactory.GetGrain(0, "a string!");
-
-
- Notice we still have a primary key, which can still be either a GUID or a long. We can choose to ignore this by setting the primary key to zero, or we can combine the primary key and secondary key together as a joined key.
+Notice we still have a primary key, which can still be either a GUID or a long. We can choose to ignore this by setting the primary key to zero, or we can combine the primary key and secondary key together as a joined key.
 
  To access the extended key in the grain, we can call an overload on the  GetPrimaryKey method:
 
-    public class ExampleGrain : Orleans.GrainBase, IExampleGrain
+``` csharp
+public class ExampleGrain : Orleans.GrainBase, IExampleGrain
+{
+    public Task Hello()
     {
-        public Task Hello()
-        {
-    	    string extendedKey;
-            long primaryKey = this.GetPrimaryKey(out extendedKey);
-            Console.WriteLine("Hello from " + extendedKey);
-            return TaskDone.Done;
-        }
+	    string extendedKey;
+        long primaryKey = this.GetPrimaryKey(out extendedKey);
+        Console.WriteLine("Hello from " + extendedKey);
+        return TaskDone.Done;
     }
+}
+```
 
- The stock ticker example used in the  Interaction with Libraries and Services uses ExtendedPrimaryKey to activate grains representing different stock symbols.
+The stock ticker example used in the  Interaction with Libraries and Services uses ExtendedPrimaryKey to activate grains representing different stock symbols.
 
 ## Next
 

@@ -22,64 +22,66 @@ The idea behind the single-threaded execution model for actors is that the invok
 
  First create a class in the interface project which we'll use to send the greetings around:
 
-
-    public class GreetingData
-    {
-        public long From { get; set; }
-        public string Message { get; set; }
-        public int Count { get; set; }
-    }
-
+``` csharp
+public class GreetingData
+{
+    public long From { get; set; }
+    public string Message { get; set; }
+    public int Count { get; set; }
+}
+```
 
 From will be the sender of the message (the ID of the grain), Message will be the message text, and Count will be the number of times the message has been sent back and forth. This stops us from getting a stack overflow.
 
  We need to modify the arguments of Greeting on the Employee interface to :
 
 
-    Task Greeting(GreetingData data);
-
+``` csharp
+Task Greeting(GreetingData data);
+```
 
  We need to update the implementation accordingly:
 
+``` csharp
+public async Task Greeting(GreetingData data)
+{
+    Console.WriteLine("{0} said: {1}", data.From, data.Message);
 
-    public async Task Greeting(GreetingData data)
-    {
-        Console.WriteLine("{0} said: {1}", data.From, data.Message);
+    // stop this from repeating endlessly
+    if (data.Count >= 3) return; 
 
-        // stop this from repeating endlessly
-        if (data.Count >= 3) return; 
-
-        // send a message back to the sender
-        var fromGrain = EmployeeFactory.GetGrain(data.From);
-        await fromGrain.Greeting(new GreetingData { 
-            From = this.GetPrimaryKeyLong(), 
-            Message = "Thanks!", 
-            Count = data.Count + 1 });
-    }
-
+    // send a message back to the sender
+    var fromGrain = EmployeeFactory.GetGrain(data.From);
+    await fromGrain.Greeting(new GreetingData { 
+        From = this.GetPrimaryKeyLong(), 
+        Message = "Thanks!", 
+        Count = data.Count + 1 });
+}
+```
 
  We'll also update the Manager class, so it send the new message object:
 
-
-    public async Task AddDirectReport(IEmployee employee)
-    {
-        _reports.Add(employee);
-        await employee.SetManager(this);
-        await employee.Greeting(new GreetingData { 
-            From = this.GetPrimaryKeyLong(),
-            Message = "Welcome to my team!" });
-    }
-
+``` csharp
+public async Task AddDirectReport(IEmployee employee)
+{
+    _reports.Add(employee);
+    await employee.SetManager(this);
+    await employee.Greeting(new GreetingData { 
+        From = this.GetPrimaryKeyLong(),
+        Message = "Welcome to my team!" });
+}
+```
 
  Now the Employee sends a message back to the manager, saying "Thanks!".
 
  Let's add some simple client code to add a direct report to a manager:
 
 
-    var e0 = EmployeeFactory.GetGrain(0);
-    var m1 = ManagerFactory.GetGrain(1);
-    m1.AddDirectReport(e0);
-
+``` csharp
+var e0 = EmployeeFactory.GetGrain(0);
+var m1 = ManagerFactory.GetGrain(1);
+m1.AddDirectReport(e0);
+```
 
  When we run this code, the first "Thanks!" greeting is received. However, when this message is responded to this we get a 30 second pause, then warnings appear in the log and we're told the grain is about to break it's promise.
 
@@ -100,20 +102,21 @@ From will be the sender of the message (the ID of the grain), Message will be th
  Orleans offers us a way to deal with this, by marking the grain [Reentrant], which means that additional calls may be made while the grain is waiting for a task to complete, resulting in interleaved execution.
 
 
-    [Reentrant]
-    public class Employee : Orleans.Grain, Interfaces.IEmployee
+``` csharp
+[Reentrant]
+public class Employee : Orleans.Grain, Interfaces.IEmployee
+{
+    public async Task Greeting(GreetingData data)
     {
-        public async Task Greeting(GreetingData data)
-        {
-            Console.WriteLine("{0} said: {1}", 
-                          data.From.GetPrimaryKey().ToString(), 
-                          data.Message);
-            await data.From.Greeting(
-                new GreetingData { 
-                    From = EmployeeFactory.Cast(this.AsReference()), 
-                    Message = "Hi yourself!" });
-    }  
-
+        Console.WriteLine("{0} said: {1}", 
+                      data.From.GetPrimaryKey().ToString(), 
+                      data.Message);
+        await data.From.Greeting(
+            new GreetingData { 
+                From = EmployeeFactory.Cast(this.AsReference()), 
+                Message = "Hi yourself!" });
+}  
+```
 
  We see that the sample works, and Orleans is able to interleave the grain calls:
 
@@ -127,30 +130,29 @@ From will be the sender of the message (the ID of the grain), Message will be th
 Messages
 Messages are simply data passed from one actor to, we just created the  GreetingData class to do just this.
 
- In .NET, most objects are created from a class of some sort and are passed around by reference, something that doesn't work well with concurrency, and definitely not with distribution. 
+In .NET, most objects are created from a class of some sort and are passed around by reference, something that doesn't work well with concurrency, and definitely not with distribution. 
 
- When Orleans sends a message from one grain to another, it creates a deep copy of the object, and provides the copy to the second grain, and not the object stored in the first grain. This prohibits the mutation of state from one grain to another, one of the main tenants in the actor model is that state shouldn't be shared, and message passing is the only mechanism for exchanging data.
+When Orleans sends a message from one grain to another, it creates a deep copy of the object, and provides the copy to the second grain, and not the object stored in the first grain. This prohibits the mutation of state from one grain to another, one of the main tenants in the actor model is that state shouldn't be shared, and message passing is the only mechanism for exchanging data.
 
- When the grains are in different silos, the object model is serialized to a binary format, and sent over the wire.
+When the grains are in different silos, the object model is serialized to a binary format, and sent over the wire.
 
- However, this deep copy process is expensive, and if you promise not to modify the message, then for communication with grains within a silo, it's unnecessary.
+However, this deep copy process is expensive, and if you promise not to modify the message, then for communication with grains within a silo, it's unnecessary.
 
- If you indicate to Orleans that you are not going to modify the object (i.e. it's immutable) then it can skip the deep copy step, and it will pass the object by reference. There's no way Orleans or C# can stop you from modifying the state, you have to be disciplined.
+If you indicate to Orleans that you are not going to modify the object (i.e. it's immutable) then it can skip the deep copy step, and it will pass the object by reference. There's no way Orleans or C# can stop you from modifying the state, you have to be disciplined.
 
- Immutability is indicated with a the [Immutable] attribute on the class:
+Immutability is indicated with a the [Immutable] attribute on the class:
 
+``` csharp
+[Immutable]
+public class GreetingData
+{
+    public long From { get; set; }
+    public string Message { get; set; }
+    public int Count { get; set; }
+}
+```
 
-    [Immutable]
-    public class GreetingData
-    {
-        public long From { get; set; }
-        public string Message { get; set; }
-        public int Count { get; set; }
-    }
-
-
- No other code change is required, this is just a signal to give to Orleans to tell it your not going to modify this object.
-
+No other code change is required, this is just a signal to give to Orleans to tell it your not going to modify this object.
 
 ## Next
 

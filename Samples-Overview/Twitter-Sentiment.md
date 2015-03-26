@@ -20,35 +20,41 @@ Recall that some sentiment analysis will often result in a neutral weighting, so
 ### Orleans
 There are three main Orleans grains in the sample. The TweetDispatcher is the public “endpoint” for sentiment analysis.
 
-    [StatelessWorker]
-    public interface ITweetDispatcherGrain : Orleans.IGrain 
-    {
-        Task AddScore(int score, string[] hashtags, string tweet);
-        Task<Totals[]> GetTotals(string[] hashtags); 
-    }
+``` csharp
+[StatelessWorker]
+public interface ITweetDispatcherGrain : Orleans.IGrain 
+{
+    Task AddScore(int score, string[] hashtags, string tweet);
+    Task<Totals[]> GetTotals(string[] hashtags); 
+}
+```
 
 Note that it is a stateless grain, and its main role is to pass the work to stateful grains for processing. AddScore takes a tweet, and parses out each hashtag for processing by the appropriate grain. GetTotals retrieves get the number of tweets that have included a specific list of hashtags. This grain exists in part to support the “batch processing” of several hashtags within a single tweet.
 
 One Orleans grain is created for each unique hashtag, and this grain is used to track the current sentiment score.
 
-    [ExtendedPrimaryKey]
-    public interface IHashtagGrain : Orleans.IGrain 
-    {
-        Task AddScore(int score, string lastTweet);
-        Task<Totals> GetTotals();
-    }
+``` csharp
+[ExtendedPrimaryKey]
+public interface IHashtagGrain : Orleans.IGrain 
+{
+    Task AddScore(int score, string lastTweet);
+    Task<Totals> GetTotals();
+}
+```    
 
 
 Note that the ExtendedPrimaryKey attribute indicates that a string, in this case the twitter hashtag, is being used as a composite key for the grain, instead of the more usual Guid or long, which is a more natural fit for grains that have strings rather than numeric keys. The AddMethod updates the current state with the latest sentiment score, and GetTotals returns a Totals structure, with the breakdown of the sentiment analysis, along with the date stamp for the last processed tweet, and the test of the last tweet. The last tweet is kept just to allow the UI to display it, to help give the sentiment more context.
 
 When first activated, the grain tracks this activation by calling the IncrementCounter method on a Counter grain.
 
-     public interface ICounter : Orleans.IGrain 
-    {
-        Task IncrementCounter();
-        Task ResetCounter();
-	    Task<int> GetTotalCounter(); 
-    }
+``` csharp
+public interface ICounter : Orleans.IGrain 
+{
+    Task IncrementCounter();
+    Task ResetCounter();
+    Task<int> GetTotalCounter(); 
+}
+```
 
 
 To increase performance, the counter grain only persists its internal state periodically, in this case, every 100 calls. The running total does not have to be one hundred percent accurate, so if the data were lost due to a silo failure between updates, that would not be critical. If this grain were to be called repeatedly from other grains, it could become a bottleneck, and some form of aggregation pattern would be needed, but as its only called once from each grain, upon grain initialization, this should not be an issue. 

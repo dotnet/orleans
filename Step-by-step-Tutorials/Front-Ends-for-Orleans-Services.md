@@ -25,19 +25,19 @@ Next, add a reference to the Orleans.dll file in the project references.
 
  As with the Orleans host we created earlier, we need to initialize Orleans. This is best done in the Global.asax.cs file like this:
 
-
-    namespace WebApplication1
+``` csharp
+namespace WebApplication1
+{
+    public class WebApiApplication : System.Web.HttpApplication
     {
-        public class WebApiApplication : System.Web.HttpApplication
+        protected void Application_Start()
         {
-            protected void Application_Start()
-            {
-                OrleansClient.Initialize(Server.MapPath("~/DevTestClientConfiguration.xml"));
-           	   ...
+            OrleansClient.Initialize(Server.MapPath("~/DevTestClientConfiguration.xml"));
+       	   ...
+```
 
 
-
- Now when the ASP.NET application starts, it will initialize the Orleans Client.
+Now when the ASP.NET application starts, it will initialize the Orleans Client.
 
 ## Creating the Controller
 
@@ -55,15 +55,16 @@ Now lets add a controller to the project, to receive HTTP requests, and call the
 
  We can add a `Get` method to the controller, which we'll use to return the level of an Employee.
 
-
-    public class EmployeeController : ApiController
+``` csharp
+public class EmployeeController : ApiController
+{
+    public Task<int> Get(long id)
     {
-        public Task<int> Get(long id)
-        {
-            var employee = EmployeeFactory.GetGrain(id);
-            return employee.Level;
-        }
+        var employee = EmployeeFactory.GetGrain(id);
+        return employee.Level;
     }
+}
+```
 
 Note that the controller is asynchronous, and we can just pass back the `Task` which the grain returns.
 

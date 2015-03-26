@@ -18,14 +18,14 @@ RequestContext is an Orleans feature that allows application metadata, such as a
 
  For example, to set a trace ID in the client to a new GUID, one would simply call:
 
+``` csharp
+RequestContext.Set("TraceId", new Guid());
+```
 
-    RequestContext.Set(“TraceId”, new Guid());
+Within grain code (or other code that runs within Orleans on a scheduler thread), the trace ID of the original client request could be used, for instance, when writing a log:
 
-
- Within grain code (or other code that runs within Orleans on a scheduler thread), the trace ID of the original client request could be used, for instance, when writing a log:
-
-
-    Logger.Info(“Currently processing external request {0}”, RequestContext.Get(“TraceId”));
-
+``` csharp
+Logger.Info("Currently processing external request {0}", RequestContext.Get("TraceId"));
+```
 
 While any serializable object may be sent as application metadata, it’s worth mentioning that large or complex objects may add noticeable overhead to message serialization time. For this reason, the use of simple types (strings, GUIDs, or numeric types) is recommended.
