@@ -35,3 +35,6 @@ We roughly put them into 3 size categories based on our gut feel, which may be w
 7. **Support for dependency injection** [Medium]
 
 8. **Orleans backplane for SignalR** [Medium]
+
+9. **Port Orleans to [coreclr](https://github.com/dotnet/coreclr)** [Medium]
+  * Some APIs from the full .NET got deprecated in coreclr, mainly around files and reflection, but at large the porting effort shouldn't be too big. This will allow to run Orleans efficiently cross platform.
