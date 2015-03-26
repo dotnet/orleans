@@ -6,8 +6,6 @@ title: Writing Custom Serializers
 
 [[ THIS SECTION NEEDS REVIEW ]] 
 
-# Writing Custom Serializers
-
 Orleans introduced a new serialization framework for data types passed in request and response messages. As part of this framework, application types marked with the  Serializable attribute have custom serializer routines generated for them as part of client generation. In general, each type has three routines generated: one to make a deep copy of an object of the type; one to write a tokenized byte representation of an object of the type to a byte stream; and one to recreate a new object of the type from a tokenized byte stream.
 
  In some cases, it might be possible to get improved performance by hand-coding some or all of these routines. This note describes how to do so, and identifies some specific cases when it might be helpful.
@@ -42,7 +40,7 @@ Copier methods are flagged with the Orleans.CopierMethod attribute:
 [CopierMethod]}
 static private object Copy(object input)
 {
-    …
+    ...
 }
 ```
 
@@ -87,7 +85,7 @@ Serialization methods are flagged with the  SerializerMethod attribute:
 [SerializerMethod]
 static private void Serialize(object input, BinaryTokenStreamWriter stream, Type expected)
 {
-    …
+    ...
 }
 ```
 
@@ -130,7 +128,7 @@ Deserialization methods are flagged with the DeserializerMethod attribute:
 [DeserializerMethod]
 static private object Deserialize(Type expected, BinaryTokenStreamReader stream)
 {
-    …
+    ...
 }
 ```
 
