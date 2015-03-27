@@ -458,13 +458,11 @@ namespace Orleans.Runtime.Configuration
             if (!xmlElement.HasAttribute("AgeLimit"))
                 throw new ArgumentException("The AgeLimit attribute is required for a <Deactivate/> element.");
             TimeSpan ageLimit = ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
-#if DEBUG
             TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
             if (ageLimit < minAgeLimit)
             {
                 throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
             }
-#endif
             return ageLimit;
         }
 
