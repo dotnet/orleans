@@ -55,7 +55,7 @@ hr    | hour(s)
 ## Specifying the Default (Global) Age Limit
 
 The default collection age limit that applies to all grain types can be customized by adding the OrleansConfiguation/Globals/Application/Defaults/Deactivation element to the OrleansConfiguration.xml file. 
-The mininal allowed age limit is 1 minute.
+The minimal allowed age limit is 1 minute.
 
 The following example specifies that all activations that have been idle for 10 minutes or more should be considered eligible for deactivation.
 
@@ -74,7 +74,7 @@ The following example specifies that all activations that have been idle for 10 
 
 ## Specifying per-Type Age Limits
 
-Individual grain types may specify a collection age limit that is independent from the global default, using the OrleansConfiguation/Globals/Application/GrainType/Deactivation element. The mininal allowed age limit is 1 minute.
+Individual grain types may specify a collection age limit that is independent from the global default, using the OrleansConfiguation/Globals/Application/GrainType/Deactivation element. The minimal allowed age limit is 1 minute.
 
 In the following example, activations that have been idle for 10 minutes are eligible for collection, except activations that are instantiations of the MyGrainAssembly.DoNotDeactivateMeOften class, which are not considered collectable unless idle for a full 24 hours:
 
