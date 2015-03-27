@@ -157,9 +157,12 @@ namespace Orleans.Runtime.Host
             }
 
             // Try using Server.MapPath to resolve for web roles running in IIS web apps
-            appRootPath = HttpContext.Current.Server.MapPath(@"~\");
-            if (appRootPath != null) 
-                yield return new DirectoryInfo(appRootPath);
+            if (HttpContext.Current != null)
+            {
+                appRootPath = HttpContext.Current.Server.MapPath(@"~\");
+                if (appRootPath != null)
+                    yield return new DirectoryInfo(appRootPath);
+            }
 
             // Try using HostingEnvironment.MapPath to resolve for web roles running in IIS Express
             // https://orleans.codeplex.com/discussions/547617
