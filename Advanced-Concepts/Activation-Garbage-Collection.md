@@ -40,22 +40,24 @@ Activations that haven't been used within a period of time are deactivated autom
 
 ## Configuration
 
-Unit Suffixes
 Any length of time in the configuration XML file may use a suffix that specifies a unit of time:
 
-Suffix  | Unit 
+Suffix      |     Unit 
 ------------- | -------------
 none  | millisecond(s)  
-ms  | millisecond(s)  
-s  | second(s)  
-m  | minute(s)  
-hr  | hour(s)  
+ms    | millisecond(s)  
+s     | second(s)  
+m     | minute(s)  
+hr    | hour(s)  
 
 
 
 ## Specifying the Default (Global) Age Limit
 
-The default collection age limit that applies to all grain types can be customized by adding the OrleansConfiguation/Globals/Application/Defaults/Deactivation element to the OrleansConfiguration.xml file. The following example specifies that all activations that have been idle for 10 minutes or more should be considered eligible for deactivation.
+The default collection age limit that applies to all grain types can be customized by adding the OrleansConfiguation/Globals/Application/Defaults/Deactivation element to the OrleansConfiguration.xml file. 
+The mininal allowed age limit is 1 minute.
+
+The following example specifies that all activations that have been idle for 10 minutes or more should be considered eligible for deactivation.
 
 ``` xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -72,9 +74,9 @@ The default collection age limit that applies to all grain types can be customiz
 
 ## Specifying per-Type Age Limits
 
-Individual grain types may specify a collection age limit that is independent from the global default, using the OrleansConfiguation/Globals/Application/GrainType/Deactivation element.
+Individual grain types may specify a collection age limit that is independent from the global default, using the OrleansConfiguation/Globals/Application/GrainType/Deactivation element. The mininal allowed age limit is 1 minute.
 
- In the following example, activations that have been idle for 10 minutes are eligible for collection, except activations that are instantiations of the MyGrainAssembly.DoNotDeactivateMeOften class, which are not considered collectable unless idle for a full 24 hours:
+In the following example, activations that have been idle for 10 minutes are eligible for collection, except activations that are instantiations of the MyGrainAssembly.DoNotDeactivateMeOften class, which are not considered collectable unless idle for a full 24 hours:
 
 
 ``` xml
