@@ -6,6 +6,12 @@ if "%BuildingInsideVisualStudio%" == "true" (
     set PKG_DIR=%TargetDir%\..\NuGet.Packages
 )
 
+if "%BuildingInsideVisualStudio%" == "true" (
+    set CHOCO_PKG_DIR=%SolutionDir%\Chocolatey.Packages
+) else (
+    set CHOCO_PKG_DIR=%TargetDir%\..\Chocolatey.Packages
+)
+
 copy /y "%SolutionDir%SDK\OrleansConfiguration.xml" "%TargetDir%"
 copy /y "%SolutionDir%SDK\ClientConfiguration.xml" "%TargetDir%"
 
@@ -16,8 +22,15 @@ if "%BuildOrleansNuGet%" == "" (
         set BuildOrleansNuGet=false
     )
 )
+if "%BuildOrleansChocolatey%" == "" (
+    if "%Configuration%" == "Release" (
+        set BuildOrleansChocolatey=true
+    ) else (
+        set BuildOrleansChocolatey=false
+    )
+)
 
-@echo BuildingInsideVisualStudio = %BuildingInsideVisualStudio% BuildOrleansNuGet = %BuildOrleansNuGet%
+@echo BuildingInsideVisualStudio = %BuildingInsideVisualStudio% BuildOrleansNuGet = %BuildOrleansNuGet% BuildOrleansChocolatey = %BuildOrleansChocolatey%
 
 copy /y "%SolutionDir%NuGet\*.props" "%TargetDir%\"
 copy /y "%SolutionDir%NuGet\EmptyFile.cs" "%TargetDir%\"
@@ -35,6 +48,20 @@ if not "%BuildingInsideVisualStudio%" == "true" (
         @echo Copying Orleans NuGet packages to %PKG_DIR%
         if not exist "%PKG_DIR%" (md "%PKG_DIR%") else (del /s/q "%PKG_DIR%\*")
         xcopy /y *.nupkg "%PKG_DIR%\"
+    ) else (
+        @echo Skipping generation of Orleans NuGet packages for Configuration=%Configuration% because BuildOrleansNuGet=%BuildOrleansNuGet%
+    )
+    if "%BuildOrleansChocolatey%" == "true" (
+        @echo Clean old generated Orleans Chocolatey packages from %TargetDir%
+        del /q orleans.nupkg
+
+        @echo Build Orleans Chocolatey packages from %TargetDir%
+        call "%SolutionDirChocolatey\CreateOrleansChocolateyPackage.bat" . .\Version.txt
+        if ERRORLEVEL 1 EXIT /B 1
+    
+        @echo Copying Orleans Chocolatey packages to %PKG_DIR%
+        if not exist "%CHOCO_PKG_DIR%" (md "%CHOCO_PKG_DIR%") else (del /s/q "%CHOCO_PKG_DIR%\*")
+        xcopy /y orleans.nupkg "%CHOCO_PKG_DIR%\"
     ) else (
         @echo Skipping generation of Orleans NuGet packages for Configuration=%Configuration% because BuildOrleansNuGet=%BuildOrleansNuGet%
     )

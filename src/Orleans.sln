@@ -125,6 +125,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterInternal", "TesterInt
 		{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0} = {6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Chocolatey", "Chocolatey", "{D1754F30-D9F1-4AFA-8DCA-D578B787CA4E}"
+	ProjectSection(SolutionItems) = preProject
+		Chocolatey\CreateOrleansChocolateyPackage.bat = Chocolatey\CreateOrleansChocolateyPackage.bat
+		Chocolatey\orleans.nuspec = Chocolatey\orleans.nuspec
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
