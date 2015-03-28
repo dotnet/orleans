@@ -146,7 +146,7 @@ namespace Orleans.Streams
             }
 
             var unregisterTasks = new List<Task>();
-            var meAsStreamProducer = StreamProducerExtensionFactory.Cast(this.AsReference());
+            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
             foreach (var streamId in pubSubCache.Keys)
             {
                 logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
@@ -381,8 +381,8 @@ namespace Orleans.Streams
             try
             {
                 if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetreaveNewStream");
-                
-                IStreamProducerExtension meAsStreamProducer = StreamProducerExtensionFactory.Cast(this.AsReference());
+
+                IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
                 if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
                 
