@@ -53,15 +53,15 @@ if not "%BuildingInsideVisualStudio%" == "true" (
     )
     if "%BuildOrleansChocolatey%" == "true" (
         @echo Clean old generated Orleans Chocolatey packages from %TargetDir%
-        del /q orleans.nupkg
+        del /q *.nupkg
 
         @echo Build Orleans Chocolatey packages from %TargetDir%
-        call "%SolutionDirChocolatey\CreateOrleansChocolateyPackage.bat" . .\Version.txt
+        call "%SolutionDir%Chocolatey\CreateOrleansChocolateyPackage.bat" . .\Version.txt
         if ERRORLEVEL 1 EXIT /B 1
     
-        @echo Copying Orleans Chocolatey packages to %PKG_DIR%
+        @echo Copying Orleans Chocolatey packages to %CHOCO_PKG_DIR%
         if not exist "%CHOCO_PKG_DIR%" (md "%CHOCO_PKG_DIR%") else (del /s/q "%CHOCO_PKG_DIR%\*")
-        xcopy /y orleans.nupkg "%CHOCO_PKG_DIR%\"
+        xcopy /y "%SolutionDir%Chocolatey\*.nupkg" "%CHOCO_PKG_DIR%\"
     ) else (
         @echo Skipping generation of Orleans NuGet packages for Configuration=%Configuration% because BuildOrleansNuGet=%BuildOrleansNuGet%
     )
