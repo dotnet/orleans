@@ -24,6 +24,8 @@ title: Links
 
 [John Azariah & Mahesh Krishnan - Immutability, State and Scale - Functional, Distributed Applications in Azure](http://vimeo.com/97315938)
 
+[A look at Microsoft Orleans through Erlang-tinted glasses](http://theburningmonk.com/2014/12/a-look-at-microsoft-orleans-through-erlang-tinted-glasses/).
+
 [Project Orleans - Actor Model framework](http://www.slideshare.net/nmackenzie/project-orleans)
 
 [Orleans & Thinking Outside the Box](http://msdevshow.com/2014/05/orleans-and-thinking-outside-the-box/)
