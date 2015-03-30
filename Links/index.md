@@ -20,7 +20,7 @@ title: Links
 ## **By others**
 [Two Reasons You May Want to Use Microsoft’s Project Orleans](http://www.bloggedbychris.com/2015/03/18/reasons-project-orleans/)
 
-[Hatay Tuna - Applied Actor Model with Orleans](https://github.com/hataytuna/Distributed/blob/master/Applied%20Actor%20Model%20with%20Orleans%20v1.1.pdf)
+[Hatay Tuna & Christian Martinez - Applied Actor Model with Orleans](https://github.com/hataytuna/Distributed/blob/master/Applied%20Actor%20Model%20with%20Orleans%20v1.1.pdf)
 
 [John Azariah & Mahesh Krishnan - Immutability, State and Scale - Functional, Distributed Applications in Azure](http://vimeo.com/97315938)
 
