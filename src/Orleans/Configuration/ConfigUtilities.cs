@@ -461,7 +461,10 @@ namespace Orleans.Runtime.Configuration
             TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
             if (ageLimit < minAgeLimit)
             {
-                throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
+                if (GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT)
+                {
+                    throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
+                }
             }
             return ageLimit;
         }
