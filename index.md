@@ -27,6 +27,8 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Step-by-step Tutorials](Step-by-step-Tutorials)** - Complementing the "Getting Started" guide, this section will take you through a series of samples and hands-on tutorials that teach you the core concepts, as well as some advanced ones through hands-on experience.
 
+* **[Deployment and Versioning of Dependencies](Deployment-and-Versioning-of-Dependencies)** - How to deploy your application code and manage dependencies of it and of the Orleans runtime.
+
 * **[Orleans Streams](Orleans-Streams)** - This section describes the reactive programming with Orleans streams and the extensibility model for implementing new stream types.
 
 * **[Frequently Asked Questions](Frequently-Asked-Questions)**
