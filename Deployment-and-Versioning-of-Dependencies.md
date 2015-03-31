@@ -13,11 +13,11 @@ Orleans currently references the following external dependencies.
 
 **Newtonsoft.Json 5.0.8**
 
-The exact versions of the dependencies will change over time. We will use the current versions to illustrate  the deployment and versioning options. The general we are trying to follow with regards to Azure SDK is to target it's version current-1, to make transition to new versions of it easier. As of this writing the current version is 2.5, and hence we target 2.4.
+The exact versions of the dependencies will change over time. We will use the current versions to illustrate the deployment and versioning options. The general rule we are trying to follow with regards to Azure SDK is to target it's version current-1, to make transition to new versions of it easier. As of this writing the current version is 2.5, and hence we target 2.4.
 
 ## Versioning of Orleans dependencies ##
 
-A typical use case is when you need to run Orleans, silo or client, with a different version of a dependency library, for example with Azure SDK 2.5. In this scenario, Orleans works just like any other .NET library being subject to assembly binding redirect rules. All you need to do is to add a set of binding redirect settings to the app.config file of the process.
+A typical use case is when you need to run Orleans, silo or client, with a different version of a dependent library, for example with Azure SDK 2.5. In this scenario, Orleans works just like any other .NET library being subject to assembly binding redirect rules. All you need to do is to add a set of binding redirect settings to the app.config file of the process.
 
 Here's an example of an app.config that redirects Microsoft.WindowsAzure.Storage and Microsoft.WindowsAzure.Storage to the versions included in Azure SDK 2.5 and Azure Newtonsoft.Json to version 6.0.0.0.
 
