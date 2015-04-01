@@ -456,10 +456,10 @@ namespace UnitTests.Tester
 
             config.Globals.LivenessType = options.LivenessType;
 
+            config.AdjustForTestEnvironment();
+
             globalConfig = config.Globals;
-            globalConfig.AdjustForTestEnvironment();
-
-
+            
             string siloName;
             switch (type)
             {
