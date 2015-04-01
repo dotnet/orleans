@@ -247,7 +247,7 @@ namespace Orleans.Runtime.Providers
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
-            var managerGrainRef = PersistentStreamPullingManagerFactory.Cast(manager.AsReference());
+            var managerGrainRef = manager.AsReference<IPersistentStreamPullingManager>();
             // Need to call it as a grain reference though.
             await managerGrainRef.Initialize(queueAdapter.AsImmutable());
         }

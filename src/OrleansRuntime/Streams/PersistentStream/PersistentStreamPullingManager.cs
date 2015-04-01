@@ -92,7 +92,7 @@ namespace Orleans.Streams
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
 
-            var meAsQueueBalanceListener = StreamQueueBalanceListenerFactory.Cast(this.AsReference());
+            var meAsQueueBalanceListener = this.AsReference<IStreamQueueBalanceListener>();
             queueBalancer.SubscribeToQueueDistributionChangeEvents(meAsQueueBalanceListener);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
@@ -186,7 +186,7 @@ namespace Orleans.Streams
                 foreach (var agent in agents)
                 {
                     // Init the agent only after it was registered locally.
-                    var agentGrainRef = PersistentStreamPullingAgentFactory.Cast(agent.AsReference());
+                    var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
                     // Need to call it as a grain reference.
                     var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(((IQueueAdapter)queueAdapter).AsImmutable()));
                     task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_08, String.Format("PersistentStreamPullingAgent {0} failed to Initialize.", agent.QueueId));
@@ -218,7 +218,7 @@ namespace Orleans.Streams
 
                 agents.Add(agent);
                 queuesToAgentsMap.Remove(queueId);
-                var agentGrainRef = PersistentStreamPullingAgentFactory.Cast(agent.AsReference());
+                var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
                 var task = OrleansTaskExtentions.SafeExecute(agentGrainRef.Shutdown);
                 task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_11,
                     String.Format("PersistentStreamPullingAgent {0} failed to Shutdown.", agent.QueueId));
