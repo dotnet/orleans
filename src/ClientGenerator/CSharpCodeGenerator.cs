@@ -521,10 +521,9 @@ namespace Orleans.CodeGeneration
             foreach (var paramInfo in parameters)
             {
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
-                    invokeArguments += string.Format("{0} is global::Orleans.Grain ? {0}.AsReference<{2}.{1}>() : {0}",
+                    invokeArguments += string.Format("{0} is global::Orleans.Grain ? {0}.AsReference<{1}>() : {0}",
                         GetParameterName(paramInfo),
-                        paramInfo.ParameterType.Name,
-                        paramInfo.ParameterType.Namespace);
+                        TypeUtils.GetFullName(paramInfo.ParameterType));
                 else
                     invokeArguments += GetParameterName(paramInfo);
 
