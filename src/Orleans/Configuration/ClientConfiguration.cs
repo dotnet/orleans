@@ -395,15 +395,6 @@ namespace Orleans.Runtime.Configuration
         public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
         {
             return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
-        } 
-
-        /// <summary>
-        /// This method may be called by the client host or test host to tweak a provider configuration after it has been already loaded.
-        /// Its is optional and should NOT be automaticaly called by the runtime.
-        /// </summary>
-        internal void AdjustConfiguration()
-        {
-            ProviderConfigurationUtility.AdjustConfiguration(ProviderConfigurations, DeploymentId);
         }
 
         /// <summary>

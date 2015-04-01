@@ -28,13 +28,12 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Remoting;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.Runtime;
+﻿﻿using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+﻿﻿using UnitTests.Tester.Extensions;
 
 namespace UnitTests.Tester
 {
@@ -458,6 +457,8 @@ namespace UnitTests.Tester
             config.Globals.LivenessType = options.LivenessType;
 
             globalConfig = config.Globals;
+            globalConfig.AdjustForTestEnvironment();
+
 
             string siloName;
             switch (type)

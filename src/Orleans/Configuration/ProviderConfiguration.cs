@@ -350,16 +350,6 @@ namespace Orleans.Runtime.Configuration
             return providerConfigurations.Values.SelectMany(category => category.Providers.Values);
         }
 
-        internal static void AdjustConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string deploymentId)
-        {
-            if (String.IsNullOrEmpty(deploymentId)) return;
-
-            foreach (ProviderCategoryConfiguration providerCategoryConfig in providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)).Select(kv => kv.Value))
-            {
-                providerCategoryConfig.SetConfiguration("DeploymentId", deploymentId);
-            }
-        }
-
         internal static string PrintProviderConfigurations(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations)
         {
             var sb = new StringBuilder();
