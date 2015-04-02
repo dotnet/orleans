@@ -45,14 +45,14 @@ The server configuration should look like this:
 
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
-   <Globals>
-      <StatisticsProviders>
-        <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="MySQLStatsProvider" ConnectionString="..." />
-      </StatisticsProviders>
-   </Globals>
-    <Defaults>
-        <Statistics ProviderType="MySQLStatsProvider" WriteLogStatisticsToTable="true"/>
-    </Defaults>
+     <Globals>
+         <StatisticsProviders>
+             <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="MySQLStatsProvider" ConnectionString="..." />
+         </StatisticsProviders>
+     </Globals>
+     <Defaults>
+         <Statistics ProviderType="MySQLStatsProvider" WriteLogStatisticsToTable="true"/>
+     </Defaults>
 </OrleansConfiguration>
 ```
 
@@ -60,9 +60,9 @@ The client configuration should look like this:
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
-   <StatisticsProviders>
-       <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="SQL" ConnectionString="..." />
-    </StatisticsProviders>
-    <Statistics ProviderType="MySQLStatsProvider" WriteLogStatisticsToTable="true"/>
+      <StatisticsProviders>
+         <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="SQL" ConnectionString="..." />
+      </StatisticsProviders>
+      <Statistics ProviderType="MySQLStatsProvider" WriteLogStatisticsToTable="true"/>
 </ClientConfiguration>
 ```
