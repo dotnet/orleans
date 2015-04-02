@@ -216,23 +216,6 @@ namespace UnitTests.StorageTests
         }
 
         [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
-        public void SiloInstanceTable_FindPrimarySiloEndpoint()
-        {
-            RegisterSiloInstance();
-
-            IPEndPoint primary = manager.FindPrimarySiloEndpoint();
-            Assert.IsNull(primary, "Primary silo should not be found before Silo.Activate");
-
-            manager.ActivateSiloInstance(myEntry);
-
-            primary = manager.FindPrimarySiloEndpoint();
-            Assert.IsNotNull(primary, "Primary silo should be found after Silo.Activate");
-
-            Assert.AreEqual(myEntry.Address, primary.Address.ToString(), "Primary silo address");
-            Assert.AreEqual(myEntry.Port, primary.Port.ToString(CultureInfo.InvariantCulture), "Primary silo port");
-        }
-
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
         public void SiloAddress_ToFrom_RowKey()
         {
             string ipAddress = "1.2.3.4";
@@ -274,7 +257,6 @@ namespace UnitTests.StorageTests
 
                 HostName = myEndpoint.Address.ToString(),
                 ProxyPort = "30000",
-                Primary = true.ToString(),
 
                 RoleName = "MyRole",
                 InstanceName = "MyInstance",
@@ -310,7 +292,6 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(referenceEntry.HostName, entry.HostName, "HostName");
             //Assert.AreEqual(referenceEntry.Status, entry.Status, "Status");
             Assert.AreEqual(referenceEntry.ProxyPort, entry.ProxyPort, "ProxyPort");
-            Assert.AreEqual(referenceEntry.Primary, entry.Primary, "Primary");
             Assert.AreEqual(referenceEntry.RoleName, entry.RoleName, "RoleName");
             Assert.AreEqual(referenceEntry.InstanceName, entry.InstanceName, "InstanceName");
             Assert.AreEqual(referenceEntry.UpdateZone, entry.UpdateZone, "UpdateZone");
