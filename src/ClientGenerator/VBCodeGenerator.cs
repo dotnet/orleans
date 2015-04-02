@@ -525,10 +525,9 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
             foreach (ParameterInfo paramInfo in parameters)
             {
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
-                    invokeArguments += string.Format("If(typeof({0}) is Global.Orleans.Grain, {0}.AsReference<{2}.{1}>(),{0})",
+                    invokeArguments += string.Format("If(typeof({0}) is Global.Orleans.Grain, {0}.AsReference<{1}>(),{0})",
                         GetParameterName(paramInfo),
-                        paramInfo.ParameterType.Name,
-                        paramInfo.ParameterType.Namespace);
+                        TypeUtils.GetFullName(paramInfo.ParameterType));
                 else
                     invokeArguments += GetParameterName(paramInfo);
 
