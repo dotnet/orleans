@@ -26,5 +26,5 @@ This section covers a number of topics that are intended for the advanced user o
 
 [Configuring .NET Garbage Collection](Configuring-.NET-Garbage-Collection)
 
-[SQL Tables](SQL-Tables)
+[Configuring SQL Tables](Configuring-SQL-Tables)
 
