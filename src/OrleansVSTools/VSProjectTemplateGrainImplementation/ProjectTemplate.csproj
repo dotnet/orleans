@@ -51,7 +51,8 @@
 	<ItemGroup>
 		<Compile Include="Grain1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-	</ItemGroup>
+    <Compile Include="Properties\orleans.codegen.cs" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
