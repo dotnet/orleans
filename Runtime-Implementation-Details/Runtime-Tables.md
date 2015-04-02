@@ -16,7 +16,7 @@ Runtime tables:
 
 ## Orleans Silo Instances table
 
-Orleans Silo Instances table, also commonly referred as Membership table, lists the set of silos that make Orleans deployment. More details about the cluster management protocol that maintains this table can be found [here](Cluster-Management).
+Orleans Silo Instances table, also commonly referred as Membership table, lists the set of silos that make Orleans deployment. More details can be found in the description of the [Cluster Management Protocol](Cluster-Management) that maintains this table.
 
 All rows in this table consists of the following collumns:
 
@@ -38,7 +38,22 @@ All rows in this table consists of the following collumns:
 16. SuspectingTimes - the list of times when this silo was suspected. Managed by cluster management protocol. 
 17. StartTime - the time when this silo was started.
 18. IAmAliveTime - the last time this silo reoprted that it is alive. Used for diagnostics and troubleshooting only.
-19. MembershipVersion - the special collumn used only by version row, as described by the cluster management protocol.
 
+There is also a specila row in this table, called membership version row.
+It has the following collumns:
 
+1. PartitionKey - deployment id.
+2. RowKey - "VersionRow" costant string
+3. DeploymentId 
+4. MembershipVersion - the latest version of the current membership configuration. 
+
+## Orleans Reminders table
+
+## Silo Metrics table
+
+## Clients Metrics table
+
+## Silo Statistics table
+
+## Clients Statistics table
 
