@@ -187,6 +187,7 @@
     <Compile Include="Providers\IProviderRuntime.cs" />
     <Compile Include="Statistics\ThreadCycleStopWatch.cs" />
     <Compile Include="Streams\PubSub\PubSubSubscriptionState.cs" />
+    <Compile Include="Streams\PubSub\SubscriptionMarker.cs" />
     <Compile Include="Streams\SimpleMessageStream\SimpleMessageStreamProducer.cs" />
     <Compile Include="Streams\PersistentAdapter\IBatchContainer.cs" />
     <Compile Include="Streams\PersistentAdapter\IQueueAdapter.cs" />

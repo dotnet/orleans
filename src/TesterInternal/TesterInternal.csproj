@@ -68,6 +68,7 @@
   <ItemGroup>
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

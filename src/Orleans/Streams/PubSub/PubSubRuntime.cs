@@ -23,7 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Runtime.Remoting.Messaging;
+﻿using System.Threading.Tasks;
 
 using Orleans.Runtime;
 
@@ -171,18 +172,18 @@ namespace Orleans.Streams
         }
         private bool IsImplicitSubscriber(GuidId subscriptionId, StreamId streamId)
         {
-            return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId);
+            return SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid);
         }
 
         public GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId)
         {
             GrainId grainId = GrainExtensions.GetGrainId(requesterAddress);
-            // If there is an implicit subscription setup for the provided grain on this provided stream, subscription should match the stream Id.
-            // If there is no implicit subscription setup, generate new random unique subscriptionId.
-            // TODO: Replace subscription id with statically generated subscriptionId instead of getting it from the streamId.
-            return implicitPubSub.IsImplicitSubscriber(grainId, streamId)
-                ? GuidId.GetGuidId(grainId.GetPrimaryKey())
-                : GuidId.GetNewGuidId();
+            Guid subscriptionId;
+            if (!implicitPubSub.TryGetImplicitSubscriptionGuid(grainId, streamId, out subscriptionId))
+            {
+                subscriptionId = SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid());
+            }
+            return GuidId.GetGuidId(subscriptionId);
         }
     }
 }
