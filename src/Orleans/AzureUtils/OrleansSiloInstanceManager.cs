@@ -47,7 +47,6 @@ namespace Orleans.AzureUtils
         public string HostName { get; set; }        // Mandatory
         public string Status { get; set; }          // Mandatory
         public string ProxyPort { get; set; }       // Optional
-        public string Primary { get; set; }         // Optional - should be depricated
 
         public string RoleName { get; set; }        // Optional - only for Azure role
         public string InstanceName { get; set; }    // Optional - only for Azure role
@@ -121,7 +120,6 @@ namespace Orleans.AzureUtils
                 sb.Append(" Host=").Append(HostName);
                 sb.Append(" Status=").Append(Status);
                 sb.Append(" ProxyPort=").Append(ProxyPort);
-                sb.Append(" Primary=").Append(Primary);
 
                 if (!string.IsNullOrEmpty(RoleName)) sb.Append(" RoleName=").Append(RoleName);
                 sb.Append(" Instance=").Append(InstanceName);
@@ -218,51 +216,10 @@ namespace Orleans.AzureUtils
                 .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
         }
 
-        public IPEndPoint FindPrimarySiloEndpoint()
-        {
-            SiloInstanceTableEntry primarySilo = FindPrimarySilo();
-            if (primarySilo == null) return null;
-
-            int port = 0;
-            if (!string.IsNullOrEmpty(primarySilo.Port))
-            {
-                int.TryParse(primarySilo.Port, out port);
-            }
-            return new IPEndPoint(IPAddress.Parse(primarySilo.Address), port);
-        }
-
         public List<Uri> FindAllGatewayProxyEndpoints()
         {
             IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = FindAllGatewaySilos();
             return gatewaySiloInstances.Select(gateway => gateway.ToGatewayUri()).ToList();
-        }
-
-        private SiloInstanceTableEntry FindPrimarySilo()
-        {
-            logger.Info(ErrorCode.Runtime_Error_100275, "Searching for active primary silo for deployment {0} ...", this.DeploymentId);
-            string primary = true.ToString();
-
-            Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
-                instance.PartitionKey == this.DeploymentId
-                && instance.Status == INSTANCE_STATUS_ACTIVE
-                && instance.Primary == primary;
-
-            var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
-                                 .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
-
-            var primarySilo = default(SiloInstanceTableEntry);
-            List<SiloInstanceTableEntry> primarySilosList = queryResults.Select(entity => entity.Item1).ToList();
-
-            if (primarySilosList.Count == 0)
-            {
-                logger.Error(ErrorCode.Runtime_Error_100310, "Could not find Primary Silo");
-            }
-            else
-            {
-                primarySilo = primarySilosList.FirstOrDefault();
-                logger.Info(ErrorCode.Runtime_Error_100276, "Found Primary Silo: {0}", primarySilo);
-            }
-            return primarySilo;
         }
 
         private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()

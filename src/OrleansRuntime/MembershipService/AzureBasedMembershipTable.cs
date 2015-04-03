@@ -214,8 +214,7 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrEmpty(tableEntry.ProxyPort))
                 parse.ProxyPort = int.Parse(tableEntry.ProxyPort);
 
-            if (!string.IsNullOrEmpty(tableEntry.Primary))
-                parse.IsPrimary = bool.Parse(tableEntry.Primary);
+            parse.IsPrimary = false; // there are no primaries with in Azure table.
 
             int port = 0;
             if (!string.IsNullOrEmpty(tableEntry.Port))
@@ -280,7 +279,6 @@ namespace Orleans.Runtime.MembershipService
                 HostName = memEntry.HostName,
                 Status = memEntry.Status.ToString(),
                 ProxyPort = memEntry.ProxyPort.ToString(CultureInfo.InvariantCulture),
-                Primary = memEntry.IsPrimary.ToString(),
                 RoleName = memEntry.RoleName,
                 InstanceName = memEntry.InstanceName,
                 UpdateZone = memEntry.UpdateZone.ToString(CultureInfo.InvariantCulture),

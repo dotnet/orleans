@@ -172,10 +172,10 @@ namespace Orleans
     {
         public SiloAddress SiloAddress { get; set; }
 
-        public string HostName { get; set; }              // Mandatory
-        public SiloStatus Status { get; set; }                // Mandatory
-        public int ProxyPort { get; set; }             // Optional
-        public bool IsPrimary { get; set; }            // Optional - should be depricated
+        public string HostName { get; set; }          
+        public SiloStatus Status { get; set; }          
+        public int ProxyPort { get; set; }             
+        public bool IsPrimary { get; set; }           
 
         public string RoleName { get; set; }              // Optional - only for Azure role
         public string InstanceName { get; set; }          // Optional - only for Azure role
