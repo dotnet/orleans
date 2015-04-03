@@ -158,7 +158,8 @@ namespace Orleans.Runtime
                 if (!typeof(ISystemTarget).IsAssignableFrom(grainType.Type))
                 {
                     int grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainType.Type);
-                    sb.AppendFormat("Grain class {0} [{1} (0x{2})] from {3}.dll implementing interfaces: ", 
+                    sb.AppendFormat("Grain class {0}.{1} [{2} (0x{3})] from {4}.dll implementing interfaces: ",
+                        grainType.Type.Namespace,
                         TypeUtils.GetTemplatedName(grainType.Type),
                         grainClassTypeCode,
                         grainClassTypeCode.ToString("X"),
