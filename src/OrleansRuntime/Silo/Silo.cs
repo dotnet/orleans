@@ -399,6 +399,9 @@ namespace Orleans.Runtime
 
             InjectDependencies();
 
+            // Validate the configuration.
+            GlobalConfig.Application.ValidateConfiguration(logger);
+
             // ensure this runs in the grain context, wait for it to complete
             scheduler.QueueTask(CreateSystemGrains, catalog.SchedulingContext)
                 .WaitWithThrow(initTimeout);
