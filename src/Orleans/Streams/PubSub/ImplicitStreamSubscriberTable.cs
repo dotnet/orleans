@@ -133,7 +133,7 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        // Create a subscriptionId that is unique per grainId, grainType, namespace combination.
+        /// Create a subscriptionId that is unique per grainId, grainType, namespace combination.
         /// </summary>
         /// <param name="grainId"></param>
         /// <param name="streamId"></param>

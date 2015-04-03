@@ -858,7 +858,9 @@ namespace Orleans
         Loader_IgnoreNonPublicGrainClass        = LoaderBase + 15,
         Loader_UnexpectedException              = LoaderBase + 16,
         Loader_SkippingBadAssembly              = LoaderBase + 17,
-
+        Loader_TypeLoadError_2                  = LoaderBase + 18,
+        Loader_TypeLoadError_3                  = LoaderBase + 19,
+        Loader_TypeLoadError_4                  = LoaderBase + 20,
 
         PlacementBase                               = Runtime + 1800,
         Placement_RuntimeStatisticsUpdateFailure_1  = PlacementBase + 1,
