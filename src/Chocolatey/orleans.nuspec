@@ -25,7 +25,25 @@
           <releaseNotes></releaseNotes>
         </metadata>
         <files>
+          <file src="..\..\Binaries\Release\ClientConfiguration.xml" target="Binaries\OrleansClient\ClientConfiguration.xml" />
+          <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Configuration.dll" target="Binaries\OrleansClient\Microsoft.WindowsAzure.Configuration.dll"/>
+          <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Storage.dll" target="Binaries\OrleansClient\Microsoft.WindowsAzure.Storage.dll" />
+          <file src="..\..\Binaries\Release\Microsoft.Data.Edm.dll" target="Binaries\OrleansClient\Microsoft.Data.Edm.dll" />
+          <file src="..\..\Binaries\Release\Microsoft.Data.OData.dll" target="Binaries\OrleansClient\Microsoft.Data.OData.dll" />
+          <file src="..\..\Binaries\Release\Microsoft.Data.Services.Client.dll" target="Binaries\OrleansClient\Microsoft.Data.Services.Client.dll" />
+          <file src="..\..\Binaries\Release\System.Spatial.dll" target="Binaries\OrleansClient\System.Spatial.dll"  />
+          <file src="..\..\Binaries\Release\Orleans.dll" target="Binaries\OrleansClient\Orleans.dll" />
+          <file src="..\..\Binaries\Release\Orleans.SDK.targets" target="Binaries\OrleansClient\Orleans.SDK.targets" />
+          <file src="..\..\Binaries\Release\Orleans.xml" target="Binaries\OrleansClient\Orleans.xml" />
+          <file src="..\..\Binaries\Release\OrleansAzureUtils.dll" target="Binaries\OrleansClient\OrleansAzureUtils.dll" />
+          <file src="..\..\Binaries\Release\OrleansAzureUtils.xml" target="Binaries\OrleansClient\OrleansAzureUtils.xml" />
+          <file src="..\..\Binaries\Release\OrleansManager.exe" target="Binaries\OrleansClient\OrleansManager.exe" />
+          <file src="..\..\Binaries\Release\OrleansManager.exe.config" target="Binaries\OrleansClient\OrleansManager.exe.config" />
+          <file src="..\..\Binaries\Release\OrleansProviders.dll" target="Binaries\OrleansClient\OrleansProviders.dll" />
+          
+          <!--
           <file src="C:\Microsoft Project Orleans SDK v1.0\SDK\Binaries\**" target="Binaries" />
           <file src="C:\Microsoft Project Orleans SDK v1.0\SDK\RemoteDeployment\**" target="RemoteDeployment" />
+          -->
         </files>
       </package>
