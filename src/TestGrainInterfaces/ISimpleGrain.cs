@@ -28,7 +28,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-//using Newtonsoft.Json.Linq;
 using Orleans;
 
 namespace UnitTests.GrainInterfaces
@@ -41,8 +40,6 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetAxB();
         Task<int> GetAxB(int a, int b);
         Task<int> GetA();
-
-        //Task<Newtonsoft.Json.Linq.JObject> GetJObject();
     }
 
     public interface ISimpleCLIGrain : ISimpleGrain

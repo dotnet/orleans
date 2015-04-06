@@ -28,11 +28,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using Newtonsoft.Json.Linq;
-using Orleans.Serialization;
-using System.Runtime.Serialization;
-using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 
 namespace UnitTests.General
 {
@@ -95,23 +90,6 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
         public async Task SimpleGrainDataFlow()
         {
-            string json = @"{
-                    CPU: 'Intel',
-                    Drives: [
-                            'DVD read/writer',
-                            '500 gigabyte hard drive'
-                            ]
-                    }";
-
-            JObject obj = JObject.Parse(json);
-            try
-            {
-                object obj2 = RoundTripGrainReferenceDotNetSerializer(obj);
-            }catch(Exception exc)
-            {
-                int j = 0;
-            }
-
             ISimpleGrain grain = GetSimpleGrain();
 
             Task setAPromise = grain.SetA(3);
@@ -120,16 +98,6 @@ namespace UnitTests.General
             var x = await grain.GetAxB();
 
             Assert.AreEqual(12, x);
-        }
-
-        private static object RoundTripGrainReferenceDotNetSerializer(object input)
-        {
-            IFormatter formatter = new BinaryFormatter();
-            MemoryStream stream = new MemoryStream(new byte[1000], true);
-            formatter.Serialize(stream, input);
-            stream.Position = 0;
-            object output = formatter.Deserialize(stream);
-            return output;
         }
     }
 }
