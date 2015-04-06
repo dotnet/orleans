@@ -165,7 +165,7 @@ namespace Orleans.CodeGeneration.Serialization
                     }
                 }
 
-                SerializationGenerator.GenerateSerializationForClass(toGen, typeNamespace.ReferencedNamespace, typeNamespace.ReferencedNamespaces, language);
+                SerializationGenerator.GenerateSerializationForClass(grainAssembly, toGen, typeNamespace.ReferencedNamespace, typeNamespace.ReferencedNamespaces, language);
             }
         }
     }
