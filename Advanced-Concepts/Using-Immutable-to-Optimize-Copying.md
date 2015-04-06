@@ -4,7 +4,6 @@ title: Using Immutable<T> to Optimize Copying
 ---
 {% include JB/setup %}
 
-# Using Immutable<T> to Optimize Copying
 Orleans has a feature that can be used to avoid some of the overhead associated with serializing request messages. This note starts with a general description of how serialization works, and then explains how to use the new feature.
 
 ## Serialization in Orleans
