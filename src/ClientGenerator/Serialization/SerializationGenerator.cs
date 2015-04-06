@@ -44,7 +44,7 @@ namespace Orleans.CodeGeneration.Serialization
         /// <summary>
         /// Generate all the necessary logic for serialization of payload types used by grain interfaces.
         /// </summary>
-        internal static void GenerateSerializationForClass(Type t, CodeNamespace container, HashSet<string> referencedNamespaces, Language language)
+        internal static void GenerateSerializationForClass(Assembly grainAssembly, Type t, CodeNamespace container, HashSet<string> referencedNamespaces, Language language)
         {
             var generateSerializers = !CheckForCustomSerialization(t);
             var generateCopier = !CheckForCustomCopier(t);
@@ -260,9 +260,9 @@ namespace Orleans.CodeGeneration.Serialization
                     continue;
 
                 var fldType = fld.FieldType;
-                if (TypeUtilities.IsTypeIsInaccessibleForSerialization(fldType, t.Module))
+                if (TypeUtilities.IsTypeIsInaccessibleForSerialization(fldType, t.Module, grainAssembly))
                 {
-                    ConsoleText.WriteStatus("Skipping generation of serializer for {0} because its field {1} is of a private type.", t.FullName, fld.Name);
+                    ConsoleText.WriteStatus("Skipping generation of serializer for {0} because one of it's field {1} is of a private/internal type.", t.FullName, fld.Name);
                     return; // We cannot deserialize a class with a field of non-public type. Need to add a proper reporting here.
                 }
 

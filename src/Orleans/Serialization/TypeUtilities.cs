@@ -217,13 +217,19 @@ namespace Orleans.Serialization
             }
         }
 
-        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module currentModule)
+        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module currentModule, Assembly grainAssembly)
         {
             if(t.GetCustomAttributes(typeof(SerializableAttribute), false).Length > 0)
                 return false;
 
-            return (t.IsNotPublic && !t.Module.Equals(currentModule)) || t.IsNestedPrivate || t.IsNestedFamily ||
-                (t.IsArray && IsTypeIsInaccessibleForSerialization(t.GetElementType(), currentModule));
+            if (t.IsNotPublic)
+            {
+                if (!t.Module.Equals(currentModule)) return true; // subtype is defined in a different assembly from the outer type
+                if (!t.Assembly.Equals(grainAssembly)) return true; // subtype defined in a different assembly from the one we are generating serializers for.
+            }
+
+            return t.IsNestedPrivate || t.IsNestedFamily ||
+                (t.IsArray && IsTypeIsInaccessibleForSerialization(t.GetElementType(), currentModule, grainAssembly));
         }
     }
 }
