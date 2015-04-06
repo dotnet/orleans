@@ -119,12 +119,12 @@ namespace Orleans.Streams
             ISet<PubSubSubscriptionState> result = await explicitPubSub.RegisterProducer(streamId, streamProvider, streamProducer);
             if (String.IsNullOrWhiteSpace(streamId.Namespace)) return result;
 
-            ISet<IStreamConsumerExtension> implicitSet = implicitPubSub.GetImplicitSubscribers(streamId);
-            foreach (var consumer in implicitSet)
+            IDictionary<Guid,IStreamConsumerExtension> implicitSubscriptions = implicitPubSub.GetImplicitSubscribers(streamId);
+            foreach (var kvp in implicitSubscriptions)
             {
+                GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
                 // we ignore duplicate entries-- there's no way a programmer could prevent the duplicate entry from being added if we threw an exception to communicate the problem. 
-                GuidId subscriptionId = GuidId.GetGuidId(GrainExtensions.GetGrainId(consumer).GetPrimaryKey());
-                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, consumer, null, null));
+                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value, null, null));
             }
             return result;
         }

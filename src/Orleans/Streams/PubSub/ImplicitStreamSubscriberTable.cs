@@ -67,13 +67,13 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Retrieve a list of implicit subscribers, given a stream ID. This method throws an exception if there's no namespace associated with the stream ID. 
+        /// Retrieve a map of implicit subscriptionsIds to implicit subscribers, given a stream ID. This method throws an exception if there's no namespace associated with the stream ID. 
         /// </summary>
         /// <param name="streamId">A stream ID.</param>
         /// <returns>A set of references to implicitly subscribed grains. They are expected to support the streaming consumer extension.</returns>
         /// <exception cref="System.ArgumentException">The stream ID doesn't have an associated namespace.</exception>
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
-        internal ISet<IStreamConsumerExtension> GetImplicitSubscribers(StreamId streamId)
+        internal IDictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(StreamId streamId)
         {
             if (String.IsNullOrWhiteSpace(streamId.Namespace))
             {
@@ -81,16 +81,18 @@ namespace Orleans.Streams
             }
 
             HashSet<int> entry;
-            var result = new HashSet<IStreamConsumerExtension>();
+            var result = new Dictionary<Guid, IStreamConsumerExtension>();
             if (table.TryGetValue(streamId.Namespace, out entry))
             {
                 foreach (var i in entry)
                 {
                     IStreamConsumerExtension consumer = MakeConsumerReference(streamId.Guid, i);
-                    if (!result.Add(consumer))
+                    Guid subscriptionGuid = MakeSubscriptionGuid(i, streamId);
+                    if (result.ContainsKey(subscriptionGuid))
                     {
-                        throw new InvalidOperationException(string.Format("Internal invariant violation: generated duplicate subscriber reference: {0}", consumer));
+                        throw new InvalidOperationException(string.Format("Internal invariant violation: generated duplicate subscriber reference: {0}, subscriptionId: {1}", consumer, subscriptionGuid));
                     }
+                    result.Add(subscriptionGuid, consumer);
                 }                
                 return result;                
             }
@@ -143,6 +145,17 @@ namespace Orleans.Streams
             // first int in guid is grain type code
             int grainIdTypeCode = grainId.GetTypeCode();
 
+            return MakeSubscriptionGuid(grainIdTypeCode, streamId);
+        }
+
+        /// <summary>
+        /// Create a subscriptionId that is unique per grainId, grainType, namespace combination.
+        /// </summary>
+        /// <param name="grainIdTypeCode"></param>
+        /// <param name="streamId"></param>
+        /// <returns></returns>
+        private Guid MakeSubscriptionGuid(int grainIdTypeCode, StreamId streamId)
+        {
             // next 2 shorts ing guid are from namespace hash
             int namespaceHash = streamId.Namespace.GetHashCode();
             byte[] namespaceHashByes = BitConverter.GetBytes(namespaceHash);
