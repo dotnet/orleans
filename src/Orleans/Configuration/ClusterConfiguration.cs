@@ -431,6 +431,10 @@ namespace Orleans.Runtime.Configuration
                 if (String.IsNullOrEmpty(addrOrHost))
                 {
                     addrOrHost = Dns.GetHostName();
+
+                    // If for some reason we get "localhost" back. This seems to have happened to somebody.
+                    if (addrOrHost.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+                        return loopback;
                 }
 
                 var candidates = new List<IPAddress>();
