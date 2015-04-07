@@ -242,7 +242,7 @@ namespace Orleans.Runtime.Providers
             TimeSpan initQueueTimeout)
         {
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
-                balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, this, queueAdapter.GetStreamQueueMapper());
+                balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, queueAdapter.GetStreamQueueMapper());
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
             this.RegisterSystemTarget(manager);

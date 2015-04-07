@@ -211,6 +211,7 @@
     <Compile Include="Silo\Watchdog.cs" />
     <Compile Include="Streams\QueueBalancer\AzureDelpoymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\BestFitBalancer.cs" />
+    <Compile Include="Streams\QueueBalancer\ClusterDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\ConsistentRingQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\IDelpoymentConfiguration.cs" />
@@ -250,4 +251,3 @@
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>
-

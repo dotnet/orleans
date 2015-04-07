@@ -29,5 +29,6 @@ namespace Orleans.Streams
     {
         ConsistentRingBalancer, // Stream queue balancer that uses consistent ring provider for load balancing
         AzureDeploymentBasedBalancer, // Stream queue balancer that uses azure deployment information and silo status for load balancing.  Requires silo running in azure.
+        ClusterDeploymentBasedBalancer, // Stream queue balancer that uses cluster configuration to determin deployment information and silo status for load balancing.  Does not support dynamic changes to cluster configuration.
     }
 }
