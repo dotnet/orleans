@@ -22,9 +22,15 @@ if "%BuildOrleansNuGet%" == "" (
         set BuildOrleansNuGet=false
     )
 )
+
 if "%BuildOrleansChocolatey%" == "" (
     if "%Configuration%" == "Release" (
-        set BuildOrleansChocolatey=true
+		where /q cpack
+		if ERRORLEVEL 1 (
+			set BuildOrleansChocolatey=false
+		) else (
+			set BuildOrleansChocolatey=true
+		)
     ) else (
         set BuildOrleansChocolatey=false
     )
