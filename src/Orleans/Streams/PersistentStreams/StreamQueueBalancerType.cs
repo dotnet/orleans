@@ -25,7 +25,7 @@ using System;
 
 namespace Orleans.Streams
 {
-    internal enum StreamQueueBalancerType
+    public enum StreamQueueBalancerType
     {
         ConsistentRingBalancer, // Stream queue balancer that uses consistent ring provider for load balancing
         AzureDeploymentBasedBalancer, // Stream queue balancer that uses azure deployment information and silo status for load balancing.  Requires silo running in azure.
