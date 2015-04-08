@@ -35,6 +35,7 @@ using System.Text;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
@@ -135,7 +136,12 @@ namespace Orleans.Serialization
 
         public static void InitializeForTesting()
         {
-            BufferPool.InitGlobalBufferPoolForTesting();
+            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            // Load serialization info for currently-loaded assemblies
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                FindSerializationInfo(assembly);
+            }
         }
 
         internal static void Initialize(bool useStandardSerializer)
@@ -449,7 +455,7 @@ namespace Orleans.Serialization
         /// Looks for types with marked serializer and deserializer methods, and registers them if necessary.
         /// </summary>
         /// <param name="assembly">The assembly to look through.</param>
-        public static void FindSerializationInfo(Assembly assembly)
+        internal static void FindSerializationInfo(Assembly assembly)
         {
             // If we're using the .Net serializer, then don't bother with this at all
             if (UseStandardSerializer) return;
@@ -1845,10 +1851,10 @@ namespace Orleans.Serialization
         /// <summary>
         /// Internal test method to do a round-trip Serialize+Deserialize loop
         /// </summary>
-        internal static object RoundTripSerializationForTesting(object source)
+        public static T RoundTripSerializationForTesting<T>(T source)
         {
             byte[] data = SerializeToByteArray(source);
-            return DeserializeFromByteArray<object>(data);
+            return DeserializeFromByteArray<T>(data);
         }
 
         private static void InstallAssemblyLoadEventHandler()

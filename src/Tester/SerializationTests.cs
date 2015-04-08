@@ -39,17 +39,12 @@ namespace UnitTests.General
         public void InitializeForTesting()
         {
             SerializationManager.InitializeForTesting();
-            // Load serialization info for currently-loaded assemblies
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                SerializationManager.FindSerializationInfo(assembly);
-            }
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("BVT"), TestCategory("Serialization")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Serialization")]
         public void SerializationTests_JObject()
         {
-            string json = @"{ 
+            const string json = @"{ 
                     CPU: 'Intel', 
                     Drives: [ 
                             'DVD read/writer', 
@@ -57,19 +52,12 @@ namespace UnitTests.General
                            ] 
                    }"; 
  
-            JObject input = JObject.Parse(json); 
-            JObject output = RoundTripDotNetSerializer(input);
+            JObject input = JObject.Parse(json);
+            JObject output = SerializationManager.RoundTripSerializationForTesting(input);
             Assert.AreEqual(input.ToString(), output.ToString());
         }
 
-        private static T RoundTripDotNetSerializer<T>(T input)
-        {
-            byte[] ser = SerializationManager.SerializeToByteArray(input);
-            T output = SerializationManager.DeserializeFromByteArray<T>(ser);
-            return output;
-        }
-
-        [global::Orleans.CodeGeneration.RegisterSerializerAttribute()]
+        [Orleans.CodeGeneration.RegisterSerializerAttribute()]
         internal class JObjectSerialization
         {
             static JObjectSerialization()
@@ -79,6 +67,7 @@ namespace UnitTests.General
 
             public static object DeepCopier(object original)
             {
+                // I assume JObject is immutable, so no need to deep copy.
                 return original;
             }
 
