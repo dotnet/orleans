@@ -4,11 +4,16 @@ title: Writing Custom Serializers
 ---
 {% include JB/setup %}
 
-[[ THIS SECTION NEEDS REVIEW ]] 
+Orleans has a serialization framework for data types passed in request and response messages and for grain persistent state objects. As part of this framework, Orleans automaticaly generates serialization code for those data types. In addition to automatic serialization generation, application code can provide custom serialization for types it chooses. Orleans reccomends using the automatic serialization generation for the majority of your application types and only write custom serializers in rare cases when you beleive it is possible to get improved performance by hand-coding serializers. This note describes how to do so, and identifies some specific cases when it might be helpful.
 
-Orleans introduced a new serialization framework for data types passed in request and response messages. As part of this framework, application types marked with the  Serializable attribute have custom serializer routines generated for them as part of client generation. In general, each type has three routines generated: one to make a deep copy of an object of the type; one to write a tokenized byte representation of an object of the type to a byte stream; and one to recreate a new object of the type from a tokenized byte stream.
+There are 2 ways how application can customise serialization:
 
- In some cases, it might be possible to get improved performance by hand-coding some or all of these routines. This note describes how to do so, and identifies some specific cases when it might be helpful.
+1) Add 3 serialization methods to your type and mark them with appropriate attributes (`CopierMethod`, `SerializerMethod`, `DeserializerMethod`). This method is preferable for types that application owns, that is, the types that you can add new methods to. 
+
+2) Write a separate class annotated with an attribute `RegisterSerializerAttribute` with 3 serialization method in it. This method is usefull for types that application does not own, for example, types defined in other libraries your application has not control for.
+
+In both way the custom serialization code has to include three routines: one to make a deep copy of an object of the type; one to write a tokenized byte representation of an object of the type to a byte stream; and one to recreate a new object of the type from a tokenized byte stream.
+
 
 ## Introduction
 As described in [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Advanced-Concepts/Using-Immutable-to-Optimize-Copying), Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire, objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.
@@ -33,7 +38,7 @@ All serializer routines should be implemented as static members of the class or 
 
  Unless you implement all three serialization routines, you should mark your type with the  Serializable attribute so that the missing methods will be generated for you.
 
-## Copier
+### Copier
 Copier methods are flagged with the Orleans.CopierMethod attribute:
 
 ``` csharp
@@ -56,7 +61,8 @@ var fooCopy = SerializationManager.DeepCopyInner(foo);
 
 It is important to use DeepCopyInner, instead of DeepCopy, in order to maintain the object identity context for the full copy operation.
 
-## Maintaining Object Identity
+**Maintaining Object Identity**
+
 An important responsibility of a copy routine is to maintain object identity. The Orleans runtime provides a helper class for this: before copying a sub-object "by hand" (i.e., not by calling DeepCopyInner), check to see if it has already been referenced as follows:
 
 
@@ -77,7 +83,7 @@ Note that this should only be done for class instances, not struct instances or 
 
 If you use DeepCopyInner to copy sub-objects, then object identity is handled for you.
 
-## Serializer
+### Serializer
 Serialization methods are flagged with the  SerializerMethod attribute:
 
 
@@ -121,7 +127,7 @@ SerializationContext.Current.RecordObject(foo, stream.CurrentOffset);
 
  As for copiers, this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums), and if you use SerializeInner for sub-objects, then object identity is handled for you.
 
-## Deserializer
+### Deserializer
 Deserialization methods are flagged with the DeserializerMethod attribute:
 
 ``` csharp
