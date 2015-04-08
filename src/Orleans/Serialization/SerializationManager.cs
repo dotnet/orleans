@@ -35,6 +35,7 @@ using System.Text;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
@@ -132,6 +133,16 @@ namespace Orleans.Serialization
         #endregion
 
         #region Static initialization
+
+        public static void InitializeForTesting()
+        {
+            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            // Load serialization info for currently-loaded assemblies
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                FindSerializationInfo(assembly);
+            }
+        }
 
         internal static void Initialize(bool useStandardSerializer)
         {
@@ -841,7 +852,8 @@ namespace Orleans.Serialization
             if (t.IsSerializable)
                 return FallbackSerializationDeepCopy(original);
 
-            throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + ". Perhaps you need to mark it [Serializable]?");
+            throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + 
+                ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
         #endregion
@@ -990,7 +1002,7 @@ namespace Orleans.Serialization
             }
 
             throw new ArgumentException("No serializer found for object of type " + t.OrleansTypeName()
-                 + ". Perhaps you need to mark it [Serializable]?");
+                 + ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
         // We assume that all lower bounds are 0, since creating an array with lower bound !=0 is hard in .NET 4.0+
@@ -1294,7 +1306,8 @@ namespace Orleans.Serialization
                 return result;
             }
 
-            throw new SerializationException("Unsupported type '" + resultType.OrleansTypeName() + "' encountered. Perhaps you need to mark it [Serializable]?");
+            throw new SerializationException("Unsupported type '" + resultType.OrleansTypeName() + 
+                "' encountered. Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
         private static object DeserializeArray(Type resultType, BinaryTokenStreamReader stream)
@@ -1838,10 +1851,10 @@ namespace Orleans.Serialization
         /// <summary>
         /// Internal test method to do a round-trip Serialize+Deserialize loop
         /// </summary>
-        internal static object RoundTripSerializationForTesting(object source)
+        public static T RoundTripSerializationForTesting<T>(T source)
         {
             byte[] data = SerializeToByteArray(source);
-            return DeserializeFromByteArray<object>(data);
+            return DeserializeFromByteArray<T>(data);
         }
 
         private static void InstallAssemblyLoadEventHandler()
