@@ -33,7 +33,8 @@ It is rare that a hand-crafted serializer routine will perform meaningfully bett
 
  A key thing to do before writing a custom serializer is to make sure that the generated serializer is really hurting your performance. Profiling will help a bit here, but even more valuable is running end-to-end stress tests of your application with varying serialization loads to gauge the system-level impact, rather than the micro-impact, of serialization. For instance, building a test version that passes no parameters to or results from grain methods, simply using canned values at either end, will zoom in on the impact of serialization and copying on system performance.
 
-## Implementing the Routines
+## Method 1: Adding 3 Serialization Routines to your Type
+
 All serializer routines should be implemented as static members of the class or struct they operate on. The names shown here are not required; registration is based on the presence of the respective attributes, not on method names. Note that serializer methods need not be public.
 
  Unless you implement all three serialization routines, you should mark your type with the  Serializable attribute so that the missing methods will be generated for you.
@@ -177,6 +178,42 @@ else
 ```
 
  If you use DeserializeInner for sub-objects, then object identity is handled for you.
+
+## Method 2: Writing a Special Serialization Class 
+
+In this method you write a new class annotated with an attribute `RegisterSerializerAttribute` and put the 3 serialization routines in it. The rules for how to write those routines are identical to method 1. The only difference is how they are hooked up with the rest of Orleans serialization framework. Below is an example for such a class:
+
+
+``` csharp
+[Orleans.CodeGeneration.RegisterSerializerAttribute()]
+internal class MyObjectSerializationExample
+{
+    static MyObjectSerializationExample()
+    {
+       Register();
+    }
+
+    public static object DeepCopier(object original)
+    {
+        ...
+    }
+
+    public static void Serializer(object untypedInput, BinaryTokenStreamWriter stream, Type expected)
+    {
+        ...
+   }
+
+    public static object Deserializer(Type expected, BinaryTokenStreamReader stream)
+    {
+        ...
+    }
+
+    public static void Register()
+    {
+        SerializationManager.Register(typeof(MyObject), DeepCopier, Serializer, Deserializer);
+    }
+}
+```
 
 ## Hints for Writing Serializers and Deserializers
 Often the simplest way to write a serializer/deserializer pair is to serialize by constructing a byte array and writing the array length to the stream, followed by the array itself, and then deserialize by reversing the process. If the array is fixed-length, you can omit it from the stream. This works well when you have a data type that you can represent compactly and that doesn't have sub-objects that might be duplicated (so you don't have to worry about object identity).
