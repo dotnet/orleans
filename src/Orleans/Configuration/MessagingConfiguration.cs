@@ -149,9 +149,9 @@ namespace Orleans.Runtime.Configuration
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
 
-        private const int DEFAULT_BUFFER_POOL_BUFFER_SIZE = 4*1024;
-        private const int DEFAULT_BUFFER_POOL_MAX_SIZE = 10000;
-        private const int DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE = 250;
+        internal const int DEFAULT_BUFFER_POOL_BUFFER_SIZE = 4 * 1024;
+        internal const int DEFAULT_BUFFER_POOL_MAX_SIZE = 10000;
+        internal const int DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE = 250;
         private const bool DEFAULT_DROP_EXPIRED_MESSAGES = true;
         private const double DEFAULT_ERROR_INJECTION_RATE = 0.0;
         private const bool DEFAULT_USE_MESSAGE_BATCHING = false;

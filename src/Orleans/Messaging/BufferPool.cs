@@ -55,6 +55,12 @@ namespace Orleans.Runtime
             private set;
         }
 
+        internal static void InitGlobalBufferPoolForTesting()
+        {
+            GlobalPool = new BufferPool(MessagingConfiguration.DEFAULT_BUFFER_POOL_BUFFER_SIZE,
+                MessagingConfiguration.DEFAULT_BUFFER_POOL_MAX_SIZE, MessagingConfiguration.DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE, "Global");
+        }
+
         internal static void InitGlobalBufferPool(IMessagingConfiguration config)
         {
             GlobalPool = new BufferPool(config.BufferPoolBufferSize, config.BufferPoolMaxSize, config.BufferPoolPreallocationSize, "Global");
