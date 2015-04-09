@@ -22,15 +22,13 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using UnitTests.Tester;
 
 
 namespace UnitTests.StorageTests
@@ -60,6 +58,7 @@ namespace UnitTests.StorageTests
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
+            StorageTestConstants.Init();
         }
 
         // Use TestInitialize to run code before running each test 

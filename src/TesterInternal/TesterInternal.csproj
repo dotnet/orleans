@@ -78,7 +78,7 @@
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="StorageTests\AzureMembershipTableTests.cs" />
-    <Compile Include="StorageTests\StorageTestConstants.cs" />
+    <Compile Include="StorageTests\MembershipTablePluginTests.cs" />
     <Compile Include="StorageTests\UnitTestAzureTableDataManager.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerTests.cs" />
     <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
@@ -104,6 +104,15 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\Tester\OrleansConfigurationForUnitTests.xml">
+      <Link>OrleansConfigurationForUnitTests.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Data\TestDb.mdf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup Condition=" '$(OS)' == 'Windows_NT' ">
