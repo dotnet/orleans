@@ -28,3 +28,5 @@ This section covers a number of topics that are intended for the advanced user o
 
 [Configuring SQL Tables](Configuring-SQL-Tables)
 
+[Interceptors](Interceptors)
+
