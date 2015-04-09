@@ -22,17 +22,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
-using Microsoft.WindowsAzure.Storage.Table;
-using Orleans;
 using Orleans.AzureUtils;
 using UnitTests.Tester;
 
@@ -48,6 +42,13 @@ namespace UnitTests.StorageTests
         private UnitTestAzureTableData GenerateNewData()
         {
             return new UnitTestAzureTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
+        }
+
+        // Use ClassInitialize to run code before running the first test in the class
+        [ClassInitialize]
+        public static void ClassInitialize(TestContext testContext)
+        {
+            StorageTestConstants.Init();
         }
 
         [TestInitialize]
