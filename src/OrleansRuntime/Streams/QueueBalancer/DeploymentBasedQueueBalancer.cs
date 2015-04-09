@@ -39,7 +39,7 @@ namespace Orleans.Streams
     internal class DeploymentBasedQueueBalancer : ISiloStatusListener, IStreamQueueBalancer
     {
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly IDelpoymentConfiguration deploymentConfig;
+        private readonly IDeploymentConfiguration deploymentConfig;
         private readonly IStreamQueueMapper streamQueueMapper;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly string mySiloName;
@@ -49,7 +49,7 @@ namespace Orleans.Streams
 
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
-            IDelpoymentConfiguration deploymentConfig,
+            IDeploymentConfiguration deploymentConfig,
             IStreamQueueMapper queueMapper)
         {
             if (siloStatusOracle == null)

@@ -8,7 +8,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Deployment configuration that reads from orleans cluster configuration
     /// </summary>
-    internal class StaticClusterDeploymentConfiguration : IDelpoymentConfiguration
+    internal class StaticClusterDeploymentConfiguration : IDeploymentConfiguration
     {
         private readonly ClusterConfiguration _clusterConfiguration;
 

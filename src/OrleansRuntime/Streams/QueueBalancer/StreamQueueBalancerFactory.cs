@@ -80,12 +80,12 @@ namespace Orleans.Streams
                 }
                 case StreamQueueBalancerType.AzureDeploymentBalancer:
                 {
-                    IDelpoymentConfiguration deploymentConfiguration = new AzureDelpoymentConfiguration();
+                    IDeploymentConfiguration deploymentConfiguration = new AzureDeploymentConfiguration();
                     return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper);
                 }
                 case StreamQueueBalancerType.StaticClusterDeploymentBalancer:
                 {
-                    IDelpoymentConfiguration deploymentConfiguration = new StaticClusterDeploymentConfiguration(clusterConfiguration);
+                    IDeploymentConfiguration deploymentConfiguration = new StaticClusterDeploymentConfiguration(clusterConfiguration);
                     return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper);
                 }
                 default:
