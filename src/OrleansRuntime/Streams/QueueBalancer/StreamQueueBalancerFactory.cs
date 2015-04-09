@@ -78,14 +78,14 @@ namespace Orleans.Streams
                     IConsistentRingProviderForGrains ringProvider = runtime.GetConsistentRingProvider(0, 1);
                     return new ConsistentRingQueueBalancer(ringProvider, queueMapper);
                 }
-                case StreamQueueBalancerType.AzureDeploymentBasedBalancer:
+                case StreamQueueBalancerType.AzureDeploymentBalancer:
                 {
                     IDelpoymentConfiguration deploymentConfiguration = new AzureDelpoymentConfiguration();
                     return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper);
                 }
-                case StreamQueueBalancerType.ClusterDeploymentBasedBalancer:
+                case StreamQueueBalancerType.StaticClusterDeploymentBalancer:
                 {
-                    IDelpoymentConfiguration deploymentConfiguration = new ClusterDeploymentConfiguration(clusterConfiguration);
+                    IDelpoymentConfiguration deploymentConfiguration = new StaticClusterDeploymentConfiguration(clusterConfiguration);
                     return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper);
                 }
                 default:
