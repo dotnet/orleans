@@ -89,6 +89,7 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="ResultHandle.cs" />
+    <Compile Include="StorageTestConstants.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
@@ -166,6 +167,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
