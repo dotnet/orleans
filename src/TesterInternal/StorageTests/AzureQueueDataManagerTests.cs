@@ -30,6 +30,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.AzureUtils;
+using UnitTests.Tester;
 
 namespace UnitTests.StorageTests
 {
@@ -46,6 +47,13 @@ namespace UnitTests.StorageTests
             config.TraceFilePattern = null;
             TraceLogger.Initialize(config);
             logger = TraceLogger.GetLogger("AzureQueueDataManagerTests", TraceLogger.LoggerType.Application);
+        }
+
+        // Use ClassInitialize to run code before running the first test in the class
+        [ClassInitialize]
+        public static void ClassInitialize(TestContext testContext)
+        {
+            StorageTestConstants.Init();
         }
 
         [TestCleanup]

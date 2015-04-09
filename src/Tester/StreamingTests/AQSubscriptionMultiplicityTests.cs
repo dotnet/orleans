@@ -35,7 +35,6 @@ namespace Tester.StreamingTests
     [TestClass]
     public class AQSubscriptionMultiplicityTests : UnitTestSiloHost
     {
-        private const string DataConnectionString = "UseDevelopmentStorage=true"; // must match what is in OrleansConfigurationForUnitTests.xml
         private const string AQStreamProviderName = "AQProvider";                 // must match what is in OrleansConfigurationForUnitTests.xml
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
@@ -61,7 +60,7 @@ namespace Tester.StreamingTests
         [TestCleanup]
         public void TestCleanup()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, DeploymentId, DataConnectionString, logger).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
         }
 
         [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]

@@ -90,6 +90,7 @@
     </Compile>
     <Compile Include="ResultHandle.cs" />
     <Compile Include="SerializationTests.cs" />
+    <Compile Include="StorageTestConstants.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
