@@ -41,7 +41,8 @@ namespace UnitTests.Tester.Extensions
                 throw new ArgumentNullException("clusterConfig");
             }
 
-            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, clusterConfig.Globals.DeploymentId);
+            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DeploymentId", clusterConfig.Globals.DeploymentId);
+            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
         }
 
         /// <summary>
@@ -54,19 +55,20 @@ namespace UnitTests.Tester.Extensions
                 throw new ArgumentNullException("clientConfiguration");
             }
 
-            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, clientConfiguration.DeploymentId);
+            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DeploymentId", clientConfiguration.DeploymentId);
+            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
         }
 
-        private static void AdjustProvidersDeploymentId(IEnumerable<KeyValuePair<string, ProviderCategoryConfiguration>> providerConfigurations, string deploymentId)
+        private static void AdjustProvidersDeploymentId(IEnumerable<KeyValuePair<string, ProviderCategoryConfiguration>> providerConfigurations, string key, string @value)
         {
-            if (String.IsNullOrEmpty(deploymentId)) return;
+            if (String.IsNullOrEmpty(@value)) return;
 
             var providerConfigs = providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME))
                                                         .Select(kv => kv.Value)
                                                         .SelectMany(catagory => catagory.Providers.Values);
             foreach (IProviderConfiguration providerConfig in providerConfigs)
             {
-                providerConfig.SetProperty("DeploymentId", deploymentId);
+                providerConfig.SetProperty(key, @value);
             }
         }
     }
