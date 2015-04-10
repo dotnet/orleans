@@ -87,21 +87,21 @@ namespace UnitTests.LivenessTests
             await MembershipTable_InsertRow(membership);
         }
         
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Liveness"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_Init_SqlServer()
         {
             var membership = await GetMemebershipTable_SQL();
             Assert.IsNotNull(membership, "Membership Table handler created");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Liveness"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_ReadAll_SqlServer()
         {
             var membership = await GetMemebershipTable_SQL();
             await MembershipTable_ReadAll(membership);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Liveness"), TestCategory("SqlServer")]
+        [TestMethod,TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_InsertRow_SqlServer()
         {
             var membership = await GetMemebershipTable_SQL();
