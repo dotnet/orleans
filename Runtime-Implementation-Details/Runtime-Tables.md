@@ -63,7 +63,7 @@ Orleans Reminders table durably stores all the reminders registered in the syste
 
 ## Silo Metrics table
 
-Silo metrics table containes a small set of per-silo important key performance metrics. Each silo has one row, updated periodically by its silo in place.
+Silo metrics table containes a small set of per-silo important key performance metrics. Each silo has one row, periodically updated in-place by its silo.
 
 1. *PartitionKey* - DeploymentId
 2. *RowKey* -  silo name
@@ -80,12 +80,29 @@ Silo metrics table containes a small set of per-silo important key performance m
 13. *ReceiveQueue* - the current size of the receive queue (number of messages that arrived to this silo and are waiting to be dispatched). Captures both remote and local messages from other silos as well as from the clients.
 14. *RequestQueue*
 15. *SentMessages* - total number of remote messages sent to other silos as well as to the clients.
-16. **ReceivedMessages* - total number of remote received messages, from other silos as well as from the clients.
+16. *ReceivedMessages* - total number of remote received messages, from other silos as well as from the clients.
 17. *LoadShedding* - whether this silo is currently overloaded and is in the load shedding mode.
 18. *Clients* - number of currently connected clients
 
 
 ## Clients Metrics table
+
+Silo metrics table containes a small set of per-Orleans-client important key performance metrics. Each client has one row,  periodically updated in-place by its client. Client metrics are essentilay a subset of silo metrics.
+
+1. *PartitionKey* - DeploymentId
+2. *RowKey* - Address
+3. *DeploymentId* -  the deployment id of this Orleans service
+4. *Address* - the address (ip:port) of this client
+5. *ClientId* - the unique name of this client (pseudo client grain id)
+6. *HostName* - the hostname of this client
+7. *CPU* - current CPU utilization
+8. *MemoryUsage* - current memory usage (`GC.GetTotalMemory(false)`)
+9. *SendQueue* - the current size of the send queue (number of messages waiting to be send). Captures remote messages to other silos.
+10. *ReceiveQueue* - the current size of the receive queue (number of messages that arrived to this client and are waiting to be dispatched, including responses).
+11. *SentMessages* - total number of remote messages sent to silos.
+12. *ReceivedMessages* - total number of remote received messages from silos.
+13. *ConnectedGatewayCount* - number of gateways that this client is currently connected to.
+
 
 ## Silo Statistics table
 
