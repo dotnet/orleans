@@ -60,7 +60,7 @@ namespace UnitTests.StorageTests
         public void TestCleanup()
         {
             AzureQueueDataManager manager = GetTableManager(queueName).Result;
-            manager.DeleteQueue().Wait(); 
+            manager.DeleteQueue().Wait();
         }
 
 
@@ -136,28 +136,8 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, await manager.GetApproximateMessageCount());
         }
 
-#if DEBUG || REVISIT
         [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
-        public async Task AQ_Standalone_3_CreateDelete()
-        {
-            queueName = "Test-3-".ToLower() + Guid.NewGuid();
-            AzureQueueDataManager manager = await GetTableManager(queueName);
-            await manager.InitQueueAsync();
-            await manager.DeleteQueue();
-
-            AzureQueueDataManager manager2 = await GetTableManager(queueName);
-            await manager2.InitQueueAsync();
-            await manager2.DeleteQueue();
-
-            AzureQueueDataManager manager3 = await GetTableManager(queueName);
-            await manager3.DeleteQueue();
-            await manager3.DeleteQueue();
-            await manager3.DeleteQueue();
-        }
-#endif
-
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
-        public async Task AQ_Standalone_4_Init_MultipleThreads()
+        public async Task AQ_Standalone_3_Init_MultipleThreads()
         {
             queueName = "Test-4-".ToLower() + Guid.NewGuid();
 

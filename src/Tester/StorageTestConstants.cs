@@ -36,8 +36,8 @@ namespace UnitTests.Tester
         // DefaultEndpointsProtocol=https;AccountName=XXX;AccountKey=YYY
         // 2) Define an environment variable ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH and point it to the folder where this file is located.
         // 
-        // Post build step in the Tester project will copy the file ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH\OrleansTestStorageKey.txt into Tester\bin\Debug folder 
-        // and the MSBuild unit test framework will deply it from there into where the unit tests are run. 
+        // MSBuild unit test framework runs a script "SetupTestScript.cmd" (that is specified in Local.testsettings), which
+        // copies ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH\OrleansTestStorageKey.txt into where the unit tests are run.
         // At runtime StorageTestConstants class will read this file and use your storage account key.
         // 
         // Alternativerly, instead of using a file, you can just:

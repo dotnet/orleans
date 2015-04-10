@@ -412,7 +412,7 @@ namespace UnitTests.Tester
                 {
                     clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
                 }
-
+                clientConfig.AdjustForTestEnvironment();
                 GrainClient.Initialize(clientConfig);
             }
         }
