@@ -29,7 +29,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Deployment configuration that read cluster information from azure.
     /// </summary>
-    internal class AzureDelpoymentConfiguration : IDelpoymentConfiguration
+    internal class AzureDeploymentConfiguration : IDeploymentConfiguration
     {
         public List<string> GetAllSiloInstanceNames()
         {
