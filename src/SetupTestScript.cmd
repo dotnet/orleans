@@ -2,7 +2,12 @@
 @ECHO on
 
 SET CMDHOME=%~dp0.
-SET DEFAULT_FILE="%CMDHOME%\..\..\..\Test\OrleansTestStorageKey.txt"
+
+if exist "%CMDHOME%\..\..\..\Test" (
+  SET DEFAULT_FILE="%CMDHOME%\..\..\..\Test\OrleansTestStorageKey.txt"
+) else (
+  SET DEFAULT_FILE="%CMDHOME%\..\..\src\Test\OrleansTestStorageKey.txt"
+)
 
 
 @echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH is %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH% >> SetupTestScriptOutput.txt 
