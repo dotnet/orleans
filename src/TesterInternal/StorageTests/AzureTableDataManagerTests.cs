@@ -27,6 +27,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
+using Microsoft.WindowsAzure.Storage.Table.Protocol;
 using Orleans.AzureUtils;
 using UnitTests.Tester;
 
@@ -147,7 +148,7 @@ namespace UnitTests.StorageTests
                 string restStatus;
                 AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
                 Assert.AreEqual(HttpStatusCode.PreconditionFailed, httpStatusCode);
-                Assert.AreEqual(StorageErrorCodeStrings.ConditionNotMet, restStatus);
+                Assert.AreEqual(TableErrorCodeStrings.UpdateConditionNotSatisfied, restStatus);
             }
         }
 
@@ -228,7 +229,7 @@ namespace UnitTests.StorageTests
                 string restStatus;
                 AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
                 Assert.AreEqual(HttpStatusCode.PreconditionFailed, httpStatusCode);
-                Assert.AreEqual(StorageErrorCodeStrings.ConditionNotMet, restStatus);
+                Assert.AreEqual(TableErrorCodeStrings.UpdateConditionNotSatisfied, restStatus);
             }
 
             var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
@@ -330,7 +331,7 @@ namespace UnitTests.StorageTests
                 string restStatus;
                 AzureStorageUtils.EvaluateException(exc, out  httpStatusCode, out restStatus, true);
                 Assert.AreEqual(HttpStatusCode.PreconditionFailed, httpStatusCode);
-                Assert.AreEqual(StorageErrorCodeStrings.ConditionNotMet, restStatus);
+                Assert.AreEqual(TableErrorCodeStrings.UpdateConditionNotSatisfied, restStatus);
             }
         }
     }

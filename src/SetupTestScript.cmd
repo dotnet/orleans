@@ -10,14 +10,14 @@ if exist "%CMDHOME%\..\..\..\Test" (
 )
 
 
-@echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH is %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH% >> SetupTestScriptOutput.txt 
-@echo CMDHOME is %CMDHOME% >> SetupTestScriptOutput.txt
-@echo DEFAULT_FILE is %DEFAULT_FILE% >> SetupTestScriptOutput.txt
+echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH is %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH% >> SetupTestScriptOutput.txt 
+echo CMDHOME is %CMDHOME% >> SetupTestScriptOutput.txt
+echo DEFAULT_FILE is %DEFAULT_FILE% >> SetupTestScriptOutput.txt
 
 if not exist %DEFAULT_FILE% (
-@echo DEFAULT_FILE %DEFAULT_FILE% does not exist!!
+echo DEFAULT_FILE %DEFAULT_FILE% does not exist!! >> SetupTestScriptOutput.txt 
 ) else (
-@echo DEFAULT_FILE %DEFAULT_FILE% does exist!!
+echo DEFAULT_FILE %DEFAULT_FILE% does exist!! >> SetupTestScriptOutput.txt 
 )
 
 echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
@@ -26,17 +26,17 @@ echo "-----------------------------------------------" >> SetupTestScriptOutput.
 
 if "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%" == "" (
 
-@echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is not set. Taking %DEFAULT_FILE%. >> SetupTestScriptOutput.txt
-copy /y %DEFAULT_FILE% .
+echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is not set. Taking %DEFAULT_FILE%. >> SetupTestScriptOutput.txt
+copy /y %DEFAULT_FILE% . >> SetupTestScriptOutput.txt 
 
 ) else if not exist "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt" (
 
-@echo %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt does not exist. Taking %DEFAULT_FILE%. >> SetupTestScriptOutput.txt
-copy /y %DEFAULT_FILE% .
+echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set but %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt does not exist. Taking %DEFAULT_FILE%. >> SetupTestScriptOutput.txt
+copy /y %DEFAULT_FILE% . >> SetupTestScriptOutput.txt 
 
 ) else (
 
-@echo Found "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt" and taking it.
+echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set and found "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt". Taking it. >> SetupTestScriptOutput.txt 
 copy /y "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt"  . >> SetupTestScriptOutput.txt 
 
 )

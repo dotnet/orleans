@@ -8,6 +8,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Build.cmd = Build.cmd
 		Local.testsettings = Local.testsettings
 		Orleans.SDK.targets = Orleans.SDK.targets
+		SetupTestScript.cmd = SetupTestScript.cmd
 		Test.cmd = Test.cmd
 	EndProjectSection
 EndProject
@@ -193,4 +194,3 @@ Global
 		{0BB483EF-6401-424C-9C4F-5750B300C7FD} = {DD5D35C0-A5FE-41CC-A10D-CAAA37996479}
 	EndGlobalSection
 EndGlobal
-
