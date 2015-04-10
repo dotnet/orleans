@@ -23,7 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.ObjectModel;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
@@ -85,24 +86,32 @@ namespace Orleans
     [Serializable]
     internal class MembershipTableData
     {
-        public IList<Tuple<MembershipEntry, string>> Members { get; private set; }
+        public IReadOnlyList<Tuple<MembershipEntry, string>> Members { get; private set; }
+
         public TableVersion Version { get; private set; }
 
         public MembershipTableData(List<Tuple<MembershipEntry, string>> list, TableVersion version)
         {
-            Members = list;
+            // put deads at the end, just for logging.
+            list.Sort(
+               (x, y) =>
+               {
+                   if (x.Item1.Status.Equals(SiloStatus.Dead)) return 1; // put Deads at the end
+                   return 1;
+               });
+            Members = list.AsReadOnly();
             Version = version;
         }
 
         public MembershipTableData(Tuple<MembershipEntry, string> tuple, TableVersion version)
         {
-            Members = new List<Tuple<MembershipEntry, string>> {tuple};
+            Members = (new List<Tuple<MembershipEntry, string>> { tuple }).AsReadOnly();
             Version = version;
         }
 
         public MembershipTableData(TableVersion version)
         {
-            Members = new List<Tuple<MembershipEntry, string>>();
+            Members = (new List<Tuple<MembershipEntry, string>>()).AsReadOnly();
             Version = version;
         }
 
@@ -131,13 +140,13 @@ namespace Orleans
                                 shuttingDown > 0 ? (", " + shuttingDown + " are ShuttingDown") : "",
                                 stopping > 0 ? (", " + stopping + " are Stopping") : "");
 
-            return string.Format("{0} silos, {1} are Active, {2} are Dead{3}: {4}. Version={5}",
+            return string.Format("{0} silos, {1} are Active, {2} are Dead{3}, Version={4}. All silos: {5}",
                 Members.Count,
                 active,
                 dead,
                 otherCounts,
-                Utils.EnumerableToString(Members, (tuple) => tuple.Item1.ToFullString()), //+ " -> eTag " + tuple.Item2),
-                Version);
+                Version,
+                Utils.EnumerableToString(Members, (tuple) => tuple.Item1.ToFullString()));
         }
 
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
@@ -188,8 +197,6 @@ namespace Orleans
         public List<Tuple<SiloAddress, DateTime>> SuspectTimes { get; set; }
 
         private static readonly List<Tuple<SiloAddress, DateTime>> emptyList = new List<Tuple<SiloAddress, DateTime>>(0);
-
-        public static bool CompactMembershipLogging = true;
 
         // partialUpdate arrivies via gossiping with other oracles. In such a case only take the status.
         internal void Update(MembershipEntry updatedSiloEntry)
@@ -248,9 +255,9 @@ namespace Orleans
             return string.Format("SiloAddress={0} Status={1}", SiloAddress.ToLongString(), Status);
         }
 
-        internal string ToFullString()
+        internal string ToFullString(bool full = false)
         {
-            if (MembershipEntry.CompactMembershipLogging)
+            if (!full)
                 return ToString();
 
             List<SiloAddress> suspecters = SuspectTimes == null
