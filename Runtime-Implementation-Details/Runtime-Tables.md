@@ -48,20 +48,42 @@ There is also a special row in this table, called membership version row, with t
 
 ## Orleans Reminders table
 
-Orleans Reminders table durably stores all the reminders registered in the system. All rows in this table consist of the following columns:
+Orleans Reminders table durably stores all the reminders registered in the system. Each reminder has a separate row. All rows in this table consist of the following columns:
 
-1. *PartitionKey* - ServiceId + "_" + GrainRefConsistentHash;
+1. *PartitionKey* - ServiceId + "_" + GrainRefConsistentHash
 2. *RowKey* -  GrainReference + "-" ReminderName
-1. *GrainReference* - the grain refernce of the grain that created this reminder.
-2. *ReminderName* - the name of this reminder
-3. *ServiceId* - the service id of the currently running Orleans service
-4. *DeploymentId* - the deployment  id of the currently running Orleans service
-5. *StartAt* - the time when this reminder was suppoused to tick in the first time
-6. *Period* - the time period for this reminder
-7. *GrainRefConsistentHash* - the consistent hash of the GrainReference
+3. *GrainReference* - the grain refernce of the grain that created this reminder.
+4. *ReminderName* - the name of this reminder
+5. *ServiceId* - the service id of the currently running Orleans service
+6. *DeploymentId* - the deployment  id of the currently running Orleans service
+7. *StartAt* - the time when this reminder was suppoused to tick in the first time
+8. *Period* - the time period for this reminder
+9. *GrainRefConsistentHash* - the consistent hash of the GrainReference
 
 
 ## Silo Metrics table
+
+Silo metrics table containes a small set of per-silo important key performance metrics. Each silo has one row, updated periodically by its silo in place.
+
+1. *PartitionKey* - DeploymentId
+2. *RowKey* -  silo name
+3. *DeploymentId* -  the deployment id of this Orleans service
+4. *Address* - the silo address (ip:port:epoch) of this silo
+5. *SiloName* - the name of this silo (in Azure it is its Instance name)
+6. *GatewayAddress* - the gateway ip:port of tis silo
+7. *HostName* - the hostname of this silo
+8. *CPU* - current CPU utilization
+9. *MemoryUsage* - current memory usage (`GC.GetTotalMemory(false)`)
+10. *Activations* - number of activations on this silo
+11. *RecentlyUsedActivations* - number of activations on this silo that were used in the last 10 minutes (Note: this number may currently not be accurate if  different age limits are used for different grain types).
+12. *SendQueue* - the current size of the send queue (number of messages waiting to be send). Only captures remote messages to other silos (not including messages to the clients).
+13. *ReceiveQueue* - the current size of the receive queue (number of messages that arrived to this silo and are waiting to be dispatched). Captures both remote and local messages from other silos as well as from the clients.
+14. *RequestQueue*
+15. *SentMessages* - total number of remote messages sent to other silos as well as to the clients.
+16. **ReceivedMessages* - total number of remote received messages, from other silos as well as from the clients.
+17. *LoadShedding* - whether this silo is currently overloaded and is in the load shedding mode.
+18. *Clients* - number of currently connected clients
+
 
 ## Clients Metrics table
 
