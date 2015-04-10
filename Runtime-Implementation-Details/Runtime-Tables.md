@@ -21,16 +21,16 @@ Orleans Silo Instances table, also commonly referred to as Membership table, lis
 All rows in this table consist of the following columns:
 
 1. *PartitionKey* - deployment id.
-2. *RowKe*y - Silo IP Address + "-" + Silo Port + "-" + Silo Generation number (epoch)
-3. *DeploymentId*
+2. *RowKey* - Silo IP Address + "-" + Silo Port + "-" + Silo Generation number (epoch)
+3. *DeploymentId* - the deployment id of this Orleans service
 4. *Address* - IP address
 5. *Port* - silo to silo TCP port
-6. *Generatio*n - Generation number (epoch number)
+6. *Generation* - Generation number (epoch number)
 7. *HostName* - silo Hostname
 8. *Status* - status of this silo, as set by cluster management protocol. Any of the type [`Orleans.Runtime.SiloStatus`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Runtime/SiloStatus.cs)
 9. *ProxyPort* - silo to clients TCP port
 10. *Primary* - whether this silo is primary or not. Deprecated.
-11. *RoleName** - The name of this role, if running is Azure.
+11. *RoleName* - The name of this role, if running is Azure.
 12. *InstanceName* - The name of this role instance, if running is Azure.
 13. *UpdateZone* - Azure update zone, if running is Azure.
 14. *FaultZone* - Azure fault zone, if running is Azure.
@@ -47,6 +47,19 @@ There is also a special row in this table, called membership version row, with t
 4. *MembershipVersion* - the latest version of the current membership configuration. 
 
 ## Orleans Reminders table
+
+Orleans Reminders table durably stores all the reminders registered in the system. All rows in this table consist of the following columns:
+
+1. *PartitionKey* - ServiceId + "_" + GrainRefConsistentHash;
+2. *RowKey* -  GrainReference + "-" ReminderName
+1. *GrainReference* - the grain refernce of the grain that created this reminder.
+2. *ReminderName* - the name of this reminder
+3. *ServiceId* - the service id of the currently running Orleans service
+4. *DeploymentId* - the deployment  id of the currently running Orleans service
+5. *StartAt* - the time when this reminder was suppoused to tick in the first time
+6. *Period* - the time period for this reminder
+7. *GrainRefConsistentHash* - the consistent hash of the GrainReference
+
 
 ## Silo Metrics table
 
