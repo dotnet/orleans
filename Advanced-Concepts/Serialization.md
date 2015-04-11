@@ -1,10 +1,26 @@
 ---
 layout: page
-title: Writing Custom Serializers
+title: Serialization and Writing Custom Serializers
 ---
 {% include JB/setup %}
 
-Orleans has a serialization framework for data types passed in request and response messages and for grain persistent state objects. As part of this framework, Orleans automaticaly generates serialization code for those data types. In addition to automatic serialization generation, application code can provide custom serialization for types it chooses. Orleans reccomends using the automatic serialization generation for the majority of your application types and only write custom serializers in rare cases when you beleive it is possible to get improved performance by hand-coding serializers. This note describes how to do so, and identifies some specific cases when it might be helpful.
+## Orleans Serialization
+
+Orleans has an advance and extensible serialization framework for data types passed in grain request and response messages and for grain persistent state objects. As part of this framework, Orleans automaticaly generates serialization code for those data types. Orleans serialization is compatible with standard .NET binary serialization but is more effecient and provides more compact representation. In addition to generating a more efficient serialization/deserialization for types that are already .NET-serializable Orleans also tries to generate serializers for types used in grain interfaces that are not .NET-serializable. It also includes a set of efficient built-in serializers for frequently used types: lists, dictionaries, etc.
+
+There are 2 important features of Orleans's serializer that set it aside from a lot of other third party serialization frameworks: dynamic types or arbitrary polymorphism and object identity.
+
+1. **Dynamic types or arbitrary polymorphism** - Orleans does not put any restrictions on the types that can be passed in grain calls and maintains the dynamic nature of the actual data type. That means, for example, that if the method in the grain interfaces is declared to accept `IDictionary` but at runtime the sender passes `SortedDictionary`, the receiver will indeed get `SortedDictionary` (although the "static contract"/grain interface did not specify this behaviour). 
+
+2. **Maintaining Object identity** - if the same object is passed multiple types in the arguments of a grain call or is indirectly pointed more than once from the arguments, Orleans will serialize it only once. At the receiver side Orleans will restore all references correctly, so that two pointers to the same object still point to the same object after deserialization as well. Object identity is important to preserve in scenarios like the following. Imagine actor A is sending a dictionary with 100 entries to actor B, and 10 of the keys in the dictionary point to the same object obj on the A's side. Without preserving object identity, B would receive a dictionary of 100 entries with those 10 keys pointing to 10 different clones of obj. With object identity preserved, the dictionary on B's side looks exactly like on A's side with those 10 keys pointing to a single object obj.
+
+Both above behaviours are provided by standard .NET binary serializer. Therefore Orleans also provides a standard and familiar behaviour.
+
+
+
+## Writing Custom Serializers
+
+In addition to automatic serialization generation, application code can provide custom serialization for types it chooses. Orleans reccomends using the automatic serialization generation for the majority of your application types and only write custom serializers in rare cases when you beleive it is possible to get improved performance by hand-coding serializers. This note describes how to do so, and identifies some specific cases when it might be helpful.
 
 There are 2 ways how application can customise serialization:
 
