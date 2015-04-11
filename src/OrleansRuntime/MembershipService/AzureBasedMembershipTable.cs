@@ -59,7 +59,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
                 bool created = await table.tableManager.TryCreateTableVersionEntryAsync().WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
-                table.logger.Info("Created new table version row.");
+                if(created) table.logger.Info("Created new table version row.");
             }
             return table;
         }
