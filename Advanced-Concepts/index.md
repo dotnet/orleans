@@ -8,7 +8,7 @@ This section covers a number of topics that are intended for the advanced user o
 
 [Using Immutable to Optimize Copying](Using-Immutable-to-Optimize-Copying)
 
-[Writing Custom Serializers](Writing-Custom-Serializers)
+[Serialization and Writing Custom Serializers](Serialization)
 
 [Reentrant Grains](Reentrant-Grains)
 
