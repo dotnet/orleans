@@ -152,7 +152,7 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="data">Data to be inserted into the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> CreateTableEntryAsync(T data)
+        public async Task<string> TryCreateTableEntryAsync(T data)
         {
             const string operation = "CreateTableEntry";
             var startTime = DateTime.UtcNow;
@@ -178,8 +178,7 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_05, String.Format("Intermediate error creating entry {0} in the table {1}",
-                                (data == null ? "null" : data.ToString()), TableName), exc);
+                    CheckAlertWriteError(operation, data, null, exc);
                     throw;
                 }
             }

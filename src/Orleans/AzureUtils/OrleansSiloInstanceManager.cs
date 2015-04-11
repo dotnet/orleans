@@ -356,7 +356,7 @@ namespace Orleans.AzureUtils
                     return false;
                 }
                 SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
-                await storage.CreateTableEntryAsync(entry);
+                await storage.TryCreateTableEntryAsync(entry);
                 return true;
             }
             catch (Exception exc)

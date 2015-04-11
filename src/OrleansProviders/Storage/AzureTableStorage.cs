@@ -417,7 +417,7 @@ namespace Orleans.Storage
                 GrainStateEntity entity = record.Entity;
                 if (logger.IsVerbose3) logger.Verbose3((int)ProviderErrorCode.AzureTableProvider_Storage_Writing, "Writing: PartitionKey={0} RowKey={1} to Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 string eTag = String.IsNullOrEmpty(record.ETag) ?
-                    await tableManager.CreateTableEntryAsync(record.Entity) :
+                    await tableManager.TryCreateTableEntryAsync(record.Entity) :
                     await tableManager.UpdateTableEntryAsync(entity, record.ETag);
                 record.ETag = eTag;
             }
