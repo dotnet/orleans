@@ -272,7 +272,7 @@ namespace Orleans.AzureUtils
 
         internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
         {
-            return storage.MergeTableEntryAsync(data, AzureStorageUtils.ANY_ETAG);
+            return storage.MergeTableEntryAsync(data, AzureStorageUtils.ANY_ETAG); // we merge this without checking eTags.
         }
 
         internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)

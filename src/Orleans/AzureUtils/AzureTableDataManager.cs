@@ -23,7 +23,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Data.Services.Client;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
@@ -31,7 +30,6 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage.Table.Queryable;
 using Orleans.Runtime;
 
@@ -124,10 +122,10 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-                CloudTable tableReference = tableCreationClient.GetTableReference(TableName);
+                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
                 bool didDelete = await Task<bool>.Factory.FromAsync(
-                        tableReference.BeginDeleteIfExists,
-                        tableReference.EndDeleteIfExists,
+                        tableRef.BeginDeleteIfExists,
+                        tableRef.EndDeleteIfExists,
                         null);
 
                 if (didDelete)
@@ -231,7 +229,7 @@ namespace Orleans.AzureUtils
 
 
         /// <summary>
-        /// Merges a data entry in the Azure table, without checking eTags.
+        /// Merges a data entry in the Azure table.
         /// </summary>
         /// <param name="data">Data to be merged in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
@@ -331,7 +329,7 @@ namespace Orleans.AzureUtils
                 try
                 {
                     // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then DeleteIfExistsAsync.
-                     var opResult =  await Task<TableResult>.Factory.FromAsync(
+                    await Task<TableResult>.Factory.FromAsync(
                         tableReference.BeginExecute,
                         tableReference.EndExecute,
                         TableOperation.Delete(data),
@@ -365,32 +363,24 @@ namespace Orleans.AzureUtils
 
             try
             {
-                try
+                TableResult retrievedResult = await Task<TableResult>.Factory.FromAsync(
+                    tableReference.BeginExecute,
+                    tableReference.EndExecute,
+                    TableOperation.Retrieve<T>(partitionKey, rowKey),
+                    null);
+                if (retrievedResult == null || retrievedResult.Result == null || AzureStorageUtils.IsNotFoundError((HttpStatusCode)retrievedResult.HttpStatusCode))
                 {
-                    TableResult retrievedResult = await Task<TableResult>.Factory.FromAsync(
-                        tableReference.BeginExecute,
-                        tableReference.EndExecute,
-                        TableOperation.Retrieve<T>(partitionKey, rowKey),
-                        null);
-                    if (retrievedResult == null || retrievedResult.Result == null || AzureStorageUtils.IsNotFoundError((HttpStatusCode)retrievedResult.HttpStatusCode))
-                    {
-                        if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
-                        return null;  // No data
-                    }
-                    //The ETag of data is needed in further operations.                                        
-                    return new Tuple<T, string>(retrievedResult.Result as T, retrievedResult.Etag);
+                    if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
+                    return null;  // No data
                 }
-                catch (Exception)
-                {
-                    //CheckAlertWriteError(operation, data, null, exc);
-                    throw;
-                }
+                //The ETag of data is needed in further operations.                                        
+                return new Tuple<T, string>(retrievedResult.Result as T, retrievedResult.Etag);
+
             }
             finally
             {
                 CheckAlertSlowAccess(startTime, operation);
             }
-
         }
 
         /// <summary>
@@ -430,7 +420,7 @@ namespace Orleans.AzureUtils
             var startTime = DateTime.UtcNow;
             if (Logger.IsVerbose2) Logger.Verbose2("Deleting {0} table entries: {1}", TableName, Utils.EnumerableToString(collection));
 
-            if (collection == null) throw new ArgumentNullException("list");
+            if (collection == null) throw new ArgumentNullException("collection");
 
             if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
             {
@@ -517,7 +507,7 @@ namespace Orleans.AzureUtils
                         backoff);
 
                     // Data was read successfully if we got to here                    
-                    return results.Select((T i) => Tuple.Create(i, i.ETag)).ToList();
+                    return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
                 }
                 catch (Exception exc)
                 {
@@ -545,10 +535,10 @@ namespace Orleans.AzureUtils
         public async Task BulkInsertTableEntries(IReadOnlyCollection<T> collection)
         {
             const string operation = "BulkInsertTableEntries";
-            if (collection == null) throw new ArgumentNullException("data");
+            if (collection == null) throw new ArgumentNullException("collection");
             if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
             {
-                throw new ArgumentOutOfRangeException("data", collection.Count,
+                throw new ArgumentOutOfRangeException("collection", collection.Count,
                         "Too many rows for bulk update - max " + AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
             }
 
@@ -584,8 +574,6 @@ namespace Orleans.AzureUtils
                         tableReference.EndExecuteBatch,
                         entityBatch,
                         null);
-
-                    return;
                 }
                 catch (Exception exc)
                 {
