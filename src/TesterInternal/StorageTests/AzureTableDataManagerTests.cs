@@ -65,12 +65,12 @@ namespace UnitTests.StorageTests
         public async Task AzureTableDataManager_CreateTableEntryAsync()
         {
             var data = GenerateNewData();
-            await manager.TryCreateTableEntryAsync(data);
+            await manager.CreateTableEntryAsync(data);
             try
             {
                 var data2 = data.Clone();
                 data2.StringData = "NewData";
-                await manager.TryCreateTableEntryAsync(data2);
+                await manager.CreateTableEntryAsync(data2);
                 Assert.Fail("Should have thrown StorageException.");
             }
             catch (StorageException exc)
@@ -263,7 +263,7 @@ namespace UnitTests.StorageTests
                 Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
             }
 
-            string etag = await manager.TryCreateTableEntryAsync(data2.Clone());
+            string etag = await manager.CreateTableEntryAsync(data2.Clone());
             var tuple = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
             try
             {
@@ -315,7 +315,7 @@ namespace UnitTests.StorageTests
                 Assert.AreEqual(StorageErrorCodeStrings.ResourceNotFound, restStatus);
             }
 
-            string etag = await manager.TryCreateTableEntryAsync(data2.Clone());
+            string etag = await manager.CreateTableEntryAsync(data2.Clone());
             var tuple1 = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
             var tuple2 = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
 

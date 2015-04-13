@@ -150,7 +150,7 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="data">Data to be inserted into the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> TryCreateTableEntryAsync(T data)
+        public async Task<string> CreateTableEntryAsync(T data)
         {
             const string operation = "CreateTableEntry";
             var startTime = DateTime.UtcNow;
