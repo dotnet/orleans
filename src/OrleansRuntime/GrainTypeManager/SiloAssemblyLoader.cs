@@ -151,7 +151,7 @@ namespace Orleans.Runtime
             var sb = new StringBuilder();
             sb.AppendLine(String.Format("Loaded grain type summary for {0} types: ", grainTypeData.Count));
 
-            foreach (var grainType in grainTypeData.Values.OrderBy(gtd => gtd.Type.Name))
+            foreach (var grainType in grainTypeData.Values.OrderBy(gtd => gtd.Type.FullName))
             {
                 // Skip system targets and Orleans grains
                 var assemblyName = grainType.Type.Assembly.FullName.Split(',')[0];
