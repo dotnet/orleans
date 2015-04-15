@@ -54,4 +54,18 @@ namespace Orleans
     public interface IGrainWithStringKey : IGrain
     {
     }
+
+    /// <summary>
+    /// Marker interface for grains with compound keys.
+    /// </summary>
+    public interface IGrainWithGuidCompoundKey : IGrain
+    {
+    }
+
+    /// <summary>
+    /// Marker interface for grains with compound keys.
+    /// </summary>
+    public interface IGrainWithIntegerCompoundKey : IGrain
+    {
+    }
 }
