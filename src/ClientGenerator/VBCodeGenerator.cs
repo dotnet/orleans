@@ -385,14 +385,15 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 factoryClass.Members.Add(new CodeSnippetTypeMember(
                      String.Format(codeFmt, FixupTypeName(interfaceName), interfaceId)));
 
-            bool hasKeyExt = GrainInterfaceData.UsesPrimaryKeyExtension(iface.Type);
+            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
+            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
 
             bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
             bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
             bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
             bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
 
-            if (isDefaultKey && hasKeyExt)
+            if (isLongCompoundKey)
             {
                 // the programmer has specified [ExtendedPrimaryKey] on the interface.
                 add(
@@ -405,7 +406,9 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                         Public Shared Function GetGrain(primaryKey as System.Int64, keyExt as System.String, grainClassNamePrefix As System.String) As {0}
                             Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), {1}, primaryKey, keyExt, grainClassNamePrefix))
                         End Function");
-
+            }
+            else if (isGuidCompoundKey)
+            {
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey As System.Guid, keyExt as System.String) As {0}

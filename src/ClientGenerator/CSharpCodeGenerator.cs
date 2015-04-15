@@ -381,13 +381,14 @@ namespace Orleans.CodeGeneration
             Action<string> add = codeFmt => factoryClass.Members.Add(
                 new CodeSnippetTypeMember(String.Format(codeFmt, iface.InterfaceTypeName, interfaceId)));
 
-            bool hasKeyExt = GrainInterfaceData.UsesPrimaryKeyExtension(iface.Type);
+            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
+            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
             bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
             bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
             bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
             bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
 
-            if (isDefaultKey && hasKeyExt)
+            if (isLongCompoundKey)
             {
                 // the programmer has specified [ExtendedPrimaryKey] on the interface.
                 add(@"
@@ -401,7 +402,9 @@ namespace Orleans.CodeGeneration
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt, grainClassNamePrefix));
                         }}");
-
+            }
+            else if (isGuidCompoundKey)
+            {
                 add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt)
                         {{

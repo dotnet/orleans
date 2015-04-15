@@ -27,8 +27,7 @@ using System.Collections.Generic;
 
 namespace Orleans.Streams
 {
-    [ExtendedPrimaryKey]
-    internal interface IPubSubRendezvousGrain : IGrain
+    internal interface IPubSubRendezvousGrain : IGrainWithGuidCompoundKey
     {
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, IStreamProducerExtension streamProducer);
 
