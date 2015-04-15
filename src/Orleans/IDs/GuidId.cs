@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 ﻿using System;
 using Orleans.Concurrency;
 using Orleans.Serialization;
+using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -33,7 +34,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [Immutable]
-    public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>
+    public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>, ISerializable
     {
         private static readonly Lazy<Interner<Guid, GuidId>> guidIdInternCache = new Lazy<Interner<Guid, GuidId>>(
                     () => new Interner<Guid, GuidId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
@@ -138,5 +139,19 @@ namespace Orleans.Runtime
 
         #endregion
 
+        #region ISerializable Members
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("Guid", Guid, typeof(Guid));
+        }
+
+        // The special constructor is used to deserialize values. 
+        private GuidId(SerializationInfo info, StreamingContext context)
+        {
+            Guid = (Guid) info.GetValue("Guid", typeof(Guid));
+        }
+
+        #endregion
     }
 }

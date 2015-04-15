@@ -29,14 +29,17 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
-        // Those fields have to be public non-readonly for JSonSerialization to work!
-        public readonly GuidId SubscriptionId;
-        public readonly StreamId Stream;
-        public readonly IStreamConsumerExtension Consumer;
+        // These fields have to be public non-readonly for JSonSerialization to work!
+        // Implement ISerializable if changing any of them to readonly
+        public GuidId SubscriptionId;
+        public StreamId Stream;
+        public IStreamConsumerExtension Consumer;
         public StreamSequenceToken StreamSequenceToken;
         public IStreamFilterPredicateWrapper FilterWrapper; // Serialized func info
 
-        internal PubSubSubscriptionState(
+        // This constructor has to be public for JSonSerialization to work!
+        // Implement ISerializable if changing it to non-public
+        public PubSubSubscriptionState(
             GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
