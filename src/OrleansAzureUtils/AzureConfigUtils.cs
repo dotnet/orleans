@@ -25,7 +25,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
+﻿using System.Linq;
+﻿using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Web;
@@ -135,7 +136,7 @@ namespace Orleans.Runtime.Host
         /// Return the expected possible base locations for the Azure app directory we are being run from
         /// </summary>
         /// <returns>Enererable list of app directory locations</returns>
-        private static List<DirectoryInfo> FindAppDirectoryLocations()
+        private static IEnumerable<DirectoryInfo> FindAppDirectoryLocations()
         {
             // App directory locations:
             // Worker Role code:            {RoleRoot}\approot
