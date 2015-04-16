@@ -137,7 +137,10 @@ namespace Orleans.Streams
                 await State.WriteStateAsync();
             
             if (State.Producers.Count == 0 && State.Consumers.Count == 0)
+            {
+                await State.ClearStateAsync(); //State contains no producers or consumers, remove it from storage
                 DeactivateOnIdle(); // No producers or consumers left now, so flag ourselves to expedite Deactivation
+            }
         }
 
         public async Task RegisterConsumer(
@@ -256,6 +259,7 @@ namespace Orleans.Streams
             }
             else if (State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
             {
+                await State.ClearStateAsync(); //State contains no producers or consumers, remove it from storage
                 // No producers or consumers left now, so flag ourselves to expedite Deactivation
                 DeactivateOnIdle();
             }
