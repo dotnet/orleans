@@ -25,8 +25,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Net;
+﻿using System.Linq;
+﻿using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Web;
@@ -144,34 +144,64 @@ namespace Orleans.Runtime.Host
             // WebRole - IIS web app code:  {ServerRoot}
             // WebRole - IIS Express:       {ServerRoot}\bin
 
-            string appRootPath;
-
-            var roleRootDir = Environment.GetEnvironmentVariable("RoleRoot");
-            if (roleRootDir != null)
+            var locations = new List<DirectoryInfo>();
+            
+            Utils.SafeExecute(() =>
             {
-                // Being called from Role startup code - either Azure WorkerRole or WebRole
+                var roleRootDir = Environment.GetEnvironmentVariable("RoleRoot");
+                if (roleRootDir != null)
+                {
+                    // Being called from Role startup code - either Azure WorkerRole or WebRole
+                    Assembly assy = Assembly.GetExecutingAssembly();
+                    string appRootPath = Path.GetDirectoryName(assy.Location);
+                    if (appRootPath != null)
+                        locations.Add(new DirectoryInfo(appRootPath));
+                }
+            });
+
+            Utils.SafeExecute(() =>
+            {
+                var roleRootDir = Environment.GetEnvironmentVariable("RoleRoot");
+                if (roleRootDir != null)
+                {
+                    string appRootPath = Path.GetDirectoryName(roleRootDir + Path.DirectorySeparatorChar + "approot" + Path.DirectorySeparatorChar);
+                    if (appRootPath != null)
+                        locations.Add(new DirectoryInfo(appRootPath));
+                }
+            });
+
+            Utils.SafeExecute(() =>
+            {
                 Assembly assy = Assembly.GetExecutingAssembly();
-                appRootPath = Path.GetDirectoryName(assy.Location);
+                string appRootPath = Path.GetDirectoryName(new Uri(assy.CodeBase).LocalPath);
                 if (appRootPath != null)
-                    yield return new DirectoryInfo(appRootPath);
-            }
+                    locations.Add(new DirectoryInfo(appRootPath));
+            });
 
-            // Try using Server.MapPath to resolve for web roles running in IIS web apps
-            if (HttpContext.Current != null)
+            Utils.SafeExecute(() =>
             {
-                appRootPath = HttpContext.Current.Server.MapPath(@"~\");
-                if (appRootPath != null)
-                    yield return new DirectoryInfo(appRootPath);
-            }
+                // Try using Server.MapPath to resolve for web roles running in IIS web apps
+                if (HttpContext.Current != null)
+                {
+                    string appRootPath = HttpContext.Current.Server.MapPath(@"~\");
+                    if (appRootPath != null)
+                        locations.Add(new DirectoryInfo(appRootPath));
+                }
+            });
 
-            // Try using HostingEnvironment.MapPath to resolve for web roles running in IIS Express
-            // https://orleans.codeplex.com/discussions/547617
-            appRootPath = System.Web.Hosting.HostingEnvironment.MapPath("~/bin/");
-            if (appRootPath != null)
-                yield return new DirectoryInfo(appRootPath);
+
+            Utils.SafeExecute(() =>
+            {
+                // Try using HostingEnvironment.MapPath to resolve for web roles running in IIS Express
+                // https://orleans.codeplex.com/discussions/547617
+                string appRootPath = System.Web.Hosting.HostingEnvironment.MapPath("~/bin/");
+                if (appRootPath != null)
+                    locations.Add(new DirectoryInfo(appRootPath));
+            });
 
             // Try current directory
-            yield return new DirectoryInfo(".");
+            locations.Add(new DirectoryInfo("."));
+            return locations;
 
             // We have run out of ideas where to look!
             // Searched locations = 
