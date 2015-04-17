@@ -72,19 +72,19 @@
     <Reference Include="System.Xml" />
 
     <Reference Include="Orleans">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.5\lib\net45\Orleans.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.7\lib\net45\Orleans.dll</HintPath>
     </Reference>
     <Reference Include="OrleansAzureUtils">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansAzureUtils.1.0.5\lib\net45\OrleansAzureUtils.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.OrleansAzureUtils.1.0.7\lib\net45\OrleansAzureUtils.dll</HintPath>
     </Reference>
     <Reference Include="OrleansHost">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.0.5\lib\net45\OrleansHost.exe</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.0.7\lib\net45\OrleansHost.exe</HintPath>
     </Reference>
     <Reference Include="OrleansProviders">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.0.5\lib\net45\OrleansProviders.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.0.7\lib\net45\OrleansProviders.dll</HintPath>
     </Reference>
     <Reference Include="OrleansRuntime">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.0.5\lib\net45\OrleansRuntime.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.0.7\lib\net45\OrleansRuntime.dll</HintPath>
     </Reference>
 </ItemGroup>
   <ItemGroup>

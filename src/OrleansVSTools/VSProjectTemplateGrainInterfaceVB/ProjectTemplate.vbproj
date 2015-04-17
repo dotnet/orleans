@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.5\build\Microsoft.Orleans.Templates.Interfaces.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.5\build\Microsoft.Orleans.Templates.Interfaces.props')" />
+  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.7\build\Microsoft.Orleans.Templates.Interfaces.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.7\build\Microsoft.Orleans.Templates.Interfaces.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -46,7 +46,7 @@
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Orleans">
       <Private>False</Private>
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.5\lib\net45\Orleans.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.7\lib\net45\Orleans.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -104,6 +104,6 @@
     </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.5\build\Microsoft.Orleans.Templates.Interfaces.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.5\build\Microsoft.Orleans.Templates.Interfaces.targets')" />
+  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.7\build\Microsoft.Orleans.Templates.Interfaces.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.7\build\Microsoft.Orleans.Templates.Interfaces.targets')" />
 </Project>
 

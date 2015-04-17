@@ -9,10 +9,10 @@
   <package id="Unofficial.Microsoft.WindowsAzure.ServiceRuntime" version="2.4.0.0" targetFramework="net45" />
   <package id="WindowsAzure.Storage" version="4.2.0" targetFramework="net45" />
 
-  <package id="Microsoft.Orleans.Core" version="1.0.5" targetFramework="net45" />
-  <package id="Microsoft.Orleans.OrleansAzureUtils" version="1.0.5" targetFramework="net45" />
-  <package id="Microsoft.Orleans.OrleansHost" version="1.0.5" targetFramework="net45" />
-  <package id="Microsoft.Orleans.OrleansProviders" version="1.0.5" targetFramework="net45" />
-  <package id="Microsoft.Orleans.OrleansRuntime" version="1.0.5" targetFramework="net45" />
-  <package id="Microsoft.Orleans.Server" version="1.0.5" targetFramework="net45" />
+  <package id="Microsoft.Orleans.Core" version="1.0.7" targetFramework="net45" />
+  <package id="Microsoft.Orleans.OrleansAzureUtils" version="1.0.7" targetFramework="net45" />
+  <package id="Microsoft.Orleans.OrleansHost" version="1.0.7" targetFramework="net45" />
+  <package id="Microsoft.Orleans.OrleansProviders" version="1.0.7" targetFramework="net45" />
+  <package id="Microsoft.Orleans.OrleansRuntime" version="1.0.7" targetFramework="net45" />
+  <package id="Microsoft.Orleans.Server" version="1.0.7" targetFramework="net45" />
 </packages>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.0.5" Language="en-US" Publisher="Microsoft" />
+    <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.0.7" Language="en-US" Publisher="Microsoft" />
     <DisplayName>OrleansVSTools</DisplayName>
     <Description>Orleans Tools for Visual Studio 2012, 2013, 2015</Description>
     <MoreInfo>htts://github.com/dotnet/orleans/</MoreInfo>
