@@ -68,7 +68,7 @@ namespace Orleans.Runtime
         }
 
         internal void AddEntry(int interfaceId, Type iface, int grainTypeCode, string grainInterface, string grainClass, string assembly, 
-                                PlacementStrategy placement, bool primaryImplementation = false)
+                                bool isGenericGrainClass, PlacementStrategy placement, bool primaryImplementation = false)
         {
             lock (this)
             {
@@ -84,16 +84,10 @@ namespace Orleans.Runtime
 
                     table[interfaceId] = grainInterfaceData;
 
-                    if (iface.IsGenericType)
-                    {
-                        iface = iface.GetGenericTypeDefinition();
-                    }
-
-                    var key = iface.AssemblyQualifiedName;
-                    typeToInterfaceData[key] = grainInterfaceData;
+                    typeToInterfaceData[typeKey(iface)] = grainInterfaceData;
                 }
 
-                var implementation = new GrainClassData(grainTypeCode, grainClass, grainInterfaceData, placement);
+                var implementation = new GrainClassData(grainTypeCode, grainClass, isGenericGrainClass, grainInterfaceData, placement);
                 if (!implementationIndex.ContainsKey(grainTypeCode))
                     implementationIndex.Add(grainTypeCode, implementation);
 
@@ -166,7 +160,16 @@ namespace Orleans.Runtime
                     return false;
 
                 var implementation = implementationIndex[typeCode];
-                grainClass = genericArguments == null ? implementation.GrainClass : implementation.GetGenericClassName(genericArguments);
+
+                // Testing whether the grain implementation is generic allows for non-generic grain classes 
+                // to implement one or more generic grain interfaces.
+                // For generic grain classes, the assumption that they take the same generic arguments 
+                // as the implemented generic interface(s) still holds.
+                grainClass =
+                    genericArguments == null || !implementation.IsGeneric
+                    ? implementation.GrainClass
+                    : implementation.GetGenericClassName(genericArguments);
+
                 placement = implementation.PlacementStrategy;
                 return true;
 
@@ -182,22 +185,25 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            grainClass = genericArguments == null ? implementation.GrainClass : implementation.GetGenericClassName(genericArguments);
+            // Testing whether the grain implementation is generic allows for non-generic grain classes 
+            // to implement one or more generic grain interfaces.
+            // For generic grain classes, the assumption that they take the same generic arguments 
+            // as the implemented generic interface(s) still holds.
+            grainClass =
+                genericArguments == null || !implementation.IsGeneric
+                ? implementation.GrainClass 
+                : implementation.GetGenericClassName(genericArguments);
+
             return true;
         }
 
 
         public bool TryGetGrainTypeCode(Type interfaceType, out int grainTypeCode, string grainClassNamePrefix)
         {
-            if (interfaceType.IsGenericType)
-            {
-                interfaceType = interfaceType.GetGenericTypeDefinition();
-            }
-
             grainTypeCode = 0;
             GrainInterfaceData interfaceData;
-            var key = interfaceType.AssemblyQualifiedName;
-            if (!this.typeToInterfaceData.TryGetValue(key, out interfaceData))
+
+            if (!this.typeToInterfaceData.TryGetValue(typeKey(interfaceType), out interfaceData))
             {
                 return false;
             }
@@ -215,6 +221,15 @@ namespace Orleans.Runtime
             }
 
             return TryGetGrainTypeCode(interfaceData, out grainTypeCode, grainClassNamePrefix);
+        }
+
+        private string typeKey(Type interfaceType)
+        {
+            return TypeUtils.GetTemplatedName(
+                        TypeUtils.GetFullName(interfaceType),
+                        interfaceType,
+                        interfaceType.GetGenericArguments(),
+                        t => false);
         }
 
         private static bool TryGetGrainTypeCode(GrainInterfaceData interfaceData, out int grainTypeCode, string grainClassNamePrefix)
@@ -361,17 +376,22 @@ namespace Orleans.Runtime
         private readonly GrainInterfaceData interfaceData;
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;
+        [NonSerialized]
+        private readonly bool isGeneric;
+
         private readonly PlacementStrategy placementStrategy;
 
         internal int GrainTypeCode { get; private set; }
         internal string GrainClass { get; private set; }
         internal PlacementStrategy PlacementStrategy { get { return placementStrategy; } }
         internal GrainInterfaceData InterfaceData { get { return interfaceData; } }
+        internal bool IsGeneric { get { return isGeneric; } }
 
-        internal GrainClassData(int grainTypeCode, string grainClass, GrainInterfaceData interfaceData, PlacementStrategy placement)
+        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, GrainInterfaceData interfaceData, PlacementStrategy placement)
         {
             GrainTypeCode = grainTypeCode;
             GrainClass = grainClass;
+            this.isGeneric = isGeneric;
             this.interfaceData = interfaceData;
             genericClassNames = new Dictionary<string, string>(); // TODO: initialize only for generic classes
             placementStrategy = placement ?? PlacementStrategy.GetDefault();
