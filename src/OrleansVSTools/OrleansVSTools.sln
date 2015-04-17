@@ -8,6 +8,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		..\SDK\InstallOrleansVSTools.cmd = ..\SDK\InstallOrleansVSTools.cmd
 		..\SDK\OrleansVSTools.vsix = ..\SDK\OrleansVSTools.vsix
 		..\SDK\UninstallOrleansVSTools.cmd = ..\SDK\UninstallOrleansVSTools.cmd
+		..\Build\Version.txt = ..\Build\Version.txt
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Project Templates", "Project Templates", "{CE88569C-DAB3-4BDA-8064-B54C0104683D}"
