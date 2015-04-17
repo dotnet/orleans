@@ -30,6 +30,22 @@ namespace Orleans.Runtime
     /// </summary>
     internal static class TypeCodeMapper
     {
+        internal static int GetImplementationTypeCode(Type interfaceType, string grainClassNamePrefix = null)
+        {
+            int typeCode;
+            IGrainTypeResolver grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
+            if (!grainTypeResolver.TryGetGrainTypeCode(interfaceType, out typeCode, grainClassNamePrefix))
+            {
+                var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
+                throw new ArgumentException(
+                    String.Format("Cannot find a type code for an implementation class for grain interface: {0}{2}. Make sure the grain assembly was correctly deployed and loaded in the silo.{1}",
+                                  interfaceType,
+                                  String.IsNullOrEmpty(loadedAssemblies) ? String.Empty : String.Format(" Loaded grain assemblies: {0}", loadedAssemblies),
+                                  String.IsNullOrEmpty(grainClassNamePrefix) ? String.Empty : ", grainClassNamePrefix=" + grainClassNamePrefix));
+            }
+            return typeCode;
+        }
+
         internal static int GetImplementationTypeCode(int interfaceId, string grainClassNamePrefix = null)
         {
             int typeCode;
@@ -56,7 +72,7 @@ namespace Orleans.Runtime
 
         internal static GrainId ComposeGrainId(int baseTypeCode, Guid primaryKey, Type interfaceType, string keyExt = null)
         {
-            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode),
+            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode), 
                 primaryKey, keyExt);
         }
 

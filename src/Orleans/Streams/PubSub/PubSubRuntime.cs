@@ -78,12 +78,9 @@ namespace Orleans.Streams
 
         private static IPubSubRendezvousGrain GetRendezvousGrain(StreamId streamId)
         {
-            return (IPubSubRendezvousGrain)GrainClient.InvokeStaticMethodThroughReflection(
-                "Orleans",
-                "Orleans.Streams.PubSubRendezvousGrainFactory",
-                "GetGrain",
-                new Type[] { typeof(Guid), typeof(string) },
-                new object[] { streamId.Guid, streamId.ProviderName + "_" + streamId.Namespace });
+            return GrainFactory.GetGrain<IPubSubRendezvousGrain>(
+                primaryKey: streamId.Guid,
+                keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
         }
 
         public GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId)

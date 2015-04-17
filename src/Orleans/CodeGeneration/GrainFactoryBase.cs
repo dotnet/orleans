@@ -213,7 +213,7 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        private static void DisallowNullOrWhiteSpaceKeyExtensions(string keyExt)
+        internal static void DisallowNullOrWhiteSpaceKeyExtensions(string keyExt)
         {
             if (!string.IsNullOrWhiteSpace(keyExt)) return;
 
