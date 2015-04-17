@@ -23,8 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Concurrent;
-
-using Orleans.Runtime;
+﻿using Orleans.CodeGeneration;
+﻿using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -109,7 +109,7 @@ namespace Orleans
         public static TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
-            Orleans.CodeGeneration.GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+            GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             return Cast<TGrainInterface>(
                 _MakeGrainReference(
@@ -129,7 +129,7 @@ namespace Orleans
         public static TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
-            Orleans.CodeGeneration.GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+            GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             return Cast<TGrainInterface>(
                 _MakeGrainReference(
