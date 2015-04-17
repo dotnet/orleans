@@ -59,7 +59,7 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 _MakeGrainReference(
-                    baseTypeCode => ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
         }
@@ -76,7 +76,7 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 _MakeGrainReference(
-                    baseTypeCode => ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
         }
@@ -93,7 +93,47 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 _MakeGrainReference(
-                    baseTypeCode => ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
+                    typeof(TGrainInterface),
+                    grainClassNamePrefix));
+        }
+
+        /// <summary>
+        /// Gets a reference to a grain.
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The interface to get.</typeparam>
+        /// <param name="primaryKey">The primary key of the grain.</param>
+        /// <param name="keyExtension">The key extention of the grain.</param>
+        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
+        /// <returns></returns>
+        public static TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithGuidCompoundKey
+        {
+            Orleans.CodeGeneration.GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+
+            return Cast<TGrainInterface>(
+                _MakeGrainReference(
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
+                    typeof(TGrainInterface),
+                    grainClassNamePrefix));
+        }
+
+        /// <summary>
+        /// Gets a reference to a grain.
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The interface to get.</typeparam>
+        /// <param name="primaryKey">The primary key of the grain.</param>
+        /// <param name="keyExtension">The key extention of the grain.</param>
+        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
+        /// <returns></returns>
+        public static TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithGuidCompoundKey
+        {
+            Orleans.CodeGeneration.GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+
+            return Cast<TGrainInterface>(
+                _MakeGrainReference(
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
         }
@@ -197,7 +237,7 @@ namespace Orleans
             {
                 throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + interfaceType.FullName);
             }
-            GrainId grainId = getGrainId(GetImplementationTypeCode(interfaceType, grainClassNamePrefix));
+            GrainId grainId = getGrainId(TypeCodeMapper.GetImplementationTypeCode(interfaceType, grainClassNamePrefix));
             return GrainReference.FromGrainId(grainId, interfaceType.IsGenericType ? interfaceType.UnderlyingSystemType.FullName : null);
         }
 
@@ -293,57 +333,6 @@ namespace Orleans
                             "If you are running on the silo, perhaps you are trying to send a message or create a grain reference not within Orleans thread or from within grain constructor?";
                 throw new InvalidOperationException(msg);
             }
-        }
-
-        internal static int GetImplementationTypeCode(Type interfaceType, string grainClassNamePrefix = null)
-        {
-            int typeCode;
-            IGrainTypeResolver grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
-            if (!grainTypeResolver.TryGetGrainTypeCode(interfaceType, out typeCode, grainClassNamePrefix))
-            {
-                var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
-                throw new ArgumentException(
-                    String.Format("Cannot find a type code for an implementation class for grain interface: {0}{2}. Make sure the grain assembly was correctly deployed and loaded in the silo.{1}",
-                                  interfaceType,
-                                  String.IsNullOrEmpty(loadedAssemblies) ? String.Empty : String.Format(" Loaded grain assemblies: {0}", loadedAssemblies),
-                                  String.IsNullOrEmpty(grainClassNamePrefix) ? String.Empty : ", grainClassNamePrefix=" + grainClassNamePrefix));
-            }
-            return typeCode;
-        }
-
-        internal static int GetImplementationTypeCode(string grainImplementationClassName)
-        {
-            int typeCode;
-            IGrainTypeResolver grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
-            if (!grainTypeResolver.TryGetGrainTypeCode(grainImplementationClassName, out typeCode))
-                throw new ArgumentException(String.Format("Cannot find a type code for an implementation grain class: {0}. Make sure the grain assembly was correctly deployed and loaded in the silo.", grainImplementationClassName));
-
-            return typeCode;
-        }
-
-        private static GrainId ComposeGrainId(int baseTypeCode, Guid primaryKey, Type interfaceType)
-        {
-            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode), primaryKey);
-        }
-
-        private static GrainId ComposeGrainId(int baseTypeCode, long primaryKey, Type interfaceType)
-        {
-            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode), primaryKey);
-        }
-
-        private static GrainId ComposeGrainId(int baseTypeCode, string primaryKey, Type interfaceType)
-        {
-            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode), primaryKey);
-        }      
-
-        private static long ComposeGenericTypeCode(Type interfaceType, int baseTypeCode)
-        {
-            if (!interfaceType.IsGenericType)
-                return baseTypeCode;
-
-            string args = TypeUtils.GetGenericTypeArgs(interfaceType.GetGenericArguments(), t => true);
-            int hash = Utils.CalculateIdHash(args);
-            return (((long)(hash & 0x00FFFFFF)) << 32) + baseTypeCode;
         }
         #endregion
     }
