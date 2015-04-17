@@ -88,13 +88,14 @@ namespace Orleans
         /// <param name="primaryKey">The primary key of the grain.</param>
         /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
         /// <returns></returns>
-        public static TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassPrefixName = null)
+        public static TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey
         {
             return Cast<TGrainInterface>(
                 _MakeGrainReference(
                     baseTypeCode => ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
-                    typeof(TGrainInterface)));
+                    typeof(TGrainInterface),
+                    grainClassNamePrefix));
         }
 
         /// <summary>
