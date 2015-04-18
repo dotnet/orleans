@@ -83,8 +83,8 @@ namespace Orleans.Runtime
                     grainInterfaceData = new GrainInterfaceData(interfaceId, iface, grainInterface);
 
                     table[interfaceId] = grainInterfaceData;
-
-                    typeToInterfaceData[typeKey(iface)] = grainInterfaceData;
+                    var interfaceTypeKey = GetTypeKey(iface, isGenericGrainClass);
+                    typeToInterfaceData[interfaceTypeKey] = grainInterfaceData;
                 }
 
                 var implementation = new GrainClassData(grainTypeCode, grainClass, isGenericGrainClass, grainInterfaceData, placement);
@@ -201,14 +201,43 @@ namespace Orleans.Runtime
         public bool TryGetGrainTypeCode(Type interfaceType, out int grainTypeCode, string grainClassNamePrefix)
         {
             grainTypeCode = 0;
+            List<GrainClassData> foundImplementations = new List<GrainClassData>();
             GrainInterfaceData interfaceData;
 
-            if (!this.typeToInterfaceData.TryGetValue(typeKey(interfaceType), out interfaceData))
+            // First, try to find a non-generic grain implementation:
+            if (this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, false), out interfaceData))
             {
-                return false;
+                GrainClassData implementation;
+                if (TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
+                    foundImplementations.Add(implementation);
             }
 
-            return TryGetGrainTypeCode(interfaceData, out grainTypeCode, grainClassNamePrefix);
+            // If the interface is generic, try to find a generic grain implementation:
+            if (interfaceType.IsGenericType && this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, true), out interfaceData))
+            {
+                GrainClassData implementation;
+                if (TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
+                    foundImplementations.Add(implementation);
+            }
+
+            switch(foundImplementations.Count)
+            {
+                case 0:
+                    return false;
+                case 1:
+                    grainTypeCode = foundImplementations[0].GrainTypeCode;
+                    return true;
+                default:
+                    var implementationsDescription = 
+                        Utils.EnumerableToString(foundImplementations, d => d.GrainClass, ",", false);
+                    var prefixDescription = 
+                        String.IsNullOrEmpty(grainClassNamePrefix)? "": String.Format(", grainClassNamePrefix={0}", grainClassNamePrefix); 
+                    throw new OrleansException(String.Format("Cannot resolve grain interface {0}{1} to a grain class because both generic and non-generic implementations of it exist: {2}",
+                        interfaceType.AssemblyQualifiedName,
+                        prefixDescription,
+                        implementationsDescription
+                        ));
+            }
         }
 
         public bool TryGetGrainTypeCode(int grainInterfaceId, out int grainTypeCode, string grainClassNamePrefix = null)
@@ -219,22 +248,37 @@ namespace Orleans.Runtime
             {
                 return false;
             }
-
             return TryGetGrainTypeCode(interfaceData, out grainTypeCode, grainClassNamePrefix);
         }
 
-        private string typeKey(Type interfaceType)
+        private string GetTypeKey(Type interfaceType, bool isGenericGrainClass)
         {
-            return TypeUtils.GetTemplatedName(
-                        TypeUtils.GetFullName(interfaceType),
-                        interfaceType,
-                        interfaceType.GetGenericArguments(),
-                        t => false);
+            if (isGenericGrainClass && interfaceType.IsGenericType)
+            {
+                return interfaceType.GetGenericTypeDefinition().AssemblyQualifiedName;
+            }
+            else 
+            {
+                return TypeUtils.GetTemplatedName(
+                            TypeUtils.GetFullName(interfaceType),
+                            interfaceType,
+                            interfaceType.GetGenericArguments(),
+                            t => false);
+            }
         }
-
         private static bool TryGetGrainTypeCode(GrainInterfaceData interfaceData, out int grainTypeCode, string grainClassNamePrefix)
         {
             grainTypeCode = 0;
+            GrainClassData grainClassData;
+            var found = TryGetGrainClassData(interfaceData, out grainClassData, grainClassNamePrefix);
+            if (found) 
+                grainTypeCode = grainClassData.GrainTypeCode;
+            return found;
+        }
+
+        private static bool TryGetGrainClassData(GrainInterfaceData interfaceData, out GrainClassData grainClassData, string grainClassNamePrefix)
+        {
+            grainClassData = null;
             var implementations = interfaceData.Implementations;
 
             if (implementations.Length == 0)
@@ -244,13 +288,13 @@ namespace Orleans.Runtime
             {
                 if (implementations.Length == 1)
                 {
-                    grainTypeCode = implementations[0].GrainTypeCode;
+                    grainClassData = implementations[0];
                     return true;
                 }
 
                 if (interfaceData.PrimaryImplementation != null)
                 {
-                    grainTypeCode = interfaceData.PrimaryImplementation.GrainTypeCode;
+                    grainClassData = interfaceData.PrimaryImplementation;
                     return true;
                 }
 
@@ -262,7 +306,7 @@ namespace Orleans.Runtime
             {
                 if (implementations[0].GrainClass.StartsWith(grainClassNamePrefix, StringComparison.Ordinal))
                 {
-                    grainTypeCode = implementations[0].GrainTypeCode;
+                    grainClassData = implementations[0];
                     return true;
                 }
                     
@@ -279,7 +323,7 @@ namespace Orleans.Runtime
 
             if (matches.Length == 1)
             {
-                grainTypeCode = matches[0].GrainTypeCode;
+                grainClassData = matches[0];
                 return true;
             }
 

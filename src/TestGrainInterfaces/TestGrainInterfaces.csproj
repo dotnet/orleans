@@ -46,8 +46,10 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IGenericGrain.cs" />
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
+    <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />
     <Compile Include="ISimpleGrain.cs" />
@@ -95,4 +97,3 @@
   </Target> 
   -->
 </Project>
-
