@@ -51,6 +51,8 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Orleans Virtual Meetups](https://github.com/OrleansContrib/meetups)**
 
+* **[Orleans Gitter Chat Forum](https://gitter.im/dotnet/orleans)**
+
 * **[Ideas for Contributions](Ideas-for-Contributions)**
 
 * **[Student Projects](Student-Projects)**
