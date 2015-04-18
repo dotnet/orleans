@@ -90,5 +90,16 @@ namespace UnitTests.General
             Assert.AreEqual("1234", stringResult);
         }
 
+        /// If both a concrete implementation and a generic implementation of a 
+        /// generic interface exist, prefer the concrete implementation.
+        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        public async Task GenericGrainTests_PreferConcreteGrainImplementationOfGenericInterface()
+        {
+            var grainOfDouble = GetGrain<ISimpleGenericGrain<double>>();
+            var result = await grainOfDouble.Ping(4.0);
+
+            Assert.AreEqual(8.0, result);
+        }
+
     }
 }

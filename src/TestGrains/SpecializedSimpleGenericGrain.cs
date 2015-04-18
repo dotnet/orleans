@@ -32,11 +32,11 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class SimpleGenericGrain<T> :Grain, ISimpleGenericGrain<T>
+    class SpecializedSimpleGenericGrain : SimpleGenericGrain<double>
     {
-        public virtual Task<T> Ping(T a)
+        public override Task<double> Ping(double a)
         {
-            return Task.FromResult(a);
+            return base.Ping(a * 2.0);
         }
     }
 }

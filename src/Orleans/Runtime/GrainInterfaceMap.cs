@@ -197,7 +197,6 @@ namespace Orleans.Runtime
             return true;
         }
 
-
         public bool TryGetGrainTypeCode(Type interfaceType, out int grainTypeCode, string grainClassNamePrefix)
         {
             grainTypeCode = 0;
@@ -205,39 +204,22 @@ namespace Orleans.Runtime
             GrainInterfaceData interfaceData;
 
             // First, try to find a non-generic grain implementation:
-            if (this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, false), out interfaceData))
+            if (this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, false), out interfaceData) &&
+                TryGetGrainTypeCode(interfaceData, out grainTypeCode, grainClassNamePrefix))
             {
-                GrainClassData implementation;
-                if (TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
-                    foundImplementations.Add(implementation);
+                return true;
             }
 
-            // If the interface is generic, try to find a generic grain implementation:
-            if (interfaceType.IsGenericType && this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, true), out interfaceData))
+            // If a concrete implementation was not found and the interface is generic, 
+            // try to find a generic grain implementation:
+            if (interfaceType.IsGenericType && 
+                this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, true), out interfaceData) &&
+                TryGetGrainTypeCode(interfaceData, out grainTypeCode, grainClassNamePrefix))
             {
-                GrainClassData implementation;
-                if (TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
-                    foundImplementations.Add(implementation);
+                return true;
             }
 
-            switch(foundImplementations.Count)
-            {
-                case 0:
-                    return false;
-                case 1:
-                    grainTypeCode = foundImplementations[0].GrainTypeCode;
-                    return true;
-                default:
-                    var implementationsDescription = 
-                        Utils.EnumerableToString(foundImplementations, d => d.GrainClass, ",", false);
-                    var prefixDescription = 
-                        String.IsNullOrEmpty(grainClassNamePrefix)? "": String.Format(", grainClassNamePrefix={0}", grainClassNamePrefix); 
-                    throw new OrleansException(String.Format("Cannot resolve grain interface {0}{1} to a grain class because both generic and non-generic implementations of it exist: {2}",
-                        interfaceType.AssemblyQualifiedName,
-                        prefixDescription,
-                        implementationsDescription
-                        ));
-            }
+            return false;
         }
 
         public bool TryGetGrainTypeCode(int grainInterfaceId, out int grainTypeCode, string grainClassNamePrefix = null)
@@ -266,35 +248,26 @@ namespace Orleans.Runtime
                             t => false);
             }
         }
+
         private static bool TryGetGrainTypeCode(GrainInterfaceData interfaceData, out int grainTypeCode, string grainClassNamePrefix)
         {
             grainTypeCode = 0;
-            GrainClassData grainClassData;
-            var found = TryGetGrainClassData(interfaceData, out grainClassData, grainClassNamePrefix);
-            if (found) 
-                grainTypeCode = grainClassData.GrainTypeCode;
-            return found;
-        }
-
-        private static bool TryGetGrainClassData(GrainInterfaceData interfaceData, out GrainClassData grainClassData, string grainClassNamePrefix)
-        {
-            grainClassData = null;
             var implementations = interfaceData.Implementations;
 
             if (implementations.Length == 0)
-                    return false;
+                return false;
 
             if (String.IsNullOrEmpty(grainClassNamePrefix))
             {
                 if (implementations.Length == 1)
                 {
-                    grainClassData = implementations[0];
+                    grainTypeCode = implementations[0].GrainTypeCode;
                     return true;
                 }
 
                 if (interfaceData.PrimaryImplementation != null)
                 {
-                    grainClassData = interfaceData.PrimaryImplementation;
+                    grainTypeCode = interfaceData.PrimaryImplementation.GrainTypeCode;
                     return true;
                 }
 
@@ -306,15 +279,15 @@ namespace Orleans.Runtime
             {
                 if (implementations[0].GrainClass.StartsWith(grainClassNamePrefix, StringComparison.Ordinal))
                 {
-                    grainClassData = implementations[0];
+                    grainTypeCode = implementations[0].GrainTypeCode;
                     return true;
                 }
-                    
+
                 return false;
             }
 
             var matches = implementations.Where(impl => impl.GrainClass.Equals(grainClassNamePrefix)).ToArray(); //exact match?
-            if(matches.Length == 0)
+            if (matches.Length == 0)
                 matches = implementations.Where(
                     impl => impl.GrainClass.StartsWith(grainClassNamePrefix, StringComparison.Ordinal)).ToArray(); //prefix matches
 
@@ -323,12 +296,12 @@ namespace Orleans.Runtime
 
             if (matches.Length == 1)
             {
-                grainClassData = matches[0];
+                grainTypeCode = matches[0].GrainTypeCode;
                 return true;
             }
 
             throw new OrleansException(String.Format("Cannot resolve grain interface ID={0}, grainClassNamePrefix={1} to a grain class because of multiple implementations of it: {2}",
-                interfaceData.InterfaceId, 
+                interfaceData.InterfaceId,
                 grainClassNamePrefix,
                 Utils.EnumerableToString(matches, d => d.GrainClass, ",", false)));
         }
