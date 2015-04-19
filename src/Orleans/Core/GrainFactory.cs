@@ -58,7 +58,7 @@ namespace Orleans
             where TGrainInterface : IGrainWithGuidKey
         {
             return Cast<TGrainInterface>(
-                _MakeGrainReference(
+                GrainFactoryBase.MakeGrainReference_FromType(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -75,7 +75,7 @@ namespace Orleans
             where TGrainInterface : IGrainWithIntegerKey
         {
             return Cast<TGrainInterface>(
-                _MakeGrainReference(
+                GrainFactoryBase.MakeGrainReference_FromType(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -92,7 +92,7 @@ namespace Orleans
             where TGrainInterface : IGrainWithStringKey
         {
             return Cast<TGrainInterface>(
-                _MakeGrainReference(
+                GrainFactoryBase.MakeGrainReference_FromType(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -112,7 +112,7 @@ namespace Orleans
             GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             return Cast<TGrainInterface>(
-                _MakeGrainReference(
+                GrainFactoryBase.MakeGrainReference_FromType(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -132,7 +132,7 @@ namespace Orleans
             GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             return Cast<TGrainInterface>(
-                _MakeGrainReference(
+                GrainFactoryBase.MakeGrainReference_FromType(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -227,20 +227,6 @@ namespace Orleans
         }
         #endregion
 
-        private static IAddressable _MakeGrainReference(
-            Func<int, GrainId> getGrainId,
-            Type interfaceType,
-            string grainClassNamePrefix = null)
-        {
-            CheckRuntimeEnvironmentSetup();
-            if (!CodeGeneration.GrainInterfaceData.IsGrainType(interfaceType))
-            {
-                throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + interfaceType.FullName);
-            }
-            GrainId grainId = getGrainId(TypeCodeMapper.GetImplementationTypeCode(interfaceType, grainClassNamePrefix));
-            return GrainReference.FromGrainId(grainId, interfaceType.IsGenericType ? interfaceType.UnderlyingSystemType.FullName : null);
-        }
-
         #region Interface Casting
         private static readonly ConcurrentDictionary<Type, Func<IAddressable, object>> casters
             = new ConcurrentDictionary<Type, Func<IAddressable, object>>();
@@ -319,20 +305,6 @@ namespace Orleans
             }
 
             return method.CreateDelegate(delegateType);
-        }
-
-        /// <summary>
-        /// Check the current runtime environment has been setup and initialized correctly.
-        /// Throws InvalidOperationException if current runtime environment is not initialized.
-        /// </summary>
-        private static void CheckRuntimeEnvironmentSetup()
-        {
-            if (RuntimeClient.Current == null)
-            {
-                var msg = "Orleans runtime environment is not set up (RuntimeClient.Current==null). If you are running on the client, perhaps you are missing a call to Client.Initialize(...) ? " +
-                            "If you are running on the silo, perhaps you are trying to send a message or create a grain reference not within Orleans thread or from within grain constructor?";
-                throw new InvalidOperationException(msg);
-            }
         }
         #endregion
     }
