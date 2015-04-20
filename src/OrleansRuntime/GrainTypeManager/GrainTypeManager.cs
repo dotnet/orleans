@@ -169,6 +169,7 @@ namespace Orleans.Runtime
         private void AddToGrainInterfaceToClassMap(Type grainClass, IEnumerable<Type> grainInterfaces, bool isUnordered)
         {
             var grainClassCompleteName = TypeUtils.GetFullName(grainClass);
+            var isGenericGrainClass = grainClass.ContainsGenericParameters;
             var grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainClass);
             var placement = GrainTypeData.GetPlacementStrategy(grainClass);
 
@@ -178,8 +179,8 @@ namespace Orleans.Runtime
                 var ifaceName = TypeUtils.GetRawClassName(ifaceCompleteName);
                 var isPrimaryImplementor = IsPrimaryImplementor(grainClass, iface);
                 var ifaceId = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface);
-                grainInterfaceMap.AddEntry(ifaceId, iface, grainClassTypeCode, ifaceName, grainClassCompleteName, grainClass.Assembly.CodeBase,
-                    placement, isPrimaryImplementor);
+                grainInterfaceMap.AddEntry(ifaceId, iface, grainClassTypeCode, ifaceName, grainClassCompleteName, 
+                    grainClass.Assembly.CodeBase, isGenericGrainClass, placement, isPrimaryImplementor);
             }
 
             if (isUnordered)
