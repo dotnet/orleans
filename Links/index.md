@@ -18,6 +18,8 @@ title: Links
 
 
 ## **By others**
+[Project Orleans: Different Than Erlang, Designed for a Broad Group of Developers](http://thenewstack.io/project-orleans-different-than-erlang-designed-for-a-broad-group-of-developers/)
+
 [Two Reasons You May Want to Use Microsoft’s Project Orleans](http://www.bloggedbychris.com/2015/03/18/reasons-project-orleans/)
 
 [Hatay Tuna & Christian Martinez - Applied Actor Model with Orleans](https://github.com/hataytuna/Distributed/blob/master/Applied%20Actor%20Model%20with%20Orleans%20v1.1.pdf)
