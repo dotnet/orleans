@@ -405,6 +405,7 @@ namespace Orleans.Runtime
             // ensure this runs in the grain context, wait for it to complete
             scheduler.QueueTask(CreateSystemGrains, catalog.SchedulingContext)
                 .WaitWithThrow(initTimeout);
+            if (logger.IsVerbose) {  logger.Verbose("System grains created successfully."); }
 
             // Initialize storage providers once we have a basic silo runtime environment operating
             storageProviderManager = new StorageProviderManager();
@@ -413,6 +414,7 @@ namespace Orleans.Runtime
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
             catalog.SetStorageManager(storageProviderManager);
+            if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
             var siloStreamProviderManager = new Orleans.Streams.StreamProviderManager();
@@ -421,33 +423,41 @@ namespace Orleans.Runtime
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
             InsideRuntimeClient.Current.CurrentStreamProviderManager = siloStreamProviderManager;
+            if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
             bool waitForPrimaryToStart = globalConfig.PrimaryNodeIsRequired && siloType != SiloType.Primary;
             scheduler.QueueTask(() => LocalSiloStatusOracle.Start(waitForPrimaryToStart), statusOracleContext)
                 .WaitWithThrow(initTimeout);
+            if (logger.IsVerbose) { logger.Verbose("Local silo status oracle created successfully."); }
             scheduler.QueueTask(LocalSiloStatusOracle.BecomeActive, statusOracleContext)
                 .WaitWithThrow(initTimeout);
+            if (logger.IsVerbose) { logger.Verbose("Local silo status oracle became active successfully."); }
 
             try
             {
                 siloStatistics.Start(LocalConfig);
+                if (logger.IsVerbose) { logger.Verbose("Silo statistics manager started successfully."); }
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement
                 scheduler.QueueTask(DeploymentLoadPublisher.Instance.Start, DeploymentLoadPublisher.Instance.SchedulingContext)
                     .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Silo deployment load publisher started successfully."); }
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 platformWatchdog = new Watchdog(nodeConfig.StatisticsLogWriteInterval, healthCheckParticipants);
                 platformWatchdog.Start();
+                if (logger.IsVerbose) { logger.Verbose("Silo platform watchdog started successfully."); }
 
                 // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
                 scheduler.QueueTask(reminderService.Start, ((SystemTarget)reminderService).SchedulingContext)
                     .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Reminder service started successfully."); }
 
                 // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
                 scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 
                 var bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
@@ -455,14 +465,19 @@ namespace Orleans.Runtime
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
                 BootstrapProviders = bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
+                if (logger.IsVerbose) { logger.Verbose("App bootstrap calls done successfully."); }
 
                 // Now that we're active, we can start the gateway
                 var mc = messageCenter as MessageCenter;
                 if (mc != null)
+                {
                     mc.StartGateway(clientRegistrar);
+                }
+                if (logger.IsVerbose) { logger.Verbose("Message gateway service started successfully."); }
 
                 scheduler.QueueTask(clientRegistrar.Start, ((SystemTarget)clientRegistrar).SchedulingContext)
                     .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
 
                 SystemStatus.Current = SystemStatus.Running;
             }
@@ -472,6 +487,7 @@ namespace Orleans.Runtime
                 FastKill(); // if failed after Membership became active, mark itself as dead in Membership abale.
                 throw;
             }
+            if (logger.IsVerbose) { logger.Verbose("Silo.Start complete: System status = {0}", SystemStatus.Current); }
         }
 
         private void ConfigureThreadPoolAndServicePointSettings()
