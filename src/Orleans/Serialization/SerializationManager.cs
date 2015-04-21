@@ -764,17 +764,16 @@ namespace Orleans.Serialization
 
         private static object DeepCopierHelper(Type t, object original)
         {
-            if (t.IsOrleansShallowCopyable())
-            {
-                // Simple value types and immutables have already been deep-copied sufficiently
-                return original;
-            }
-
             // Arrays are all that's left. 
             // Handling arbitrary-rank arrays is a bit complex, but why not?
             var originalArray = original as Array;
             if (originalArray != null)
             {
+                if (originalArray.Rank == 1 && originalArray.GetLength(0) == 0)
+                {
+                    // A common special case - empty one dimentional array
+                    return originalArray;
+                }
                 // A common special case
                 if ((original is byte[]) && (originalArray.Rank == 1))
                 {

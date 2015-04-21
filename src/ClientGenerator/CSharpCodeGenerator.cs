@@ -569,26 +569,28 @@ namespace Orleans.CodeGeneration
             if (methodInfo.ReturnType == typeof(void))
             {
                 methodImpl = string.Format(@"
-                base.InvokeOneWayMethod({0}, new object[] {{{1}}} {2});",
-                methodId, invokeArguments, optional);
+                    base.InvokeOneWayMethod({0}, {1} {2});",
+                    methodId, 
+                    invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
+                    optional);
             }
             else
             {
                 if (methodInfo.ReturnType == typeof(Task))
                 {
                     methodImpl = string.Format(@"
-                return base.InvokeMethodAsync<object>({0}, new object[] {{{1}}} {2});",
+                return base.InvokeMethodAsync<object>({0}, {1} {2});",
                         methodId,
-                        invokeArguments,
+                        invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
                         optional);
                 }
                 else
                 {
                     methodImpl = string.Format(@"
-                return base.InvokeMethodAsync<{0}>({1}, new object[] {{{2}}} {3});",
+                return base.InvokeMethodAsync<{0}>({1}, {2} {3});",
                         GetActualMethodReturnType(methodInfo.ReturnType, SerializeFlag.NoSerialize),
                         methodId,
-                        invokeArguments,
+                        invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
                         optional);
                 }
             }

@@ -61,6 +61,7 @@ namespace Orleans
     }
     
     [Serializable]
+    [Immutable]
     internal class TableVersion
     {
         public int Version { get; private set; }

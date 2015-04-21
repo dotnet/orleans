@@ -1237,10 +1237,13 @@ namespace Orleans.Serialization
 
             stream.Write(request.InterfaceId);
             stream.Write(request.MethodId);
-            stream.Write(request.Arguments.Length);
-            foreach (var arg in request.Arguments)
+            stream.Write(request.Arguments != null ? request.Arguments.Length : 0);
+            if (request.Arguments != null)
             {
-                SerializationManager.SerializeInner(arg, stream, null);
+                foreach (var arg in request.Arguments)
+                {
+                    SerializationManager.SerializeInner(arg, stream, null);
+                }
             }
         }
 
@@ -1250,11 +1253,15 @@ namespace Orleans.Serialization
             int mid = stream.ReadInt();
 
             int argCount = stream.ReadInt();
-            var args = new object[argCount];
+            object[] args = null;
 
-            for (var i = 0; i < argCount; i++)
+            if (argCount > 0)
             {
-                args[i] = SerializationManager.DeserializeInner(null, stream);
+                args = new object[argCount];
+                for (var i = 0; i < argCount; i++)
+                {
+                    args[i] = SerializationManager.DeserializeInner(null, stream);
+                }
             }
 
             return new InvokeMethodRequest(iid, mid, args);
@@ -1264,10 +1271,14 @@ namespace Orleans.Serialization
         {
             var request = (InvokeMethodRequest)original;
 
-            var args = new object[request.Arguments.Length];
-            for (var i = 0; i < request.Arguments.Length; i++)
+            object[] args = null;
+            if (request.Arguments != null)
             {
-                args[i] = SerializationManager.DeepCopyInner(request.Arguments[i]);
+                args = new object[request.Arguments.Length];
+                for (var i = 0; i < request.Arguments.Length; i++)
+                {
+                    args[i] = SerializationManager.DeepCopyInner(request.Arguments[i]);
+                }
             }
 
             var result = new InvokeMethodRequest(request.InterfaceId, request.MethodId, args);
