@@ -320,9 +320,13 @@ namespace Orleans.Runtime
         /// </summary>
         protected async Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
-            CheckForGrainArguments(arguments);
-
-            var argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
+            object[] argsDeepCopy = null;
+            if (arguments != null)
+            {
+                CheckForGrainArguments(arguments);
+                argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
+            }
+            
             var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
 
             if (IsUnordered)

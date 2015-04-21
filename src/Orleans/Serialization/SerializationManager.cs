@@ -769,6 +769,11 @@ namespace Orleans.Serialization
             var originalArray = original as Array;
             if (originalArray != null)
             {
+                if (originalArray.Rank == 1 && originalArray.GetLength(0) == 0)
+                {
+                    // A common special case - empty one dimentional array
+                    return originalArray;
+                }
                 // A common special case
                 if ((original is byte[]) && (originalArray.Rank == 1))
                 {
