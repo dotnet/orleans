@@ -30,71 +30,60 @@ namespace Orleans.Runtime
     /// </summary>
     internal static class TypeCodeMapper
     {
-        internal static int GetImplementationTypeCode(Type interfaceType, string grainClassNamePrefix = null)
+        internal static GrainClassData GetImplementation(Type interfaceType, string grainClassNamePrefix = null)
         {
-            int typeCode;
+            GrainClassData implementation;
             IGrainTypeResolver grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
-            if (!grainTypeResolver.TryGetGrainTypeCode(interfaceType, out typeCode, grainClassNamePrefix))
+            if (!grainTypeResolver.TryGetGrainClassData(interfaceType, out implementation, grainClassNamePrefix))
             {
                 var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
                 throw new ArgumentException(
-                    String.Format("Cannot find a type code for an implementation class for grain interface: {0}{2}. Make sure the grain assembly was correctly deployed and loaded in the silo.{1}",
+                    String.Format("Cannot find an implementation class for grain interface: {0}{2}. Make sure the grain assembly was correctly deployed and loaded in the silo.{1}",
                                   interfaceType,
                                   String.IsNullOrEmpty(loadedAssemblies) ? String.Empty : String.Format(" Loaded grain assemblies: {0}", loadedAssemblies),
                                   String.IsNullOrEmpty(grainClassNamePrefix) ? String.Empty : ", grainClassNamePrefix=" + grainClassNamePrefix));
             }
-            return typeCode;
+            return implementation;
         }
 
-        internal static int GetImplementationTypeCode(int interfaceId, string grainClassNamePrefix = null)
+        internal static GrainClassData GetImplementation(int interfaceId, string grainClassNamePrefix = null)
         {
-            int typeCode;
+            GrainClassData implementation;
             var grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
-            if (grainTypeResolver.TryGetGrainTypeCode(interfaceId, out typeCode, grainClassNamePrefix)) return typeCode;
+            if (grainTypeResolver.TryGetGrainClassData(interfaceId, out implementation, grainClassNamePrefix)) return implementation;
 
             var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
             throw new ArgumentException(
-                String.Format("Cannot find a type code for an implementation class for grain interface: {0}{2}. Make sure the grain assembly was correctly deployed and loaded in the silo.{1}",
+                String.Format("Cannot find an implementation class for grain interface: {0}{2}. Make sure the grain assembly was correctly deployed and loaded in the silo.{1}",
                     interfaceId,
                     String.IsNullOrEmpty(loadedAssemblies) ? String.Empty : String.Format(" Loaded grain assemblies: {0}", loadedAssemblies),
                     String.IsNullOrEmpty(grainClassNamePrefix) ? String.Empty : ", grainClassNamePrefix=" + grainClassNamePrefix));
         }
 
-        internal static int GetImplementationTypeCode(string grainImplementationClassName)
+        internal static GrainClassData GetImplementation(string grainImplementationClassName)
         {
-            int typeCode;
+            GrainClassData implementation;
             var grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
-            if (!grainTypeResolver.TryGetGrainTypeCode(grainImplementationClassName, out typeCode))
-                throw new ArgumentException(String.Format("Cannot find a type code for an implementation grain class: {0}. Make sure the grain assembly was correctly deployed and loaded in the silo.", grainImplementationClassName));
+            if (!grainTypeResolver.TryGetGrainClassData(grainImplementationClassName, out implementation))
+                throw new ArgumentException(String.Format("Cannot find an implementation grain class: {0}. Make sure the grain assembly was correctly deployed and loaded in the silo.", grainImplementationClassName));
 
-            return typeCode;
+            return implementation;
         }
 
-        internal static GrainId ComposeGrainId(int baseTypeCode, Guid primaryKey, Type interfaceType, string keyExt = null)
+        internal static GrainId ComposeGrainId(GrainClassData implementation, Guid primaryKey, Type interfaceType, string keyExt = null)
         {
-            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode), 
-                primaryKey, keyExt);
+            return GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExt);
         }
 
-        internal static GrainId ComposeGrainId(int baseTypeCode, long primaryKey, Type interfaceType, string keyExt = null)
+        internal static GrainId ComposeGrainId(GrainClassData implementation, long primaryKey, Type interfaceType, string keyExt = null)
         {
-            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode),
-                primaryKey, keyExt);
+            return GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExt);
         }
 
-        internal static GrainId ComposeGrainId(int baseTypeCode, string primaryKey, Type interfaceType)
+        internal static GrainId ComposeGrainId(GrainClassData implementation, string primaryKey, Type interfaceType)
         {
-            return GrainId.GetGrainId(ComposeGenericTypeCode(interfaceType, baseTypeCode), primaryKey);
+            return GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey);
         }
 
-        internal static long ComposeGenericTypeCode(Type interfaceType, int baseTypeCode)
-        {
-            if (!interfaceType.IsGenericType)
-                return baseTypeCode;
-
-            string args = TypeUtils.GetGenericTypeArgs(interfaceType.GetGenericArguments(), t => true);
-            int hash = Utils.CalculateIdHash(args);
-            return (((long)(hash & 0x00FFFFFF)) << 32) + baseTypeCode;
-        }
     }
 }
