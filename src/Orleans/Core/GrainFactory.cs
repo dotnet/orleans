@@ -58,7 +58,7 @@ namespace Orleans
             where TGrainInterface : IGrainWithGuidKey
         {
             return Cast<TGrainInterface>(
-                GrainFactoryBase.MakeGrainReference_FromType(
+                GrainFactoryBase.MakeGrainReference(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -75,7 +75,7 @@ namespace Orleans
             where TGrainInterface : IGrainWithIntegerKey
         {
             return Cast<TGrainInterface>(
-                GrainFactoryBase.MakeGrainReference_FromType(
+                GrainFactoryBase.MakeGrainReference(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -92,7 +92,7 @@ namespace Orleans
             where TGrainInterface : IGrainWithStringKey
         {
             return Cast<TGrainInterface>(
-                GrainFactoryBase.MakeGrainReference_FromType(
+                GrainFactoryBase.MakeGrainReference(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -112,7 +112,7 @@ namespace Orleans
             GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             return Cast<TGrainInterface>(
-                GrainFactoryBase.MakeGrainReference_FromType(
+                GrainFactoryBase.MakeGrainReference(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
@@ -127,12 +127,12 @@ namespace Orleans
         /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
         /// <returns></returns>
         public static TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithGuidCompoundKey
+            where TGrainInterface : IGrainWithIntegerCompoundKey
         {
             GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             return Cast<TGrainInterface>(
-                GrainFactoryBase.MakeGrainReference_FromType(
+                GrainFactoryBase.MakeGrainReference(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
                     typeof(TGrainInterface),
                     grainClassNamePrefix));
