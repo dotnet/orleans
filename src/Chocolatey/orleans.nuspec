@@ -1,72 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-      <!-- Do not remove this test for UTF-8: if “Ω” doesn’t appear as greek uppercase omega letter enclosed in quotation marks, you should use an editor that supports UTF-8, not this one. -->
-      <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-        <metadata>
-          <!-- Read this before publishing packages to chocolatey.org: https://github.com/chocolatey/chocolatey/wiki/CreatePackages -->
-          <id>orleans</id>
-          <title>Orleans</title>
-          <version>1.0.5</version>
-          <authors>Microsoft Research</authors>
-          <owners>David Podhola</owners>
-          <summary>Orleans - Distributed Actor Model</summary>
-          <description>
-            Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 cloud services, as well as by a number of other companies.
-          </description>
-          <projectUrl>https://github.com/dotnet/orleans</projectUrl>
-          <tags>Orleans admin</tags>
-          <copyright>Copyright (C) 2015 Microsoft Research</copyright>
-          <licenseUrl>https://github.com/dotnet/orleans/blob/master/LICENSE</licenseUrl>
-          <requireLicenseAcceptance>false</requireLicenseAcceptance>
-          <!-- Important note about https://cdn.rawgit.com: Files are cached permanently after the first request. Use commit URLs when updating the icon. -->
-          <!--<iconUrl>http://cdn.rawgit.com/__CHOCO_PKG_MAINTAINER_REPO__/master/icons/Sync.Today.png</iconUrl>-->
-          <!--<dependencies>
-      <dependency id="" version="" /> Should not .NET choco package be here?
-    </dependencies>-->
-          <releaseNotes></releaseNotes>
-        </metadata>
-        <files>
-          <file src="..\..\Binaries\Release\ClientConfiguration.xml" target="Binaries\OrleansClient\ClientConfiguration.xml" />
-          <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Configuration.dll" target="Binaries\OrleansClient\Microsoft.WindowsAzure.Configuration.dll"/>
-          <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Storage.dll" target="Binaries\OrleansClient\Microsoft.WindowsAzure.Storage.dll" />
-          <file src="..\..\Binaries\Release\Microsoft.Data.Edm.dll" target="Binaries\OrleansClient\Microsoft.Data.Edm.dll" />
-          <file src="..\..\Binaries\Release\Microsoft.Data.OData.dll" target="Binaries\OrleansClient\Microsoft.Data.OData.dll" />
-          <file src="..\..\Binaries\Release\Microsoft.Data.Services.Client.dll" target="Binaries\OrleansClient\Microsoft.Data.Services.Client.dll" />
-          <file src="..\..\Binaries\Release\System.Spatial.dll" target="Binaries\OrleansClient\System.Spatial.dll"  />
-          <file src="..\..\Binaries\Release\Orleans.dll" target="Binaries\OrleansClient\Orleans.dll" />
-          <file src="..\..\Binaries\Release\Orleans.SDK.targets" target="Binaries\OrleansClient\Orleans.SDK.targets" />
-          <file src="..\..\Binaries\Release\Orleans.xml" target="Binaries\OrleansClient\Orleans.xml" />
-          <file src="..\..\Binaries\Release\OrleansAzureUtils.dll" target="Binaries\OrleansClient\OrleansAzureUtils.dll" />
-          <file src="..\..\Binaries\Release\OrleansAzureUtils.xml" target="Binaries\OrleansClient\OrleansAzureUtils.xml" />
-          <file src="..\..\Binaries\Release\OrleansManager.exe" target="Binaries\OrleansClient\OrleansManager.exe" />
-          <file src="..\..\Binaries\Release\OrleansManager.exe.config" target="Binaries\OrleansClient\OrleansManager.exe.config" />
-          <file src="..\..\Binaries\Release\OrleansProviders.dll" target="Binaries\OrleansClient\OrleansProviders.dll" />
+<!-- Do not remove this test for UTF-8: if “Ω” doesn’t appear as greek uppercase omega letter enclosed in quotation marks, you should use an editor that supports UTF-8, not this one. -->
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <!-- Read this before publishing packages to chocolatey.org: https://github.com/chocolatey/chocolatey/wiki/CreatePackages -->
+    <id>orleans</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Server Deployment Package</title>
+    <summary>Orleans - Distributed Actor Model</summary>
+    <description>
+      Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 cloud services, as well as by a number of other companies.
+    </description>
+    <projectUrl>https://github.com/dotnet/orleans</projectUrl>
+    <tags>Orleans Silo Deployment Cloud-Computing Actor-Model Actors Virtual-Actors Distributed-Systems C# .NET</tags>
+    <authors>Microsoft Research</authors>
+    <owners>Microsoft,Orleans</owners>
+    <copyright>Copyright (C) 2015 Microsoft Research</copyright>
+    <licenseUrl>https://github.com/dotnet/orleans/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <!-- Important note about https://cdn.rawgit.com: Files are cached permanently after the first request. Use commit URLs when updating the icon. -->
+    <!--<iconUrl>http://cdn.rawgit.com/__CHOCO_PKG_MAINTAINER_REPO__/master/icons/Sync.Today.png</iconUrl>-->
+    <dependencies>
+      <dependency id="DotNet4.5" version="4.5.20120822" />
+    </dependencies>
+    <releaseNotes></releaseNotes>
+  </metadata>
+  <files>
+    <file src="..\..\Binaries\Release\ClientConfiguration.xml" target="Binaries\ClientConfiguration.xml" />
+    <file src="..\..\Binaries\Release\OrleansConfiguration.xml" target="Binaries\OrleansConfiguration.xml" />
+    <file src="..\..\Binaries\Release\Configuration\OrleansConfiguration.xsd" target="Binaries\OrleansConfiguration.xsd" />
+    <file src="..\..\Binaries\Release\SQLServer\CreateTables.sql" target="Binaries\CreateTables.sql" />
 
-          <file src="..\..\Binaries\Release\CounterControl.exe" target="Binaries\OrleansServer\CounterControl.exe" />
-          <file src="..\..\Binaries\Release\CounterControl.exe.config" target="Binaries\OrleansServer\CounterControl.exe.config" />
-          <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Configuration.dll" target="Binaries\OrleansServer\Microsoft.WindowsAzure.Configuration.dll"/>
-          <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Storage.dll" target="Binaries\OrleansServer\Microsoft.WindowsAzure.Storage.dll" />
-          <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.ServiceRuntime.dll" target="Binaries\OrleansServer\Microsoft.WindowsAzure.ServiceRuntime.dll" />
-          <file src="..\..\Binaries\Release\Microsoft.Data.Edm.dll" target="Binaries\OrleansServer\Microsoft.Data.Edm.dll" />
-          <file src="..\..\Binaries\Release\Microsoft.Data.OData.dll" target="Binaries\OrleansServer\Microsoft.Data.OData.dll" />
-          <file src="..\..\Binaries\Release\Microsoft.Data.Services.Client.dll" target="Binaries\OrleansServer\Microsoft.Data.Services.Client.dll" />
-          <file src="..\..\Binaries\Release\System.Spatial.dll" target="Binaries\OrleansServer\System.Spatial.dll"  />
-          <file src="..\..\Binaries\Release\Orleans.dll" target="Binaries\OrleansServer\Orleans.dll" />
-          <file src="..\..\Binaries\Release\Orleans.SDK.targets" target="Binaries\OrleansServer\Orleans.SDK.targets" />
-          <file src="..\..\Binaries\Release\Orleans.xml" target="Binaries\OrleansServer\Orleans.xml" />
-          <file src="..\..\Binaries\Release\OrleansAzureUtils.dll" target="Binaries\OrleansServer\OrleansAzureUtils.dll" />
-          <file src="..\..\Binaries\Release\OrleansAzureUtils.xml" target="Binaries\OrleansServer\OrleansAzureUtils.xml" />
-          <file src="..\..\Binaries\Release\OrleansConfiguration.xml" target="Binaries\OrleansServer\OrleansConfiguration.xml" />
-          <file src="..\..\Binaries\Release\Configuration\OrleansConfiguration.xsd" target="Binaries\OrleansServer\OrleansConfiguration.xsd" />
-          <file src="..\..\Binaries\Release\OrleansHost.exe" target="Binaries\OrleansServer\OrleansHost.exe" />
-          <file src="..\..\Binaries\Release\OrleansHost.exe.config" target="Binaries\OrleansServer\OrleansHost.exe.config" />
-          <file src="..\..\Binaries\Release\OrleansManager.exe" target="Binaries\OrleansClient\OrleansManager.exe" />
-          <file src="..\..\Binaries\Release\OrleansManager.exe.config" target="Binaries\OrleansClient\OrleansManager.exe.config" />
-          <file src="..\..\Binaries\Release\OrleansProviders.dll" target="Binaries\OrleansClient\OrleansProviders.dll" />
-          <file src="..\..\Binaries\Release\OrleansRuntime.dll" target="Binaries\OrleansClient\OrleansRuntime.dll" />
-          <file src="..\..\Binaries\Release\StartOrleans.cmd" target="Binaries\OrleansClient\StartOrleans.cmd" />
-          <file src="..\..\Binaries\Release\SQLServer\CreateTables.sql" target="Binaries\OrleansClient\CreateTables.sql" />
-          <file src="..\..\Binaries\Release\Newtonsoft.Json.dll" target="Binaries\OrleansClient\Newtonsoft.Json.dll" />
-          
-          <file src="..\..\misc\scripts\RemoteDeployment\**" target="RemoteDeployment" />
-        </files>
-      </package>
+    <file src="..\..\Binaries\Release\Orleans.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\Orleans.xml" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansAzureUtils.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansAzureUtils.xml" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansProviders.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansRuntime.dll" target="Binaries" />
+
+    <file src="..\..\Binaries\Release\CounterControl.exe" target="Binaries" />
+    <file src="..\..\Binaries\Release\CounterControl.exe.config" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansHost.exe" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansHost.exe.config" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansManager.exe" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansManager.exe.config" target="Binaries" />
+    <file src="..\..\Binaries\Release\*.cmd" target="Binaries" />
+    
+    <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Configuration.dll" target="Binaries"/>
+    <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Storage.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.ServiceRuntime.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\Microsoft.Data.Edm.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\Microsoft.Data.OData.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\Microsoft.Data.Services.Client.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\Newtonsoft.Json.dll" target="Binaries" />
+    <file src="..\..\Binaries\Release\System.Spatial.dll" target="Binaries"  />
+
+    <file src="..\..\misc\scripts\RemoteDeployment\**" target="RemoteDeployment" />
+  </files>
+</package>

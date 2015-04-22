@@ -47,7 +47,7 @@ if not "%BuildingInsideVisualStudio%" == "true" (
         @echo Clean old generated Orleans NuGet packages from %TargetDir%
         del /q *.nupkg
 
-        @echo Build Orleans NuGet packages from %TargetDir%
+        @echo ===== Build Orleans NuGet packages from %TargetDir%
         call "%SolutionDir%NuGet\CreateOrleansPackages.bat" . .\Version.txt
         if ERRORLEVEL 1 EXIT /B 1
     
@@ -61,7 +61,7 @@ if not "%BuildingInsideVisualStudio%" == "true" (
         @echo Clean old generated Orleans Chocolatey packages from %TargetDir%
         del /q *.nupkg
 
-        @echo Build Orleans Chocolatey packages from %TargetDir%
+        @echo ===== Build Orleans Chocolatey packages from %TargetDir%
         call "%SolutionDir%Chocolatey\CreateOrleansChocolateyPackage.bat" . .\Version.txt
         if ERRORLEVEL 1 EXIT /B 1
     
