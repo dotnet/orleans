@@ -390,17 +390,16 @@ namespace Orleans.CodeGeneration
 
             if (isLongCompoundKey)
             {
-                // the programmer has specified [ExtendedPrimaryKey] on the interface.
                 add(@"
                         public static {0} GetGrain(long primaryKey, string keyExt)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt));
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey: primaryKey, keyExtension: keyExt);
                         }}");
 
                 add(@"
                         public static {0} GetGrain(long primaryKey, string keyExt, string grainClassNamePrefix)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt, grainClassNamePrefix));
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey: primaryKey, keyExtension: keyExt, grainClassNamePrefix: grainClassNamePrefix);
                         }}");
             }
             else if (isGuidCompoundKey)
@@ -408,19 +407,64 @@ namespace Orleans.CodeGeneration
                 add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt));
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey: primaryKey, keyExtension: keyExt);
                         }}");
 
                 add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt, string grainClassNamePrefix)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt,grainClassNamePrefix));
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey: primaryKey, keyExtension: keyExt, grainClassNamePrefix: grainClassNamePrefix);
                         }}");
             }
             else
             {
                 // the programmer has not specified [ExplicitPlacement] on the interface nor [ExtendedPrimaryKey].
-                if (isLongKey || isDefaultKey)
+                if (isLongKey)
+                {
+                    add(@"
+                        public static {0} GetGrain(long primaryKey)
+                        {{
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey);
+                        }}");
+
+                    add(@"
+                        public static {0} GetGrain(long primaryKey, string grainClassNamePrefix)
+                        {{
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey, grainClassNamePrefix);
+                        }}");
+                }
+
+                if (isGuidKey)
+                {
+                    add(@"
+                        public static {0} GetGrain(System.Guid primaryKey)
+                        {{
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey);
+                        }}");
+
+                    add(@"
+                        public static {0} GetGrain(System.Guid primaryKey, string grainClassNamePrefix)
+                        {{
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey, grainClassNamePrefix);
+                        }}");
+                }
+
+                if (isStringKey)
+                {
+                    add(@"
+                        public static {0} GetGrain(System.String primaryKey)
+                        {{
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey);
+                        }}");
+
+                    add(@"
+                        public static {0} GetGrain(System.String primaryKey, string grainClassNamePrefix)
+                        {{
+                            return global::Orleans.GrainFactory.GetGrain<{0}>(primaryKey, grainClassNamePrefix);
+                        }}");
+                }
+
+                if (isDefaultKey)
                 {
                     add(@"
                         public static {0} GetGrain(long primaryKey)
@@ -433,33 +477,16 @@ namespace Orleans.CodeGeneration
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey, grainClassNamePrefix));
                         }}");
-                }
 
-                if (isGuidKey || isDefaultKey)
-                {
                     add(@"
                         public static {0} GetGrain(System.Guid primaryKey)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey));
                         }}");
 
+
                     add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string grainClassNamePrefix)
-                        {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey, grainClassNamePrefix));
-                        }}");
-                }
-
-                if (isStringKey)
-                {
-                    add(@"
-                        public static {0} GetGrain(System.String primaryKey)
-                        {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey));
-                        }}");
-
-                    add(@"
-                        public static {0} GetGrain(System.String primaryKey, string grainClassNamePrefix)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey, grainClassNamePrefix));
                         }}");

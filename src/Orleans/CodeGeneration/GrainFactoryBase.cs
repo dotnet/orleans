@@ -53,7 +53,6 @@ namespace Orleans.CodeGeneration
                 MakeGrainReference(
                     implementation => TypeCodeMapper.ComposeGrainId(implementation, primaryKey, grainInterfaceType),
                     grainInterfaceType,
-                    interfaceId,
                     grainClassNamePrefix);
         }
 
@@ -76,7 +75,6 @@ namespace Orleans.CodeGeneration
                 MakeGrainReference(
                     implementation => TypeCodeMapper.ComposeGrainId(implementation, primaryKey, grainInterfaceType),
                     grainInterfaceType,
-                    interfaceId,
                     grainClassNamePrefix);
         }
 
@@ -99,7 +97,6 @@ namespace Orleans.CodeGeneration
                 MakeGrainReference(
                     implementation => TypeCodeMapper.ComposeGrainId(implementation, primaryKey, grainInterfaceType),
                     grainInterfaceType,
-                    interfaceId,
                     grainClassNamePrefix);
         }
 
@@ -126,7 +123,6 @@ namespace Orleans.CodeGeneration
                 MakeGrainReference(
                     implementation => TypeCodeMapper.ComposeGrainId(implementation, primaryKey, grainInterfaceType, keyExt),
                     grainInterfaceType,
-                    interfaceId,
                     grainClassNamePrefix);
         }
 
@@ -153,11 +149,10 @@ namespace Orleans.CodeGeneration
                 MakeGrainReference(
                     implementation => TypeCodeMapper.ComposeGrainId(implementation, primaryKey, grainInterfaceType, keyExt),
                     grainInterfaceType,
-                    interfaceId,
                     grainClassNamePrefix);
         }
 
-        internal static IAddressable MakeGrainReference_FromType(
+        internal static IAddressable MakeGrainReference(
             Func<GrainClassData, GrainId> getGrainId,
             Type interfaceType,
             string grainClassNamePrefix = null)
@@ -170,23 +165,6 @@ namespace Orleans.CodeGeneration
             var implementation = TypeCodeMapper.GetImplementation(interfaceType, grainClassNamePrefix);
             GrainId grainId = getGrainId(implementation);
             return GrainReference.FromGrainId(grainId, interfaceType.IsGenericType ? interfaceType.UnderlyingSystemType.FullName : null);
-        }
-
-        internal static IAddressable MakeGrainReference(
-            Func<GrainClassData, GrainId> getGrainId,
-            Type grainType,
-            int interfaceId,
-            string grainClassNamePrefix = null)
-        {
-            CheckRuntimeEnvironmentSetup();
-            if (!GrainInterfaceData.IsGrainType(grainType))
-            {
-                throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + grainType.FullName);
-            }
-            var implementation = TypeCodeMapper.GetImplementation(grainType, grainClassNamePrefix);
-            GrainId grainId = getGrainId(implementation);
-            return GrainReference.FromGrainId(grainId, 
-                grainType.IsGenericType ? grainType.UnderlyingSystemType.FullName : null);
         }
 
         /// <summary>
