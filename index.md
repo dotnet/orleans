@@ -67,8 +67,6 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Orleans Best Practices](http://research.microsoft.com/apps/pubs/default.aspx?id=244727)** - A collection of tips and trick to help design, build, and run an Orleans-based application.
 
-* **[PAD -- Performance Anomaly Detection in Multi-Server Distributed Systems](http://research.microsoft.com/apps/pubs/default.aspx?id=217109)**
-
 * The original **[Orleans Codeplex site](https://orleans.codeplex.com)** with documentation, samples and discussion forum . Now deprecated -- all source code, documentation and samples have now been migrated to GitHub.
 
 * **[Links](Links)** Blog posts, articles and other links about Orleans.
