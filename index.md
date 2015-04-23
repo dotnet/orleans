@@ -17,7 +17,7 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Orleans NuGet Packages](NuGets)**
 
-* **[What's new in Orleans?](What's-new-in-Orleans)** - Coverage of the new and changed features in the September refresh of the preview binaries.
+* **[What's new in Orleans?](What's-new-in-Orleans)** - Coverage of the new and changed features since the original September 2014 preview release.
 
 ## Introduction and Tutorials
 
@@ -45,26 +45,30 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 ## Community and Contributions
 
-* **[Orleans GitHub Repository](https://github.com/dotnet/orleans)**
+* **[Orleans GitHub Repository](https://github.com/dotnet/orleans)** Pull requests are always welcome!
 
-* **[Repository of community add-ons to Orleans](https://github.com/OrleansContrib)**
+* **[Orleans Community - Repository of community add-ons to Orleans](https://github.com/OrleansContrib)** Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
 
-* **[Orleans Virtual Meetups](https://github.com/OrleansContrib/meetups)**
+* **[Orleans Community - Virtual Meetups](https://github.com/OrleansContrib/meetups)**
 
-* **[Orleans Gitter Chat Forum](https://gitter.im/dotnet/orleans)**
+* **[Orleans Community - Gitter Chat Forum](https://gitter.im/dotnet/orleans)**
 
 * **[Ideas for Contributions](Ideas-for-Contributions)**
 
-* **[Student Projects](Student-Projects)**
+* **[Intern and Student Projects](Student-Projects)**
+
+* **[Who Is Using Orleans?](Who-Is-Using-Orleans)** A partial list of companies, projects and applications which are using Orleans.
 
 ## Other Documentation Resources
 
-* **[Orleans Best Practices](files/Orleans Best Practices.pptx)** - A collection of tips and trick to help design, build, and run an Orleans-based application.
+* **[Microsoft Research Project Orleans home page](http://research.microsoft.com/en-us/projects/orleans/)**
 
-* **[Latest Orleans technical report](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf)**
+* **[Orleans Technical Report - Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)**
 
-* **[Original Orleans Codeplex site](https://orleans.codeplex.com)** with documentation, samples and discussion forum (will be migrated here)
+* **[Orleans Best Practices](http://research.microsoft.com/apps/pubs/default.aspx?id=244727)** - A collection of tips and trick to help design, build, and run an Orleans-based application.
 
-* **[Microsoft Research project page](http://research.microsoft.com/en-us/projects/orleans/)**
+* **[PAD -- Performance Anomaly Detection in Multi-Server Distributed Systems](http://research.microsoft.com/apps/pubs/default.aspx?id=217109)**
 
-* **[Links](Links)**
+* The original **[Orleans Codeplex site](https://orleans.codeplex.com)** with documentation, samples and discussion forum . Now deprecated -- all source code, documentation and samples have now been migrated to GitHub.
+
+* **[Links](Links)** Blog posts, articles and other links about Orleans.
