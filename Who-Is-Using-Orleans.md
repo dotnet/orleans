@@ -1,5 +1,5 @@
 ---
-layout: index
+layout: page
 title: Who Is Using Orleans?
 tagline: A partial list of companies and projects that are using Orleans
 ---
