@@ -1,11 +1,10 @@
 ---
 layout: index
 title: Who Is Using Orleans?
-tagline: A partial list of some companies and projects that are using Orleans.
+tagline: A partial list of companies and projects that are using Orleans
 ---
 {% include JB/setup %}
 
-# Who Is Using Orleans?
 
 Orleans has been used extensively by several Microsoft projects and product groups, 
 most notably by 343 Industries as a platform for all of Halo 4 cloud services.
@@ -22,11 +21,11 @@ Feel free to send us a pull request on GitHub to add your company / project to t
 This list is for companies that are using Orleans.
 
 Company|Link|Notes
--------|----|-----
-Gassumo|<a href="http://gassumo.com" target="_blank">www.gassumo.com</a>|
-Microsoft|<a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>|
-Microsoft Research|<a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
-NašeÚkoly.CZ|<a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
+---------|------|-------
+Gassumo  | <a href="http://gassumo.com" target="_blank">www.gassumo.com</a>|
+Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>|
+Microsoft Research  |  <a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
+NašeÚkoly.CZ    |<a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
 
 
 ## Projects and Applications
