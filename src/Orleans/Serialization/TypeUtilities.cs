@@ -65,12 +65,8 @@ namespace Orleans.Serialization
                 t == typeof (Immutable<>))
                 return true;
 
-            var attributes = t.GetCustomAttributesData();
-            if (attributes != null && attributes.Count > 0)
-            {
-                if(attributes.Any(attr => attr.AttributeType == (typeof (ImmutableAttribute))))
-                    return true;
-            }
+            if (t.GetCustomAttributes(typeof (ImmutableAttribute), false).Length > 0) 
+                return true;  
 
             if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof (Immutable<>))
                 return true;
