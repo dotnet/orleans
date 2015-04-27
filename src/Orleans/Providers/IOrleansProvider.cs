@@ -60,7 +60,7 @@ namespace Orleans.Providers
     /// <summary>
     /// Internal provider management interface for instantiating dependent providers in a hierarchical tree of dependencies
     /// </summary>
-    internal interface IProviderManager
+    public interface IProviderManager
     {
         /// <summary>
         /// Call into Provider Manager for instantiating dependent providers in a hierarchical tree of dependencies

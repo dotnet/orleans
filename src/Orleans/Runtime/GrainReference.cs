@@ -472,7 +472,7 @@ namespace Orleans.Runtime
             else if (typeof(Grain).IsAssignableFrom(sourceType))
             {
                 Grain grainClassRef = (Grain)grainRef;
-                GrainReference g = FromGrainId(grainClassRef.Identity);
+                GrainReference g = FromGrainId(grainClassRef.Data.Identity);
                 grainRef = g;
             }
             else if (!typeof(GrainReference).IsAssignableFrom(sourceType))

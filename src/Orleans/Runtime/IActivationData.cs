@@ -27,6 +27,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Runtime
 {
+    //TODO: this interface should not meta-data for a grain activation. 
     internal interface IActivationData
     {
         GrainReference GrainReference { get; }
@@ -36,8 +37,11 @@ namespace Orleans.Runtime
         ActivationAddress Address { get; }
         string IdentityString { get; }
         string RuntimeIdentity { get;  }
-        void DeactivateOnIdle();
+
+        // TODO: move this logic to the GrainRuntime
         void DelayDeactivation(TimeSpan timeSpan);
+
+        // TODO: move this logic to the GrainRuntime
         IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
     }
 }

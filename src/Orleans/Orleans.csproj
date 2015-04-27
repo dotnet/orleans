@@ -119,6 +119,8 @@
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
     <Compile Include="Core\Exceptions.cs" />
+    <Compile Include="Core\GrainIdentity.cs" />
+    <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IGrainState.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="IDs\GuidId.cs" />
@@ -126,6 +128,7 @@
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
+    <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
     <Compile Include="AssemblyLoader\AssemblyLoader.cs" />
@@ -133,8 +136,12 @@
     <Compile Include="AssemblyLoader\CachedReflectionOnlyTypeResolver.cs" />
     <Compile Include="Runtime\IActivationData.cs" />
     <Compile Include="IDs\UniqueKey.cs" />
+    <Compile Include="Core\IGrainFactory.cs" />
+    <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />
+    <Compile Include="Timers\ITimerRegistry.cs" />
     <Compile Include="Statistics\StageAnalysis.cs" />
     <Compile Include="Core\GrainFactory.cs" />
     <Compile Include="Runtime\HashRing.cs" />
@@ -216,6 +223,8 @@
     <Compile Include="Streams\Core\StreamSequenceToken.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
     <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
+    <Compile Include="Timers\ReminderRegistry.cs" />
+    <Compile Include="Timers\TimerRegistry.cs" />
     <Compile Include="Utils\SetExtensions.cs" />
     <Compile Include="Placement\ActivationCountBasedPlacement.cs" />
     <Compile Include="Placement\StatelessWorkerPlacement.cs" />

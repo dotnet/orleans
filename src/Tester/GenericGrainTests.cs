@@ -44,14 +44,14 @@ namespace UnitTests.General
         {
         }
 
-        public static I GetGrain<I>(int i) where I : IGrainWithIntegerKey
+        public TGrainInterface GetGrain<TGrainInterface>(int i) where TGrainInterface : IGrainWithIntegerKey
         {
-            return GrainFactory.GetGrain<I>(i);
+            return GrainFactory.GetGrain<TGrainInterface>(i);
         }
 
-        public static I GetGrain<I>() where I : IGrainWithIntegerKey 
+        public TGrainInterface GetGrain<TGrainInterface>() where TGrainInterface : IGrainWithIntegerKey 
         {
-            return GrainFactory.GetGrain<I>(GetRandomGrainId());
+            return GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
         }
 
         private static int GetRandomGrainId()

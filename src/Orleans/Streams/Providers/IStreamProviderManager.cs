@@ -26,7 +26,7 @@ using Orleans.Providers;
 
 namespace Orleans.Streams
 {
-    internal interface IStreamProviderManager : IProviderManager
+    public interface IStreamProviderManager : IProviderManager
     {
         IEnumerable<IStreamProvider> GetStreamProviders();
     }
