@@ -29,7 +29,8 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.Remoting;
 using System.Threading;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿﻿using System.Threading.Tasks;
+﻿﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 ﻿﻿using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -57,8 +58,7 @@ namespace UnitTests.Tester
         protected readonly UnitTestSiloOptions siloInitOptions;
         protected readonly UnitTestClientOptions clientInitOptions;
 
-        protected static GlobalConfiguration globalConfig = null;
-        protected static ClientConfiguration clientConfig = null;
+        private static TimeSpan livenessStabilizationTime;
 
         protected static readonly Random random = new Random();
 
@@ -170,23 +170,29 @@ namespace UnitTests.Tester
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
         public void WaitForLivenessToStabilize(bool didKill = false)
         {
+            TimeSpan stabilizationTime = livenessStabilizationTime;
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
+            Thread.Sleep(stabilizationTime);
+            WriteLog("WaitForLivenessToStabilize is done sleeping");
+        }
+
+        private static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
+        {
             TimeSpan stabilizationTime = TimeSpan.Zero;
             if (didKill)
             {
                 // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-                stabilizationTime = UnitTestUtils.Multiply(globalConfig.ProbeTimeout, globalConfig.NumMissedProbesLimit);
+                stabilizationTime = UnitTestUtils.Multiply(global.ProbeTimeout, global.NumMissedProbesLimit);
             }
-            if (globalConfig.UseLivenessGossip)
+            if (global.UseLivenessGossip)
             {
                 stabilizationTime += TimeSpan.FromSeconds(5);
             }
             else
             {
-                stabilizationTime += UnitTestUtils.Multiply(globalConfig.TableRefreshTimeout, 2);
+                stabilizationTime += UnitTestUtils.Multiply(global.TableRefreshTimeout, 2);
             }
-            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-            Thread.Sleep(stabilizationTime);
-            WriteLog("WaitForLivenessToStabilize is done sleeping");
+            return stabilizationTime;
         }
 
         /// <summary>
@@ -197,7 +203,8 @@ namespace UnitTests.Tester
         {
             SiloHandle instance = StartOrleansSilo(
                 Silo.SiloType.Secondary,
-                this.siloInitOptions);
+                this.siloInitOptions,
+                InstanceCounter++);
             additionalSilos.Add(instance);
             return instance;
         }
@@ -274,8 +281,8 @@ namespace UnitTests.Tester
             primarySiloOptions.PickNewDeploymentId = false;
             secondarySiloOptions.PickNewDeploymentId = false;
 
-            Primary = StartOrleansSilo(Silo.SiloType.Primary, primarySiloOptions);
-            Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions);
+            Primary = StartOrleansSilo(Silo.SiloType.Primary, primarySiloOptions, InstanceCounter++);
+            Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, InstanceCounter++);
             WaitForLivenessToStabilize();
             GrainClient.Initialize();
         }
@@ -317,14 +324,15 @@ namespace UnitTests.Tester
                 var options = instance.Options;
                 var type = instance.Silo.Type;
                 StopOrleansSilo(instance, stopGracefully);
-                instance = StartOrleansSilo(type, options);
+                instance = StartOrleansSilo(type, options, InstanceCounter++);
                 return instance;
             }
             return null;
         }
 
         #region Private methods
-        private void Initialize(UnitTestSiloOptions options, UnitTestClientOptions clientOptions = null)
+
+        private void Initialize(UnitTestSiloOptions options, UnitTestClientOptions clientOptions)
         {
             bool doStartPrimary = false;
             bool doStartSecondary = false;
@@ -365,17 +373,43 @@ namespace UnitTests.Tester
                 DeploymentId = GetDeploymentId();
             }
 
-            if (doStartPrimary)
+            if (options.ParallelStart)
             {
-                Primary = StartOrleansSilo(Silo.SiloType.Primary, options);
-            }
-            if (doStartSecondary)
+                var handles = new List<Task<SiloHandle>>();     
+                if (doStartPrimary)
+                {
+                    int instanceCount = InstanceCounter++;
+                    handles.Add(Task.Run(() => StartOrleansSilo(Silo.SiloType.Primary, options, instanceCount)));
+                }
+                if (doStartSecondary)
+                {
+                    int instanceCount = InstanceCounter++;
+                    handles.Add(Task.Run(() => StartOrleansSilo(Silo.SiloType.Secondary, options, instanceCount)));
+                }
+                Task.WhenAll(handles.ToArray()).Wait();
+                if (doStartPrimary)
+                {
+                    Primary = handles[0].Result;
+                }
+                if (doStartSecondary)
+                {
+                    Secondary = handles[1].Result;
+                }
+            }else
             {
-                Secondary = StartOrleansSilo(Silo.SiloType.Secondary, options);
+                if (doStartPrimary)
+                {
+                    Primary = StartOrleansSilo(Silo.SiloType.Primary, options, InstanceCounter++);
+                }
+                if (doStartSecondary)
+                {
+                    Secondary = StartOrleansSilo(Silo.SiloType.Secondary, options, InstanceCounter++);
+                }
             }
 
             if (!GrainClient.IsInitialized && options.StartClient)
             {
+                ClientConfiguration clientConfig;
                 if (clientOptions.ClientConfigFile != null)
                 {
                     clientConfig = ClientConfiguration.LoadFromFile(clientOptions.ClientConfigFile.FullName);
@@ -417,7 +451,7 @@ namespace UnitTests.Tester
             }
         }
 
-        private SiloHandle StartOrleansSilo(Silo.SiloType type, UnitTestSiloOptions options, AppDomain shared = null)
+        private SiloHandle StartOrleansSilo(Silo.SiloType type, UnitTestSiloOptions options, int instanceCount, AppDomain shared = null)
         {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
@@ -458,7 +492,7 @@ namespace UnitTests.Tester
 
             config.AdjustForTestEnvironment();
 
-            globalConfig = config.Globals;
+            livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
             
             string siloName;
             switch (type)
@@ -467,27 +501,25 @@ namespace UnitTests.Tester
                     siloName = "Primary";
                     break;
                 default:
-                    siloName = "Secondary_" + InstanceCounter.ToString(CultureInfo.InvariantCulture);
+                    siloName = "Secondary_" + instanceCount.ToString(CultureInfo.InvariantCulture);
                     break;
             }
 
             NodeConfiguration nodeConfig = config.GetConfigurationForNode(siloName);
             nodeConfig.HostNameOrIPAddress = "loopback";
-            nodeConfig.Port = basePort + InstanceCounter;
+            nodeConfig.Port = basePort + instanceCount;
             nodeConfig.DefaultTraceLevel = config.Defaults.DefaultTraceLevel;
             nodeConfig.PropagateActivityId = config.Defaults.PropagateActivityId;
             nodeConfig.BulkMessageLimit = config.Defaults.BulkMessageLimit;
 
             if (nodeConfig.ProxyGatewayEndpoint != null && nodeConfig.ProxyGatewayEndpoint.Address != null)
             {
-                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, ProxyBasePort + InstanceCounter);
+                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, ProxyBasePort + instanceCount);
             }
 
             config.Globals.ExpectedClusterSize = 2;
 
             config.Overrides[siloName] = nodeConfig;
-
-            InstanceCounter++;
 
             WriteLog("Starting a new silo in app domain {0} with config {1}", siloName, config.ToString(siloName));
             AppDomain appDomain;
@@ -526,7 +558,7 @@ namespace UnitTests.Tester
             instance.Process = null;
         }
 
-        private Silo LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, out AppDomain appDomain)
+        private static Silo LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, out AppDomain appDomain)
         {
             AppDomainSetup setup = GetAppDomainSetupInfo();
 

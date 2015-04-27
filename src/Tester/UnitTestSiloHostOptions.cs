@@ -63,6 +63,7 @@ namespace UnitTests.Tester
         public string MachineName { get; set; }
         public int LargeMessageWarningThreshold { get; set; }
         public GlobalConfiguration.LivenessProviderType LivenessType { get; set; }
+        public bool ParallelStart { get; set; }
 
         public UnitTestSiloOptions()
         {
@@ -76,6 +77,7 @@ namespace UnitTests.Tester
             MachineName = ".";
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
             SiloConfigFile = new FileInfo("OrleansConfigurationForUnitTests.xml");
+            ParallelStart = false;
         }
 
         public UnitTestSiloOptions Copy()
@@ -92,7 +94,8 @@ namespace UnitTests.Tester
                 MachineName = MachineName,
                 LargeMessageWarningThreshold = LargeMessageWarningThreshold,
                 PropagateActivityId = PropagateActivityId,
-                LivenessType = LivenessType
+                LivenessType = LivenessType,
+                ParallelStart = ParallelStart
             };
         }
     }
