@@ -18,7 +18,7 @@ If the Orleans system is configured not to do automatic retries (default setting
 
 In the system with retries (either by the runtime or by the application) the message may arrive multiple times. Orleans currently does nothing to durably store which messages already arrived and suppress the second delivery (we believe this would be pretty costly). So in the system with retries Orleans does NOT guarantee at most once delivery. 
 
-**If you keep retrying potentially indefinitely**, **the message will eventually arrive**, thus providing at least once delivery guarantee. Notice that “will eventually arrive” is something that the runtime needs to guarantee. It does not come for free just by itself. Orleans provides that since grains never go into any permanent failure state and a failed grain will for sure eventually be re-activated on another silo.
+**If you keep retrying potentially indefinitely**, **the message will eventually arrive**, thus providing at least once delivery guarantee. Notice that “will eventually arrive” is something that the runtime needs to guarantee. It does not come for free just by itself even if you keep retrying. Orleans provides eventually delivery since grains never go into any permanent failure state and a failed grain will for sure eventually be re-activated on another silo.
 
 **So to summarize**: in the system without retries Orleans guarantees at most once message delivery. In the system with infinite retries Orleans guarantee at least once (and does NOT guarantee at most once).
 
