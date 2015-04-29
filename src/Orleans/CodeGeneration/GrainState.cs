@@ -112,131 +112,57 @@ namespace Orleans.CodeGeneration
             grainTypeName = grainTypeFullName;
         }
 
+        #region IGrainState storage operation methods
+        /// <summary>
+        /// Async method to cause refresh of the current grain state data from backing store.
+        /// Any previous contents of the grain state data will be overwritten.
+        /// </summary>
+        [Obsolete("Use Grain.Storage.ReadStateAsync method instead.")]
+        public async Task ReadStateAsync()
+        {
+            var grain = RuntimeClient.Current.CurrentActivationData.GrainInstance as Grain<IGrainState>;
+            if (grain == null)
+            {
+                throw new NullReferenceException("No GrainInstance has been set up.");
+            }
+            await grain.Storage.ReadStateAsync();
+        }
+
+        /// <summary>
+        /// Async method to cause write of the current grain state data into backing store.
+        /// </summary>
+        [Obsolete("Use Grain.Storage.WriteStateAsync method instead.")]
+        public async Task WriteStateAsync()
+        {
+            var grain = RuntimeClient.Current.CurrentActivationData.GrainInstance as Grain<IGrainState>;
+            if (grain == null)
+            {
+                throw new NullReferenceException("No GrainInstance has been set up.");
+            }
+            await grain.Storage.WriteStateAsync();
+        }
+
+        /// <summary>
+        /// Async method to cause write of the current grain state data into backing store.
+        /// </summary>
+        [Obsolete("Use Grain.Storage.ClearStateAsync method instead.")]
+        public async Task ClearStateAsync()
+        {
+            var grain = RuntimeClient.Current.CurrentActivationData.GrainInstance as Grain<IGrainState>;
+            if (grain == null)
+            {
+                throw new NullReferenceException("No GrainInstance has been set up.");
+            }
+            await grain.Storage.ClearStateAsync();
+        }
+        #endregion
+
         #region IGrainState properties & methods
 
         /// <summary>
         /// Opaque value set by the storage provider representing an 'Etag' setting for the last time the state data was read from backing store.
         /// </summary>
         public string Etag { get; set; }
-
-        /// <summary>
-        /// Async method to cause refresh of the current grain state data from backing store.
-        /// Any previous contents of the grain state data will be overwritten.
-        /// </summary>
-        public async Task ReadStateAsync()
-        {
-            const string what = "ReadState";
-            Stopwatch sw = Stopwatch.StartNew();
-            // The below is the worng way to create GrainReference.
-            // IAddressable.AsReference is also a wrong way to get GrainReference.
-            // Both are weakly types and lose the actual strongly typed Grain Reference.
-            GrainReference grainRef = RuntimeClient.Current.CurrentActivationData.GrainReference;
-            IStorageProvider storage = GetCheckStorageProvider(what);
-            try
-            {
-                await storage.ReadStateAsync(grainTypeName, grainRef, this);
-                StorageStatisticsGroup.OnStorageRead(storage, grainTypeName, grainRef, sw.Elapsed);
-            }
-            catch (Exception exc)
-            {
-                StorageStatisticsGroup.OnStorageReadError(storage, grainTypeName, grainRef);
-                string errMsg = MakeErrorMsg(what, grainRef, exc);
-
-                storage.Log.Error((int)ErrorCode.StorageProvider_ReadFailed, errMsg, exc);
-                throw new OrleansException(errMsg, exc);
-            }
-            finally
-            {
-                sw.Stop();
-            }
-        }
-
-        /// <summary>
-        /// Async method to cause write of the current grain state data into backing store.
-        /// </summary>
-        public async Task WriteStateAsync()
-        {
-            const string what = "WriteState";
-            Stopwatch sw = Stopwatch.StartNew();
-            GrainReference grainRef = RuntimeClient.Current.CurrentActivationData.GrainReference;
-            IStorageProvider storage = GetCheckStorageProvider(what);
-
-            Exception errorOccurred;
-            try
-            {
-                await storage.WriteStateAsync(grainTypeName, grainRef, this);
-                StorageStatisticsGroup.OnStorageWrite(storage, grainTypeName, grainRef, sw.Elapsed);
-                errorOccurred = null;
-            }
-            catch (Exception exc)
-            {
-                errorOccurred = exc;
-            }
-            // Note, we can't do this inside catch block above, because await is not permitted there.
-            if (errorOccurred != null)
-            {
-                StorageStatisticsGroup.OnStorageWriteError(storage, grainTypeName, grainRef);
-                string errMsgToLog = MakeErrorMsg(what, grainRef, errorOccurred);
-
-                storage.Log.Error((int)ErrorCode.StorageProvider_WriteFailed, errMsgToLog, errorOccurred);
-                errorOccurred = new OrleansException(errMsgToLog, errorOccurred);
-
-#if REREAD_STATE_AFTER_WRITE_FAILED
-            // Force rollback to previously stored state
-            try
-            {
-                sw.Restart();
-                storage.Log.Warn((int)ErrorCode.StorageProvider_ForceReRead, "Forcing re-read of last good state for grain Type={0}", grainTypeName);
-                await storage.ReadStateAsync(grainTypeName, grainId, this);
-                StorageStatisticsGroup.OnStorageRead(storage, grainTypeName, grainId, sw.Elapsed);
-            }
-            catch (Exception exc)
-            {
-                StorageStatisticsGroup.OnStorageReadError(storage, grainTypeName, grainId);
-                // Should we ignore this secondary error, and just return the original one?
-                errMsg = MakeErrorMsg("re-read state from store after write error", grainId, exc);
-                errorOccurred = new OrleansException(errMsg, exc);
-            }
-#endif
-            }
-            sw.Stop();
-            if (errorOccurred != null)
-            {
-                throw errorOccurred;
-            }
-        }
-
-        /// <summary>
-        /// Async method to cause write of the current grain state data into backing store.
-        /// </summary>
-        public async Task ClearStateAsync()
-        {
-            const string what = "ClearState";
-            Stopwatch sw = Stopwatch.StartNew();
-            GrainReference grainRef = RuntimeClient.Current.CurrentActivationData.GrainReference;
-            IStorageProvider storage = GetCheckStorageProvider(what);
-            try
-            {
-                // Clear (most likely Delete) state from external storage
-                await storage.ClearStateAsync(grainTypeName, grainRef, this);
-                // Null out the in-memory copy of the state
-                SetAll(null);
-                // Update counters
-                StorageStatisticsGroup.OnStorageDelete(storage, grainTypeName, grainRef, sw.Elapsed);
-            }
-            catch (Exception exc)
-            {
-                StorageStatisticsGroup.OnStorageDeleteError(storage, grainTypeName, grainRef);
-                string errMsg = MakeErrorMsg(what, grainRef, exc);
-
-                storage.Log.Error((int)ErrorCode.StorageProvider_DeleteFailed, errMsg, exc);
-                throw new OrleansException(errMsg, exc);
-            }
-            finally
-            {
-                sw.Stop();
-            }
-        }
 
         /// <summary>
         /// Converts this property bag into a dictionary.
@@ -262,25 +188,5 @@ namespace Orleans.CodeGeneration
             // All system data is handled by SetAllInternal method, which calls this.
         }
         #endregion
-
-        private string MakeErrorMsg(string what, GrainReference grainReference, Exception exc)
-        {
-            HttpStatusCode httpStatusCode;
-            string errorCode;
-            AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out errorCode, true);
-            return string.Format("Error from storage provider during {0} for grain Type={1} Pk={2} Id={3} Error={4}"  + Environment.NewLine + " {5}",
-                what, grainTypeName, grainReference.GrainId.ToDetailedString(), grainReference, errorCode, TraceLogger.PrintException(exc));
-        }
-
-        private IStorageProvider GetCheckStorageProvider(string what)
-        {
-            IStorageProvider storage = RuntimeClient.Current.CurrentStorageProvider;
-            if (storage == null)
-            {
-                throw new OrleansException(string.Format(
-                    "Cannot {0} - No storage provider configured for grain Type={1}", what, grainTypeName));
-            }
-            return storage;
-        }
     }
  }
