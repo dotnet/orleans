@@ -25,7 +25,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -275,6 +274,22 @@ namespace Orleans
     public class Grain<TGrainState> : Grain
         where TGrainState : class, IGrainState
     {
+        private IStorage stateStorageBridge;
+
+        protected internal IStorage Storage
+        {
+            get
+            {
+                if (stateStorageBridge == null)
+                {
+                    // Lazy create the storage bridge
+                    IStorageProvider store = Data.StorageProvider;
+                    string grainTypeName = Data.GrainTypeName;
+                    stateStorageBridge = new GrainStateStorageBridge<TGrainState>(grainTypeName, this, store);
+                }
+                return stateStorageBridge;
+            }
+        }
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
         /// Client code should use the GrainFactory to get a reference to a Grain.

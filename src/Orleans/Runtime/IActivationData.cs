@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
@@ -32,16 +32,15 @@ namespace Orleans.Runtime
     {
         GrainReference GrainReference { get; }
         GrainId Identity { get; }
+        string GrainTypeName { get; }
         Grain GrainInstance { get; }
         ActivationId ActivationId { get; }
         ActivationAddress Address { get; }
         string IdentityString { get; }
         string RuntimeIdentity { get;  }
-
-        // TODO: move this logic to the GrainRuntime
+        void DeactivateOnIdle();
         void DelayDeactivation(TimeSpan timeSpan);
-
-        // TODO: move this logic to the GrainRuntime
+        IStorageProvider StorageProvider { get; }
         IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
     }
 }

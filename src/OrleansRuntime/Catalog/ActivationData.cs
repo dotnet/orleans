@@ -232,6 +232,18 @@ namespace Orleans.Runtime
 
         #endregion
 
+        public string GrainTypeName
+        {
+            get
+            {
+                if (GrainInstanceType == null)
+                {
+                    throw new ArgumentNullException("GrainInstanceType", "GrainInstanceType has not been set.");
+                }
+                return GrainInstanceType.FullName;
+            }
+        }
+
         internal Type GrainInstanceType { get; private set; }
 
         internal void SetGrainInstance(Grain grainInstance)
