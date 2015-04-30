@@ -20,97 +20,39 @@ In some cases grain code might need to “break out” of the Orleans task sched
 3) Methods with signature 'async void' should not be used with grains, they are intended for graphical user interface event handlers.
 
 
-For reference, this is a sample of one of the many canonical unit test case(s) we have for scheduler / sub-task behavior in the Orleans BVT / Nightly test suites:
+Belwo is a sample code that demonstrates the usage of `TaskScheduler.Current`, `Task.Run` and a special custom scheduler to escape from Orlean grain cnotext and get back to it.
 
 ``` csharp
    public Task MyGrainMethod()
     {
-        // This works.
-        var orleansTS = TaskScheduler.Current; // Grabs the Orleans task scheduler
+        // Grab the Orleans task scheduler
+        var orleansTs = TaskScheduler.Current; 
         await TaskDelay(10000);
-        Assert.AreEqual(orleansTS, TaskScheduler.Current); // Current task scheduler did not change, the code after await is        still running in the same task scheduler
+        // Current task scheduler did not change, the code after await is still running in the same task scheduler.
+        Assert.AreEqual(orleansTs, TaskScheduler.Current); 
         
-        Task.Run
         Task t1 = Task.Run( () => 
-             { 
-                 // This code runs on the thread pool scheduler, not on Orleans task scheduler
-                Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
-                Assert.AreEqual(TaskScheduler.Default, TaskScheduler.Current); 
-             }  );
+         { 
+            // This code runs on the thread pool scheduler, not on Orleans task scheduler
+            Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+            Assert.AreEqual(TaskScheduler.Default, TaskScheduler.Current); 
+         } );
         await t1;
-        Assert.AreEqual(orleansTS, TaskScheduler.Current); // We are back to Orleans task scheduler, since await was executed in  Orleans task scheduler context we are now back to that context.
+        // We are back to Orleans task scheduler, since await was executed in Orleans task scheduler context we are now back to that context.
+        Assert.AreEqual(orleansTS, TaskScheduler.Current); 
         
         Task t2 = Task.Factory.StartNew(() =>
-                {
-                   // This code runs on MyCustomSchedulerThatIWroteMyself scheduler, not on Orleans task scheduler
-                Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
-                Assert.AreEqual(MyCustomSchedulerThatIWroteMyself, TaskScheduler.Current); 
-                },
-                CancellationToken.None, TaskCreationOptions.None,
-                scheduler: MyCustomSchedulerThatIWroteMyself);
+         {
+            // This code runs on MyCustomSchedulerThatIWroteMyself scheduler, not on Orleans task scheduler
+            Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+            Assert.AreEqual(MyCustomSchedulerThatIWroteMyself, TaskScheduler.Current); 
+         },
+            CancellationToken.None, TaskCreationOptions.None,
+            scheduler: MyCustomSchedulerThatIWroteMyself);
         await t2;
-        Assert.AreEqual(orleansTS, TaskScheduler.Current); // We are back to Orleans task scheduler.
+        // We are back to Orleans task scheduler.
+        Assert.AreEqual(orleansTS, TaskScheduler.Current); 
     }
-```
-    
-``` csharp
-[TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Scheduler")]
-public async Task Sched_Task_WhenAny_Busy_Timeout()
-{
-    TaskScheduler scheduler = new ActivationTaskScheduler(masterScheduler.Pool);
-    ResultHandle pause1 = new ResultHandle();
-    ResultHandle pause2 = new ResultHandle();
-    ResultHandle finish = new ResultHandle();
-    Task<int> task1 = null;
-    Task<int> task2 = null;
-    Task join = null;
-
-    SafeRandom random = new SafeRandom();
-    Task wrapper = new Task(() =>
-    {
-        task1 = Task<int>.Factory.StartNew(() =>
-        {
-            Console.WriteLine("Task-1 Started");
-            Assert.AreEqual(scheduler, TaskScheduler.Current);
-
-            int num1 = 1;
-            while (!pause1.Done) // Infinite busy loop
-            {
-                num1 = random.Next();
-            }
-
-            Console.WriteLine("Task-1 Done");
-            return num1;
-        });
-
-        task2 = Task<int>.Factory.StartNew(() =>
-        {
-            Console.WriteLine("Task-2 Started");
-            Assert.AreEqual(scheduler, TaskScheduler.Current);
-
-            int num2 = 2;
-            while (!pause2.Done) // Infinite busy loop
-            {
-                num2 = random.Next();
-            }
-            Console.WriteLine("Task-2 Done");
-            return num2;
-        });
-
-        join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2)));
-        finish.Done = true;
-    });
-
-    wrapper.Start(scheduler);
-    finish.WaitForFinished(TimeSpan.FromSeconds(1));
-
-    await join;
-    Assert.IsTrue(join.IsCompleted && !join.IsFaulted, "Join Status " + join.Status);
-    Assert.IsFalse(task1.IsFaulted, "Task-1 Faulted " + task1.Exception);
-    Assert.IsFalse(task1.IsCompleted, "Task-1 Status " + task1.Status);
-    Assert.IsFalse(task2.IsFaulted, "Task-2 Faulted " + task2.Exception);
-    Assert.IsFalse(task2.IsCompleted, "Task-2 Status " + task2.Status);
-}
 ```
 
 ## Summary
