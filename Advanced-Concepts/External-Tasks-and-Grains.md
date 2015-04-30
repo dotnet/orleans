@@ -6,26 +6,20 @@ title: External Tasks and Grains
 
 [[THIS SECTON NEEDS TO BE UPDATED]]
 
-By design, any sub-Tasks spawned from grain code (for example, by using `await` or `ContinueWith` or `Task.Factory.StartNew`) will be dispatched on the same per-activation TPL Task Scheduler as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of [grain turn based concurency] (http://dotnet.github.io/orleans/Step-by-step-Tutorials/Concurrency).
+By design, any sub-Tasks spawned from grain code (for example, by using `await` or `ContinueWith` or `Task.Factory.StartNew`) will be dispatched on the same per-activation [TPL Task Scheduler](https://msdn.microsoft.com/en-us/library/dd997402(v=vs.110).aspx) as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of [grain turn based concurency](http://dotnet.github.io/orleans/Step-by-step-Tutorials/Concurrency).
 
-It is possible to “break out” of the Orleans task scheduling model by “doing something special”, such as explicitly pointing a Task to a different task scheduler (e.g. TaskScheduler.Default to run on .NET thread pool). However, our working hypothesis is this will be a very advanced and seldom required usage scenario beyond the “normal” usage patterns described below.
+In some cases grain code might need to “break out” of the Orleans task scheduling model and “do something special”, such as explicitly pointing a Task to a different task scheduler or using the .NET Thread pool. Example of such cases may be when the grain code has to execute a synchronous remote blocking call (such as remote IO). Doing that in the grain context will block the grain as well as one of the Orleans threads and thus should never be made. Instead, the grain code can execute this piece of blocking code on the thread pool thread and join (`await`) the completion of that execution and proceed in the grain context. However, our working hypothesis is this will be a very advanced and seldom required usage scenario beyond the “normal” usage patterns.
 
-Both Task.Delay and Task.Factory.FromAsync use .NET timer and/or .NET thread pool under the covers (which counts as “doing something special” for the purposes of this discussion), and so the normal Task.Delay / Timeout and FromAsync scenarios should work exactly the way you would intuitively expect them to when run under Orleans task scheduler.
+## Task based APIs:
 
-Similarly, Task.Run will ALWAYS run outside of the single-threaded execution model for Orleans grains, as it runs on .NET thread pool [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx).
+1) `await`, `Task.Factory.StartNew`, `Task.ContinuewWith`, `Task.WhenAny`, `Task.WhenAll`, `Task.Delay` all respect the current Task Scheduler. That means that using them in the default way, without passing a different TaskScheduler, will cause them to execte in the grain context.
 
-Whether new Task(...) and Task.Factory.StartNew work the way you “expect” them to depends on what you are trying to do. 
-
-By default, those new sub-Tasks WILL run subject to the single-threaded execution model for that grain, but possible to do various unnatural acts to escape.
-
-Again, our working hypothesis is that this is the “right” behavior for “least surprises”.
-
-Composite tasks primitives such as Task.WhenAny or Task.WhenAll can sometimes be a little tricky, because they themselves are “triggered” by .NET framework automatically based on state of input tasks, but any ContinueWith code chained to the composite (or code after await of that composite) will run under the “current” scheduler at the point the composite task was created. 
-
- In almost all cases though (modulo some extremely advanced Task scenarios) you should get the result you expect & want – When used from inside grain they will “Join” execution back into running under the Orleans per-activation task scheduler & single threaded execution model for that grain.
+2) Both `Task.Run` and the `endMethod` delegate of `Task.Factory.FromAsync` do NOT respect the current task Scheduler. They both use the TaskScheduler.Default scheduler, which is the .NET thread pool task Scheduler. Therefore, they will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx). Any continuation of `await` code chained to them will run back under the “current” scheduler at the point the composite task was created, which is the grain context. 
 
 
-As a side-note, methods with signature 'async void' should not be used with grains, they are intended for graphical user interface event handlers.
+3) Methods with signature 'async void' should not be used with grains, they are intended for graphical user interface event handlers.
+
+
 For reference, this is a sample of one of the many canonical unit test case(s) we have for scheduler / sub-task behavior in the Orleans BVT / Nightly test suites:
 
 ``` csharp
