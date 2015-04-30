@@ -77,13 +77,11 @@
     <Compile Include="Streams\AzureQueue\AzureQueueAdapterReceiver.cs" />
     <Compile Include="Streams\AzureQueue\SimpleAzureQueueStreamProvider.cs" />
     <Compile Include="Streams\AzureQueue\AzureQueueStreamProviderUtils.cs" />
-    <Compile Include="Streams\Common\IQueueAdapterCache.cs" />
-    <Compile Include="Streams\Common\SimpleQueueAdapterCacheCursor.cs" />
-    <Compile Include="Streams\Common\QueueAdapterCacheMissException .cs" />
+    <Compile Include="Streams\Common\SimpleQueueCache.cs" />
+    <Compile Include="Streams\Common\SimpleQueueCacheCursor.cs" />
     <Compile Include="Streams\Common\SimpleQueueAdapterCache.cs" />
     <Compile Include="Streams\Common\EventSequenceToken.cs" />
     <Compile Include="Streams\AzureQueue\AzureQueueBatchContainer.cs" />
-    <Compile Include="Streams\AzureQueue\AzureQueueStreamQueueMapper.cs" />
     <Compile Include="Streams\AzureQueue\AzureQueueStreamProvider.cs" />
     <Compile Include="ProviderErrorCode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -138,4 +136,3 @@
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>
-

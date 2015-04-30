@@ -21,24 +21,23 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
-using System.Runtime.Serialization;
+﻿using System.Threading.Tasks;
+using Orleans.Providers;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Exception indicates that the requested data is not available.
+    /// Adapter factory.  This should create an adapter from the stream provider configuration
     /// </summary>
-    [Serializable]
-    public class DataNotAvailableException : Exception
+    public interface IQueueAdapterFactory
     {
-        public DataNotAvailableException() : this("Data not found") { }
-        public DataNotAvailableException(string message) : base(message) { }
-        public DataNotAvailableException(string message, Exception inner) : base(message, inner) { }
+        void Init(IProviderConfiguration config, string providerName, Logger logger);
 
-        public DataNotAvailableException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
+        Task<IQueueAdapter> CreateAdapter();
+
+        IQueueAdapterCache GetQueueAdapterCache();
+
+        IStreamQueueMapper GetStreamQueueMapper();
     }
 }

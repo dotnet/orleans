@@ -110,7 +110,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <SubType>Designer</SubType>
     </Content>
-    <Content Include="OrleansConfigurationForAQUnitTests.xml">
+    <Content Include="OrleansConfigurationForStreamingUnitTests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="OrleansConfigurationForUnitTests.xml">

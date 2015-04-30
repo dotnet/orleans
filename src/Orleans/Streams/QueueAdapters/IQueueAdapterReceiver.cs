@@ -44,23 +44,7 @@ namespace Orleans.Streams
         /// Retrieves batches from a message queue.
         /// </summary>
         /// <returns></returns>
-        Task<IEnumerable<IBatchContainer>> GetQueueMessagesAsync();
-
-        /// <summary>
-        /// Add messages to the cache
-        /// </summary>
-        /// <param name="messages"></param>
-        void AddToCache(IEnumerable<IBatchContainer> messages);
-
-        /// <summary>
-        /// Acquire a stream message cursor.  This can be used to read messages from a
-        ///   stream starting at the location indicated by the provided token.
-        /// </summary>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
-        /// <param name="token"></param>
-        /// <returns></returns>
-        IQueueAdapterCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token);
+        Task<IEnumerable<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
 
         /// <summary>
         /// Receiver is no longer used.  Shutdown and clean up.

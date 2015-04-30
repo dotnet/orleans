@@ -43,6 +43,7 @@ namespace UnitTests.Tester
     /// Runs a Primary & Secondary silo in seperate app domains, and client in main app domain.
     /// Additional silos can also be started in-process if required for particular test cases.
     /// </summary>
+    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansConfigurationForUnitTests.xml")]
     [DeploymentItem("ClientConfigurationForUnitTests.xml")]
     [DeploymentItem("TestGrainInterfaces.dll")]

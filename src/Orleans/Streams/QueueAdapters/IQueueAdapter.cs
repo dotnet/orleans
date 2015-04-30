@@ -55,17 +55,15 @@ namespace Orleans.Streams
         IQueueAdapterReceiver CreateReceiver(QueueId queueId);
 
         /// <summary>
-        /// Returns IStreamQueueMapper.
-        /// </summary>
-        /// <returns></returns>
-        IStreamQueueMapper GetStreamQueueMapper();
-
-        /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
         /// </summary>
         /// <returns>True if this is a rewindable stream adapter, false otherwise.</returns>
         bool IsRewindable { get; }
 
+        /// <summary>
+        /// Direction of this queue adapter: Read, Write or ReadWrite.
+        /// </summary>
+        /// <returns>The direction in which this adapter provides data.</returns>
         StreamProviderDirection Direction { get; }
     }
 

@@ -25,17 +25,18 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using UnitTests.Tester;
 
 namespace Tester.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForAQUnitTests.xml")]
+    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class AQSubscriptionMultiplicityTests : UnitTestSiloHost
     {
-        private const string AQStreamProviderName = "AQProvider";                 // must match what is in OrleansConfigurationForUnitTests.xml
+        private const string AQStreamProviderName = "AzureQueueProvider";                 // must match what is in OrleansConfigurationForStreamingUnitTests.xml
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
         private readonly SubscriptionMultiplicityTestRunner runner;
@@ -44,10 +45,10 @@ namespace Tester.StreamingTests
             : base(new UnitTestSiloOptions
             {
                 StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForAQUnitTests.xml"),
+                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
             })
         {
-            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName);
+            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
         }
 
         [ClassInitialize]

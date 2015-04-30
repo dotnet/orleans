@@ -28,7 +28,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Enumerates the messages in a stream
     /// </summary>
-    public interface IQueueAdapterCacheCursor
+    public interface IQueueCacheCursor : IDisposable
     {
         /// <summary>
         /// Get the current value.

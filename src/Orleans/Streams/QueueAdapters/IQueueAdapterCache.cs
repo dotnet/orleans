@@ -21,17 +21,23 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using Orleans.Streams;
+﻿using System;
+using System.Collections.Generic;
+using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.AzureQueue
+namespace Orleans.Streams
 {
-    internal class AzureQueueStreamQueueMapper : HashRingBasedStreamQueueMapper
+    public interface IQueueAdapterCache
     {
-        private const int NUM_QUEUES = 8; // keep as power of 2.
+        /// <summary>
+        /// Create a cache for a given queue id
+        /// </summary>
+        /// <param name="messages"></param>
+        IQueueCache CreateQueueCache(QueueId queueId);
 
-        internal AzureQueueStreamQueueMapper(string queueNamePrefix)
-            : base(NUM_QUEUES, queueNamePrefix)
-        {
-        }
+        /// <summary>
+        /// Current total size of this cache.
+        /// </summary>
+        int Size { get; }
     }
 }

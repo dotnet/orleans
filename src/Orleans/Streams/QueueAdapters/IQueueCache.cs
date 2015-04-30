@@ -23,28 +23,45 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.Common
+namespace Orleans.Streams
 {
-    public interface IQueueAdapterCache
+    public interface IQueueCache
     {
         /// <summary>
-        /// Acquires a cursor to enumerate through the _messages starting at the provided token.
+        /// The id of the queue for which this cache is caching data.
         /// </summary>
-        /// <param name="sequenceToken"></param>
-        /// <returns></returns>
-        object GetCursor(StreamSequenceToken sequenceToken);
+        QueueId Id { get; }
 
         /// <summary>
-        /// Aquires the next message in the cache at the provided cursor
+        /// Current cache size.
         /// </summary>
-        /// <param name="cursorObj"></param>
-        /// <param name="batch"></param>
-        /// <param name="backPressure">Indicates how much backpressure this cursor should exert (0-100)</param>
-        /// <returns></returns>
-        bool TryGetNextMessage(object cursorObj, out IBatchContainer batch, out double backPressure);
+        int Size { get; }
 
-        void Add(IBatchContainer batch, StreamSequenceToken sequenceToken);
+        /// <summary>
+        /// The limit of the maximum number of items that can be added to the cache in a single AddToCache operation.
+        /// </summary>
+        int MaxAddCount { get; }
+
+        /// <summary>
+        /// Add messages to the cache
+        /// </summary>
+        /// <param name="messages"></param>
+        void AddToCache(IEnumerable<IBatchContainer> messages);
+
+        /// <summary>
+        /// Acquire a stream message cursor.  This can be used to retreave messages from the
+        ///   cache starting at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamGuid"></param>
+        /// <param name="streamNamespace"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token);
+
+        /// <summary>
+        /// Returns true if this cache is under pressure.
+        /// </summary>
+        bool IsUnderPressure();
     }
 }

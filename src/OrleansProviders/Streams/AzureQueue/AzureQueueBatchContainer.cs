@@ -91,7 +91,8 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public override string ToString()
         {
-            return string.Format("AzureQueueBatchContainer:Stream={0},#Items={1}", StreamGuid, events.Count);
+            return string.Format("[AzureQueueBatchContainer:Stream={0},#Items={1}]", StreamGuid, events.Count);
+            //return string.Format("[AzureBatch:#Items={0},Items{1}]", events.Count, Utils.EnumerableToString(events.Select((e, i) => String.Format("{0}-{1}", e, sequenceToken.CreateSequenceTokenForEvent(i)))));
         }
     }
 }
