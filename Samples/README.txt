@@ -1,4 +1,4 @@
-HelloWorldNuget uses Orleans Nuget packages available at https://www.nuget.org/packages?q=microsoft.orleans.
+HelloWorldNuget and AzureWebSample use Orleans Nuget packages available at https://www.nuget.org/packages?q=microsoft.orleans.
 
 In order to run the rest of the samples you need first to install the Orleans installer msi, as described here: http://dotnet.github.io/orleans/Installation
 
