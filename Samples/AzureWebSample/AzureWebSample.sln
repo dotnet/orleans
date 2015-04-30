@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30723.0
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{CC5FD16D-436D-48AD-A40C-5A424C6E3E79}") = "OrleansAzureSample", "OrleansAzureSample\OrleansAzureSample.ccproj", "{492563FC-84B6-41C5-A776-394A8BBF72C6}"
 EndProject
@@ -12,6 +12,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldInterfaces", "..\HelloWorld\HelloWorldInterfaces\HelloWorldInterfaces.csproj", "{163CCE80-C506-468C-9B28-E2FF198097E3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorldGrains", "..\HelloWorld\HelloWorldGrains\HelloWorldGrains.csproj", "{98D4DB83-175E-44D5-A14B-9C66EE89F037}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{AE2BF58A-CBBF-4528-9382-15687000A891}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

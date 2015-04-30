@@ -54,6 +54,7 @@
       <Private>True</Private>
       <RoleType>Worker</RoleType>
       <RoleName>OrleansAzureSilos</RoleName>
+      <UpdateDiagnosticsConnectionStringOnPublish>True</UpdateDiagnosticsConnectionStringOnPublish>
       <!--<UpdateDiagnosticsConnectionStringOnPublish>True</UpdateDiagnosticsConnectionStringOnPublish>-->
     </ProjectReference>
     <ProjectReference Include="..\WebRole\WebRole.csproj">
@@ -62,7 +63,16 @@
       <Private>True</Private>
       <RoleType>Web</RoleType>
       <RoleName>WebRole</RoleName>
+      <UpdateDiagnosticsConnectionStringOnPublish>True</UpdateDiagnosticsConnectionStringOnPublish>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="OrleansAzureSilosContent\" />
+    <Folder Include="WebRoleContent\" />
+  </ItemGroup>
+  <ItemGroup>
+    <DiagnosticsConfiguration Include="OrleansAzureSilosContent\diagnostics.wadcfgx" />
+    <DiagnosticsConfiguration Include="WebRoleContent\diagnostics.wadcfgx" />
   </ItemGroup>
   <!-- Import the target files for this project template -->
   <PropertyGroup>
