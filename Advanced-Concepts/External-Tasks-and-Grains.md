@@ -6,7 +6,7 @@ title: External Tasks and Grains
 
 [[THIS SECTON NEEDS TO BE UPDATED]]
 
-By design, any sub-Tasks spawned from grain code (for example, by using Task.Factory.StartNew) will inherit the same single-threaded execution model as for grain code.
+By design, any sub-Tasks spawned from grain code (for example, by using `await` or `ContinueWith` or `Task.Factory.StartNew`) will be dispatched on the same per-activation TPL Task Scheduler as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of [grain turn based concurency] (http://dotnet.github.io/orleans/Step-by-step-Tutorials/Concurrency).
 
 It is possible to “break out” of the Orleans task scheduling model by “doing something special”, such as explicitly pointing a Task to a different task scheduler (e.g. TaskScheduler.Default to run on .NET thread pool). However, our working hypothesis is this will be a very advanced and seldom required usage scenario beyond the “normal” usage patterns described below.
 
