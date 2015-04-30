@@ -23,6 +23,37 @@ In some cases grain code might need to “break out” of the Orleans task sched
 For reference, this is a sample of one of the many canonical unit test case(s) we have for scheduler / sub-task behavior in the Orleans BVT / Nightly test suites:
 
 ``` csharp
+   public Task MyGrainMethod()
+    {
+        // This works.
+        var orleansTS = TaskScheduler.Current; // Grabs the Orleans task scheduler
+        await TaskDelay(10000);
+        Assert.AreEqual(orleansTS, TaskScheduler.Current); // Current task scheduler did not change, the code after await is        still running in the same task scheduler
+        
+        Task.Run
+        Task t1 = Task.Run( () => 
+             { 
+                 // This code runs on the thread pool scheduler, not on Orleans task scheduler
+                Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+                Assert.AreEqual(TaskScheduler.Default, TaskScheduler.Current); 
+             }  );
+        await t1;
+        Assert.AreEqual(orleansTS, TaskScheduler.Current); // We are back to Orleans task scheduler, since await was executed in  Orleans task scheduler context we are now back to that context.
+        
+        Task t2 = Task.Factory.StartNew(() =>
+                {
+                   // This code runs on MyCustomSchedulerThatIWroteMyself scheduler, not on Orleans task scheduler
+                Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+                Assert.AreEqual(MyCustomSchedulerThatIWroteMyself, TaskScheduler.Current); 
+                },
+                CancellationToken.None, TaskCreationOptions.None,
+                scheduler: MyCustomSchedulerThatIWroteMyself);
+        await t2;
+        Assert.AreEqual(orleansTS, TaskScheduler.Current); // We are back to Orleans task scheduler.
+    }
+```
+    
+``` csharp
 [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Scheduler")]
 public async Task Sched_Task_WhenAny_Busy_Timeout()
 {
