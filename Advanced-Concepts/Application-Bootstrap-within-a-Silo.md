@@ -23,7 +23,9 @@ We have now added support for this auto-run functionality through configuring "b
 </OrleansConfiguration>
 ```
 
- These bootstrap providers are C# classes that implement the Orleans.IBootstrapProvider interface.
+It is also possible to configure Bootstrap provider programaticaly, via calling ` public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)` on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) class.
+
+These bootstrap providers are C# classes that implement the `Orleans.Providers.IBootstrapProvider` interface.
 
 When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.
 
