@@ -110,5 +110,10 @@ This call will delay deactivation of this activation for at least the specified 
 A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
 A negative <c>timeSpan</c> value means “unlock, and make this activation available for GC again”.
 
-This call takes priority over any Activation Garbage Collection settings specified in the config.
+You can also instruct the runtime to deactivate the grain next time it becomes idle, by using:
+``` csharp
+  protected void DeactivateOnIdle()
+```
+
+Both those calls take priority over any Activation Garbage Collection settings specified in the config.
 Please notice that this setting only applies to this particular activation from which it has been called and it does not apply to all possible instances of grains of this type.
