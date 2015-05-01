@@ -250,6 +250,36 @@ namespace Orleans.Runtime.Host
                 throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
         }
 
+		/// <summary>
+		/// Wait for this silo to shutdown or be cancelled.
+		/// </summary>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <remarks>
+		/// Note: This method call will block execution of current thread, 
+		/// and will not return control back to the caller until the silo is shutdown or 
+		/// an external request for cancellation has been issued.
+		/// </remarks>
+		public void WaitForOrleansSiloShutdown(CancellationToken cancellationToken)
+		{
+			if (!IsStarted)
+				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " since it was not started successfully previously.");
+
+			if (startupEvent != null)
+				startupEvent.Reset();
+			else
+				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+
+			if (orleans != null)
+			{
+				// Intercept cancellation to initiate silo stop from outside
+				cancellationToken.Register(HandleExternalCancellation);
+
+				WaitHandle.WaitAny(new WaitHandle[] {orleans.SiloTerminatedEvent, cancellationToken.WaitHandle});
+			}
+			else
+				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+		}
+
         /// <summary>
         /// Set the DeploymentId for this silo, 
         /// as well as the Azure connection string to use the silo system data, 
@@ -465,6 +495,13 @@ namespace Orleans.Runtime.Host
             TraceLogger.Initialize(nodeCfg);
             logger = TraceLogger.GetLogger("OrleansSiloHost", TraceLogger.LoggerType.Runtime);
         }
+
+		private void HandleExternalCancellation()
+		{
+			// Try to perform gracefull shutdown of Silo when we a cancellation request has been made
+			logger.Info(ErrorCode.SiloStopping, "External cancellation triggered, starting to shutdown silo.");
+			StopOrleansSilo();
+		}
 
         /// <summary>
         /// Called when this silo is being Disposed by .NET runtime.
