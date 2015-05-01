@@ -58,7 +58,6 @@ namespace UnitTests.StorageTests
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            StorageTestConstants.Init();
         }
 
         // Use TestInitialize to run code before running each test 

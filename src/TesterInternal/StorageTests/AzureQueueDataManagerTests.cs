@@ -49,13 +49,6 @@ namespace UnitTests.StorageTests
             logger = TraceLogger.GetLogger("AzureQueueDataManagerTests", TraceLogger.LoggerType.Application);
         }
 
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            StorageTestConstants.Init();
-        }
-
         [TestCleanup]
         public void TestCleanup()
         {
