@@ -80,7 +80,7 @@ protected Task<IOrleansReminder> RegisterOrUpdateReminder(string reminderName, T
 * dueTime specifies a quantity of time to wait before issuing the first timer tick. 
 * period specifies the period of the timer. 
 
- Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling **Grain.UnregisterReminder**:
+Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling **Grain.UnregisterReminder**:
 
 ``` csharp
 protected Task UnregisterReminder(IOrleansReminder reminder)
@@ -97,15 +97,17 @@ protected Task<IOrleansReminder> GetReminder(string reminderName)
 ```
 
 ## Which Should I Use?
-The Orleans team recommends that you use timers in the following circumstances: 
-* It doesn't matter (or is desirable) that the timer ceases to function if the activation is deactivated or failures occur. 
+We recommend that you use timers in the following circumstances: 
+
+* It doesn't matter (or is desirable) that the timer ceases to function if the activation is deactivated or failures occur.
 * If the resolution of the timer is small (e.g. reasonably expressible in seconds or minutes). 
 * The timer callback can be started from Grain.ActivateAsync or when a grain method is invoked.
 
- The Orleans team recommends that you use reminders in the following circumstances: 
+We recommend that you use reminders in the following circumstances: 
+
 * When the periodic behavior needs to survive the activation and any failures. 
 * To perform infrequent tasks (e.g. reasonably expressible in minutes, hours, or days).
 
 ## Combining Timers and Reminders
 
- You might consider using a combination of reminders and timers to accomplish your goal. For example, if you need a timer with a small resolution that needs to survive across activations, you can use a reminder that runs every five minutes, whose purpose is to wake up a grain that restarts a local timer that may have been lost due to a deactivation.
+You might consider using a combination of reminders and timers to accomplish your goal. For example, if you need a timer with a small resolution that needs to survive across activations, you can use a reminder that runs every five minutes, whose purpose is to wake up a grain that restarts a local timer that may have been lost due to a deactivation.
