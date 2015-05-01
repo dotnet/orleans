@@ -111,6 +111,7 @@ A positive <c>timeSpan</c> value means “prevent GC of this activation for that
 A negative <c>timeSpan</c> value means “unlock, and make this activation available for GC again”.
 
 You can also instruct the runtime to deactivate the grain next time it becomes idle, by using:
+
 ``` csharp
   protected void DeactivateOnIdle()
 ```
