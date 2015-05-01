@@ -54,13 +54,6 @@ namespace Tester.StreamingTests
         {
         }
 
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            StorageTestConstants.Init();
-        }
-
         // Use ClassCleanup to run code after all tests in a class have run
         [ClassCleanup]
         public static void MyClassCleanup()

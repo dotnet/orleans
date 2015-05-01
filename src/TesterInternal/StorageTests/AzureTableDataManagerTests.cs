@@ -45,13 +45,6 @@ namespace UnitTests.StorageTests
             return new UnitTestAzureTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
         }
 
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            StorageTestConstants.Init();
-        }
-
         [TestInitialize]
         public void TestInitialize()
         {

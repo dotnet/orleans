@@ -40,13 +40,6 @@ namespace UnitTests.StorageTests
         private string PartitionKey;
         private UnitTestAzureTableDataManager manager;
 
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            StorageTestConstants.Init();
-        }
-
         [TestInitialize]
         public void TestInitialize()
         {

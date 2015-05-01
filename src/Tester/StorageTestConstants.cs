@@ -48,7 +48,7 @@ namespace UnitTests.Tester
 
         private const string DEFAULT_STORAGE_DATA_CONNECTION_STRING = "UseDevelopmentStorage=true";
 
-        public static void Init()
+        static StorageTestConstants()
         {
             if (DataConnectionString != null)
             {
