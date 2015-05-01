@@ -23,7 +23,12 @@ We have now added support for this auto-run functionality through configuring "b
 </OrleansConfiguration>
 ```
 
-It is also possible to configure Bootstrap provider programaticaly, via calling ` public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)` on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) class.
+It is also possible to register Bootstrap provider programaticaly, via calling 
+
+``` csharp
+public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+```
+on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) class.
 
 These bootstrap providers are C# classes that implement the `Orleans.Providers.IBootstrapProvider` interface.
 
