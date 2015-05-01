@@ -22,26 +22,29 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 ﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 using Orleans.Streams;
 using Orleans.Runtime;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
     public class AzureQueueAdapterFactory : IQueueAdapterFactory
     {
         private const string CACHE_SIZE = "CacheSizeKB";
-        private const int DEFAULT_CACHE_SIZE = 4;
-        private const int KB = 1 << 10;
+        private const int DEFAULT_CACHE_SIZE = 4 * (1 << 10);
         
         private string deploymentId;
         private string dataConnectionString;
         private string providerName;
         private int cacheSize;
+        private HashRingBasedStreamQueueMapper streamQueueMapper;
+        private IQueueAdapterCache adapterCache;
 
         public const string DATA_CONNECTION_STRING = "DataConnectionString";
         public const string DEPLOYMENT_ID = "DeploymentId";
+        public const int NUM_QUEUES = 8; // keep as power of 2.
         
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger)
         {
@@ -59,12 +62,24 @@ namespace Orleans.Providers.Streams.AzureQueue
                     throw new ArgumentException(String.Format("{0} invalid.  Must be int", CACHE_SIZE));
             }
             this.providerName = providerName;
+            streamQueueMapper = new HashRingBasedStreamQueueMapper(NUM_QUEUES, providerName);
+            adapterCache = new SimpleQueueAdapterCache(this, cacheSize, logger);
         }
 
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter(dataConnectionString, deploymentId, providerName, cacheSize * KB);
+            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
+        }
+
+        public virtual IQueueAdapterCache GetQueueAdapterCache()
+        {
+            return adapterCache;
+        }
+
+        public IStreamQueueMapper GetStreamQueueMapper()
+        {
+            return streamQueueMapper;
         }
     }
 }

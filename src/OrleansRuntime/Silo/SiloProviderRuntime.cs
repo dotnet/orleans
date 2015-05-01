@@ -223,7 +223,7 @@ namespace Orleans.Runtime.Providers
             if (null == context)
                 throw new ArgumentNullException("context");
             if (!(context is ISchedulingContext))
-                throw new ArgumentNullException("context object is not of a ISchedulingContext type.");
+                throw new ArgumentException("context object is not of a ISchedulingContext type.", "context");
 
             // copied from InsideRuntimeClient.ExecAsync().
             return OrleansTaskScheduler.Instance.RunOrQueueTask(asyncFunc, (ISchedulingContext) context);
@@ -237,14 +237,15 @@ namespace Orleans.Runtime.Providers
         public async Task StartPullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
             TimeSpan initQueueTimeout)
         {
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
-                balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, queueAdapter.GetStreamQueueMapper());
+                balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper());
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var managerGrainRef = manager.AsReference<IPersistentStreamPullingManager>();

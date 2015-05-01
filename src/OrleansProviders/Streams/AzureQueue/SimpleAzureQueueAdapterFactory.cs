@@ -54,5 +54,15 @@ namespace Orleans.Providers.Streams.AzureQueue
             var adapter = new SimpleAzureQueueAdapter(dataConnectionString, providerName, queueName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
+
+        public virtual IQueueAdapterCache GetQueueAdapterCache()
+        {
+            throw new OrleansException("SimpleAzureQueueAdapter is a write-only adapter, it does not support reading from the queue and thus does not need cache.");
+        }
+
+        public IStreamQueueMapper GetStreamQueueMapper()
+        {
+            throw new OrleansException("SimpleAzureQueueAdapter does not support multiple queues, it only writes to one queue.");
+        }
     }
 }

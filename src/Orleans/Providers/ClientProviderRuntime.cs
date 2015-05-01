@@ -195,10 +195,11 @@ namespace Orleans.Providers
         public Task StartPullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
             TimeSpan initQueueTimeout)
-        {
+        {        
             return TaskDone.Done;
         }
     }

@@ -40,7 +40,7 @@ namespace UnitTests.SampleStreaming
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
-            hostingGrain.logger.Info("OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null");
+            hostingGrain.logger.Info("OnNextAsync(item={0}, token={1})", item, token != null ? token.ToString() : "null");
             hostingGrain.numConsumedItems++;
             return TaskDone.Done;
         }
@@ -83,14 +83,14 @@ namespace UnitTests.SampleStreaming
 
         public Task StartPeriodicProducing()
         {
-            logger.Info("StartProducing");
+            logger.Info("StartPeriodicProducing");
             producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
             return TaskDone.Done;
         }
 
         public Task StopPeriodicProducing()
         {
-            logger.Info("StopProducing");
+            logger.Info("StopPeriodicProducing");
             producerTimer.Dispose();
             producerTimer = null;
             return TaskDone.Done;
@@ -112,7 +112,7 @@ namespace UnitTests.SampleStreaming
             if (producerTimer != null)
             {
                 numProducedItems++;
-                logger.Info("TimerCallback ({0})", numProducedItems);
+                logger.Info("TimerCallback (item={0})", numProducedItems);
                 return producer.OnNextAsync(numProducedItems);
             }
             return TaskDone.Done;

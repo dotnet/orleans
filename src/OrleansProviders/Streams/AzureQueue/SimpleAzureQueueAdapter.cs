@@ -59,23 +59,19 @@ namespace Orleans.Providers.Streams.AzureQueue
             throw new OrleansException("SimpleAzureQueueAdapter is a write-only adapter, it does not support reading from the queue.");
         }
 
-        public IStreamQueueMapper GetStreamQueueMapper()
-        {
-            throw new OrleansException("SimpleAzureQueueAdapter does not support multiple queues, it only writes to one queue.");
-        }
-
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events)
         {
             if (events == null)
             {
-                throw new ArgumentNullException("Trying to QueueMessageBatchAsync null data.");
+                throw new ArgumentNullException("events", "Trying to QueueMessageBatchAsync null data.");
             }
-            int count = events.Count();
-            if (count != 1)
-            {
-                throw new OrleansException("Trying to QueueMessageBatchAsync a batch of more than one event. " +
-                                           "SimpleAzureQueueAdapter does not support batching. Instead, you can batch in your application code.");
-            }
+            //int count = events.Count();
+            //if (count != 1)
+            //{
+            //    throw new OrleansException("Trying to QueueMessageBatchAsync a batch of more than one event. " +
+            //                               "SimpleAzureQueueAdapter does not support batching. Instead, you can batch in your application code.");
+            //}
+
             object data = events.First();
             bool isBytes = data is byte[];
             bool isString = data is string;

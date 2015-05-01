@@ -32,7 +32,7 @@ using UnitTests.Tester;
 
 namespace Tester.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForUnitTests.xml")]
+    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class SampleStreamingTests : UnitTestSiloHost
@@ -49,9 +49,16 @@ namespace Tester.StreamingTests
             : base(new UnitTestSiloOptions
             {
                 StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForUnitTests.xml"),
+                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
             })
         {
+        }
+
+
+        [ClassInitialize]
+        public static void ClassInitialize(TestContext testContext)
+        {
+            StorageTestConstants.Init();
         }
 
         // Use ClassCleanup to run code after all tests in a class have run
@@ -66,8 +73,7 @@ namespace Tester.StreamingTests
         {
             if (streamProvider != null && streamProvider.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                string dataConnectionString = "";
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, UnitTestSiloHost.DeploymentId, dataConnectionString, logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
             }
         }
 
@@ -89,38 +95,32 @@ namespace Tester.StreamingTests
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory( "Nightly" ), TestCategory( "Streaming" )]
+        [TestMethod, TestCategory( "Nightly" ), TestCategory("Streaming" )]
         public async Task SampleStreamingTests_3()
         {
             logger.Info("************************ SampleStreamingTests_3 *********************************" );
             streamId = Guid.NewGuid();
             streamProvider = SMS_STREAM_PROVIDER_NAME;
-            await StreamingTests_Producer_InlineConsumer( streamId, streamProvider );
+            await StreamingTests_Producer_InlineConsumer(streamId, streamProvider );
         }
 
-        // To run the streaming test with Azure Queue adapter you need:
-        // 1) Uncomment the AzureQueueProvider element in StreamProviders section in the Config_StreamProvidersForUnitTests.xml.
-        // 1) Add DataConnectionString to AzureQueueProvider element.
-        // 2) Set the dataConnectionString variable in the TestCleanup method to this value as well.
-        // 3) Uncomment and run the below 2 tests.
+        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        public async Task SampleStreamingTests_4()
+        {
+            logger.Info("************************ SampleStreamingTests_4 *********************************");
+            streamId = Guid.NewGuid();
+            streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
+            await StreamingTests_Consumer_Producer(streamId, streamProvider);
+        }
 
-        //[TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
-        //public async Task SampleStreamingTests_3()
-        //{
-        //    logger.Info("************************ SampleStreamingTests_3 *********************************");
-        //    streamId = Guid.NewGuid();
-        //    streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        //    await StreamingTests_Consumer_Producer(streamId, streamProvider);
-        //}
-
-        //[TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
-        //public async Task SampleStreamingTests_4()
-        //{
-        //    logger.Info("************************ SampleStreamingTests_4 *********************************");
-        //    streamId = Guid.NewGuid();
-        //    streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        //    await StreamingTests_Producer_Consumer(streamId, streamProvider);
-        //}
+        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        public async Task SampleStreamingTests_5()
+        {
+            logger.Info("************************ SampleStreamingTests_5 *********************************");
+            streamId = Guid.NewGuid();
+            streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
+            await StreamingTests_Producer_Consumer(streamId, streamProvider);
+        }
 
         private async Task StreamingTests_Consumer_Producer(Guid streamId, string streamProvider)
         {

@@ -4,13 +4,13 @@ using System.Runtime.Serialization;
 
 using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.Common
+namespace Orleans.Streams
 {
     /// <summary>
     /// Exception indicates that the requested message is not in the queue cache.
     /// </summary>
     [Serializable]
-    public class QueueAdapterCacheMissException : DataNotAvailableException
+    public class QueueCacheMissException : DataNotAvailableException
     {
         private const string MESSAGE_FORMAT = "Item not found in cache.  Requested: {0}, Low: {1}, High: {2}";
 
@@ -18,16 +18,16 @@ namespace Orleans.Providers.Streams.Common
         public string Low { get; private set; }
         public string High { get; private set; }
 
-        public QueueAdapterCacheMissException() : this("Item no longer in cache") { }
-        public QueueAdapterCacheMissException(string message) : base(message) { }
-        public QueueAdapterCacheMissException(string message, Exception inner) : base(message, inner) { }
+        public QueueCacheMissException() : this("Item no longer in cache") { }
+        public QueueCacheMissException(string message) : base(message) { }
+        public QueueCacheMissException(string message, Exception inner) : base(message, inner) { }
 
-        public QueueAdapterCacheMissException(EventSequenceToken requested, EventSequenceToken low, EventSequenceToken high)
+        public QueueCacheMissException(StreamSequenceToken requested, StreamSequenceToken low, StreamSequenceToken high)
             : this(requested.ToString(), low.ToString(), high.ToString())
         {
         }
 
-        public QueueAdapterCacheMissException(string requested, string low, string high)
+        public QueueCacheMissException(string requested, string low, string high)
             : this(String.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
         {
             Requested = requested;
@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
             High = high;
         }
 
-        public QueueAdapterCacheMissException(SerializationInfo info, StreamingContext context)
+        public QueueCacheMissException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             Requested = info.GetString("Requested");

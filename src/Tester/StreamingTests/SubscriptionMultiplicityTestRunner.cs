@@ -27,6 +27,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
 using UnitTests.SampleStreaming;
@@ -38,14 +39,16 @@ namespace Tester.StreamingTests
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
         private readonly string streamProviderName;
+        private readonly Logger logger;
 
-        public SubscriptionMultiplicityTestRunner(string streamProviderName)
+        public SubscriptionMultiplicityTestRunner(string streamProviderName, Logger logger)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
                 throw new ArgumentNullException("streamProviderName");
             }
             this.streamProviderName = streamProviderName;
+            this.logger = logger;
         }
 
         public async Task MultipleSubscriptionTest(Guid streamGuid, string streamNamespace)
@@ -260,8 +263,27 @@ namespace Tester.StreamingTests
                      consumerCount != numConsumed.Count || // subscription counts are wrong?
                      numConsumed.Values.Any(consumedCount => consumedCount != numProduced)) // consumed events don't match produced events for any subscription?
             {
+                if (numProduced <= 0)
+                {
+                    logger.Info("numProduced <= 0: Events were not produced");
+                }
+                if (consumerCount != numConsumed.Count)
+                {
+                    logger.Info("consumerCount != numConsumed.Count: Incorrect number of consumers. consumerCount = {0}, numConsumed.Count = {1}",
+                        consumerCount, numConsumed.Count);
+                }
+                foreach (int consumed in numConsumed.Values)
+                {
+                    if (numProduced != consumed)
+                    {
+                        logger.Info("numProduced != consumed: Produced and consumed counts do not match. numProduced = {0}, consumed = {1}",
+                            numProduced, consumed);
+                            //numProduced, Utils.DictionaryToString(numConsumed));
+                    }
+                }
                 return false;
             }
+            logger.Info("All counts are equal. numProduced = {0}, consumerCount = {1}", numProduced, consumerCount); //Utils.DictionaryToString(numConsumed));
             return true;
         }
     }
