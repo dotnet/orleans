@@ -274,7 +274,7 @@ namespace Orleans.Runtime.Host
 				// Intercept cancellation to initiate silo stop from outside
 				cancellationToken.Register(HandleExternalCancellation);
 
-				WaitHandle.WaitAny(new WaitHandle[] {orleans.SiloTerminatedEvent, cancellationToken.WaitHandle});
+				orleans.SiloTerminatedEvent.WaitOne();
 			}
 			else
 				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
