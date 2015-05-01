@@ -29,7 +29,7 @@ using Orleans.Runtime.Configuration;
 
 namespace UnitTests.Tester
 {
-    public class StorageTestConstants
+    public static class StorageTestConstants
     {
         // In order to specify your own Azure Storage DataConnectionString you should:
         // 1) Create a file named OrleansTestStorageKey.txt and put one line with your storage key there, without "", like this:

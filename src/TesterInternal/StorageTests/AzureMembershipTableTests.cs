@@ -53,6 +53,13 @@ namespace UnitTests.StorageTests
             logger = TraceLogger.GetLogger("AzureMembershipTableTests", TraceLogger.LoggerType.Application);
         }
 
+        // Use ClassInitialize to run code before running the first test in the class
+        [ClassInitialize]
+        public static void ClassInitialize(TestContext testContext)
+        {
+            TraceLogger.Initialize(new NodeConfiguration());
+        }
+
         // Use TestInitialize to run code before running each test 
         [TestInitialize]
         public void TestInitialize()
