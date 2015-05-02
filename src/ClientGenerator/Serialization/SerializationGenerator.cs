@@ -61,7 +61,10 @@ namespace Orleans.CodeGeneration.Serialization
             container.Imports.Add(new CodeNamespaceImport("System.Collections.Generic"));
             container.Imports.Add(new CodeNamespaceImport("System.Reflection"));
             container.Imports.Add(new CodeNamespaceImport("Orleans.Serialization"));
-            container.Imports.Add(new CodeNamespaceImport(t.Namespace));
+            if (!String.IsNullOrEmpty(t.Namespace))
+            {
+                container.Imports.Add(new CodeNamespaceImport(t.Namespace));
+            }
 
             // Create the class declaration, including any required generic parameters
             // At one time this was a struct, not a class, so all the variable names are "structFoo". Too bad.
@@ -614,7 +617,10 @@ namespace Orleans.CodeGeneration.Serialization
 
         private static void ImportFieldNamespaces(Type t, CodeNamespaceImportCollection imports)
         {
-            imports.Add(new CodeNamespaceImport(t.Namespace));
+            if (!String.IsNullOrEmpty(t.Namespace))
+            {
+                imports.Add(new CodeNamespaceImport(t.Namespace));
+            }
 
             if (!t.IsGenericType) return;
 
