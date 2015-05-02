@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Net;
+﻿using System.Runtime.InteropServices.WindowsRuntime;
 ﻿using System.Threading;
 
 
@@ -51,8 +52,40 @@ namespace Orleans.Runtime.Host
             SiloHost.LoadOrleansConfig();
         }
 
+        /// <summary>
+        /// Run the Silo.
+        /// </summary>
+        /// <remarks>
+        /// If the Silo starts up successfully, then this method will block and not return 
+        /// until the silo shutdown event is triggered, or the silo shuts down for some other reason.
+        /// If the silo fails to star, then a StartupError.txt summary file will be written, 
+        /// and a process mini-dump will be created in the current working directory.
+        /// </remarks>
+        /// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
+        public int Run()
+        {
+			return RunImpl();
+        }
+
 		/// <summary>
 		/// Run the Silo.
+		/// </summary>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <remarks>
+		/// If the Silo starts up successfully, then this method will block and not return 
+		/// until the silo shutdown event is triggered or the silo shuts down for some other reason or 
+		/// an external request for cancellation has been issued.
+		/// If the silo fails to star, then a StartupError.txt summary file will be written, 
+		/// and a process mini-dump will be created in the current working directory.
+		/// </remarks>
+		/// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
+		public int Run(CancellationToken cancellationToken)
+		{
+			return RunImpl(cancellationToken);
+		}
+
+		/// <summary>
+		/// Run method helper.
 		/// </summary>
 		/// <param name="cancellationToken">Optional cancellation token.</param>
 		/// <remarks>
@@ -63,7 +96,7 @@ namespace Orleans.Runtime.Host
 		/// and a process mini-dump will be created in the current working directory.
 		/// </remarks>
 		/// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
-		public int Run(CancellationToken? cancellationToken = null)
+		private int RunImpl(CancellationToken? cancellationToken = null)
 		{
 			bool ok;
 
