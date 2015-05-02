@@ -1,15 +1,15 @@
 @echo Begin Post-Build script
 
 if "%BuildingInsideVisualStudio%" == "true" (
-    set PKG_DIR=%SolutionDir%\NuGet.Packages
+    set PKG_DIR=%SolutionDir%NuGet.Packages
 ) else (
-    set PKG_DIR=%TargetDir%\..\NuGet.Packages
+    set PKG_DIR=%TargetDir%..\NuGet.Packages
 )
 
 if "%BuildingInsideVisualStudio%" == "true" (
-    set CHOCO_PKG_DIR=%SolutionDir%\Chocolatey.Packages
+    set CHOCO_PKG_DIR=%SolutionDir%Chocolatey.Packages
 ) else (
-    set CHOCO_PKG_DIR=%TargetDir%\..\Chocolatey.Packages
+    set CHOCO_PKG_DIR=%TargetDir%..\Chocolatey.Packages
 )
 
 copy /y "%SolutionDir%SDK\OrleansConfiguration.xml" "%TargetDir%"
@@ -25,8 +25,9 @@ if "%BuildOrleansNuGet%" == "" (
 
 if "%BuildOrleansChocolatey%" == "" (
     if "%Configuration%" == "Release" (
-		where /q cpack
+		where choco
 		if ERRORLEVEL 1 (
+            @echo == Chocolatey packager not found, setting BuildOrleansChocolatey=false
 			set BuildOrleansChocolatey=false
 		) else (
 			set BuildOrleansChocolatey=true
@@ -38,37 +39,42 @@ if "%BuildOrleansChocolatey%" == "" (
 
 @echo BuildingInsideVisualStudio = %BuildingInsideVisualStudio% BuildOrleansNuGet = %BuildOrleansNuGet% BuildOrleansChocolatey = %BuildOrleansChocolatey%
 
-copy /y "%SolutionDir%NuGet\*.props" "%TargetDir%\"
-copy /y "%SolutionDir%NuGet\EmptyFile.cs" "%TargetDir%\"
-copy /y "%SolutionDir%NuGet\*Install.ps1" "%TargetDir%\"
+copy /y "%SolutionDir%NuGet\*.props" "%TargetDir%"
+copy /y "%SolutionDir%NuGet\EmptyFile.cs" "%TargetDir%"
+copy /y "%SolutionDir%NuGet\*Install.ps1" "%TargetDir%"
 
 if not "%BuildingInsideVisualStudio%" == "true" (
     if "%BuildOrleansNuGet%" == "true" (
-        @echo Clean old generated Orleans NuGet packages from %TargetDir%
+        @echo == Clean old generated Orleans NuGet packages from %TargetDir%
         del /q *.nupkg
 
         @echo ===== Build Orleans NuGet packages from %TargetDir%
         call "%SolutionDir%NuGet\CreateOrleansPackages.bat" . .\Version.txt
         if ERRORLEVEL 1 EXIT /B 1
     
-        @echo Copying Orleans NuGet packages to %PKG_DIR%
+        @echo == Copying Orleans NuGet packages to %PKG_DIR%
         if not exist "%PKG_DIR%" (md "%PKG_DIR%") else (del /s/q "%PKG_DIR%\*")
         xcopy /y *.nupkg "%PKG_DIR%\"
+        @echo == Clean transient generated Orleans NuGet packages from %TargetDir%
+        del /q *.nupkg
     ) else (
-        @echo Skipping generation of Orleans NuGet packages for Configuration=%Configuration% because BuildOrleansNuGet=%BuildOrleansNuGet%
+        @echo ===== Skipping generation of Orleans NuGet packages for %Configuration% because BuildOrleansNuGet=%BuildOrleansNuGet%
     )
+
     if "%BuildOrleansChocolatey%" == "true" (
-        @echo Clean old generated Orleans Chocolatey packages from %TargetDir%
+        @echo == Clean old generated Orleans Chocolatey / NuGet packages from %TargetDir%
         del /q *.nupkg
 
         @echo ===== Build Orleans Chocolatey packages from %TargetDir%
         call "%SolutionDir%Chocolatey\CreateOrleansChocolateyPackage.bat" . .\Version.txt
-        if ERRORLEVEL 1 EXIT /B 1
+        if ERRORLEVEL 1 EXIT /B 2
     
-        @echo Copying Orleans Chocolatey packages to %CHOCO_PKG_DIR%
+        @echo == Copying Orleans Chocolatey packages to %CHOCO_PKG_DIR%
         if not exist "%CHOCO_PKG_DIR%" (md "%CHOCO_PKG_DIR%") else (del /s/q "%CHOCO_PKG_DIR%\*")
-        xcopy /y "%SolutionDir%Chocolatey\*.nupkg" "%CHOCO_PKG_DIR%\"
+        xcopy /y *.nupkg "%CHOCO_PKG_DIR%\"
+        @echo == Clean transient generated Orleans Chocolatey packages from %TargetDir%
+        del /q *.nupkg
     ) else (
-        @echo Skipping generation of Orleans NuGet packages for Configuration=%Configuration% because BuildOrleansNuGet=%BuildOrleansNuGet%
+        @echo ===== Skipping generation of Orleans Chocolatey packages for %Configuration% because BuildOrleansChocolatey=%BuildOrleansChocolatey%
     )
 )

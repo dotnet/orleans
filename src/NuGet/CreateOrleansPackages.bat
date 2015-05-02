@@ -32,11 +32,13 @@ if EXIST "%VERSION%" (
 
 @echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%
 
-@set NUGET_PACK_OPTS= -NoPackageAnalysis
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
+@set NUGET_PACK_OPTS= -Version %VERSION% 
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%"
+@REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
-  "%NUGET_EXE%" pack "%%G" -Version %VERSION% -BasePath "%BASE_PATH%" %NUGET_PACK_OPTS%
+  "%NUGET_EXE%" pack "%%G" %NUGET_PACK_OPTS%
   if ERRORLEVEL 1 EXIT /B 1
 )
 
