@@ -458,7 +458,10 @@ namespace Orleans.CodeGeneration
             // add referrenced named spaces
             foreach (string referredNamespace in grainNamespace.ReferencedNamespaces)
                 if (referredNamespace != referenceNameSpace.Name)
-                    referenceNameSpace.Imports.Add(new CodeNamespaceImport(referredNamespace));
+                    if (!String.IsNullOrEmpty(referredNamespace))
+                    {
+                        referenceNameSpace.Imports.Add(new CodeNamespaceImport(referredNamespace));
+                    }
 
             if (options.TargetLanguage == Language.VisualBasic && referenceNameSpace.Name.StartsWith(options.RootNamespace))
             {
