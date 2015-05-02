@@ -29,7 +29,7 @@ using System.Text;
 using System.Net;
 using System.Xml;
 using Orleans.AzureUtils;
-﻿using Orleans.Providers;
+using Orleans.Providers;
 using Orleans.Streams;
 using Orleans.Storage;
 

@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 
 namespace $safeprojectname$
 {
