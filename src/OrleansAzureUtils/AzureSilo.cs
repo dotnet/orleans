@@ -215,30 +215,13 @@ namespace Orleans.Runtime.Host
             }
         }
 
-        /// <summary>
-        /// Makes this Orleans silo begin executing and become active.
-        /// Note: This method call will only return control back to the caller when the silo is shutdown.
-        /// </summary>
-		public void Run()
-        {
-            logger.Info(ErrorCode.Runtime_Error_100289, "OrleansAzureHost entry point called");
-
-            // Hook up to receive notification of Azure role stopping events
-            RoleEnvironment.Stopping += HandleAzureRoleStopping;
-
-            if (host.IsStarted)
-                host.WaitForOrleansSiloShutdown();
-            else
-                throw new ApplicationException("Silo failed to start correctly - aborting");
-        }
-
 		/// <summary>
 		/// Makes this Orleans silo begin executing and become active.
 		/// Note: This method call will only return control back to the caller when the silo is shutdown or 
 		/// an external request for cancellation has been issued.
 		/// </summary>
-		/// <param name="cancellationToken">Cancellation token.</param>
-		public void Run(CancellationToken cancellationToken)
+		/// <param name="cancellationToken">Optional cancellation token.</param>
+		public void Run(CancellationToken? cancellationToken = null)
 		{
 			logger.Info(ErrorCode.Runtime_Error_100289, "OrleansAzureHost entry point called");
 

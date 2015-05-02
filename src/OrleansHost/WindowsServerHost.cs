@@ -51,51 +51,10 @@ namespace Orleans.Runtime.Host
             SiloHost.LoadOrleansConfig();
         }
 
-        /// <summary>
-        /// Run the Silo.
-        /// </summary>
-        /// <remarks>
-        /// If the Silo starts up successfully, then this method will block and not return 
-        /// until the silo shutdown event is triggered, or the silo shuts down for some other reason.
-        /// If the silo fails to star, then a StartupError.txt summary file will be written, 
-        /// and a process mini-dump will be created in the current working directory.
-        /// </remarks>
-        /// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
-        public int Run()
-        {
-            bool ok;
-
-            try
-            {
-                SiloHost.InitializeOrleansSilo();
-                ok = SiloHost.StartOrleansSilo();
-
-                if (ok)
-                {
-                    ConsoleText.WriteStatus(string.Format("Successfully started Orleans silo '{0}' as a {1} node.", SiloHost.Name, SiloHost.Type));
-                    SiloHost.WaitForOrleansSiloShutdown();
-                }
-                else
-                {
-                    ConsoleText.WriteError(string.Format("Failed to start Orleans silo '{0}' as a {1} node.", SiloHost.Name, SiloHost.Type));
-                }
-
-                ConsoleText.WriteStatus(string.Format("Orleans silo '{0}' shutdown.", SiloHost.Name));
-            }
-            catch (Exception exc)
-            {
-                SiloHost.ReportStartupError(exc);
-                TraceLogger.CreateMiniDump();
-                ok = false;
-            }
-
-            return ok ? 0 : 1;
-        }
-
 		/// <summary>
 		/// Run the Silo.
 		/// </summary>
-		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <param name="cancellationToken">Optional cancellation token.</param>
 		/// <remarks>
 		/// If the Silo starts up successfully, then this method will block and not return 
 		/// until the silo shutdown event is triggered or the silo shuts down for some other reason or 
@@ -104,7 +63,7 @@ namespace Orleans.Runtime.Host
 		/// and a process mini-dump will be created in the current working directory.
 		/// </remarks>
 		/// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
-		public int Run(CancellationToken cancellationToken)
+		public int Run(CancellationToken? cancellationToken = null)
 		{
 			bool ok;
 
