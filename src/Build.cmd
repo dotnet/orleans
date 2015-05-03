@@ -55,7 +55,8 @@ set STEP=WIX
 @GOTO :EOF
 
 :ErrorStop
+set RC=%ERRORLEVEL%
 if "%STEP%" == "" set STEP=%CONFIGURATION%
-@echo ===== Build FAILED for %PROJ% -- %STEP% with error %ERRORLEVEL% - CANNOT CONTINUE =====
-
+@echo ===== Build FAILED for %PROJ% -- %STEP% with error %RC% - CANNOT CONTINUE =====
+exit /B %RC%
 :EOF
