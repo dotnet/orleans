@@ -108,7 +108,10 @@ namespace Orleans.Runtime.Host
 				if (ok)
 				{
 					ConsoleText.WriteStatus(string.Format("Successfully started Orleans silo '{0}' as a {1} node.", SiloHost.Name, SiloHost.Type));
-					SiloHost.WaitForOrleansSiloShutdown(cancellationToken);
+					if (cancellationToken.HasValue)
+						SiloHost.WaitForOrleansSiloShutdown(cancellationToken.Value);
+					else
+						SiloHost.WaitForOrleansSiloShutdown();
 				}
 				else
 				{

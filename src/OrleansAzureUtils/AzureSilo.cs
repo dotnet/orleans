@@ -286,7 +286,12 @@ namespace Orleans.Runtime.Host
 			RoleEnvironment.Stopping += HandleAzureRoleStopping;
 
 			if (host.IsStarted)
-				host.WaitForOrleansSiloShutdown(cancellationToken);
+			{
+				if (cancellationToken.HasValue)
+					host.WaitForOrleansSiloShutdown(cancellationToken.Value);
+				else
+					host.WaitForOrleansSiloShutdown();
+			}
 			else
 				throw new ApplicationException("Silo failed to start correctly - aborting");
 		}

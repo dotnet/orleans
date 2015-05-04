@@ -228,34 +228,29 @@ namespace Orleans.Runtime.Host
         }
 
 		/// <summary>
-		/// Wait for this silo to shutdown or be cancelled.
+		/// Wait for this silo to shutdown.
 		/// </summary>
-		/// <param name="cancellationToken">Optional cancellation token.</param>
+		/// <remarks>
+		/// Note: This method call will block execution of current thread, 
+		/// and will not return control back to the caller until the silo is shutdown.
+		/// </remarks>
+		public void WaitForOrleansSiloShutdown()
+		{
+			WaitForOrleansSiloShutdownImpl();
+		}
+
+		/// <summary>
+		/// Wait for this silo to shutdown or to be stopped with provided cancellation token.
+		/// </summary>
+		/// <param name="cancellationToken">Cancellation token.</param>
 		/// <remarks>
 		/// Note: This method call will block execution of current thread, 
 		/// and will not return control back to the caller until the silo is shutdown or 
 		/// an external request for cancellation has been issued.
 		/// </remarks>
-		public void WaitForOrleansSiloShutdown(CancellationToken? cancellationToken = null)
+		public void WaitForOrleansSiloShutdown(CancellationToken cancellationToken)
 		{
-			if (!IsStarted)
-				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " since it was not started successfully previously.");
-
-			if (startupEvent != null)
-				startupEvent.Reset();
-			else
-				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
-
-			if (orleans != null)
-			{
-				// Intercept cancellation to initiate silo stop
-				if (cancellationToken.HasValue)
-					cancellationToken.Value.Register(HandleExternalCancellation);
-
-				orleans.SiloTerminatedEvent.WaitOne();
-			}
-			else
-				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+			WaitForOrleansSiloShutdownImpl(cancellationToken);
 		}
 
         /// <summary>
@@ -474,6 +469,40 @@ namespace Orleans.Runtime.Host
             logger = TraceLogger.GetLogger("OrleansSiloHost", TraceLogger.LoggerType.Runtime);
         }
 
+		/// <summary>
+		/// Helper to wait for this silo to shutdown or to be stopped via a cancellation token.
+		/// </summary>
+		/// <param name="cancellationToken">Optional cancellation token.</param>
+		/// <remarks>
+		/// Note: This method call will block execution of current thread, 
+		/// and will not return control back to the caller until the silo is shutdown or 
+		/// an external request for cancellation has been issued.
+		/// </remarks>
+		private void WaitForOrleansSiloShutdownImpl(CancellationToken? cancellationToken = null)
+		{
+			if (!IsStarted)
+				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " since it was not started successfully previously.");
+
+			if (startupEvent != null)
+				startupEvent.Reset();
+			else
+				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+
+			if (orleans != null)
+			{
+				// Intercept cancellation to initiate silo stop
+				if (cancellationToken.HasValue)
+					cancellationToken.Value.Register(HandleExternalCancellation);
+
+				orleans.SiloTerminatedEvent.WaitOne();
+			}
+			else
+				throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+		}
+
+		/// <summary>
+		/// Handle the silo stop request coming from an external cancellation token.
+		/// </summary>
 		private void HandleExternalCancellation()
 		{
 			// Try to perform gracefull shutdown of Silo when we a cancellation request has been made
