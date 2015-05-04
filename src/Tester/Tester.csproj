@@ -93,8 +93,10 @@
     <Compile Include="SerializationTests.cs" />
     <Compile Include="StorageTestConstants.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
+    <Compile Include="StreamingTests\PubSubDeactivationTestRunner.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
+    <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
     <Compile Include="UnitTestSiloHostOptions.cs" />
@@ -109,6 +111,9 @@
     <Content Include="ClientConfigurationForUnitTests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <SubType>Designer</SubType>
+    </Content>
+    <Content Include="OrleansConfigurationForStreamingDeactivationUnitTests.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="OrleansConfigurationForStreamingUnitTests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
