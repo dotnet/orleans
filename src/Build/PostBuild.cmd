@@ -24,12 +24,16 @@ if "%BuildOrleansNuGet%" == "" (
 )
 
 if "%BuildOrleansChocolatey%" == "" (
-    if "%Configuration%" == "Release" (
+	if "%APPVEYOR%" == "True" (
+        @echo == Cannot use Appveyor's Chocolatey packager v0.9.8, setting BuildOrleansChocolatey=false
+		set BuildOrleansChocolatey=false
+    ) else if "%Configuration%" == "Release" (
 		where choco
 		if ERRORLEVEL 1 (
             @echo == Chocolatey packager not found, setting BuildOrleansChocolatey=false
 			set BuildOrleansChocolatey=false
 		) else (
+			choco
 			set BuildOrleansChocolatey=true
 		)
     ) else (
