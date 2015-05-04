@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading;
 using Microsoft.WindowsAzure.ServiceRuntime;
 
 using Orleans.AzureUtils;
@@ -218,19 +219,21 @@ namespace Orleans.Runtime.Host
         /// Makes this Orleans silo begin executing and become active.
         /// Note: This method call will only return control back to the caller when the silo is shutdown.
         /// </summary>
-        public void Run()
+		public void Run()
         {
-            logger.Info(ErrorCode.Runtime_Error_100289, "OrleansAzureHost entry point called");
-
-            // Hook up to receive notification of Azure role stopping events
-            RoleEnvironment.Stopping += HandleAzureRoleStopping;
-
-            if (host.IsStarted)
-                host.WaitForOrleansSiloShutdown();
-            
-            else
-                throw new ApplicationException("Silo failed to start correctly - aborting");
+            RunImpl();
         }
+
+		/// <summary>
+		/// Makes this Orleans silo begin executing and become active.
+		/// Note: This method call will only return control back to the caller when the silo is shutdown or 
+		/// an external request for cancellation has been issued.
+		/// </summary>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		public void Run(CancellationToken cancellationToken)
+		{
+			RunImpl(cancellationToken);
+		}
 
         /// <summary>
         /// Stop this Orleans silo executing.
@@ -265,5 +268,32 @@ namespace Orleans.Runtime.Host
             logger.Info(ErrorCode.SiloStopping, "HandleAzureRoleStopping - starting to shutdown silo");
             host.StopOrleansSilo();
         }
+
+		/// <summary>
+		/// Run method helper.
+		/// </summary>
+		/// <remarks>
+		/// Makes this Orleans silo begin executing and become active.
+		/// Note: This method call will only return control back to the caller when the silo is shutdown or 
+		/// an external request for cancellation has been issued.
+		/// </remarks>
+		/// <param name="cancellationToken">Optional cancellation token.</param>
+		private void RunImpl(CancellationToken? cancellationToken = null)
+		{
+			logger.Info(ErrorCode.Runtime_Error_100289, "OrleansAzureHost entry point called");
+
+			// Hook up to receive notification of Azure role stopping events
+			RoleEnvironment.Stopping += HandleAzureRoleStopping;
+
+			if (host.IsStarted)
+			{
+				if (cancellationToken.HasValue)
+					host.WaitForOrleansSiloShutdown(cancellationToken.Value);
+				else
+					host.WaitForOrleansSiloShutdown();
+			}
+			else
+				throw new ApplicationException("Silo failed to start correctly - aborting");
+		}
     }
 }
