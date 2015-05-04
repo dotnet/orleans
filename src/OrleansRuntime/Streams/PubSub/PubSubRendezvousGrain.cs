@@ -64,13 +64,20 @@ namespace Orleans.Streams
             logger = GetLogger(this.GetType().Name + "-" + RuntimeIdentity + "-" + IdentityString);
             LogPubSubCounts("OnActivateAsync");
 
-            int numRemoved = RemoveDeadProducers();
-            if (numRemoved > 0)
-                await State.WriteStateAsync();
             if (State.Consumers == null)
                 State.Consumers = new HashSet<PubSubSubscriptionState>();
             if (State.Producers == null)
                 State.Producers = new HashSet<PubSubPublisherState>();
+
+            int numRemoved = RemoveDeadProducers();
+            if (numRemoved > 0)
+            {
+                if (State.Producers.Count > 0 || State.Consumers.Count > 0)
+                    await State.WriteStateAsync();
+                else
+                    await State.ClearStateAsync(); //State contains no producers or consumers, remove it from storage
+            }
+
             if (logger.IsVerbose)
                 logger.Info("OnActivateAsync-Done");
         }
