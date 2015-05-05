@@ -14,7 +14,7 @@ We recommend running Azure Samples (AzureWebSample, TicTacToe) in elevated mode 
 All other non-Orleans dependencies, such as Azure Storage, Azure Service Runtime, etc... are consumed via Nuget packages.
 
 
-**### TROUBLESHOOTIG ###**
+### TROUBLESHOOTIG ###
 
 You may need to execute the following commands to reserve static ports to Orleans or allow traffic through the firewall:
 "netsh http add urlacl url=http://*:22222/ user=<DOMAIN\user>"
