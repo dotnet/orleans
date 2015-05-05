@@ -125,6 +125,12 @@ namespace UnitTests.SampleStreaming
             logger.Info("{0} (item={1})", caller, numProducedItems);
             return producer.OnNextAsync(numProducedItems);
         }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("OnDeactivateAsync");
+            return TaskDone.Done;
+        }
     }
 
     public class SampleStreaming_ConsumerGrain : Grain, ISampleStreaming_ConsumerGrain
@@ -166,6 +172,12 @@ namespace UnitTests.SampleStreaming
         public Task<int> GetNumberConsumed()
         {
             return Task.FromResult(numConsumedItems);
+        }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("OnDeactivateAsync");
+            return TaskDone.Done;
         }
     }
 
@@ -225,6 +237,12 @@ namespace UnitTests.SampleStreaming
         public Task OnErrorAsync( Exception ex )
         {
             logger.Info( "OnErrorAsync({0})", ex );
+            return TaskDone.Done;
+        }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("OnDeactivateAsync");
             return TaskDone.Done;
         }
     }

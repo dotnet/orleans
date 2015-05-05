@@ -75,6 +75,12 @@ namespace Orleans.Streams
                 logger.Info("OnActivateAsync-Done");
         }
 
+        public override Task OnDeactivateAsync()
+        {
+            LogPubSubCounts("OnDeactivateAsync");
+            return TaskDone.Done;
+        }
+
         private int RemoveDeadProducers()
         {
             // Remove only those we know for sure are Dead.
@@ -287,7 +293,7 @@ namespace Orleans.Streams
 
         private void LogPubSubCounts(string fmt, params object[] args)
         {
-            if (logger.IsVerbose)
+            if (logger.IsVerbose || DEBUG_PUB_SUB)
             {
                 int numProducers = 0;
                 int numConsumers = 0;

@@ -93,7 +93,7 @@
     <Compile Include="SerializationTests.cs" />
     <Compile Include="StorageTestConstants.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
-    <Compile Include="StreamingTests\PubSubDeactivationTestRunner.cs" />
+    <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />

@@ -54,7 +54,13 @@ namespace TestGrains
             var stream = streamProvider.GetStream<int>(streamId, streamNamespace);
 
             // subscribe
-            StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync((e, t) => count.Increment());
+            StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync(
+                (e, t) =>
+                {
+                    logger.Info("Got next event {0}", e);
+                    count.Increment();
+                    return TaskDone.Done;
+                });
 
             // track counter
             consumedMessageCounts.Add(handle, count);
@@ -127,6 +133,12 @@ namespace TestGrains
         public Task Deactivate()
         {
             DeactivateOnIdle();
+            return TaskDone.Done;
+        }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("OnDeactivateAsync");
             return TaskDone.Done;
         }
     }
