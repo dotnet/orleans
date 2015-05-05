@@ -99,6 +99,7 @@ namespace UnitTests.SampleStreaming
 
         public Task<int> GetNumberProduced()
         {
+            logger.Info("GetNumberProduced");
             return Task.FromResult(numProducedItems);
         }
 

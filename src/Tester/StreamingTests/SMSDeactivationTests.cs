@@ -63,5 +63,13 @@ namespace Tester.StreamingTests
             logger.Info("************************ SMSDeactivationTest *********************************");
             await runner.DeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        public async Task SMSDeactivationTestWithClientGrain()
+        {
+            logger.Info("************************ SMSDeactivationTest *********************************");
+            await runner.DeactivationTestWithClientGrain(Guid.NewGuid(), StreamNamespace);
+        }
+
     }
 }
