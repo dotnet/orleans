@@ -35,6 +35,7 @@ This list is for projects, websites and applications that are powered by Orleans
 Wesbites/Apps|Link|Notes
 -------------|----|-----
 Halo 4 - 343 Industries|<a href="https://www.halowaypoint.com" target="_blank">https://www.halowaypoint.com</a>|
+Microsoft BigPark Studio|<a href="https://github.com/OrleansContrib/OrleansTemplates" target="_blank">https://github.com/OrleansContrib/OrleansTemplates</a>|
 Orleans-Contrib|<a href="https://github.com/OrleansContrib" target="_blank">OrleansContrib</a>|Community contribution projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.|
 Pegasus Mission|<a href="http://pegasusmission.com," target="_blank">http://pegasusmission.com</a>|[More Info](http://pegasusmission.com/2015/03/04/orleans-above-the-cloud-piraeus-overview/) and [here](https://github.com/dotnet/orleans/issues/99#issuecomment-74697629)|
 Sync.Today 2015|<a href="https://github.com/SyncToday/synctoday2015" target="_blank">Sync.Today 2015 Community Edition</a>|.NET Business Processes Automation Platform. More info [here](http://www.naseukoly.cz/home/synctoday)|
