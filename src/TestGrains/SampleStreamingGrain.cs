@@ -26,6 +26,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
+using System.Runtime.CompilerServices;
 
 namespace UnitTests.SampleStreaming
 {
@@ -98,6 +99,7 @@ namespace UnitTests.SampleStreaming
 
         public Task<int> GetNumberProduced()
         {
+            logger.Info("GetNumberProduced");
             return Task.FromResult(numProducedItems);
         }
 
@@ -107,15 +109,21 @@ namespace UnitTests.SampleStreaming
             return TaskDone.Done;
         }
 
+        public Task Produce()
+        {
+            return Fire();
+        }
+
         private Task TimerCallback(object state)
         {
-            if (producerTimer != null)
-            {
-                numProducedItems++;
-                logger.Info("TimerCallback (item={0})", numProducedItems);
-                return producer.OnNextAsync(numProducedItems);
-            }
-            return TaskDone.Done;
+            return producerTimer != null? Fire(): TaskDone.Done;
+        }
+
+        private Task Fire([CallerMemberName] string caller = null)
+        {
+            numProducedItems++;
+            logger.Info("{0} (item={1})", caller, numProducedItems);
+            return producer.OnNextAsync(numProducedItems);
         }
     }
 

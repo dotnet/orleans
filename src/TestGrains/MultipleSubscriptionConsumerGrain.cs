@@ -89,6 +89,7 @@ namespace TestGrains
 
         public async Task StopConsuming(StreamSubscriptionHandle<int> handle)
         {
+            logger.Info("StopConsuming");
             // unsubscribe
             await handle.UnsubscribeAsync();
 
@@ -115,6 +116,7 @@ namespace TestGrains
 
         public Task ClearNumberConsumed()
         {
+            logger.Info("ClearNumberConsumed");
             foreach (Counter count in consumedMessageCounts.Values)
             {
                 count.Clear();

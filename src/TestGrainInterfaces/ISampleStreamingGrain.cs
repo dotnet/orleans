@@ -38,6 +38,7 @@ namespace UnitTests.SampleStreaming
         Task<int> GetNumberProduced();
 
         Task ClearNumberProduced();
+        Task Produce();
     }
 
     public interface ISampleStreaming_ConsumerGrain : IGrain
