@@ -69,13 +69,17 @@ namespace Tester.StreamingTests
             this.logger = logger;
         }
 
+        private async Task TestDeadlock (Task task, string message)
+        {
+            var result = await Task.WhenAny(task, Task.Delay(Timeout));
+            Assert.AreEqual(task, result, message);
+        }
+
         public async Task DeactivationTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
             ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
             IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
-
-            Thread.Sleep(5000);
 
             // subscribe (PubSubRendezvousGrain will have one consumer)
             StreamSubscriptionHandle<int> subscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
@@ -87,20 +91,15 @@ namespace Tester.StreamingTests
             var count = await consumer.GetNumberConsumed();
             Assert.AreEqual(count[subscriptionHandle], 1, "Consumer grain has not received stream message");
 
-            Thread.Sleep(180000); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+            //TODO: trigger deactivation programmatically
+            Thread.Sleep(130000); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
-
-            //confirm that the silo continues to operate despite the deactivation deadlock:
-
-            // consumer grain AgeLimit is set to 2hr in configuration - should still be active and accessible:
-            count = await consumer.GetNumberConsumed();
-            Assert.AreEqual(count[subscriptionHandle], 1, "Consumer grain has been deactivated");
-
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:
-            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
-            await producer.Produce();
+            await TestDeadlock(producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName), "BecomeProducer is hung due to deactivation deadlock");
+            await TestDeadlock(producer.Produce(), "Produce is hung due to deactivation deadlock");
 
-            // consumer grain should continue to receive stream messages despite deactivation hang:
+            // consumer grain should continue to receive stream messages:
             count = await consumer.GetNumberConsumed();
             Assert.AreEqual(count[subscriptionHandle], 2, "Consumer did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
         }
@@ -110,30 +109,24 @@ namespace Tester.StreamingTests
             ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
 
             var count = new Counter();
-            // get stream
+            // get stream and subscribe
             IStreamProvider streamProvider = Orleans.GrainClient.GetStreamProvider(streamProviderName);
             var stream = streamProvider.GetStream<int>(streamGuid, streamNamespace);
-            // subscribe
             StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync((e, t) => count.Increment());
 
-            Thread.Sleep(5000);
-
-            //// subscribe (PubSubRendezvousGrain will have one consumer)
-            //StreamSubscriptionHandle<int> subscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
             // produce one message (PubSubRendezvousGrain will have one consumer and one producer)
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
             await producer.Produce();
 
             Assert.AreEqual(count.Value, 1, "Client consumer grain has not received stream message");
 
-            Thread.Sleep(180000); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+            //TODO: trigger deactivation programmatically
+            Thread.Sleep(130000); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
-
-            //confirm that the silo continues to operate despite the deactivation deadlock:
-
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:
-            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
-            await producer.Produce();
+            await TestDeadlock(producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName), "BecomeProducer is hung due to deactivation deadlock");
+            await TestDeadlock(producer.Produce(), "Produce is hung due to deactivation deadlock");
 
             Assert.AreEqual(count.Value, 2, "Client consumer grain did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
         }
