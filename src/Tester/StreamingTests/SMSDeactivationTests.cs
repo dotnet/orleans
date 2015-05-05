@@ -37,7 +37,7 @@ namespace Tester.StreamingTests
     {
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
-        private readonly PubSubDeactivationTestRunner runner;
+        private readonly DeactivationTestRunner runner;
 
         public SMSDeactivationTests()
             : base(new UnitTestSiloOptions
@@ -47,7 +47,7 @@ namespace Tester.StreamingTests
                 SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingDeactivationUnitTests.xml"),
             })
         {
-            runner = new PubSubDeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
+            runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run
@@ -57,18 +57,20 @@ namespace Tester.StreamingTests
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Failures"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [ExpectedException(typeof(TimeoutException))]
         public async Task SMSDeactivationTest()
         {
             logger.Info("************************ SMSDeactivationTest *********************************");
             await runner.DeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
-        public async Task SMSDeactivationTestWithClientGrain()
+        [TestMethod, TestCategory("Failures"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [ExpectedException(typeof(TimeoutException))]
+        public async Task SMSDeactivationTest_ClientConsumer()
         {
             logger.Info("************************ SMSDeactivationTest *********************************");
-            await runner.DeactivationTestWithClientGrain(Guid.NewGuid(), StreamNamespace);
+            await runner.DeactivationTest_ClientConsumer(Guid.NewGuid(), StreamNamespace);
         }
 
     }

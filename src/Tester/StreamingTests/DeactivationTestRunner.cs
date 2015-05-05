@@ -22,8 +22,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -37,7 +35,7 @@ using UnitTests.Tester;
 
 namespace Tester.StreamingTests
 {
-    class PubSubDeactivationTestRunner
+    class DeactivationTestRunner
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
         private readonly string streamProviderName;
@@ -59,7 +57,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        public PubSubDeactivationTestRunner(string streamProviderName, Logger logger)
+        public DeactivationTestRunner(string streamProviderName, Logger logger)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
@@ -67,12 +65,6 @@ namespace Tester.StreamingTests
             }
             this.streamProviderName = streamProviderName;
             this.logger = logger;
-        }
-
-        private async Task TestDeadlock (Task task, string message)
-        {
-            var result = await Task.WhenAny(task, Task.Delay(Timeout));
-            Assert.AreEqual(task, result, message);
         }
 
         public async Task DeactivationTest(Guid streamGuid, string streamNamespace)
@@ -96,23 +88,24 @@ namespace Tester.StreamingTests
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:
-            await TestDeadlock(producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName), "BecomeProducer is hung due to deactivation deadlock");
-            await TestDeadlock(producer.Produce(), "Produce is hung due to deactivation deadlock");
+
+            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName).WithTimeout(Timeout, "BecomeProducer is hung due to deactivation deadlock");
+            await producer.Produce().WithTimeout(Timeout, "Produce is hung due to deactivation deadlock");
 
             // consumer grain should continue to receive stream messages:
             count = await consumer.GetNumberConsumed();
             Assert.AreEqual(count[subscriptionHandle], 2, "Consumer did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
         }
-        public async Task DeactivationTestWithClientGrain(Guid streamGuid, string streamNamespace)
+        public async Task DeactivationTest_ClientConsumer(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
             ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
 
             var count = new Counter();
             // get stream and subscribe
-            IStreamProvider streamProvider = Orleans.GrainClient.GetStreamProvider(streamProviderName);
+            IStreamProvider streamProvider = GrainClient.GetStreamProvider(streamProviderName);
             var stream = streamProvider.GetStream<int>(streamGuid, streamNamespace);
-            StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync((e, t) => count.Increment());
+            StreamSubscriptionHandle<int> subscriptionHandle = await stream.SubscribeAsync((e, t) => count.Increment());
 
             // produce one message (PubSubRendezvousGrain will have one consumer and one producer)
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
@@ -125,8 +118,8 @@ namespace Tester.StreamingTests
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:
-            await TestDeadlock(producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName), "BecomeProducer is hung due to deactivation deadlock");
-            await TestDeadlock(producer.Produce(), "Produce is hung due to deactivation deadlock");
+            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName).WithTimeout(Timeout, "BecomeProducer is hung due to deactivation deadlock");
+            await producer.Produce().WithTimeout(Timeout, "Produce is hung due to deactivation deadlock");
 
             Assert.AreEqual(count.Value, 2, "Client consumer grain did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
         }

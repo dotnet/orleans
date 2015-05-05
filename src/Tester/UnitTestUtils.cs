@@ -25,12 +25,11 @@ using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 
 namespace UnitTests.Tester
 {
-    public class UnitTestUtils
+    public static class UnitTestUtils
     {
         public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout)
         {
@@ -75,6 +74,29 @@ namespace UnitTests.Tester
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = NumDotNetPoolThreads; // 1000;
             ServicePointManager.UseNagleAlgorithm = false;
+        }
+
+        public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout, string message)
+        {
+            if (taskToComplete.IsCompleted)
+            {
+                await taskToComplete;
+                return;
+            }
+
+            await Task.WhenAny(taskToComplete, Task.Delay(timeout));
+
+            // We got done before the timeout, or were able to complete before this code ran, return the result
+            if (taskToComplete.IsCompleted)
+            {
+                // Await this so as to propagate the exception correctly
+                await taskToComplete;
+                return;
+            }
+
+            // We did not complete before the timeout, we fire and forget to ensure we observe any exceptions that may occur
+            taskToComplete.Ignore();
+            throw new TimeoutException(message);
         }
     }
 }
