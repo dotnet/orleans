@@ -475,7 +475,7 @@ namespace Orleans.Runtime
                 }
                 if (logger.IsVerbose) { logger.Verbose("Message gateway service started successfully."); }
 
-                scheduler.QueueTask(clientRegistrar.Start, ((SystemTarget)clientRegistrar).SchedulingContext)
+                scheduler.QueueTask(clientRegistrar.Start, clientRegistrar.SchedulingContext)
                     .WaitWithThrow(initTimeout);
                 if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
 

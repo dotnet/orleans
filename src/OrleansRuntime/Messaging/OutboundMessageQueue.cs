@@ -151,7 +151,6 @@ namespace Orleans.Runtime.Messaging
         {
             pingSender.Start();
             systemSender.Start();
-
         }
 
         public void Stop()

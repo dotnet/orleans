@@ -148,7 +148,7 @@ namespace Orleans.Runtime.GrainDirectory
             cacheSuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_CACHE_SUCCESSES);
             StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_CACHE_HITRATIO, () =>
                 {
-                    long delta1 = 0, delta2 = 0;
+                    long delta1, delta2;
                     long curr1 = cacheSuccesses.GetCurrentValueAndDelta(out delta1);
                     long curr2 = cacheLookups.GetCurrentValueAndDelta(out delta2);
                     return String.Format("{0}, Delta={1}", 
@@ -459,13 +459,13 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (Seed == null)
                 {
-                    var grainName = String.Empty;
+                    string grainName;
                     if (!Constants.TryGetSystemGrainName(grain, out grainName))
                         grainName = "MembershipTableGrain";
                     
                     var errorMsg = grainName + " cannot run without Seed node - please check your silo configuration file and make sure it specifies a SeedNode element. " +
                         " Alternatively, you may want to use AzureTable for LivenessType.";
-                    throw new ArgumentException(errorMsg, "grain = " + grain.ToString());
+                    throw new ArgumentException(errorMsg, "grain = " + grain);
                 }
                 // Directory info for the membership table grain has to be located on the primary (seed) node, for bootstrapping
                 if (log.IsVerbose2) log.Verbose2("Silo {0} looked for a special grain {1}, returned {2}", MyAddress, grain, Seed);
@@ -577,7 +577,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // Caching optimization:
                     // cache the result of a successfull RegisterActivation call, only if it is not a duplicate activation.
                     // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
-                    List<Tuple<SiloAddress, ActivationId>> cached = null;
+                    List<Tuple<SiloAddress, ActivationId>> cached;
                     if (!DirectoryCache.LookUp(address.Grain, out cached))
                     {
                         cached = new List<Tuple<SiloAddress, ActivationId>>(1);
@@ -710,7 +710,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public List<ActivationAddress> GetLocalCacheData(GrainId grain)
         {
-            List<Tuple<SiloAddress, ActivationId>> cached = null;
+            List<Tuple<SiloAddress, ActivationId>> cached;
             return DirectoryCache.LookUp(grain, out cached) ? 
                 cached.Select(elem => ActivationAddress.GetAddress(elem.Item1, grain, elem.Item2)).Where(addr => IsValidSilo(addr.Silo)).ToList() : 
                 null;
