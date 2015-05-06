@@ -105,6 +105,8 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task<Tuple<ActivationAddress, int>> RegisterSingleActivation(ActivationAddress address, int retries)
         {
             router.RegistrationsSingleActRemoteReceived.Increment();
+            if (logger.IsVerbose2) logger.Verbose2("Trying to register activation for grain. GrainId: {0}. ActivationId: {1}.", address.Grain, address.Activation);
+
             // validate that this grain should be stored in our partition
             SiloAddress owner = router.CalculateTargetSilo(address.Grain);
             if (owner == null)
@@ -123,7 +125,7 @@ namespace Orleans.Runtime.GrainDirectory
                 throw new OrleansException("Silo " + router.MyAddress + " is not the owner of the grain " +
                                                 address.Grain + " Owner=" + owner);
 
-            if (logger.IsVerbose2) logger.Verbose2("Retry " + retries + " RemoteGrainDirectory.RegisterSingleActivation for address=" + address + " at Owner=" + owner);
+            if (logger.IsVerbose2) logger.Verbose2("Retry {0} RemoteGrainDirectory.RegisterSingleActivation for address={1} at Owner={2}", retries, address, owner);
             PrepareForRetry(retries);
 
             await Task.Delay(RETRY_DELAY);
@@ -158,6 +160,7 @@ namespace Orleans.Runtime.GrainDirectory
             // validate that this request arrived correctly
             //logger.Assert(ErrorCode.Runtime_Error_100140, silo.Matches(router.MyAddress), "destination address != my address");
             //var result = new List<ActivationAddress>();
+            if (logger.IsVerbose2) logger.Verbose2("RegisterManySingleActivation Count={0}", addresses.Count);
 
             if (addresses.Count == 0)
                 return TaskDone.Done;
@@ -186,7 +189,7 @@ namespace Orleans.Runtime.GrainDirectory
             
             if (retries > 0)
             {
-                if (logger.IsVerbose2) logger.Verbose2("Retry " + retries + " RemoteGrainDirectory.Unregister for address=" + address + " at Owner=" + owner);
+                if (logger.IsVerbose2) logger.Verbose2("Retry {0} RemoteGrainDirectory.Unregister for address={1} at Owner={2}", retries, address, owner);
                 PrepareForRetry(retries);
 
                 await Task.Delay(RETRY_DELAY);
@@ -272,7 +275,7 @@ namespace Orleans.Runtime.GrainDirectory
             
             if (retries > 0)
             {
-                if (logger.IsVerbose2) logger.Verbose2("Retry " + retries + " RemoteGrainDirectory.DeleteGrain for Grain=" + grain + " at Owner=" + owner);
+                if (logger.IsVerbose2) logger.Verbose2("Retry {0} RemoteGrainDirectory.DeleteGrain for Grain={1} at Owner={2}", retries, grain, owner);
                 PrepareForRetry(retries);
 
                 await Task.Delay(RETRY_DELAY);
