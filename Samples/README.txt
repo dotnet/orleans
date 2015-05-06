@@ -1,4 +1,4 @@
-HelloWorldNuget and AzureWebSample use Orleans Nuget packages available at https://www.nuget.org/packages?q=microsoft.orleans.
+HelloWorldNuget, Chirper and AzureWebSample use Orleans Nuget packages available at https://www.nuget.org/packages?q=microsoft.orleans.
 
 In order to run the rest of the samples you need first to install the Orleans installer msi, as described here: http://dotnet.github.io/orleans/Installation
 
@@ -14,7 +14,7 @@ We recommend running Azure Samples (AzureWebSample, TicTacToe) in elevated mode 
 All other non-Orleans dependencies, such as Azure Storage, Azure Service Runtime, etc... are consumed via Nuget packages.
 
 
-### TROUBLESHOOTIG ###
+### TROUBLESHOOTING ###
 
 You may need to execute the following commands to reserve static ports to Orleans or allow traffic through the firewall:
 "netsh http add urlacl url=http://*:22222/ user=<DOMAIN\user>"
