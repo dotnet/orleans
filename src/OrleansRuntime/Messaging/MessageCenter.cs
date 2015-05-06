@@ -22,7 +22,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 
@@ -38,11 +37,11 @@ namespace Orleans.Runtime.Messaging
         private static readonly TraceLogger log = TraceLogger.GetLogger("Orleans.Messaging.MessageCenter");
         private Action<Message> rerouteHandler;
 
-        // ReSharper disable UnaccessedField.Local
+        // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;
         private IntValueStatistic receiveQueueLengthCounter;
-        // ReSharper restore UnaccessedField.Local
-        
+        // ReSharper restore NotAccessedField.Local
+
         internal IOutboundMessageQueue OutboundQueue { get; set; }
         internal IInboundMessageQueue InboundQueue { get; set; }
         internal SocketManager SocketManager;
@@ -186,7 +185,7 @@ namespace Orleans.Runtime.Messaging
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.Result != Message.ResponseTypes.Rejection)
-                && (msg.TargetGrain != Constants.SystemMembershipTableId))
+                && !Constants.SystemMembershipTableId.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
             }
