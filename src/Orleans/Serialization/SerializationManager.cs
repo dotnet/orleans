@@ -1490,7 +1490,7 @@ namespace Orleans.Serialization
 
         #region Special case code for message headers
 
-        internal static void SerializeMessageHeaders(Dictionary<string, object> headers, BinaryTokenStreamWriter stream)
+        internal static void SerializeMessageHeaders(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1509,13 +1509,13 @@ namespace Orleans.Serialization
             }
         }
 
-        private static void SerializeMessageHeaderDictHelper(Dictionary<string, object> headers, BinaryTokenStreamWriter stream)
+        private static void SerializeMessageHeaderDictHelper(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
         {
             stream.Write(SerializationTokenType.StringObjDict);
             stream.Write(headers.Count);
             foreach (var header in headers)
             {
-                stream.Write(header.Key);
+                stream.Write((byte)header.Key);
                 SerializeMessageHeaderValueHelper(header.Value, stream);
             }
         }
@@ -1547,9 +1547,9 @@ namespace Orleans.Serialization
             if (stream.TryWriteSimpleObject(value))
                 return;
 
-            if (value is Dictionary<string, object>)
+            if (value is Dictionary<Message.Header, object>)
             {
-                SerializeMessageHeaderDictHelper((Dictionary<string, object>)value, stream);
+                SerializeMessageHeaderDictHelper((Dictionary<Message.Header, object>)value, stream);
                 return;
             }
 
@@ -1571,7 +1571,7 @@ namespace Orleans.Serialization
             throw new ArgumentException("Invalid message header passed to SerializeMessageHeaders; type is " + value.GetType().Name, "value");
         }
 
-        internal static Dictionary<string, object> DeserializeMessageHeaders(BinaryTokenStreamReader stream)
+        internal static Dictionary<Message.Header, object> DeserializeMessageHeaders(BinaryTokenStreamReader stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1608,14 +1608,14 @@ namespace Orleans.Serialization
             return result;
         }
 
-        private static Dictionary<string, object> DeserializeMessageHeaderDictHelper(BinaryTokenStreamReader stream)
+        private static Dictionary<Message.Header, object> DeserializeMessageHeaderDictHelper(BinaryTokenStreamReader stream)
         {
             var count = stream.ReadInt();
-            var result = new Dictionary<string, object>(count);
+            var result = new Dictionary<Message.Header, object>(count);
             for (var i = 0; i < count; i++)
             {
-                var key = stream.ReadString();
-                result.Add(key, DeserializeMessageHeaderHelper(stream));
+                var key = stream.ReadByte();
+                result.Add((Message.Header)key, DeserializeMessageHeaderHelper(stream));
             }
             return result;
         }

@@ -35,8 +35,6 @@ namespace Orleans.Runtime.Messaging
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
 
-        internal static readonly string PingHeader = Message.Header.APPLICATION_HEADER_FLAG + Message.Header.PING_APPLICATION_HEADER;
-
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;
         protected HashSet<Socket> OpenReceiveSockets;
@@ -411,7 +409,12 @@ namespace Orleans.Runtime.Messaging
                 msg.AddTimestamp(Message.LifecycleTag.ReceiveIncoming);
 
             // See it's a Ping message, and if so, short-circuit it
-            if (msg.GetScalarHeader<bool>(PingHeader))
+            object pingObj;
+            var requestContext = msg.RequestContextData;
+            if (requestContext != null &&
+                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out pingObj) &&
+                pingObj is bool &&
+                (bool)pingObj)
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 

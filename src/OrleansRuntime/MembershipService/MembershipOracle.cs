@@ -885,7 +885,7 @@ namespace Orleans.Runtime.MembershipService
             Task pingTask;
             try
             {
-                RequestContext.Set(Message.Header.PING_APPLICATION_HEADER, true);
+                RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
                 pingTask = GetOracleReference(siloAddress).Ping(pingNumber);
 
                 // Update stats counters -- only count Pings that were successfuly sent [but not necessarily replied to]
@@ -893,7 +893,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                RequestContext.Remove(Message.Header.PING_APPLICATION_HEADER);
+                RequestContext.Remove(RequestContext.PING_APPLICATION_HEADER);
             }
             return pingTask;
         }

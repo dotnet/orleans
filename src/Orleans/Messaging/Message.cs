@@ -34,41 +34,41 @@ namespace Orleans.Runtime
     [Serializable]
     internal class Message : IOutgoingMessage
     {
-        public static class Header
+        public enum Header : byte
         {
-            public const string ALWAYS_INTERLEAVE = "#AI";
-            public const string CACHE_INVALIDATION_HEADER = "#CIH";
-            public const string CATEGORY = "#MT";
-            public const string CORRELATION_ID = "#ID";
-            public const string DEBUG_CONTEXT = "#CTX";
-            public const string DIRECTION = "#ST";
-            public const string EXPIRATION = "#EX";
-            public const string FORWARD_COUNT = "#FC";
-            public const string INTERFACE_ID = "#IID";
-            public const string METHOD_ID = "#MID";
-            public const string NEW_GRAIN_TYPE = "#NT";
-            public const string GENERIC_GRAIN_TYPE = "#GGT";
-            public const string RESULT = "#R";
-            public const string REJECTION_INFO = "#RJI";
-            public const string REJECTION_TYPE = "#RJT";
-            public const string READ_ONLY = "#RO";
-            public const string RESEND_COUNT = "#RS";
-            public const string SENDING_ACTIVATION = "#SA";
-            public const string SENDING_GRAIN = "#SG";
-            public const string SENDING_SILO = "#SS";
-            public const string IS_NEW_PLACEMENT = "#NP";
+            ALWAYS_INTERLEAVE = 1,
+            CACHE_INVALIDATION_HEADER,
+            CATEGORY,
+            CORRELATION_ID,
+            DEBUG_CONTEXT,
+            DIRECTION,
+            EXPIRATION,
+            FORWARD_COUNT,
+            INTERFACE_ID,
+            METHOD_ID,
+            NEW_GRAIN_TYPE,
+            GENERIC_GRAIN_TYPE,
+            RESULT,
+            REJECTION_INFO,
+            REJECTION_TYPE,
+            READ_ONLY,
+            RESEND_COUNT,
+            SENDING_ACTIVATION,
+            SENDING_GRAIN,
+            SENDING_SILO,
+            IS_NEW_PLACEMENT,
 
-            public const string TARGET_ACTIVATION = "#TA";
-            public const string TARGET_GRAIN = "#TG";
-            public const string TARGET_SILO = "#TS";
-            public const string TARGET_OBSERVER = "#TO";
-            public const string TIMESTAMPS = "Times";
-            public const string IS_UNORDERED = "#UO";
+            TARGET_ACTIVATION,
+            TARGET_GRAIN,
+            TARGET_SILO,
+            TARGET_OBSERVER,
+            TIMESTAMPS,
+            IS_UNORDERED,
 
-            public const char APPLICATION_HEADER_FLAG = '!';
-            public const string PING_APPLICATION_HEADER = "Ping";
-            public const string PRIOR_MESSAGE_ID = "#PMI";
-            public const string PRIOR_MESSAGE_TIMES = "#PMT";
+            PRIOR_MESSAGE_ID,
+            PRIOR_MESSAGE_TIMES,
+
+            REQUEST_CONTEXT,
         }
 
         public static class Metadata
@@ -84,7 +84,7 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        private readonly Dictionary<string, object> headers;
+        private readonly Dictionary<Header, object> headers;
         [NonSerialized]
         private Dictionary<string, object> metadata;
 
@@ -408,6 +408,11 @@ namespace Orleans.Runtime
             set { SetHeader(Header.REJECTION_INFO, value); }
         }
 
+        public Dictionary<string, object> RequestContextData
+        {
+            get { return GetScalarHeader<Dictionary<string, object>>(Header.REQUEST_CONTEXT); }
+            set { SetHeader(Header.REQUEST_CONTEXT, value); }
+        }
 
         public object BodyObject
         {
@@ -450,7 +455,7 @@ namespace Orleans.Runtime
 
         public Message()
         {
-            headers = new Dictionary<string, object>();
+            headers = new Dictionary<Header, object>();
             metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
@@ -534,7 +539,7 @@ namespace Orleans.Runtime
             }
             if (Message.WriteMessagingTraces) response.AddTimestamp(LifecycleTag.CreateResponse);
 
-            RequestContext.ExportToMessage(response);
+            Runtime.RequestContext.ExportToMessage(response);
 
             return response;
         }
@@ -549,12 +554,12 @@ namespace Orleans.Runtime
             return response;
         }
 
-        public bool ContainsHeader(string tag)
+        public bool ContainsHeader(Header tag)
         {
             return headers.ContainsKey(tag);
         }
 
-        public void RemoveHeader(string tag)
+        public void RemoveHeader(Header tag)
         {
             lock (headers)
             {
@@ -564,7 +569,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void SetHeader(string tag, object value)
+        public void SetHeader(Header tag, object value)
         {
             lock (headers)
             {
@@ -572,7 +577,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public object GetHeader(string tag)
+        public object GetHeader(Header tag)
         {
             object val;
             bool flag;
@@ -583,7 +588,7 @@ namespace Orleans.Runtime
             return flag ? val : null;
         }
 
-        public string GetStringHeader(string tag)
+        public string GetStringHeader(Header tag)
         {
             object val;
             if (!headers.TryGetValue(tag, out val)) return String.Empty;
@@ -592,7 +597,7 @@ namespace Orleans.Runtime
             return s ?? String.Empty;
         }
 
-        public T GetScalarHeader<T>(string tag)
+        public T GetScalarHeader<T>(Header tag)
         {
             object val;
             if (headers.TryGetValue(tag, out val))
@@ -602,55 +607,12 @@ namespace Orleans.Runtime
             return default(T);
         }
 
-        public T GetSimpleHeader<T>(string tag)
+        public T GetSimpleHeader<T>(Header tag)
         {
             object val;
             if (!headers.TryGetValue(tag, out val) || val == null) return default(T);
 
             return val is T ? (T) val : default(T);
-        }
-
-        internal void SetApplicationHeaders(Dictionary<string, object> data)
-        {
-            lock (headers)
-            {
-                foreach (var item in data)
-                {
-                    string key = Header.APPLICATION_HEADER_FLAG + item.Key;
-                    headers[key] = SerializationManager.DeepCopy(item.Value);
-                }
-            }
-        }
-
-        internal void GetApplicationHeaders(Dictionary<string, object> dict)
-        {
-            TryGetApplicationHeaders(ref dict);
-        }
-
-        private void TryGetApplicationHeaders(ref Dictionary<string, object> dict)
-        {
-            lock (headers)
-            {
-                foreach (var pair in headers)
-                {
-                    if (pair.Key[0] != Header.APPLICATION_HEADER_FLAG) continue;
-
-                    if (dict == null)
-                    {
-                        dict = new Dictionary<string, object>();
-                    }
-                    dict[pair.Key.Substring(1)] = pair.Value;
-                }
-            }
-        }
-
-        public object GetApplicationHeader(string headerName)
-        {
-            lock (headers)
-            {
-                object obj;
-                return headers.TryGetValue(Header.APPLICATION_HEADER_FLAG + headerName, out obj) ? obj : null;
-            }
         }
 
         public bool ContainsMetadata(string tag)
@@ -1088,15 +1050,15 @@ namespace Orleans.Runtime
         {
             var history = new StringBuilder();
             history.Append("<");
-            if (ContainsHeader(Message.Header.TARGET_SILO))
+            if (ContainsHeader(Header.TARGET_SILO))
             {
                 history.Append(TargetSilo).Append(":");
             }
-            if (ContainsHeader(Message.Header.TARGET_GRAIN))
+            if (ContainsHeader(Header.TARGET_GRAIN))
             {
                 history.Append(TargetGrain).Append(":");
             }
-            if (ContainsHeader(Message.Header.TARGET_ACTIVATION))
+            if (ContainsHeader(Header.TARGET_ACTIVATION))
             {
                 history.Append(TargetActivation);
             }
