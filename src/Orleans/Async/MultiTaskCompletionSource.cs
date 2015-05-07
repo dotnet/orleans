@@ -49,26 +49,38 @@ namespace Orleans
         }
 
 
-        public void TrySetOneResult()
+        public void SetOneResult()
         {
             lock (lockable)
             {
-                count--;
                 if (count <= 0)
                 {
-                    tcs.TrySetResult(true);
+                    throw new InvalidOperationException("SetOneResult was called more times than initialy specified by the count argument.");
+                }
+                count--;
+                if (count == 0)
+                {
+                    tcs.SetResult(true);
                 }
             }
         }
 
-        public void TrySetMultipleResults(int num)
+        public void SetMultipleResults(int num)
         {
             lock (lockable)
             {
-                count = count - num;
-                if (count <= 0)
+                if (num <= 0)
                 {
-                    tcs.TrySetResult(true);
+                    throw new ArgumentOutOfRangeException("num", "num has to be positive.");
+                }
+                if (count - num < 0)
+                {
+                    throw new ArgumentOutOfRangeException("num", "num is too large, count - num < 0.");
+                }
+                count = count - num;
+                if (count == 0)
+                {
+                    tcs.SetResult(true);
                 }
             }
         }

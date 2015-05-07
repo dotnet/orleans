@@ -908,7 +908,7 @@ namespace Orleans.Runtime
                 // step 5 - Resolve any waiting TaskCompletionSource
                 if (tcs != null)
                 {
-                    tcs.TrySetMultipleResults(list.Count);
+                    tcs.SetMultipleResults(list.Count);
                 }
                 logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done FinishDestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
             }catch (Exception exc)
