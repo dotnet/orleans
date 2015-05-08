@@ -119,12 +119,12 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
+        #endregion
+
         public override string ToString()
         {
             return string.Format("<SimpleQueueCacheCursor: Element={0}, SequenceToken={1}>",
                 Element != null ? Element.Value.Batch.ToString() : "null", SequenceToken != null ? SequenceToken.ToString() : "null");
         }
-
-        #endregion
     }
 }

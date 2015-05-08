@@ -47,7 +47,7 @@ namespace Orleans.Streams
         /// Add messages to the cache
         /// </summary>
         /// <param name="messages"></param>
-        void AddToCache(IEnumerable<IBatchContainer> messages);
+        void AddToCache(IList<IBatchContainer> messages);
 
         /// <summary>
         /// Acquire a stream message cursor.  This can be used to retreave messages from the
