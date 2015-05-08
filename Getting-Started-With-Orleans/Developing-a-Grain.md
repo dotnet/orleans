@@ -92,7 +92,7 @@ Grain types can be declared in one of two ways:
 * Extend `Grain<T>` if they have some persistent state that they want the Orleans runtime to handle. 
 Stated another way, by extending `Grain<T>` a grain type is automatically opted-in to the Orleans system managed persistence framework.
 
- For the remainder of this section, we will only be considering Option #2 / `Grai<T>` because Option #1 grains will continue to run as now without any behavior changes.
+ For the remainder of this section, we will only be considering Option #2 / `Grain<T>` because Option #1 grains will continue to run as now without any behavior changes.
 
 ## Grain State Stores
 
