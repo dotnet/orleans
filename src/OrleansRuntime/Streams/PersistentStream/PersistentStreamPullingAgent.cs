@@ -259,7 +259,7 @@ namespace Orleans.Streams
                 if (timer == null) return; // timer was already removed, last tick
                 
                 IQueueAdapterReceiver rcvr = receiver;
-                int maxCacheAddCount = queueCache != null ? queueCache.MaxAddCount : -1;
+                int maxCacheAddCount = queueCache != null ? queueCache.MaxAddCount : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (true)
@@ -271,10 +271,7 @@ namespace Orleans.Streams
                     }
 
                     // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
-                    IEnumerable<IBatchContainer> msgsEnumerable = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
-                    List<IBatchContainer> multiBatch = null;
-                    if (msgsEnumerable != null)
-                        multiBatch = msgsEnumerable.ToList();
+                    IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
                     
                     if (multiBatch == null || multiBatch.Count == 0) return; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
@@ -311,32 +308,31 @@ namespace Orleans.Streams
             var streamData = new StreamConsumerCollection();
             pubSubCache.Add(streamId, streamData);
             // Create a fake cursor to point into a cache.
-            // That way we will not purge the event from the cache to a potentially new alredy subscribed consumer, until we talk to pub sub.
-            // This will help ensure the "casual consistency" between pre-existing subsripton and later production.
-            var cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, firstToken);
+            // That way we will not purge the event from the cache, until we talk to pub sub.
+            // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer) 
+            // and later production.
+            var pinCursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, firstToken);
 
             try
             {
                 await RegisterAsStreamProducer(streamId, firstToken);
             }finally
             {
-                // Cleanup the fake cursor.
-                cursor.Dispose();
+                // Cleanup the fake pinning cursor.
+                pinCursor.Dispose();
             }
         }
-
-     
 
         private void StartInactiveCursors(StreamId streamId, StreamConsumerCollection streamData)
         {
             // if stream is already registered, just wake inactive consumers
             // get list of inactive consumers
-            var streamConsumers = streamData.AllConsumersForStream(streamId)
+            var inactiveStreamConsumers = streamData.AllConsumersForStream(streamId)
                 .Where(consumer => consumer.State == StreamConsumerDataState.Inactive)
                 .ToList();
 
             // for each inactive stream
-            foreach (StreamConsumerData consumerData in streamConsumers)
+            foreach (StreamConsumerData consumerData in inactiveStreamConsumers)
                 RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
         }
 
@@ -383,8 +379,7 @@ namespace Orleans.Streams
 
                     if (batch != null)
                     {
-                        deliveryTask = consumerData.StreamConsumer
-                            .DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
+                        deliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
                     }
                     else if (ex == null)
                     {

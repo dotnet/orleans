@@ -99,13 +99,12 @@ namespace Orleans.Providers.Streams.Common
             return numCursorsInLastBucket > 0;
         }
 
-        public virtual void AddToCache(IEnumerable<IBatchContainer> msgs)
+        public virtual void AddToCache(IList<IBatchContainer> msgs)
         {
             if (msgs == null) throw new ArgumentNullException("msgs");
 
-            var copyMsgs = msgs as IList<IBatchContainer> ?? msgs.ToList();
-            Log(logger, "AddToCache: added {0} items to cache.", copyMsgs.Count);
-            foreach (var message in copyMsgs)
+            Log(logger, "AddToCache: added {0} items to cache.", msgs.Count);
+            foreach (var message in msgs)
             {
                 Add(message, message.SequenceToken);
             }
@@ -113,24 +112,14 @@ namespace Orleans.Providers.Streams.Common
 
         public virtual IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token)
         {
-            EventSequenceToken sequenceToken = null;
-            if (token == null)
+            if (token != null && !(token is EventSequenceToken))
             {
                 // Null token can come from a stream subscriber that is just interested to start consuming from latest (the most recent event added to the cache).
-                // GK TODO: was lastReadMessage, now -1. Revisit!
-                //sequenceToken = new EventSequenceToken(); //lastReadMessage);
-            }
-            else
-            {
-                var eventToken = token as EventSequenceToken;
-                if (eventToken == null)
-                    throw new ArgumentOutOfRangeException("token", "token must be of type EventSequenceToken");
-
-                sequenceToken = eventToken;
+                throw new ArgumentOutOfRangeException("token", "token must be of type EventSequenceToken");
             }
 
             var cursor = new SimpleQueueCacheCursor(this, streamGuid, streamNamespace, logger);
-            InitializeCursor(cursor, sequenceToken);
+            InitializeCursor(cursor, token);
             return cursor;
         }
 
