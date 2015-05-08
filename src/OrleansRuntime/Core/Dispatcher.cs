@@ -357,8 +357,11 @@ namespace Orleans.Runtime
         /// <param name="message">Message to analyze</param>
         private void CheckDeadlock(Message message)
         {
-            object obj = message.GetApplicationHeader(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
-            if (obj == null) return; // first call in a chain
+            var requestContext = message.RequestContextData;
+            object obj;
+            if (requestContext == null ||
+                !requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out obj) ||
+                obj == null) return; // first call in a chain
 
             var prevChain = ((IList)obj);
             ActivationId nextActivationId = message.TargetActivation;
