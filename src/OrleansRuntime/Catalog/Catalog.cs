@@ -168,7 +168,7 @@ namespace Orleans.Runtime
             if (list != null && list.Count > 0)
             {
                 if (logger.IsVerbose) logger.Verbose("CollectActivations{0}", list.ToStrings(d => d.Grain.ToString() + d.ActivationId));
-                await ShutdownActivationCollector(list);
+                await ShutdownActivation_Collector(list);
             }
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
@@ -655,7 +655,7 @@ namespace Orleans.Runtime
             return data != null;
         }
 
-        private Task ShutdownActivationCollector(List<ActivationData> list)
+        private Task ShutdownActivation_Collector(List<ActivationData> list)
         {
             logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "ShutdownActivationCollector: total {0} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
@@ -671,7 +671,7 @@ namespace Orleans.Runtime
 
         // To be called fro within Activation context.
         // Cannot be awaitable, since after DestroyActivation is done the activation is in Invalid state and cannot await any Task.
-        internal void ShutdownActivationDeactivateOnIdle(ActivationData data)
+        internal void ShutdownActivation_DeactivateOnIdle(ActivationData data)
         {
             bool promptly = false;
             bool alreadBeingDestroyed = false;
@@ -687,7 +687,7 @@ namespace Orleans.Runtime
                     }
                     else // busy, so destroy later.
                     {
-                        data.AddOnInactive(() => DestroyActivation(data));
+                        data.AddOnInactive(() => DestroyActivationVoid(data));
                     }
                 }
                 else
@@ -701,7 +701,7 @@ namespace Orleans.Runtime
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE).Increment();
             if (promptly)
             {
-                DestroyActivation(data); // Don't await or Ignore!
+                DestroyActivationVoid(data); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
             }
         }
 
@@ -718,7 +718,7 @@ namespace Orleans.Runtime
 
             if (logger.IsVerbose) logger.Verbose("ShutdownActivations_DirectShutdown: {0} activations.", list.Count);
             List<ActivationData> destroyNow = null;
-            List<TaskCompletionSource<bool>> destroyLater = null;
+            List<MultiTaskCompletionSource> destroyLater = null;
             int alreadBeingDestroyed = 0;
             foreach (var d in list)
             {
@@ -741,11 +741,11 @@ namespace Orleans.Runtime
                         {
                             if (destroyLater == null)
                             {
-                                destroyLater = new List<TaskCompletionSource<bool>>();
+                                destroyLater = new List<MultiTaskCompletionSource>();
                             }
-                            var tcs = new TaskCompletionSource<bool>();
+                            var tcs = new MultiTaskCompletionSource(1);
                             destroyLater.Add(tcs);
-                            activationData.AddOnInactive(() => DestroyActivation(activationData, tcs));
+                            activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs));
                         }
                     }
                     else
@@ -777,9 +777,14 @@ namespace Orleans.Runtime
         /// For use by grain delete, transaction abort, etc.
         /// </summary>
         /// <param name="activation"></param>
-        private Task DestroyActivation(ActivationData activation, TaskCompletionSource<bool> tcs = null)
+        private void DestroyActivationVoid(ActivationData activation)
         {
-            return DestroyActivations(new List<ActivationData> { activation }, tcs != null ? new List<TaskCompletionSource<bool>> { tcs } : null);
+            StartDestroyActivations(new List<ActivationData> { activation });
+        }
+
+        private void DestroyActivationAsync(ActivationData activation, MultiTaskCompletionSource tcs)
+        {
+            StartDestroyActivations(new List<ActivationData> { activation }, tcs);
         }
 
         /// <summary>
@@ -788,7 +793,6 @@ namespace Orleans.Runtime
         /// For use by grain delete, transaction abort, etc.
         /// </summary>
         /// <param name="list"></param>
-        /// <param name="tcs"></param>
         /// <returns></returns>
         // Overall code flow:
         // Deactivating state was already set before, in the correct context under lock.
@@ -802,131 +806,116 @@ namespace Orleans.Runtime
         // UnregisterMessageTarget -> no new tasks will be enqueue (if an orphan task get enqueud, it is ignored and dropped on the floor).
         // InvalidateCacheEntry
         // Reroute pending
-        private async Task DestroyActivations(List<ActivationData> list, IEnumerable<TaskCompletionSource<bool>> tcs = null)
+        private Task DestroyActivations(List<ActivationData> list)
+        {
+            var tcs = new MultiTaskCompletionSource(list.Count);
+            StartDestroyActivations(list, tcs);
+            return tcs.Task;
+        }
+
+        private async void StartDestroyActivations(List<ActivationData> list, MultiTaskCompletionSource tcs = null)
         {
             int number = destroyActivationsNumber;
             destroyActivationsNumber++;
-            logger.Info(ErrorCode.Catalog_DestroyActivations, "Starting DestroyActivations #{0} of {1} activations", number, list.Count);
-
-            // step 1 - WaitForAllTimersToFinish
-            var tasks = new List<Task>();
-            foreach (var activation in list)
-            {
-                tasks.Add(activation.WaitForAllTimersToFinish());
-            }
-
             try
             {
-                await Task.WhenAll(tasks);
-            }
-            catch (Exception exc)
-            {
-                logger.Warn(ErrorCode.Catalog_WaitForAllTimersToFinish_Exception, String.Format("WaitForAllTimersToFinish {0} failed.", list.Count), exc);
-            }
+                logger.Info(ErrorCode.Catalog_DestroyActivations, "Starting DestroyActivations #{0} of {1} activations", number, list.Count);
 
-            // step 2 - CallGrainDeactivate
-            tasks.Clear();
-            foreach (var activation in list)
-            {
-                var activationData = activation; // Capture loop variable
-                tasks.Add(scheduler.RunOrQueueTask(
-                    () => CallGrainDeactivate(activationData), new SchedulingContext(activationData)));
-            }
-            try
-            {
-                await Task.WhenAll(tasks);
-            }
-            catch (Exception exc)
-            {
-                logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, String.Format("DeactivateActivation {0} failed.", list.Count), exc);
-            }
+                // step 1 - WaitForAllTimersToFinish
+                var tasks1 = new List<Task>();
+                foreach (var activation in list)
+                {
+                    tasks1.Add(activation.WaitForAllTimersToFinish());
+                }
 
-            // step 3 - Unregister any Stream producers associated with the grains being deactivated
-            await CleanupStreams(list);
-
-            // step 4 - UnregisterManyAsync
-            try
-            {
-                await scheduler.RunOrQueueTask(() =>
-                    directory.UnregisterManyAsync(list.Select(d => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList()),
-                    SchedulingContext);
-            }
-            catch (Exception exc)
-            {
-                logger.Warn(ErrorCode.Catalog_UnregisterManyAsync, String.Format("UnregisterManyAsync {0} failed.", list.Count), exc);
-            }
-
-            // step 5 - UnregisterMessageTarget and OnFinishedGrainDeactivate
-            foreach (var activationData in list)
-            {
                 try
                 {
-                    lock (activationData)
-                    {
-                        activationData.SetState(ActivationState.Invalid); // Deactivate calls on this activation are finished
-                    }
-                    UnregisterMessageTarget(activationData);
+                    await Task.WhenAll(tasks1);
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget2, String.Format("UnregisterMessageTarget failed on {0}.", activationData), exc);
+                    logger.Warn(ErrorCode.Catalog_WaitForAllTimersToFinish_Exception, String.Format("WaitForAllTimersToFinish {0} failed.", list.Count), exc);
                 }
-                try
-                {
-                    // IMPORTANT: no more awaits and .Ignore after that point.
- 
-                    // Just use this opportunity to invalidate local Cache Entry as well. 
-                    // If this silo is not the grain directory partition for this grain, it may have it in its cache.
-                    directory.InvalidateCacheEntry(activationData.Address);
 
-                    RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
-                }
-                catch (Exception exc)
+                // step 2 - CallGrainDeactivate
+                var tasks2 = new List<Tuple<Task, ActivationData>>();
+                foreach (var activation in list)
                 {
-                    logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Last stage of DestroyActivations failed on {0}.", activationData), exc);
+                    var activationData = activation; // Capture loop variable
+                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData), new SchedulingContext(activationData));
+                    tasks2.Add(new Tuple<Task, ActivationData>(task, activationData));
                 }
+                var asyncQueue = new AsyncBatchedContinuationQueue<ActivationData>();
+                asyncQueue.Queue(tasks2, tupleList =>
+                {
+                    FinishDestroyActivations(tupleList.Select(t => t.Item2).ToList(), number, tcs);
+                    GC.KeepAlive(asyncQueue); // not sure about GC not collecting the asyncQueue local var prematuraly, so just want to capture it here to make sure. Just to be safe.
+                });
             }
-            // step 6 - Resolve any waiting TaskCompletionSource
-            if (tcs != null)
+            catch (Exception exc)
             {
-                foreach (var t in tcs)
-                {
-                    t.TrySetResult(true);
-                }
+                logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, String.Format("StartDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
             }
-            logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done DestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
         }
 
-        /// <summary>
-        /// Perform any required cleanup of Streams previously used by these activations
-        /// </summary>
-        /// <param name="activationsList"></param>
-        /// <returns></returns>
-        private async Task CleanupStreams(List<ActivationData> activationsList)
+        private async void FinishDestroyActivations(List<ActivationData> list, int number, MultiTaskCompletionSource tcs)
         {
-            var promises = new List<Task>();
-            foreach (var activation in activationsList)
-            {
-                var activationData = activation; // Capture loop variable
-                if (!activationData.IsUsingStreams) continue;
-
-                var context = new SchedulingContext(activationData);
-                promises.Add(scheduler.RunOrQueueTask(activationData.DeactivateStreamResources, context));
-            }
             try
             {
-                if (promises.Count > 0)
+                //logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Starting FinishDestroyActivations #{0} - with {1} Activations.", number, list.Count);
+                // step 3 - UnregisterManyAsync
+                try
                 {
-                    await Task.WhenAll(promises);
+                    await scheduler.RunOrQueueTask(() =>
+                        directory.UnregisterManyAsync(list.Select(d => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList()),
+                        SchedulingContext);
                 }
-            }
-            catch (Exception exc)
+                catch (Exception exc)
+                {
+                    logger.Warn(ErrorCode.Catalog_UnregisterManyAsync, String.Format("UnregisterManyAsync {0} failed.", list.Count), exc);
+                }
+
+                // step 4 - UnregisterMessageTarget and OnFinishedGrainDeactivate
+                foreach (var activationData in list)
+                {
+                    try
+                    {
+                        lock (activationData)
+                        {
+                            activationData.SetState(ActivationState.Invalid); // Deactivate calls on this activation are finished
+                        }
+                        UnregisterMessageTarget(activationData);
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget2, String.Format("UnregisterMessageTarget failed on {0}.", activationData), exc);
+                    }
+                    try
+                    {
+                        // IMPORTANT: no more awaits and .Ignore after that point.
+
+                        // Just use this opportunity to invalidate local Cache Entry as well. 
+                        // If this silo is not the grain directory partition for this grain, it may have it in its cache.
+                        directory.InvalidateCacheEntry(activationData.Address);
+
+                        RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Last stage of DestroyActivations failed on {0}.", activationData), exc);
+                    }
+                }
+                // step 5 - Resolve any waiting TaskCompletionSource
+                if (tcs != null)
+                {
+                    tcs.SetMultipleResults(list.Count);
+                }
+                logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done FinishDestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
+            }catch (Exception exc)
             {
-                logger.Warn(ErrorCode.Catalog_DeactivateStreamResources_Exception,
-                    String.Format("DeactivateStreamResources {0} failed.", activationsList.Count), exc);
+                logger.Error(ErrorCode.Catalog_FinishDeactivateActivation_Exception, String.Format("FinishDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
             }
         }
-
         private void RerouteAllQueuedMessages(ActivationData activation, ActivationAddress forwardingAddress, string failedOperation, Exception exc = null)
         {
             lock (activation)
@@ -980,30 +969,50 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CallGrainDeactivate(ActivationData activation)
+        private async Task<ActivationData> CallGrainDeactivateAndCleanupStreams(ActivationData activation)
         {
-            var grainTypeName = activation.GrainInstanceType.FullName;
-
-            // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-            if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
-
-            // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
             try
             {
-                // just check in case this activation data is already Invalid or not here at all.
-                ActivationData ignore;
-                if (TryGetActivationData(activation.ActivationId, out ignore) && 
-                    activation.State == ActivationState.Deactivating)
+                var grainTypeName = activation.GrainInstanceType.FullName;
+
+                // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
+                if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
+
+                // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
+                try
                 {
-                    await activation.GrainInstance.OnDeactivateAsync();
+                    // just check in case this activation data is already Invalid or not here at all.
+                    ActivationData ignore;
+                    if (TryGetActivationData(activation.ActivationId, out ignore) &&
+                        activation.State == ActivationState.Deactivating)
+                    {
+                        await activation.GrainInstance.OnDeactivateAsync();
+                    }
+                    if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
                 }
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
+                catch (Exception exc)
+                {
+                    logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
+                        string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
+                }
+
+                if (activation.IsUsingStreams)
+                {
+                    try
+                    {
+                        await activation.DeactivateStreamResources();
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Warn(ErrorCode.Catalog_DeactivateStreamResources_Exception, String.Format("DeactivateStreamResources Grain type = {0} Activation = {1} failed.", grainTypeName, activation), exc);
+                    }
+                }
             }
-            catch (Exception exc)
+            catch(Exception exc)
             {
-                logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
-                    string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
+                logger.Error(ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, String.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", activation), exc);
             }
+            return activation;
         }
 
         private async Task RegisterActivationInGrainDirectory(ActivationAddress address, bool singleActivationMode)
@@ -1097,20 +1106,6 @@ namespace Orleans.Runtime
             return activatedPromise ?? TaskDone.Done;
         }
 
-        public Task DeleteGrainsLocal(List<GrainId> grainIds)
-        {
-            if (logger.IsVerbose) logger.Verbose("DeleteGrainsLocal {0}", grainIds.ToStrings());
-            var tasks = new List<Task>();
-            foreach (var grainId in grainIds)
-            {
-                List<ActivationData> targets = activations.FindTargets(grainId);
-                if (targets != null)
-                {
-                    tasks.Add(DestroyActivations(targets));
-                }
-            }
-            return Task.WhenAll(tasks);
-        }
 
         public Task DeleteActivations(List<ActivationAddress> addresses)
         {

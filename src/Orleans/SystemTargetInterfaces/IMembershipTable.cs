@@ -84,7 +84,7 @@ namespace Orleans
         /// 1) A MembershipEntry for a given silo does not exist in the table
         /// 2) A MembershipEntry for a given silo exist in the table but its etag in the table does not match the provided etag.
         /// 3) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table.
-        /// <summary>
+        /// </summary>
         /// <param name="entry">MembershipEntry to be updated.</param>
         /// <param name="etag">The etag  for the given MembershipEntry.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>

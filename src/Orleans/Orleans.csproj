@@ -96,6 +96,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Async\AsyncBatchedContinuationQueue.cs" />
+    <Compile Include="Async\MultiTaskCompletionSource.cs" />
     <Compile Include="Async\AsyncSerialExecutor.cs" />
     <Compile Include="Async\AsyncExecutorWithRetries.cs" />
     <Compile Include="Async\AsyncLock.cs" />
