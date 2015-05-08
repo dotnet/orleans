@@ -73,20 +73,22 @@ namespace Orleans.Providers.Streams.AzureQueue
                 await outstandingTask;
         }
 
-        public async Task<IEnumerable<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
             try
             {
-                int count = maxCount <= 0 ? CloudQueueMessage.MaxNumberOfMessagesToPeek : Math.Min(maxCount, CloudQueueMessage.MaxNumberOfMessagesToPeek);
+                int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ? 
+                    CloudQueueMessage.MaxNumberOfMessagesToPeek : Math.Min(maxCount, CloudQueueMessage.MaxNumberOfMessagesToPeek);
 
                 var task = queue.GetQueueMessages(count);
                 outstandingTask = task;
-                CloudQueueMessage[] messages = (await task).ToArray();
-                if (!messages.Any())
-                    return Enumerable.Empty<IBatchContainer>();
+                IEnumerable<CloudQueueMessage> messages = await task;
                 
-                AzureQueueBatchContainer[] azureQueueMessages = messages
-                    .Select(msg => AzureQueueBatchContainer.FromCloudQueueMessage(msg, lastReadMessage++)).ToArray();
+                List<IBatchContainer> azureQueueMessages = messages
+                    .Select(msg => (IBatchContainer)AzureQueueBatchContainer.FromCloudQueueMessage(msg, lastReadMessage++)).ToList();
+
+                if (azureQueueMessages.Count == 0)
+                    return new List<IBatchContainer>();
 
                 outstandingTask = Task.WhenAll(messages.Select(queue.DeleteQueueMessage));
                 await outstandingTask;
