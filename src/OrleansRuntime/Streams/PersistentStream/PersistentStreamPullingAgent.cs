@@ -311,15 +311,15 @@ namespace Orleans.Streams
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer) 
             // and later production.
-            var fakeCursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, firstToken);
+            var pinCursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, firstToken);
 
             try
             {
                 await RegisterAsStreamProducer(streamId, firstToken);
             }finally
             {
-                // Cleanup the fake cursor.
-                fakeCursor.Dispose();
+                // Cleanup the fake pinning cursor.
+                pinCursor.Dispose();
             }
         }
 

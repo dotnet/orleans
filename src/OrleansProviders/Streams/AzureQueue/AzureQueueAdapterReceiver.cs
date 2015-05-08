@@ -88,7 +88,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                     .Select(msg => (IBatchContainer)AzureQueueBatchContainer.FromCloudQueueMessage(msg, lastReadMessage++)).ToList();
 
                 if (azureQueueMessages.Count == 0)
-                    return new List<IBatchContainer>();
+                    return azureQueueMessages;
 
                 outstandingTask = Task.WhenAll(messages.Select(queue.DeleteQueueMessage));
                 await outstandingTask;
