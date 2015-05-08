@@ -34,7 +34,9 @@ namespace Orleans.Runtime
     [Serializable]
     internal class Message : IOutgoingMessage
     {
-        public enum Header : byte
+        // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
+        // This means we can't have over byte.MaxValue of them.
+        public enum Header
         {
             ALWAYS_INTERLEAVE = 1,
             CACHE_INVALIDATION_HEADER,
@@ -69,6 +71,7 @@ namespace Orleans.Runtime
             PRIOR_MESSAGE_TIMES,
 
             REQUEST_CONTEXT,
+            // Do not add over byte.MaxValue of these.
         }
 
         public static class Metadata
