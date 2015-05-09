@@ -37,8 +37,8 @@
     <file src="..\..\Binaries\Release\OrleansProviders.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansRuntime.dll" target="Binaries" />
 
-    <file src="..\..\Binaries\Release\CounterControl.exe" target="Binaries" />
-    <file src="..\..\Binaries\Release\CounterControl.exe.config" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansCounterControl.exe" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansCounterControl.exe.config" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansHost.exe" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansHost.exe.config" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansManager.exe" target="Binaries" />
