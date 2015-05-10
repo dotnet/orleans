@@ -650,6 +650,10 @@ namespace Orleans.Serialization
                                     if (comparer && (type.GetFields().Length == 0))
                                         Register(type);
                                 }
+                                else
+                                {
+                                    Register(type);
+                                }
                             }
                         }
                         else
