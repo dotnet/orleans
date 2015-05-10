@@ -26,7 +26,7 @@ using System.Diagnostics;
 using System.IO;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansUnitTestHost
+namespace OrleansTestingHost
 {
     public static class StorageTestConstants
     {

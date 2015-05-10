@@ -29,7 +29,7 @@ using System.Net;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansUnitTestHost
+namespace OrleansTestingHost
 {
     [Serializable]
     public class SiloHandle

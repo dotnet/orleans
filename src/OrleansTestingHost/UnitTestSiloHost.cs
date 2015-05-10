@@ -33,9 +33,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using OrleansUnitTestHost.Extensions;
+using OrleansTestingHost.Extensions;
 
-namespace OrleansUnitTestHost
+namespace OrleansTestingHost
 {
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 

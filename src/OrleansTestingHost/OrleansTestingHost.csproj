@@ -7,8 +7,8 @@
     <ProjectGuid>{40EE3B00-D381-485F-9C69-FF706837DEED}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>OrleansUnitTestHost</RootNamespace>
-    <AssemblyName>OrleansUnitTestHost</AssemblyName>
+    <RootNamespace>OrleansTestingHost</RootNamespace>
+    <AssemblyName>OrleansTestingHost</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />

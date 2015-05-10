@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
-    <id>Microsoft.Orleans.UnitTest</id>
+    <id>Microsoft.Orleans.TestingHost</id>
     <version>$version$</version>
-    <title>Microsoft Orleans unit test Library</title>
+    <title>Microsoft Orleans testing host Library</title>
     <authors>Microsoft Research</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
@@ -23,6 +23,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansUnitTestHost.dll" target="lib\net45" />
+    <file src="OrleansTestingHost.dll" target="lib\net45" />
   </files>
 </package>
