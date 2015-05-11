@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+# Visual Studio 14
+VisualStudioVersion = 14.0.22823.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -78,6 +78,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.Server.nuspec = NuGet\Microsoft.Orleans.Server.nuspec
 		NuGet\Microsoft.Orleans.Templates.Grains.nuspec = NuGet\Microsoft.Orleans.Templates.Grains.nuspec
 		NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec = NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec
+		NuGet\Microsoft.Orleans.TestingHost.nuspec = NuGet\Microsoft.Orleans.TestingHost.nuspec
 		NuGet\Orleans.Grains.props = NuGet\Orleans.Grains.props
 		NuGet\Orleans.Interfaces.props = NuGet\Orleans.Interfaces.props
 		NuGet\ServerInstall.ps1 = NuGet\ServerInstall.ps1
@@ -131,6 +132,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Chocolatey", "Chocolatey", 
 		Chocolatey\CreateOrleansChocolateyPackage.bat = Chocolatey\CreateOrleansChocolateyPackage.bat
 		Chocolatey\orleans.nuspec = Chocolatey\orleans.nuspec
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTestingHost", "OrleansTestingHost\OrleansTestingHost.csproj", "{40EE3B00-D381-485F-9C69-FF706837DEED}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -186,6 +189,10 @@ Global
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Release|Any CPU.Build.0 = Release|Any CPU
+		{40EE3B00-D381-485F-9C69-FF706837DEED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40EE3B00-D381-485F-9C69-FF706837DEED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40EE3B00-D381-485F-9C69-FF706837DEED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40EE3B00-D381-485F-9C69-FF706837DEED}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

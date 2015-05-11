@@ -1,0 +1,28 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.TestingHost</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans testing host Library</title>
+    <authors>Microsoft Research</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <summary>
+      Microsoft Orleans library for hosting silo in the unit test project.
+    </summary>
+    <description>
+      Microsoft Orleans library for hosting silo in the unit test project.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="1.0.5" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="1.0.5" />      
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="OrleansTestingHost.dll" target="lib\net45" />
+  </files>
+</package>
