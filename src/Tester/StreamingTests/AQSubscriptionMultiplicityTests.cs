@@ -27,6 +27,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.TestingHost;
 using UnitTests.Tester;
 
 namespace Tester.StreamingTests
@@ -42,7 +43,7 @@ namespace Tester.StreamingTests
         private readonly SubscriptionMultiplicityTestRunner runner;
 
         public AQSubscriptionMultiplicityTests()
-            : base(new UnitTestSiloOptions
+            : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),

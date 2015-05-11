@@ -28,7 +28,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using UnitTests.Tester;
+using Orleans.TestingHost;
 
 
 namespace UnitTests.StorageTests

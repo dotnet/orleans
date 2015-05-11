@@ -30,7 +30,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.AzureUtils;
-using UnitTests.Tester;
+using Orleans.TestingHost;
 
 namespace UnitTests.StorageTests
 {

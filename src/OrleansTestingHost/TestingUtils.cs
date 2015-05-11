@@ -25,11 +25,10 @@ using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans;
 
-namespace OrleansTestingHost
+namespace Orleans.TestingHost
 {
-    public static class UnitTestUtils
+    public static class TestingUtils
     {
         public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout)
         {
@@ -68,11 +67,11 @@ namespace OrleansTestingHost
             return TimeSpan.FromTicks(ticks);
         }
 
-        public static void ConfigureThreadPoolSettingsForStorageTests(int NumDotNetPoolThreads = 200)
+        public static void ConfigureThreadPoolSettingsForStorageTests(int numDotNetPoolThreads = 200)
         {
-            ThreadPool.SetMinThreads(NumDotNetPoolThreads, NumDotNetPoolThreads);
+            ThreadPool.SetMinThreads(numDotNetPoolThreads, numDotNetPoolThreads);
             ServicePointManager.Expect100Continue = false;
-            ServicePointManager.DefaultConnectionLimit = NumDotNetPoolThreads; // 1000;
+            ServicePointManager.DefaultConnectionLimit = numDotNetPoolThreads; // 1000;
             ServicePointManager.UseNagleAlgorithm = false;
         }
 

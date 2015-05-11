@@ -3,17 +3,17 @@
   <metadata>
     <id>Microsoft.Orleans.TestingHost</id>
     <version>$version$</version>
-    <title>Microsoft Orleans testing host Library</title>
+    <title>Microsoft Orleans Testing Host Library</title>
     <authors>Microsoft Research</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
     <summary>
-      Microsoft Orleans library for hosting silo in the unit test project.
+      Microsoft Orleans library for hosting silo in a testing project.
     </summary>
     <description>
-      Microsoft Orleans library for hosting silo in the unit test project.
+      Microsoft Orleans library for hosting silo in a testing project.
     </description>
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
@@ -24,5 +24,10 @@
   </metadata>
   <files>
     <file src="OrleansTestingHost.dll" target="lib\net45" />
+    
+    <file src="ClientConfigurationForTesting.xml" target="content" />
+    <file src="OrleansConfigurationForTesting.xml" target="content" />
+
+    <file src="TestingHost.Install.ps1" target="tools\install.ps1" />
   </files>
 </package>

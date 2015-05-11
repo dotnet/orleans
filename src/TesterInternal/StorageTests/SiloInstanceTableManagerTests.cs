@@ -32,7 +32,7 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using UnitTests.Tester;
+using Orleans.TestingHost;
 
 namespace UnitTests.StorageTests
 {

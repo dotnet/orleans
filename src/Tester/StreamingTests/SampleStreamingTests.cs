@@ -27,6 +27,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.TestingHost;
 using UnitTests.SampleStreaming;
 using UnitTests.Tester;
 
@@ -46,7 +47,7 @@ namespace Tester.StreamingTests
         private string streamProvider;
 
         public SampleStreamingTests()
-            : base(new UnitTestSiloOptions
+            : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
@@ -130,7 +131,7 @@ namespace Tester.StreamingTests
 
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
             }
@@ -151,7 +152,7 @@ namespace Tester.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = producer.NumberProduced.Result;
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
@@ -172,7 +173,7 @@ namespace Tester.StreamingTests
             await producer.StopPeriodicProducing();
             //int numProduced = producer.NumberProduced.Result;
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }

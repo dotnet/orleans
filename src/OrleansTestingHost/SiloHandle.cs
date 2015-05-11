@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,33 +21,27 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.TestingHost;
+using System;
+using System.Diagnostics;
+using System.Net;
+using Orleans.Runtime;
 
-namespace UnitTests.Tester
+namespace Orleans.TestingHost
 {
-    /// <summary>
-    /// Keep this class as a bridge to the OrleansTestingSilo package, 
-    /// because it gives a convenient place to declare all the additional
-    /// deployment items required by tests 
-    /// - such as the TestGrain assemblies, the client and server config files.
-    /// </summary>
-    [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [DeploymentItem("TestGrainInterfaces.dll")]
-    [DeploymentItem("TestGrains.dll")]
-    public class UnitTestSiloHost : TestingSiloHost
+    [Serializable]
+    public class SiloHandle
     {
-        public UnitTestSiloHost() // : base()
+        public Silo Silo { get; set; }
+        public AppDomain AppDomain { get; set; }
+        public TestingSiloOptions Options { get; set; }
+        public string Name { get; set; }
+        public Process Process { get; set; }
+        public string MachineName { get; set; }
+        public IPEndPoint Endpoint { get; set; }
+
+        public override string ToString()
         {
-        }
-        public UnitTestSiloHost(TestingSiloOptions siloOptions)
-            : base(siloOptions)
-        {
-        }
-        public UnitTestSiloHost(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
-            : base(siloOptions, clientOptions)
-        {
+            return String.Format("SiloHandle:{0}", Endpoint);
         }
     }
 }

@@ -26,7 +26,7 @@ using System.Diagnostics;
 using System.IO;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansTestingHost
+namespace Orleans.TestingHost
 {
     public static class StorageTestConstants
     {
@@ -61,8 +61,9 @@ namespace OrleansTestingHost
                     line = line.Trim();
                     if (!String.IsNullOrEmpty(line))
                     {
-                        Console.Out.WriteLine("Found the {0} file and using the Storage Key from there.", ORLEANS_TEST_STORAGE_KEY_FILE_NAME);
-                        Trace.WriteLine("Found the {0} file and using the Storage Key from there.", ORLEANS_TEST_STORAGE_KEY_FILE_NAME);
+                        string fileFoundMsg = string.Format("Found the {0} file and using the Storage Key from there.", ORLEANS_TEST_STORAGE_KEY_FILE_NAME);
+                        Console.Out.WriteLine(fileFoundMsg);
+                        Trace.WriteLine(fileFoundMsg);
                         DataConnectionString = line;
                     }
                 }
@@ -71,8 +72,9 @@ namespace OrleansTestingHost
             if (DataConnectionString != null) return;
 
             // If did not find the file, just use the DevelopmentStorage
-            Console.Out.WriteLine("Did not find the {0} file or it was empty. Using Default Storage Data Connection String instead.", ORLEANS_TEST_STORAGE_KEY_FILE_NAME);
-            Trace.WriteLine("Did not find the {0} file or it was empty. Using Default Storage Data Connection String instead.", ORLEANS_TEST_STORAGE_KEY_FILE_NAME);
+            string fileNotFoundMsg = string.Format("Did not find the {0} file or it was empty. Using Default Storage Data Connection String instead.", ORLEANS_TEST_STORAGE_KEY_FILE_NAME);
+            Console.Out.WriteLine(fileNotFoundMsg);
+            Trace.WriteLine(fileNotFoundMsg);
             DataConnectionString = DEFAULT_STORAGE_DATA_CONNECTION_STRING;
         }
 

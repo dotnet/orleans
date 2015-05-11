@@ -30,7 +30,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.AzureUtils;
-using UnitTests.Tester;
+using Orleans.TestingHost;
 
 namespace UnitTests.StorageTests
 {
@@ -43,7 +43,7 @@ namespace UnitTests.StorageTests
         [TestInitialize]
         public void TestInitialize()
         {
-            UnitTestUtils.ConfigureThreadPoolSettingsForStorageTests();
+            TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
             // Pre-create table, if required
             manager = new UnitTestAzureTableDataManager(StorageTestConstants.DataConnectionString);
