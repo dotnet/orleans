@@ -99,7 +99,7 @@ In the following example, activations that have been idle for 10 minutes are eli
 
 ## Configuring Activation Garbage Collection Programmatically
 
-An activation can also impact its own activation GC, by calling the method on the Orleans.Grain base class:
+An activation can also impact its own activation GC, by calling the method on the `Orleans.Grain` base class:
 
 ``` csharp
 protected void DelayDeactivation(TimeSpan timeSpan)
@@ -109,12 +109,12 @@ This call will insure that this activations is not deactivated for at least the 
 Therefore, this call provides an additional hook to **delay the deactivation beyond what is specified in the Activation Garbage Collection settings**. This call can not be used to expedite Activation Garbage Collection.
 
 
-A positive <c>`timeSpan<`/c> value means “prevent GC of this activation for that time span”.
+A positive <c>`timeSpan`</c> value means “prevent GC of this activation for that time span”.
 
 A negative <c>`timeSpan`</c> value means “cancel the previous setting of the `DelayDeactivation` call and make this activation behave based on the regular Activation Garbage Collection settings ”.
 
 
-Scenarios:
+**Scenarios:**
 
 1) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), it will cause this activatin to not be collected for at least 20 min.
 
