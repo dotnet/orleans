@@ -99,16 +99,27 @@ In the following example, activations that have been idle for 10 minutes are eli
 
 ## Configuring Activation Garbage Collection Programmatically
 
-An activation can also configure its own activation GC, by calling the method on the Orleans.Grain base class:
+An activation can also impact its own activation GC, by calling the method on the Orleans.Grain base class:
 
 ``` csharp
 protected void DelayDeactivation(TimeSpan timeSpan)
 ```
 
-This call will delay deactivation of this activation for at least the specified time duration.
+This call will insure that this activations is not deactivated for at least the specified time duration. It takes priority over Activation Garbage Collection settings specified in the config, but does not cancel it.
+Therefore, call provides an additional hook to **delay the deactivation beyond what is specified in the Activation Garbage Collection settings**. This call can not be used to expedite Activation Garbage Collection.
+
 
 A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
-A negative <c>timeSpan</c> value means “unlock, and make this activation available for GC again”.
+A negative <c>timeSpan</c> value means “cancel the previous setting of the positive `DelayDeactivation` call and make this activation behave based on the regular Activation Garbage Collection settings ”.
+
+
+Scenarios:
+1) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), it will cause this activatin to not be collected for at least 20 min.
+2) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(5 min), the activation will be collected after 10 min, if no extra calls were made.
+3) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(5 min), and after 7 minutes there is another call on this grain, the activation will be collected after 17 min from time zero, if no extra calls were made.
+4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.
+
+
 
 You can also instruct the runtime to deactivate the grain next time it becomes idle, by using:
 
@@ -116,5 +127,5 @@ You can also instruct the runtime to deactivate the grain next time it becomes i
   protected void DeactivateOnIdle()
 ```
 
-Both those calls take priority over any Activation Garbage Collection settings specified in the config.
+`DeactivateOnIdle` take priority over any Activation Garbage Collection settings specified in the config or `DelayDeactivation`.
 Please notice that this setting only applies to this particular activation from which it has been called and it does not apply to all possible instances of grains of this type.
