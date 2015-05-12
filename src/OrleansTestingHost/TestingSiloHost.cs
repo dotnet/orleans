@@ -30,19 +30,26 @@ using System.Reflection;
 using System.Runtime.Remoting;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using OrleansTestingHost.Extensions;
+using Orleans.TestingHost.Extensions;
 
-namespace OrleansTestingHost
+namespace Orleans.TestingHost
 {
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 
-    /// Runs a Primary & Secondary silo in seperate app domains, and client in main app domain.
+    /// Runs a Primary and Secondary silo in seperate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process if required for particular test cases.
     /// </summary>
-    public class UnitTestSiloHost
+    /// <remarks>
+    /// Add the following attributes to any derived test classes, 
+    /// to ensure the config files are included in the test set.
+    /// <code>
+    /// [DeploymentItem("OrleansConfigurationForTesting.xml")]
+    /// [DeploymentItem("ClientConfigurationForTesting.xml")]
+    /// </code>
+    /// </remarks>
+    public abstract class TestingSiloHost
     {
         protected static AppDomain SharedMemoryDomain;
 
@@ -50,10 +57,10 @@ namespace OrleansTestingHost
         protected static SiloHandle Secondary = null;
         protected static readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
 
-        protected readonly UnitTestSiloOptions siloInitOptions;
-        protected readonly UnitTestClientOptions clientInitOptions;
+        protected readonly TestingSiloOptions siloInitOptions;
+        protected readonly TestingClientOptions clientInitOptions;
 
-        private static TimeSpan livenessStabilizationTime;
+        private static TimeSpan _livenessStabilizationTime;
 
         protected static readonly Random random = new Random();
 
@@ -74,8 +81,8 @@ namespace OrleansTestingHost
         /// Start the default Primary and Secondary test silos, plus client in-process, 
         /// using the default silo config options.
         /// </summary>
-        public UnitTestSiloHost()
-            : this(new UnitTestSiloOptions(), new UnitTestClientOptions())
+        protected TestingSiloHost()
+            : this(new TestingSiloOptions(), new TestingClientOptions())
         {
         }
 
@@ -83,8 +90,8 @@ namespace OrleansTestingHost
         /// Start the default Primary and Secondary test silos, plus client in-process, 
         /// ensuring that fresh silos are started if they were already running.
         /// </summary>
-        public UnitTestSiloHost(bool startFreshOrleans)
-            : this(new UnitTestSiloOptions { StartFreshOrleans = startFreshOrleans }, new UnitTestClientOptions())
+        protected TestingSiloHost(bool startFreshOrleans)
+            : this(new TestingSiloOptions { StartFreshOrleans = startFreshOrleans }, new TestingClientOptions())
         {
         }
 
@@ -92,8 +99,8 @@ namespace OrleansTestingHost
         /// Start the default Primary and Secondary test silos, plus client in-process, 
         /// using the specified silo config options.
         /// </summary>
-        public UnitTestSiloHost(UnitTestSiloOptions siloOptions)
-            : this(siloOptions, new UnitTestClientOptions())
+        protected TestingSiloHost(TestingSiloOptions siloOptions)
+            : this(siloOptions, new TestingClientOptions())
         {
         }
 
@@ -101,17 +108,17 @@ namespace OrleansTestingHost
         /// Start the default Primary and Secondary test silos, plus client in-process, 
         /// using the specified silo and client config options.
         /// </summary>
-        public UnitTestSiloHost(UnitTestSiloOptions siloOptions, UnitTestClientOptions clientOptions)
+        protected TestingSiloHost(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
         {
-            this.siloInitOptions = siloOptions;
-            this.clientInitOptions = clientOptions;
+            siloInitOptions = siloOptions;
+            clientInitOptions = clientOptions;
 
             AppDomain.CurrentDomain.UnhandledException += ReportUnobservedException;
 
             try
             {
                 Initialize(siloOptions, clientOptions);
-                string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + this.GetType().FullName + " -------------------------------------";
+                string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
                 WriteLog(startMsg);
             }
             catch (TimeoutException te)
@@ -155,7 +162,8 @@ namespace OrleansTestingHost
         /// <returns>SiloHandle of the appropriate silo, or <c>null</c> if not found.</returns>
         public SiloHandle GetSiloForAddress(SiloAddress siloAddress)
         {
-            var ret = GetActiveSilos().Where(s => s.Silo.SiloAddress.Equals(siloAddress)).FirstOrDefault();
+            List<SiloHandle> activeSilos = GetActiveSilos().ToList();
+            var ret = activeSilos.Where(s => s.Silo.SiloAddress.Equals(siloAddress)).FirstOrDefault();
             return ret;
         }
 
@@ -165,7 +173,7 @@ namespace OrleansTestingHost
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
         public void WaitForLivenessToStabilize(bool didKill = false)
         {
-            TimeSpan stabilizationTime = livenessStabilizationTime;
+            TimeSpan stabilizationTime = _livenessStabilizationTime;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             Thread.Sleep(stabilizationTime);
             WriteLog("WaitForLivenessToStabilize is done sleeping");
@@ -177,7 +185,7 @@ namespace OrleansTestingHost
             if (didKill)
             {
                 // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-                stabilizationTime = UnitTestUtils.Multiply(global.ProbeTimeout, global.NumMissedProbesLimit);
+                stabilizationTime = TestingUtils.Multiply(global.ProbeTimeout, global.NumMissedProbesLimit);
             }
             if (global.UseLivenessGossip)
             {
@@ -185,7 +193,7 @@ namespace OrleansTestingHost
             }
             else
             {
-                stabilizationTime += UnitTestUtils.Multiply(global.TableRefreshTimeout, 2);
+                stabilizationTime += TestingUtils.Multiply(global.TableRefreshTimeout, 2);
             }
             return stabilizationTime;
         }
@@ -198,7 +206,7 @@ namespace OrleansTestingHost
         {
             SiloHandle instance = StartOrleansSilo(
                 Silo.SiloType.Secondary,
-                this.siloInitOptions,
+                siloInitOptions,
                 InstanceCounter++);
             additionalSilos.Add(instance);
             return instance;
@@ -265,8 +273,8 @@ namespace OrleansTestingHost
         /// </summary>
         public void RestartDefaultSilos()
         {
-            UnitTestSiloOptions primarySiloOptions = Primary.Options;
-            UnitTestSiloOptions secondarySiloOptions = Secondary.Options;
+            TestingSiloOptions primarySiloOptions = Primary.Options;
+            TestingSiloOptions secondarySiloOptions = Secondary.Options;
             // Restart as the same deployment
             string deploymentId = DeploymentId;
 
@@ -311,7 +319,7 @@ namespace OrleansTestingHost
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
-        /// <param name="kill">Whether the silo should be immediately Killed, or graceful Stop.</param>
+        /// <param name="stopGracefully">Whether the silo should be immediately Killed, or graceful Stop.</param>
         public SiloHandle RestartSilo(SiloHandle instance, bool stopGracefully = true)
         {
             if (instance != null)
@@ -327,7 +335,7 @@ namespace OrleansTestingHost
 
         #region Private methods
 
-        private void Initialize(UnitTestSiloOptions options, UnitTestClientOptions clientOptions)
+        private void Initialize(TestingSiloOptions options, TestingClientOptions clientOptions)
         {
             bool doStartPrimary = false;
             bool doStartSecondary = false;
@@ -442,11 +450,12 @@ namespace OrleansTestingHost
                     clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
                 }
                 clientConfig.AdjustForTestEnvironment();
+
                 GrainClient.Initialize(clientConfig);
             }
         }
 
-        private SiloHandle StartOrleansSilo(Silo.SiloType type, UnitTestSiloOptions options, int instanceCount, AppDomain shared = null)
+        private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
@@ -487,7 +496,7 @@ namespace OrleansTestingHost
 
             config.AdjustForTestEnvironment();
 
-            livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
+            _livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
             
             string siloName;
             switch (type)

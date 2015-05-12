@@ -28,10 +28,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.TestingHost;
 using TestGrainInterfaces;
 using UnitTests.SampleStreaming;
-using UnitTests.Tester;
-
 
 namespace Tester.StreamingTests
 {

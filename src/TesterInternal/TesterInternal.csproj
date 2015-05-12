@@ -88,6 +88,10 @@
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansTestingHost\OrleansTestingHost.csproj">
+      <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
+      <Name>OrleansTestingHost</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
@@ -105,8 +109,12 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\Tester\OrleansConfigurationForUnitTests.xml">
-      <Link>OrleansConfigurationForUnitTests.xml</Link>
+    <Content Include="..\OrleansTestingHost\ClientConfigurationForTesting.xml">
+      <Link>ClientConfigurationForTesting.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\OrleansTestingHost\OrleansConfigurationForTesting.xml">
+      <Link>OrleansConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Data\TestDb.mdf">
@@ -148,4 +156,3 @@ call "$(SolutionDir)Build\PostBuild.cmd"
   </Target>
   -->
 </Project>
-

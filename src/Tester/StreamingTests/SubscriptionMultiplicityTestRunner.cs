@@ -29,9 +29,9 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.TestingHost;
 using TestGrainInterfaces;
 using UnitTests.SampleStreaming;
-using UnitTests.Tester;
 
 namespace Tester.StreamingTests
 {
@@ -69,7 +69,7 @@ namespace Tester.StreamingTests
             await producer.StopPeriodicProducing();
 
             // check
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
 
             // unsubscribe
             await consumer.StopConsuming(firstSubscriptionHandle);
@@ -91,7 +91,7 @@ namespace Tester.StreamingTests
             Thread.Sleep(1000);
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
 
             // clear counts
             await consumer.ClearNumberConsumed();
@@ -104,7 +104,7 @@ namespace Tester.StreamingTests
             Thread.Sleep(1000);
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
 
             // clear counts
             await consumer.ClearNumberConsumed();
@@ -117,7 +117,7 @@ namespace Tester.StreamingTests
             Thread.Sleep(1000);
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
 
             // remove second subscription
             await consumer.StopConsuming(secondSubscriptionHandle);
@@ -138,7 +138,7 @@ namespace Tester.StreamingTests
             Thread.Sleep(1000);
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
 
             // Resume
             StreamSubscriptionHandle<int> resumeHandle = await consumer.Resume(firstSubscriptionHandle);
@@ -149,7 +149,7 @@ namespace Tester.StreamingTests
             Thread.Sleep(1000);
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
 
             // remove subscription
             await consumer.StopConsuming(resumeHandle);
@@ -170,7 +170,7 @@ namespace Tester.StreamingTests
             Thread.Sleep(1000);
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
 
             // Deactivate grain
             await consumer.Deactivate();
@@ -190,7 +190,7 @@ namespace Tester.StreamingTests
             Thread.Sleep(1000);
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
 
             // remove subscription
             await consumer.StopConsuming(resumeHandle);

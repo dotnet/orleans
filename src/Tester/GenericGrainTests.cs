@@ -26,6 +26,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
+using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -39,7 +40,7 @@ namespace UnitTests.General
     {
 
         public GenericGrainTests()
-            : base(new UnitTestSiloOptions { StartPrimary = true, StartSecondary = false })
+            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
         {
         }
 

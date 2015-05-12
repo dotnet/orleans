@@ -27,7 +27,7 @@ using System.Linq;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 
-namespace OrleansTestingHost.Extensions
+namespace Orleans.TestingHost.Extensions
 {
     public static class TestConfigurationExtensions
     {

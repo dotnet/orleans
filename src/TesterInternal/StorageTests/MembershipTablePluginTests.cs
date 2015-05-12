@@ -29,12 +29,12 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using UnitTests.Tester;
+using Orleans.TestingHost;
 
 namespace UnitTests.LivenessTests
 {
     [TestClass]
-    [DeploymentItem("OrleansConfigurationForUnitTests.xml")]
+    [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem(@"Data\TestDb.mdf")]
     public class MembershipTablePluginTests
     {
@@ -179,7 +179,7 @@ namespace UnitTests.LivenessTests
                     break;
 
                 case GlobalConfiguration.LivenessProviderType.SqlServer:
-                    config.DataConnectionString = StorageTestConstants.GetSqlConnectionString(TestContext);
+                    config.DataConnectionString = StorageTestConstants.GetSqlConnectionString(TestContext.DeploymentDirectory);
                     membership = await SqlMembershipTable.GetMembershipTable(config, true);
                     break;
 

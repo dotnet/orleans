@@ -26,6 +26,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
+using Orleans.TestingHost;
 using UnitTests.Tester;
 
 namespace Tester.StreamingTests
@@ -40,7 +41,7 @@ namespace Tester.StreamingTests
         private readonly DeactivationTestRunner runner;
 
         public SMSDeactivationTests()
-            : base(new UnitTestSiloOptions
+            : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
                 StartSecondary = false,

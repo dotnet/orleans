@@ -22,15 +22,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using Orleans;
 
-namespace UnitTests.Tester
+namespace Orleans.TestingHost
 {
-    // This class is used for testing.
     /// <summary>
     /// This class is for internal testing use only.
     /// </summary>
@@ -74,7 +69,7 @@ namespace UnitTests.Tester
 
         /// <summary>
         /// </summary>
-        /// <param name="timeoutMsec"></param>
+        /// <param name="timeout"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
         public bool WaitForContinue(TimeSpan timeout)
         {
@@ -83,7 +78,7 @@ namespace UnitTests.Tester
 
         /// <summary>
         /// </summary>
-        /// <param name="timeoutMsec"></param>
+        /// <param name="timeout"></param>
         /// <param name="flag"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
         public bool WaitFor(TimeSpan timeout, ref bool flag)
