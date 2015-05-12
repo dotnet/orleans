@@ -109,8 +109,9 @@ This call will insure that this activations is not deactivated for at least the 
 Therefore, this call provides an additional hook to **delay the deactivation beyond what is specified in the Activation Garbage Collection settings**. This call can not be used to expedite Activation Garbage Collection.
 
 
-A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
-A negative <c>timeSpan</c> value means “cancel the previous setting of the positive `DelayDeactivation` call and make this activation behave based on the regular Activation Garbage Collection settings ”.
+A positive <c>`timeSpan<`/c> value means “prevent GC of this activation for that time span”.
+
+A negative <c>`timeSpan`</c> value means “cancel the previous setting of the `DelayDeactivation` call and make this activation behave based on the regular Activation Garbage Collection settings ”.
 
 
 Scenarios:
