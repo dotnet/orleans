@@ -218,6 +218,8 @@ namespace Orleans.Runtime
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static void Initialize(ITraceConfiguration config, bool configChange = false)
         {
+            if (config == null) throw new ArgumentNullException("config", "No logger config data provided.");
+
             lock (lockable)
             {
                 if (IsInitialized && !configChange) return; // Already initialized

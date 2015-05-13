@@ -26,6 +26,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
+using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -34,7 +35,6 @@ using Orleans.TestingHost;
 namespace UnitTests.LivenessTests
 {
     [TestClass]
-    [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem(@"Data\TestDb.mdf")]
     public class MembershipTablePluginTests
     {
@@ -46,15 +46,23 @@ namespace UnitTests.LivenessTests
         public static void ClassInitialize(TestContext testContext)
         {
             hostName = Dns.GetHostName();
-            TraceLogger.GetLogger("MembershipTablePluginTests", TraceLogger.LoggerType.Application);
 
-            var cfg = new ClusterConfiguration();
-            cfg.LoadFromFile("OrleansConfigurationForUnitTests.xml");
-            TraceLogger.Initialize(cfg.GetConfigurationForNode("Primary"));
+            var cfg = new NodeConfiguration();
+            TraceLogger.Initialize(cfg);
 
             TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Logger.Severity.Verbose3);
             TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Logger.Severity.Verbose3);
             TraceLogger.AddTraceLevelOverride("Storage", Logger.Severity.Verbose3);
+
+            // Set shorter init timeout for these tests
+            OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
+        }
+
+        [ClassCleanup]
+        public static void ClassCleanup()
+        {
+            // Reset init timeout after tests
+            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
         }
 
         [TestCleanup]

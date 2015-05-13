@@ -149,7 +149,7 @@ namespace Orleans.AzureUtils
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
         private readonly TraceLogger logger;
 
-        private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+        internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         public string DeploymentId { get; private set; }
 
@@ -168,15 +168,18 @@ namespace Orleans.AzureUtils
             {
                 await instance.storage.InitTableAsync()
                     .WithTimeout(initTimeout);
-
             }
-            catch (TimeoutException)
+            catch (TimeoutException te)
             {
-                instance.logger.Fail(ErrorCode.AzureTable_32, String.Format("Unable to create or connect to the Azure table in {0}", initTimeout));
+                string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
+                instance.logger.Error(ErrorCode.AzureTable_32, errorMsg, te);
+                throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
-                instance.logger.Fail(ErrorCode.AzureTable_33, String.Format("Exception trying to create or connect to the Azure table: {0}", ex));
+                string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
+                instance.logger.Error(ErrorCode.AzureTable_33, errorMsg, ex);
+                throw new OrleansException(errorMsg, ex);
             }
             return instance;
         }
