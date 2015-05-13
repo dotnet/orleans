@@ -7,16 +7,26 @@ title: Custom Storage Providers
 
 ## Writing a Custom Storage Provider
 
-In the tutorial on declarative actor storage, we looked at allowing grains to store their state in an Azure table using one of the built-in storage providers. While Azure is a great place to squirrel away your data, there are many alternatives. In fact, there are so many that there was no way to support them all. Instead, Orleans is designed to let you easily add support for your own form of storage by writing a storage provider.
+In the tutorial on declarative actor storage, we looked at allowing grains to store their state in an Azure table using one of the built-in storage providers. 
+While Azure is a great place to squirrel away your data, there are many alternatives. 
+In fact, there are so many that there was no way to support them all. 
+Instead, Orleans is designed to let you easily add support for your own form of storage by writing a storage provider.
 
- In this tutorial, we'll walk through how to write a simple file-based storage provider. A file system is not necessarily the best place to store data for grains, since it's so local, but it's an easy example to help us illustrate the principles.
+In this tutorial, we'll walk through how to write a simple file-based storage provider. 
+A file system is not necessarily the best place to store data for grains, since it's so local, but it's an easy example to help us illustrate the principles.
 
 ## Getting Started
-An Orleans storage provider is simply a class that implements IStorageProvider. It should be built into an assembly that is placed in the Orleans binaries folder. To move it there on build will require adding a bit of post-build event code.
+An Orleans storage provider is simply a class that implements `IStorageProvider`. 
+It should be built into an assembly that is placed in the Orleans binaries folder. 
+To move it there on build will require adding a bit of post-build event code.
 
- We'll start by creating the project -- it should be a regular .NET class library. Once the project is created, let's also rename the file Class1.cs to FileStorageProvider.cs. That should also prompt VS to rename the class we find inside. Next, we must add references to two Orleans runtime assemblies -- Orleans.dll and OrleansRuntime.dll. The former is found under the SDK installation directory $(OrleansSDK)\Binaries\OrleansClient, while the latter is under $(OrleansSDK)\Binaries\OrleansServer.
+We'll start by creating the project -- it should be a regular .NET class library. 
+Once the project is created, let's also rename the file _Class1.cs_ to _FileStorageProvider.cs_. 
+That should also prompt VS to rename the class we find inside. 
+Next, we must add references to two Orleans runtime assemblies -- _Orleans.dll_ and _OrleansRuntime.dll_. 
+The former is found under the SDK installation directory _$(OrleansSDK)\Binaries\OrleansClient_, while the latter is under _$(OrleansSDK)\Binaries\OrleansServer_.
 
- Edit the post-build events for the storage providers project to include the following lines:
+Edit the post-build events for the storage providers project to include the following lines:
 
       if exist "$(OrleansSDK)\LocalSilo" (
       copy /y StorageProviders.dll  "$(OrleansSDK)\LocalSilo\"
@@ -25,9 +35,12 @@ An Orleans storage provider is simply a class that implements IStorageProvider. 
 
 
 
- Assuming, of course, that your project is called 'StorageProviders.' The silo host project is set up to run out of the 'LocalSilo' folder under the SDK, and the storage provider assembly needs to be there in order to be found by Orleans. In fact, if you look at the silo host and grain collection projects, you will find similar post-build events code there.
+Assuming, of course, that your project is called `StorageProviders`. 
+The silo host project is set up to run out of the _LocalSilo_ folder under the SDK, and the storage provider assembly needs to be there in order to be found by Orleans. 
+In fact, if you look at the silo host and grain collection projects, you will find similar post-build events code there.
 
- Our storage provider should implement the interface 'Orleans.Storage.IStorageProvider.' With a little bit of massaging of the code, it should look something like this:
+Our storage provider should implement the interface `Orleans.Storage.IStorageProvider`. 
+With a little bit of massaging of the code, it should look something like this:
 
 ``` csharp
 using System;
@@ -80,7 +93,11 @@ namespace StorageProviders
 }
 ```
 
- The first thing we have to figure out is what data we need to provider through configuration. The name is a required property, but we will also need the path to the root directory for our file store. That is, in fact, the only piece of information we need, so we'll add a 'RootDirectory' string property and edit the configuration file as in the previous section. In doing so, it's critical to pay attention to the namespace and class name of the provider. Add this to the 'StorageProviders' element in the configuration file:
+The first thing we have to figure out is what data we need to provider through configuration. 
+The name is a required property, but we will also need the path to the root directory for our file store. 
+That is, in fact, the only piece of information we need, so we'll add a `RootDirectory` string property and edit the configuration file as in the previous section. 
+In doing so, it's critical to pay attention to the namespace and class name of the provider. 
+Add this to the `<StorageProviders>` element in the configuration file:
 
 
      <Provider Type="StorageProviders.FileStorageProvider"
@@ -88,10 +105,14 @@ namespace StorageProviders
               RootDirectory=".\Storage"/>
 
 
- Edit the Grain1.cs file to use this storage provider instead of the Azure provider, then set a breakpoint in the Init() method of the storage provider implementation class and start the silo. If you have followed the instructions, you should hit the breakpoint during silo initialization. There's no reason to go on debugging, since you will throw an exception right away.
+Edit the _Grain1.cs_ file to use this storage provider instead of the Azure provider, then set a breakpoint in the `Init()` method of the storage provider implementation class and start the silo. 
+If you have followed the instructions, you should hit the breakpoint during silo initialization. 
+There's no reason to go on debugging, since you will throw an exception right away.
 
 ## Initializing the Provider
-There are four major functions to implement in the provider -- Close() is the only one we won't need to do anything with. As you may have guessed, the starting point is the call to Init(), which provides us with the configuration data and a chance to get things set up properly. In our case, we'll want to set the properties and create the root directory if it doesn't already exist:
+There are four major functions to implement in the provider -- `Close()` is the only one we won't need to do anything with. 
+As you may have guessed, the starting point is the call to `Init()`, which provides us with the configuration data and a chance to get things set up properly. 
+In our case, we'll want to set the properties and create the root directory if it doesn't already exist:
 
 ``` csharp
 public Task Init(string name,
@@ -112,10 +133,15 @@ public Task Init(string name,
 }
 ```
 
- Run the program again. This time, you will still crahs, but in ReadStateAsync(). After running the code, you should find a 'Storage' directory under the $(OrleansSDK)\LocalSilo directory. Make sure you have set the project up to build on F5, or you may not see the edits take effect.
+Run the program again. 
+This time, you will still crash, but in `ReadStateAsync()`. 
+After running the code, you should find a _Storage_ directory under the _$(OrleansSDK)\LocalSilo_ directory. 
+Make sure you have set the project up to build on F5, or you may not see the edits take effect.
 
 ## Reading State
-To store data in the file system (or anywhere, really), we have to devise a convention that generates a unique name for each grain. This is easiest done by combining the state type name with the grain id, which combines the grain type and GUID creating a globally unique key. Thus, ReadStateAsync() (which, by the way, should be declared as an async method), starts like this:
+To store data in the file system (or anywhere, really), we have to devise a convention that generates a unique name for each grain. 
+This is easiest done by combining the state type name with the grain id, which combines the grain type and GUID creating a globally unique key. 
+Thus, `ReadStateAsync()` (which, by the way, should be declared as an async method), starts like this:
 
 
 ``` csharp
@@ -130,7 +156,11 @@ if (!fileInfo.Exists)
     return; 
 ```
 
- We also need to decide how the data will be stored. To make it easy to inspect the data outside of the application, we're going to use JSON. A more space-conscious design may use a binary serialization format, instead, it's entirely a choice of the provider designer's. The JSON serializer is found in the System.Web.Extensions assembly, which you now need to add to the project's references. Also, add a using clause to the top of the file: "using System.Web.Script.Serialization;"
+We also need to decide how the data will be stored. 
+To make it easy to inspect the data outside of the application, we're going to use JSON. 
+A more space-conscious design may use a binary serialization format, instead, it's entirely a choice of the provider designer's. 
+The JSON serializer is found in the `System.Web.Extensions` assembly, which you now need to add to the project's references. 
+Also, add a using clause to the top of the file: `using System.Web.Script.Serialization;`
 
 ``` csharp
 using (var stream = fileInfo.OpenText())
@@ -145,7 +175,7 @@ using (var stream = fileInfo.OpenText())
 ```
 
 ## Writing State
-The format decisions have already been made, so coding up the WriteStateAsync method should be straight-forward: serialize as JSON, construct the file name, then write to the file:
+The format decisions have already been made, so coding up the `WriteStateAsync` method should be straight-forward: serialize as JSON, construct the file name, then write to the file:
 
 
 ``` csharp
@@ -174,12 +204,18 @@ public async Task WriteStateAsync(string grainType, Orleans.GrainReference grain
 
 ## Putting it Together
 
-There's really just one thing left to do, and that is to test the thing. Run the application and let it get to the end, where the greetings are shown, and then terminate it. Under the LocalSilo\Storage directory, you should find a file called 0.Grain1State, and it should contain something very recognizable:
+There's really just one thing left to do, and that is to test the thing. 
+Run the application and let it get to the end, where the greetings are shown, and then terminate it. 
+Under the _LocalSilo\Storage_ directory, you should find a file called _0.Grain1State_, and it should contain something very recognizable:
 
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810449)
 
- Run the application again, and you should see the same behavior as before, that is, the last greeting of the first session is remembered.
+Run the application again, and you should see the same behavior as before, that is, the last greeting of the first session is remembered.
 
 ## Clearing State
 
-The easiest method to write is the one that deletes grain state, which we didn't see any use of in the previous tutorial. In fact, we don't need it for our Hello World application, so we'll just leave its implementation as an exercise. It should do the obvious, i.e. delete the file.
+The easiest method to write is the one that deletes grain state, which we didn't see any use of in the previous tutorial. 
+In fact, we don't need it for our Hello World application, so we'll just leave its implementation as an exercise. 
+It should do the obvious, i.e. delete the file.
+
+[Back to Orleans Documenation homepage](../../)

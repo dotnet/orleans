@@ -4,26 +4,29 @@ title: Front Ends for Orleans Services
 ---
 {% include JB/setup %}
 
-Exposing silo gateway ports as public endpoints of an Orleans cluster is not recommended. Instead, Orleans is intended to be fronted by your own API.
+Exposing silo gateway ports as public endpoints of an Orleans cluster is not recommended. 
+Instead, Orleans is intended to be fronted by your own API.
 
- Creating an HTTP API, or web application is a common scenario. Let's extend the Employee/Manager scenario from the  [Declarative-Persistence](Declarative-Persistence) walk-through to see what steps are required to publish grain data over HTTP.
+Creating an HTTP API, or web application is a common scenario. 
+Let's extend the Employee/Manager scenario from the  [Declarative-Persistence](Declarative-Persistence) walk-through to see what steps are required to publish grain data over HTTP.
 
-Creating the ASP.NET application
+##Creating the ASP.NET application
 First, you should add a new ASP.NET Web Application to your solution:
 
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815096)
 
- Select the Web API template, although you could use MVC or Web Forms.
+Select the Web API template, although you could use MVC or Web Forms.
 
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815097)
 
 ## Initializing Orleans
 
-Next, add a reference to the Orleans.dll file in the project references.
+Next, add a reference to the _Orleans.dll_ file in the project references.
 
- Now add the "DevTestClientConfiguration.xml" file used in the Orleans Host application to the root of the ASP.NET project.
+Now add the _DevTestClientConfiguration.xml_ file used in the Orleans Host application to the root of the ASP.NET project.
 
- As with the Orleans host we created earlier, we need to initialize Orleans. This is best done in the Global.asax.cs file like this:
+As with the Orleans host we created earlier, we need to initialize Orleans. 
+This is best done in the _Global.asax.cs_ file like this:
 
 ``` csharp
 namespace WebApplication1
@@ -43,17 +46,17 @@ Now when the ASP.NET application starts, it will initialize the Orleans Client.
 
 Now lets add a controller to the project, to receive HTTP requests, and call the grain code.
 
- Right click on the "Controllers" folder, and add a new "Web API 2 Controller - Empty":
+Right click on the "Controllers" folder, and add a new "Web API 2 Controller - Empty":
 
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815098)
 
- Next, call the controller `EmployeeController`:
+Next, call the controller `EmployeeController`:
 
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815099)
 
- This will create a new empty controller called `EmployeeController`.
+This will create a new empty controller called `EmployeeController`.
 
- We can add a `Get` method to the controller, which we'll use to return the level of an Employee.
+We can add a `Get` method to the controller, which we'll use to return the level of an Employee.
 
 ``` csharp
 public class EmployeeController : ApiController
@@ -72,14 +75,13 @@ Note that the controller is asynchronous, and we can just pass back the `Task` w
 
 Now let's test the application. 
 
- Build the project, and start the local silo.
+Build the project, and start the local silo.
 
- Set the ASP.NET application as the startup project, and run the project.
+Set the ASP.NET application as the startup project, and run the project.
 
- If you navigate to the API URL (the number may be different on your project)...
+If you navigate to the API URL (the number may be different on your project)...
 
     http://localhost:6858/api/employee/3
-
 
 
  ...you should see the result returned from the grain:
@@ -88,7 +90,7 @@ Now let's test the application.
     <int xmlns="http://schemas.microsoft.com/2003/10/Serialization/">42</int>
 
 
- That's the basics in place, the rest of the API can be completed by adding the rest of the HTTP verbs.
+That's the basics in place, the rest of the API can be completed by adding the rest of the HTTP verbs.
 
 ## Next
 
