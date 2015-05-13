@@ -4,18 +4,22 @@ title: Declarative Persistence
 ---
 {% include JB/setup %}
 
-In the second tutorial, we saw how grain state survived the client being shut down, which opens up for a lot of cache-like scenarios, where Orleans is relied upon as a kind of 'cache with behavior,' an object-oriented cache, if you will. That is already very valuable and goes a long way toward achieving server-side scalability with a simple, familiar, programming model and the built-in single-threaded execution guarantees.
+In the second tutorial, we saw how grain state survived the client being shut down, which opens up for a lot of cache-like scenarios, where Orleans is relied upon as a kind of 'cache with behavior,' an object-oriented cache, if you will. 
+That is already very valuable and goes a long way toward achieving server-side scalability with a simple, familiar, programming model and the built-in single-threaded execution guarantees.
 
- However, it is sometimes that case that some of the state you are accumulating belongs in some form of permanent storage, so that it can survive a silo shutdown, or a grain migrating from one silo to another for load-balancing or a complete restart/shutdown of the service. What we have seen so far will not support such situations.
+However, it is sometimes that case that some of the state you are accumulating belongs in some form of permanent storage, so that it can survive a silo shutdown, or a grain migrating from one silo to another for load-balancing or a complete restart/shutdown of the service. What we have seen so far will not support such situations.
 
- Fortunately, Orleans offers a simple declarative model for identifying the state that needs to be stored in a permanent location, while leaving the decision when to save and restore state under programmatic control. You are not required to use the declarative persistence mechanism and can still access storage directly from your grain code, but it’s a nice way to save you some boilerplate code and build applications that are portable across various storage services.
+Fortunately, Orleans offers a simple declarative model for identifying the state that needs to be stored in a permanent location, while leaving the decision when to save and restore state under programmatic control. 
+You are not required to use the declarative persistence mechanism and can still access storage directly from your grain code, but it’s a nice way to save you some boilerplate code and build applications that are portable across various storage services.
 
 ## Getting Started
 We'll continue to build on our employee-and-manager sample.
 
-The first thing we need to do is make the identities of our workers and managers a little more predictable. In the sample, they were assigned Guids using Guid.NewGuid(), which is convenient, but doesn't let us find them in a subsequent run. Therefore, we'll create a set of guids first, then use them as the worker identities.
+The first thing we need to do is make the identities of our workers and managers a little more predictable. 
+In the sample, they were assigned GUIDs using `Guid.NewGuid()`, which is convenient, but doesn't let us find them in a subsequent run. 
+Therefore, we'll create a set of GUIDs first, then use them as the worker identities.
 
-The modified Main program looks like this:
+The modified `Main` program looks like this:
 
 ``` csharp
 static void Main(string[] args)
@@ -47,7 +51,8 @@ static void Main(string[] args)
 }
 ```
 
- Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage. The silo host project includes a configuration file 'DevTestServerConfiguration.xml' which is where we find the following section:
+Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage. 
+The silo host project includes a configuration file _DevTestServerConfiguration.xml_ which is where we find the following section:
 
 
     <OrleansConfiguration xmlns="urn:orleans">
@@ -68,19 +73,25 @@ static void Main(string[] args)
         </StorageProviders>
 
 
- The 'MemoryStorage' provider is fairly uninteresting, since it doesn't actually provide any permanent storage; it's intended for debugging persistent grains while having no access to a persistent store. In our case, that makes it hard to demonstrate persistence, so we will rely on a real storage provider.
+The `MemoryStorage` provider is fairly uninteresting, since it doesn't actually provide any permanent storage; it's intended for debugging persistent grains while having no access to a persistent store. 
+In our case, that makes it hard to demonstrate persistence, so we will rely on a real storage provider.
 
- Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should uncomment one of the other two declarations, but not both.
+Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should uncomment one of the other two declarations, but not both.
 
- In the case of the former, you have to start the Azure storage emulator after installing the latest version of the Azure SDK. In the case of the latter, you will have to create a Azure storage account and enter the name and keys in the configuration file.
+In the case of the former, you have to start the Azure storage emulator after installing the latest version of the Azure SDK. 
+In the case of the latter, you will have to create a Azure storage account and enter the name and keys in the configuration file.
 
- With one of those enabled, we're ready to tackle the grain code.
+With one of those enabled, we're ready to tackle the grain code.
 
- Note: The built-in storage provider classes Orleans.Storage.MemoryStorage and Orleans.Storage.AzureTableStorage are in the  OrleansProviders.dll assembly, so make sure that DLL is referenced in your silo worker role project with CopyLocal=True.
+Note: The built-in storage provider classes `Orleans.Storage.MemoryStorage` and `Orleans.Storage.AzureTableStorage` are in the  _OrleansProviders.dll_ assembly, so make sure that DLL is referenced in your silo worker role project with _CopyLocal='True'_.
 
 ## Declaring State
 
-Identifying that a grain should use persistent state takes three steps: declaring an interface for the state, changing the grain base class, and identifying the storage provider.
+Identifying that a grain should use persistent state takes three steps: 
+
+1. declaring an interface for the state, 
+2. changing the grain base class, and 
+3. identifying the storage provider.
 
 The first step, declaring an interface, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
 
@@ -94,7 +105,7 @@ public interface IEmployeeState : IGrainState
 }
 ```
 
- and for managers, we must store the direct reports, but the "_me" reference may continue to be created during activation.
+and for managers, we must store the direct reports, but the `_me` reference may continue to be created during activation.
 
 ``` csharp
 public interface IManagerState : IGrainState
@@ -103,7 +114,7 @@ public interface IManagerState : IGrainState
 }
 ```
 
- Then, we change the grain class declaration to identify the state interface and remove the variables that we want persisted. Make sure to remove level, and manager from the Employee class and _reports from the Manager class.
+Then, we change the grain class declaration to identify the state interface and remove the variables that we want persisted. Make sure to remove `level`, and `manager` from the `Employee` class and `_reports` from the `Manager` class.
 
  We also add an attribute to identify the storage provider:
 
@@ -120,9 +131,11 @@ and
 public class Manager : Orleans.Grain<IManagerState>, IManager
 ```
 
-At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file. This indirection is what allows you to delay choices around where to store grain state until deployment.
+At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file. 
+This indirection is what allows you to delay choices around where to store grain state until deployment.
 
-Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager. Instead, the grain base class gives us access to the state via a 'State' property that is available to the grain.
+Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager. 
+Instead, the grain base class gives us access to the state via a `State` property that is available to the grain.
 
 For example:
 
@@ -138,11 +151,11 @@ public Task SetManager(IManager manager)
 
 The question that remains is when the persistent state gets saved to the storage provider. 
 
- One choice that the Orleans designers could have made would be to have the runtime save state after every method invocation, but that turns out to be undesirable because it is far too conservative -- not all invocations will actually modify the state on all invocations, and some will never modify it. Rather than employing a complex system to evaluate state differentials after each method, Orleans asks the grain developer to add the necessary logic to determine whether state needs to be saved or not. 
+One choice that the Orleans designers could have made would be to have the runtime save state after every method invocation, but that turns out to be undesirable because it is far too conservative -- not all invocations will actually modify the state on all invocations, and some will never modify it. Rather than employing a complex system to evaluate state differentials after each method, Orleans asks the grain developer to add the necessary logic to determine whether state needs to be saved or not. 
 
- Saving the state using the storage provider is easily accomplished by calling 'State.WriteStateAsync()'. 
+Saving the state using the storage provider is easily accomplished by calling `State.WriteStateAsync()`. 
 
- Thus, the final version of the 'Promote()' and 'SetManager()' methods looks like this:
+Thus, the final version of the `Promote()` and `SetManager()` methods looks like this:
 
 ``` csharp
 public Task Promote(int newLevel)
@@ -158,7 +171,8 @@ public Task SetManager(IManager manager)
 }
 ```
 
-In the Manager class, there's only one method that need to be modified to write out data, 'AddDirectReport().' It should look like this:
+In the `Manager` class, there's only one method that need to be modified to write out data, `AddDirectReport()`. 
+It should look like this:
 
 ``` csharp
 public async Task AddDirectReport(IEmployee employee)
@@ -175,32 +189,38 @@ public async Task AddDirectReport(IEmployee employee)
 }
 ```
 
- Let's try this out!
+Let's try this out!
 
- Set a breakpoint in Employee.Promote(). 
+Set a breakpoint in `Employee.Promote()`. 
 
- When we run the client code the first time and hit the breakpoint, the level field should be 0 and the newLevel parameter either 10 or 11:
+When we run the client code the first time and hit the breakpoint, the level field should be `0` and the newLevel parameter either `10` or `11`:
 
 ![Persistence 2.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810750)
 
- Let the application finish (reach the 'Hit Enter...' prompt) and exit. Run it again, and compare what happens when you look at state this second time around:
+Let the application finish (reach the 'Hit Enter...' prompt) and exit. 
+Run it again, and compare what happens when you look at state this second time around:
 
 ![Persistence 3.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810753)
 
 
 ## Just Making Sure...
 
-It's worth checking what Azure thinks about the data. Using a storage explorer such as Azure Storage Explorer (ASE) or the one built in to Server Explorer in Visual Studio 2013, open the storage account (or developer storage of the emulator) and find the 'OrleansGrainState' table. It should look something like this (you have to hit 'Query' in ASE):
+It's worth checking what Azure thinks about the data. 
+Using a storage explorer such as Azure Storage Explorer (ASE) or the one built in to Server Explorer in Visual Studio 2013, open the storage account (or developer storage of the emulator) and find the 'OrleansGrainState' table. 
+It should look something like this (you have to hit 'Query' in ASE):
 
 ![Persistence 4.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810756)
 
- If everything's working correctly, the Guids should appear in the PartitionKey column, and the qualified class name of the grains should appear in the RowKey column.
+If everything is working correctly, the GUIDs should appear in the `PartitionKey` column, and the qualified class name of the grains should appear in the `RowKey` column.
 
 ## Mixing Things
 
-A grain may contain a combination of persisted and transient state. Any transient state should be represented by private fields in the grain class. A common use for mixing the two is to cache some computed version of the persisted state in private fields while it is present in memory. For example, a stack of elements may be externally represented as a List<T>, but internally, as a Stack<T>.
+A grain may contain a combination of persisted and transient state. 
+Any transient state should be represented by private fields in the grain class. 
+A common use for mixing the two is to cache some computed version of the persisted state in private fields while it is present in memory. 
+For example, a stack of elements may be externally represented as a `List<T>`, but internally, as a `Stack<T>`.
 
- In the case of our Manager class, the _me field is simply a cached value, something we don't even need to keep as a field in the first place, it can be created any time we need it, but since it's going to be a commonly used value, it's worth keeping it around in a transient field.
+In the case of our `Manager` class, the `_me` field is simply a cached value, something we don't even need to keep as a field in the first place, it can be created any time we need it, but since it's going to be a commonly used value, it's worth keeping it around in a transient field.
 
 
 ## Next

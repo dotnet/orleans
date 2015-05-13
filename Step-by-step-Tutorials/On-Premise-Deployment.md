@@ -5,56 +5,66 @@ title: On-Premise Deployment
 
 ## Overview
 
-While using Orleans to implement cloud-based services is a core scenario, there is nothing that intrinsically ties it to the cloud as the sole platform. Orleans can just as well be deployed to the internal, on-premise, equipment of your organization's. In this tutorial, we describe the steps to take.
+While using Orleans to implement cloud-based services is a core scenario, there is nothing that intrinsically ties it to the cloud as the sole platform.
+Orleans can just as well be deployed to the internal, on-premise, equipment of your organization's. 
+In this tutorial, we describe the steps to take.
 
- Orleans based services are xcopy-deployable. All you need to do to deploy an Orleans based service to a set of machines is copy the following set of file to the target machines and start the OrleansHost.exe host process:
-* Contents of the Orleans SDK .\Binaries\OrleansServer folder 
-* OrleansConfiguration.xml file with configuration for the deployment to replace the default placeholder from .\Binaries\OrleansServer 
-* Binaries with grain interfaces and grain implementation classes of the service along with any external dependencies to Application\<service name> subdirectory of the folder on the target with binaries from .\Binaries\OrleansServer 
+Orleans based services are xcopy-deployable. 
+All you need to do to deploy an Orleans based service to a set of machines is copy the following set of file to the target machines and start the _OrleansHost.exe_ host process:
 
-This simple task may be accomplished in many different ways and with different tools, but the Orleans GitHub repo includes a set of PowerShell scripts (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) that provide a way to deploy an Orleans based service to a cluster of machines and remote start the hosting processes on them. There are also scripts for removing a service, monitoring its performance, starting and stopping it, and collecting logs. These are the scripts we found useful for ourselves while building and testing Orleans.
+* Contents of the Orleans SDK _.\Binaries\OrleansServer_ folder 
+* _OrleansConfiguration.xml_ file with configuration for the deployment to replace the default placeholder from _.\Binaries\OrleansServer_ 
+* Binaries with grain interfaces and grain implementation classes of the service along with any external dependencies to _Application\<service name>_ subdirectory of the folder on the target with binaries from _.\Binaries\OrleansServer_.
+
+This simple task may be accomplished in many different ways and with different tools, but the Orleans GitHub repo includes a set of PowerShell scripts (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) that provide a way to deploy an Orleans based service to a cluster of machines and remote start the hosting processes on them. 
+There are also scripts for removing a service, monitoring its performance, starting and stopping it, and collecting logs. 
+These are the scripts we found useful for ourselves while building and testing Orleans.
 
 ## Prerequisites
 The following table lists the prerequisites for deploying and running Orleans on a remote machine:
 
-**.Net Framework 4.5**
+###.Net Framework 4.5
 
- Orleans runs under the .Net Framework 4.5, which can be installed from this link: http://www.microsoft.com/en-us/download/details.aspx?id=30653
+Orleans runs under the .Net Framework 4.5, which can be installed from this link: (http://www.microsoft.com/en-us/download/details.aspx?id=30653)
 
-**Powershell 2.0 with WinRM**
+###Powershell 2.0 with WinRM
 
- Windows 7 and Windows Server 2008 R2 should have these installed by default. For earlier versions of Windows, select the appropriate download from this article: http://support.microsoft.com/kb/968929. To confirm you are running the required version of PowerShell, start a PowerShell window and type Get-Host – the resulting output needs to say “Version: 2.0”
+Windows 7 and Windows Server 2008 R2 should have these installed by default. 
+For earlier versions of Windows, select the appropriate download from this article: (http://support.microsoft.com/kb/968929). 
+To confirm you are running the required version of PowerShell, start a PowerShell window and type `Get-Host` – the resulting output needs to say "Version: 2.0"
 
-**WinRM Configuration**
+###WinRM Configuration
 
- Both the source and target machines must be configured for remote operations: Open a PowerShell window as an Administrator and run the command below on the target machine (enter ‘y’ at the prompts):
+Both the source and target machines must be configured for remote operations: Open a PowerShell window as an Administrator and run the command below on the target machine (enter 'y' at the prompts):
 
      winrm quickconfig
 
-**Increase PowerShell job memory**
+###Increase PowerShell job memory
 
- Set the memory limit on remotely invoked jobs to 4Gb:
+Set the memory limit on remotely invoked jobs to 4Gb:
 
     Set-Item wsman:localhost\Shell\MaxMemoryPerShellMB 4096
 
- To change it on a remote machine, use the following steps:
+To change it on a remote machine, use the following steps:
 
     Connect-WSMan -ComputerName <string> 
     Set-Item wsman:<computerName>\Shell\MaxMemoryPerShellMB 
     Disconnect-WSMan –ComputerName <string>  
 
-**PowerShell Execution Policy set to run remote scripts**
+###PowerShell Execution Policy set to run remote scripts
 
- Open a PowerShell window as an Administrator and run the command below on the target machine(enter ‘y’ at the prompt):
+Open a PowerShell window as an Administrator and run the command below on the target machine (enter 'y' at the prompt):
 
     Set-ExecutionPolicy RemoteSigned
 
- This will set the machine to require signing for remote scripts only.
+This will set the machine to require signing for remote scripts only.
 
- Note that the user running the scripts must be a member of the Administrators Group on the remote machines. 
+Note that the user running the scripts must be a member of the Administrators Group on the remote machines. 
 
 ## Deployment Steps
-In this tutorial , we will deploy the HelloWorld sample to a set of servers. The Orleans repo includes a 'RemoteDeployment' folder (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) where everything we need can be found. Start by building the  Hello World sample, commenting out (or removing) the silo initialization and shutdown code:
+In this tutorial , we will deploy the _HelloWorld_ sample to a set of servers. 
+The Orleans repo includes a _RemoteDeployment_ folder (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) where everything we need can be found. 
+Start by building the [Hello World sample](../Samples-Overview/Hello-World), commenting out (or removing) the silo initialization and shutdown code:
 
 ``` csharp
 static void Main(string[] args)
@@ -78,61 +88,63 @@ static void Main(string[] args)
 }
 ```
 
- Also, start a new PowerShell window as Administrator and move to the RemoteDeployment folder.
+Also, start a new PowerShell window as Administrator and move to the `RemoteDeployment `folder.
 
- The basic steps to deploy Orleans code are:
-* Setup a deployment manifest (Deployment.xml). 
-* Adjust the Orleans server-side configuration (OrleansConfiguration.xml) to suit the environment. 
+The basic steps to deploy Orleans code are:
+
+* Setup a deployment manifest _(Deployment.xml)_. 
+* Adjust the Orleans server-side configuration _(OrleansConfiguration.xml)_ to suit the environment. 
 * Run the PowerShell deployment scripts to deploy Orleans into your remote environment. 
 
 ## Orleans Deployment Manifest
 The Orleans Deployment scripts use a manifest (XML) file to specify details of the deployment, including source and destination locations and local or remote machines to be deployed to.
 
- By making small changes to an existing deployment manifest xml file (typically by listing the different host machines), the same PowerShell scripts can deploy and run that Orleans system on a set of remote machines with equal ease as deploying and running that system on the local machine.
+By making small changes to an existing deployment manifest xml file (typically by listing the different host machines), the same PowerShell scripts can deploy and run that Orleans system on a set of remote machines with equal ease as deploying and running that system on the local machine.
 
- The default file name for the manifest is Deployment.xml, and if you just modify this file, which is found in the RemoteDeployment folder, it will not be necessary to specify a different name. There are times, such as during testing, it may be advantageous to maintain multiple deployment files that specify a different set of silos. These other files may be specified explicitly to the deployment tools as specified in the respective sections below.
+The default file name for the manifest is _Deployment.xml_, and if you just modify this file, which is found in the _RemoteDeployment_ folder, it will not be necessary to specify a different name. 
+There are times, such as during testing, it may be advantageous to maintain multiple deployment files that specify a different set of silos. 
+These other files may be specified explicitly to the deployment tools as specified in the respective sections below.
 
- A Deployment manifest contains many different items, which collectively allow deployment of the Orleans runtime and applications onto a variety of local and remote configurations:
+A deployment manifest contains many different items, which collectively allow deployment of the Orleans runtime and applications onto a variety of local and remote configurations:
 
-**Source location for the Orleans system runtime**
+###Source location for the Orleans system runtime
 
- Located in the “Path” attribute of the <Deployment><Packages><Package> element where the “Type” attribute is set to “System”. 
+Located in the `Path` attribute of the `<Deployment><Packages><Package>` element where the `Type` attribute is set to "System". 
 
 
     <Package Name="Orleans Runtime" Type="System" Path="..\Binaries\OrleansServer" />
 
-
-**Source location for any additional Orleans applications / grains to be included in this Orleans system**
-
- Also located in the <Deployment><Packages><Package> nodes. 
- The “Type” attribute must be set to “Application”. 
+###Source location for additional Orleans applications
+If you have any additional Orleans applications / grains to be included in this Orleans system, they are also located in the `<Deployment><Packages><Package>` nodes. 
+The `Type` attribute must be set to "Application". 
 
 
      <Package Name="HelloWorld" Type="Application" Path="..\Binaries\Applications\HelloWorldGrains" />
 
 
-**Source location for the server configuration file to be used by the Orleans host process**
+###Source location for the server configuration file to be used by the Orleans host process
 
- Located in the “Path” attribute <Deployment><RuntimeConfiguration> element. 
- The file name must be OrleansConfiguration.xml – if necessary, just change the path. 
+Located in the `Path` attribute of the `<Deployment><RuntimeConfiguration>` element. 
+The file name must be "OrleansConfiguration.xml" – if necessary, just change the path. 
 
     <RuntimeConfiguration Path=".\OrleansConfiguration.xml" /> 
 
 
-**Target location to install the Orleans server-side binaries on each machine**
+###Target location to install the Orleans server-side binaries on each machine
 
- Located in the <Deployment><TargetLocation> element. 
- This must be an absolute local file system path (i.e. no “..” locations) that is valid on all the target hosts.
+Located in the `<Deployment><TargetLocation>` element. 
+This must be an absolute local file system path (i.e. no ".." locations) that is valid on all the target hosts.
 
     <TargetLocation Path="C:\Orleans" /> 
 
 
-**The set of silos (host machines and optional silo names) this Orleans system should to be deployed to.**
+###The set of silos (host machines and optional silo names) this Orleans system should to be deployed to.
 
- Located in the <Deployment><Nodes><Node> elements. 
- Typically: Primary on localhost, or multiple machines with one silo each. 
- The “HostName” attribute specifies the machine name. 
- The “NodeName” attribute specifies the name of the silo. Generally, this is arbitrary, with the exception that if multiple silos will run on any one machine, then silo names must be unique. 
+Located in the `<Deployment><Nodes><Node>` elements. 
+Typically: "Primary" on _localhost_, or multiple machines with one silo each. 
+The `HostName` attribute specifies the machine name. 
+The `NodeName` attribute specifies the name of the silo. 
+Generally, this is arbitrary, with the exception that if multiple silos will run on any one machine, then silo names must be unique. 
 
 
     <Nodes>
@@ -142,10 +154,10 @@ The Orleans Deployment scripts use a manifest (XML) file to specify details of t
     <Nodes /> 
 
 
-**Deployment Group ID**
+###Deployment Group ID
 
- This is a GUID which distinguishes one Orleans runtime system from another, even if both Orleans systems are running on the same machines. 
- Located in the <Deployment> element. 
+This is a GUID which distinguishes one Orleans runtime system from another, even if both Orleans systems are running on the same machines. 
+Located in the `<Deployment>` element. 
 
 
     <Deployment 
@@ -155,50 +167,49 @@ The Orleans Deployment scripts use a manifest (XML) file to specify details of t
 
 
 ## Orleans Silo Configuration
-Refer to  Server Configuration for information on silo configuration.
+Refer to  [Server Configuration](../Orleans-Configuration-Guide/Server-Configuration) for information on silo configuration.
 
 ## Orleans Powershell Scripts
-The following sections detail the PowerShell scripts provided with Orleans to aid with deployment and monitoring. (Use the /? option to get the latest usage info directly from the scripts.)
+The following sections detail the PowerShell scripts provided with Orleans to aid with deployment and monitoring. 
+(Use the /? option to get the latest usage info directly from the scripts.)
 
 
 
-Script Name 
-
-Parameters 
-
-Description 
-
-DeployOrleansSilos.ps1  [$deploymentConfigFile]  Copies the Orleans files to machines specified in the deploymentConfigFile (default is Deployment.xml).  
-UndeployOrleansSilos.ps1  [$deploymentConfigFile]  Stops and removes Orleans from the deployment servers deploymentConfigFile (default is Deployment.xml).  
-MonitorOrleansSilos.ps1  [$deploymentConfigFile] [$networkInstance] [$samplesToLog] [$headerInterval] [$repeatHeaderInFile]  Monitors CPU, Memory, Network Send, and Network Receive performance counters, and logs the data to files both as an aggregate of all data, and in separate files for each server. See usage text for details about the parameters.  
-ShowOrleansSilos.ps1  [$deploymentConfigFile]  Does a quick survey of the deployment silos and reports if Orleans is running on them.  
-GatherOrleansSiloLogs.ps1  [$deploymentConfigFile] [$outputPath]  Retrieve all log files from deployment silos and stores them in the specified output folder.  
-UtilityFunctions.ps1  none  Provides ancillary functionality to the other scripts.  
+Script Name               | Parameters              | Description
+--------------------------|-------------------------|------------ 
+DeployOrleansSilos.ps1    | [$deploymentConfigFile] | Copies the Orleans files to machines specified in the deploymentConfigFile (default is Deployment.xml).  
+UndeployOrleansSilos.ps1  | [$deploymentConfigFile] | Stops and removes Orleans from the deployment servers deploymentConfigFile (default is Deployment.xml).  
+MonitorOrleansSilos.ps1   | [$deploymentConfigFile] [$networkInstance] [$samplesToLog] [$headerInterval] [$repeatHeaderInFile] | Monitors CPU, Memory, Network Send, and Network Receive performance counters, and logs the data to files both as an aggregate of all data, and in separate files for each server. See usage text for details about the parameters.  
+ShowOrleansSilos.ps1      | [$deploymentConfigFile] | Does a quick survey of the deployment silos and reports if Orleans is running on them.  
+GatherOrleansSiloLogs.ps1 | [$deploymentConfigFile] [$outputPath] | Retrieve all log files from deployment silos and stores them in the specified output folder.  
+UtilityFunctions.ps1      | none                    | Provides ancillary functionality to the other scripts.  
 
 
 ## Deploying Orleans using Powershell Script
+
 * Start a separate PowerShell command window as an administrator. 
-* Execute the DeployOrleansSilos.ps1 script, providing the location of the deployment configuration file (deployment.xml is the default and will be used if you don’t supply a value).
+* Execute the _DeployOrleansSilos.ps1_ script, providing the location of the deployment configuration file ("deployment.xml" is the default and will be used if you don’t supply a value).
 
      .\DeployOrleansSilos.ps1 .\Deployment.xml 
 
- The deployment will execute the following steps:
+The deployment will execute the following steps:
+
 * Stop any running instances of Orleans that are running on the deployment machines. 
 * Copy the Orleans files and any application files that are listed in the deployment manifest. 
 * When the copy is completed, start the silos. This will pause after starting the first silo so that it is available for the other silos to register with. 
 * Pause to allow the start-up to complete. 
 * Report the progress of the deployment. 
 
- When the deployment is complete, Orleans is ready for clients to connect to it.
+When the deployment is complete, Orleans is ready for clients to connect to it.
 
 ## Confirming Orleans Status
-To determine if Orleans is running on the servers in the deployment manifest, run the ShowOrleansSilos.ps1 script.
+To determine if Orleans is running on the servers in the deployment manifest, run the _ShowOrleansSilos.ps1_ script.
 
- If you have used a deployment manifest file named something other than the default, specify it on the command line.
+If you have used a deployment manifest file named something other than the default, specify it on the command line.
 
      .\ShowOrleansSilos.ps1 .\Deployment.xml
 
- If everything works well, you should see something like this:
+If everything works well, you should see something like this:
 
     PS C:\Orleans\misc\scripts\RemoteDeployment> .\ShowOrleansSilos.ps1 .\Deployment.xml
 
@@ -213,7 +224,9 @@ To determine if Orleans is running on the servers in the deployment manifest, ru
 
 
 ## Running the Client
-We've edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file DevTestClientConfiguratio.xml needs to be edited according to the  Client Configuration section. The setup needs to conform to how the server was set up, specifically whether or not Azure Storage is used to keep track of the deployment configuration. In the author's setup, Azure is not involved, so the client configuration looks like this:
+We've edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file _DevTestClientConfiguratio.xml_ needs to be edited according to the [Client Configuration](../Orleans-Configuration-Guide/Client-Configuration) section. 
+The setup needs to conform to how the server was set up, specifically whether or not Azure Storage is used to keep track of the deployment configuration. 
+In the author's setup, Azure is not involved, so the client configuration looks like this:
 
 
     <ClientConfiguration xmlns="urn:orleans">
@@ -224,7 +237,7 @@ We've edited the Hello World program not to start a silo in-process, but in orde
     </ClientConfiguration>
 
 
- which corresponds to a server configuration that looks like this (relevant excerpts only):
+which corresponds to a server configuration that looks like this (relevant excerpts only):
 
 
     <Globals>
@@ -239,53 +252,48 @@ We've edited the Hello World program not to start a silo in-process, but in orde
     </Defaults>
 
 
- Running the client in VS, I see this:
+Running the client in VS, I see this:
 
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=813859)
 
 ## Monitoring Orleans
-Once Orleans is deployed, you can start an optional script that will monitor the Orleans deployment using standard performance counters. Run a dedicated PowerShell command prompt as an administrator, and execute the .\MonitorOrleans.ps1 script to start monitor performance counters for an Orleans Deployment.
+Once Orleans is deployed, you can start an optional script that will monitor the Orleans deployment using standard performance counters.
+Run a dedicated PowerShell command prompt as an administrator, and execute the _.\MonitorOrleans.ps1_ script to start monitor performance counters for an Orleans Deployment.
 
- The following parameters configure the monitoring to suit individual circumstances:
-
-
-Parameter 
-
-Description 
-
-Default 
-
-DeploymentConfigFile  The deployment manifest used to install Orleans.  Deployment.xml  
-NetworkInstance  The name of the network for the network performance counters.  corp  
-SamplesToLog  The number of samples to record in the current run. Use Ctrl-C to stop the script sooner.  480, which taken in one minute intervals should continue for eight hours.  
-HeaderInterval  The number of samples to write before repeating the header.  10  
-RepeatHeaderInFile  If this switch is present, the header will be repeated in the log file at the interval specified by the previous parameter.  Only include the header at the top of the file.  
+The following parameters configure the monitoring to suit individual circumstances:
 
 
- The script will store the data in the following types listed below. The files will be written to a folder called PerformanceData under the directory where the monitoring script is run from.
+Parameter            | Default        | Description 
+---------------------|----------------|-------------
+DeploymentConfigFile | Deployment.xml | The deployment manifest used to install Orleans.   
+NetworkInstance      | corp           | The name of the network for the network performance counters.  
+SamplesToLog         | 480			  | The number of samples to record in the current run. Use Ctrl-C to stop the script sooner. The default of 480, which taken in one minute intervals should continue for eight hours.  
+HeaderInterval       | 10             | The number of samples to write before repeating the header.
+RepeatHeaderInFile   |                | If this switch is present, the header will be repeated in the log file at the interval specified by the previous parameter.  
+
+
+The script will store the data in the following types listed below. 
+The files will be written to a folder called _PerformanceData_ under the directory where the monitoring script is run from.
 
 
 
-File Type 
-
-Description 
-
-FileNameBase 
-
-Machine Specific  Contains only the data for a single machine. If there are four machines in the deployment, then there will be four of these files.  “PerfData-“ + the machine name and the Date/Time stamp.  
-Combined  Contains all of the data for all machines consolidated into a single file.  “ConsolidatedPerfData-“ + the Date/Time stamp. 
+File Type        | FileNameBase                                  | Description 
+-----------------|-----------------------------------------------|-----------------
+Machine Specific | “PerfData-” + machine name + Date/Time stamp. | Contains only the data for a single machine. If there are four machines in the deployment, then there will be four of these files.   
+Combined         | “ConsolidatedPerfData-” + Date/Time stamp.    | Contains all of the data for all machines consolidated into a single file.   
 
 
 ## Gathering Orleans Log Files
-To retrieve all log files from deployment silos and store them in the specified output folder, run the GatherOrleansSiloLogs.ps1 script.
+To retrieve all log files from deployment silos and store them in the specified output folder, run the _GatherOrleansSiloLogs.ps1_ script.
 
- If you have used a deployment manifest file named something other than the default, specify it on the command line. You may also specify an output folder where the collected log files will be stored otherwise a .\logs subdirectory will be used by default.
+If you have used a deployment manifest file named something other than the default, specify it on the command line. 
+You may also specify an output folder where the collected log files will be stored otherwise a _.\logs_ subdirectory will be used by default.
 
     .\GatherOrleansSiloLogs.ps1 .\Deployment.xml 
     .\GatherOrleansSiloLogs.ps1 .\Deployment.xml .\MyLogs
 
 ## Removing Orleans 
-When it is time to remove an Orleans deployment, use the UndeployOrleansSilos.ps1 script. 
+When it is time to remove an Orleans deployment, use the _UndeployOrleansSilos.ps1_ script. 
 
  If you have used a deployment manifest file named something other than the default, specify it on the command line.
 
