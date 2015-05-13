@@ -104,28 +104,12 @@ namespace Orleans.Runtime.MembershipService
 
         internal bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
         {
-            siloName = null;
             if (siloAddress.Equals(MyAddress))
             {
                 siloName = SiloName;
                 return true;
             }
             return localNamesTableCopy.TryGetValue(siloAddress, out siloName);
-        }
-
-        internal bool IsValidSilo(SiloAddress silo)
-        {
-            if (silo.Equals(MyAddress)) return true;
-
-            var status = GetApproximateSiloStatus(silo);
-            return status != SiloStatus.ShuttingDown && status != SiloStatus.Stopping && status != SiloStatus.Dead;
-        }
-
-        internal bool IsDeadSilo(SiloAddress silo)
-        {
-            if (silo.Equals(MyAddress)) return false;
-
-            return GetApproximateSiloStatus(silo) == SiloStatus.Dead;
         }
 
         internal bool SubscribeToSiloStatusEvents(ISiloStatusListener observer)
@@ -146,11 +130,6 @@ namespace Orleans.Runtime.MembershipService
             {
                 return statusListeners.Contains(observer) && statusListeners.Remove(observer);
             }
-        }
-
-        internal bool IsFunctional(SiloStatus status)
-        {
-            return status.Equals(SiloStatus.Active) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping);
         }
 
         internal void UpdateMyStatusLocal(SiloStatus status)

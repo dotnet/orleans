@@ -212,7 +212,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 membership = Silo.CurrentSilo.LocalSiloStatusOracle;
             }
-            return membership.IsValidSilo(silo);
+            return membership.IsFunctionalDirectory(silo);
         }
 
         internal void Clear()

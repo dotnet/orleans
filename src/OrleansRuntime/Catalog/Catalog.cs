@@ -1138,8 +1138,7 @@ namespace Orleans.Runtime
             // since this is what Directory is doing as well. Directory removes a silo based on all those 3 statuses,
             // thus it will only deliver a "remove" notification for a given silo once to us. Therefore, we need to react the fist time we are notified.
             // We may review the directory behaiviour in the future and treat ShuttingDown differently ("drain only") and then this code will have to change a well.
-            if (!status.Equals(SiloStatus.Dead) && !status.Equals(SiloStatus.ShuttingDown) &&
-                !status.Equals(SiloStatus.Stopping)) return;
+            if (!status.IsTerminating()) return;
 
             var activationsToShutdown = new List<ActivationData>();
             try

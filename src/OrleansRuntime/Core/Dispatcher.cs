@@ -266,7 +266,7 @@ namespace Orleans.Runtime
             if (Message.WriteMessagingTraces)
                 message.AddTimestamp(Message.LifecycleTag.TaskIncoming);
 
-            return catalog.SiloStatusOracle.CurrentStatus != SiloStatus.ShuttingDown;
+            return !catalog.SiloStatusOracle.CurrentStatus.IsTerminating();
         }
 
         /// <summary>
@@ -657,7 +657,7 @@ namespace Orleans.Runtime
 #endif
                 activation.ResetRunning(message);
 
-                if (catalog.SiloStatusOracle.CurrentStatus == SiloStatus.ShuttingDown) return;
+                if (catalog.SiloStatusOracle.CurrentStatus.IsTerminating()) return;
 
                 // ensure inactive callbacks get run even with transactions disabled
                 if (!activation.IsCurrentlyExecuting)
