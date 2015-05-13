@@ -143,13 +143,23 @@ namespace Orleans.Runtime.Configuration
         /// <param name="ageLimit">The age limit to use.</param>
         public void SetCollectionAgeLimit(Type type, TimeSpan ageLimit)
         {
+            SetCollectionAgeLimit(type.FullName, ageLimit);
+        }
+
+        /// <summary>
+        /// Sets the time period  to collect in-active activations for a given type.
+        /// </summary>
+        /// <param name="grainTypeFullName">Grain type full name string.</param>
+        /// <param name="ageLimit">The age limit to use.</param>
+        public void SetCollectionAgeLimit(string grainTypeFullName, TimeSpan ageLimit)
+        {
             ThrowIfLessThanZero(ageLimit, "ageLimit");
 
             GrainTypeConfiguration config;
-            if (!classSpecific.TryGetValue(type.FullName, out config))
+            if (!classSpecific.TryGetValue(grainTypeFullName, out config))
             {
-                config = new GrainTypeConfiguration(type.FullName);
-                classSpecific[type.FullName] = config;
+                config = new GrainTypeConfiguration(grainTypeFullName);
+                classSpecific[grainTypeFullName] = config;
             }
 
             config.CollectionAgeLimit = ageLimit;
@@ -162,8 +172,18 @@ namespace Orleans.Runtime.Configuration
         /// <param name="ageLimit">The age limit to use.</param>
         public void ResetCollectionAgeLimitToDefault(Type type)
         {
+            ResetCollectionAgeLimitToDefault(type.FullName);
+        }
+
+        /// <summary>
+        /// Resets the time period to collect in-active activations for a given type to a default value.
+        /// </summary>
+        /// <param name="type">Grain type full name string.</param>
+        /// <param name="ageLimit">The age limit to use.</param>
+        public void ResetCollectionAgeLimitToDefault(string grainTypeFullName)
+        {
             GrainTypeConfiguration config;
-            if (!classSpecific.TryGetValue(type.FullName, out config)) return;
+            if (!classSpecific.TryGetValue(grainTypeFullName, out config)) return;
 
             config.CollectionAgeLimit = null;
         }
