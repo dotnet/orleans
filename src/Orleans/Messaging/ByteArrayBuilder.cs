@@ -148,8 +148,15 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public ByteArrayBuilder Append(byte[] array)
         {
+            int arrLen = array.Length;
             // Big enough for its own buffer
-            if (((currentOffset > MINIMUM_BUFFER_SIZE) && (array.Length > MINIMUM_BUFFER_SIZE)) || (array.Length >= bufferSize))
+            //
+            // This is a somewhat debatable optimization:
+            // 1) If the passed array is bigger than bufferSize, don't copy it and append it as its own buffer. 
+            // 2) Make sure to ALWAYS copy arrays which size is EXACTLY bufferSize, otherwise if the data was passed as an Immutable arg, 
+            // we may return this buffer back to the BufferPool and later over-write it.
+            // 3) If we already have MINIMUM_BUFFER_SIZE in the current buffer and passed enough data, also skip the copy and append it as its own buffer. 
+            if (((arrLen != bufferSize) && (currentOffset > MINIMUM_BUFFER_SIZE) && (arrLen > MINIMUM_BUFFER_SIZE)) || (arrLen > bufferSize))
             {
                 Grow();
                 completedBuffers.Add(new ArraySegment<byte>(array));
@@ -440,23 +447,6 @@ namespace Orleans.Runtime
             return this;
         }
 
-        public ByteArrayBuilder Append(Guid g)
-        {
-            Append(g.ToByteArray());
-            return this;
-        }
-
-        public ByteArrayBuilder Append(DateTime d)
-        {
-            Append(BitConverter.GetBytes(d.Ticks));
-            return this;
-        }
-
-        public ByteArrayBuilder Append(TimeSpan s)
-        {
-            Append(BitConverter.GetBytes(s.Ticks));
-            return this;
-        }
 
         // Utility function for manipulating lists of array segments
         public static List<ArraySegment<byte>> BuildSegmentList(List<ArraySegment<byte>> buffer, int offset)

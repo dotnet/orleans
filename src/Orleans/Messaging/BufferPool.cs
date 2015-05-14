@@ -36,6 +36,7 @@ namespace Orleans.Runtime
         private readonly CounterStatistic checkedOutBufferCounter;
         private readonly CounterStatistic checkedInBufferCounter;
         private readonly CounterStatistic droppedBufferCounter;
+        private readonly CounterStatistic droppedTooLargeBufferCounter;
 
         public static BufferPool GlobalPool;
 
@@ -76,7 +77,8 @@ namespace Orleans.Runtime
             allocatedBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_ALLOCATED_BUFFERS);
             checkedOutBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_OUT_BUFFERS);
             checkedInBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_IN_BUFFERS);
-            droppedBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_IN_DROPPED_BUFFERS);
+            droppedBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_DROPPED_BUFFERS);
+            droppedTooLargeBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_DROPPED_TOO_LARGE_BUFFERS);
 
             // Those 2 counters should be equal. If not, it means we don't release all buffers.
             IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_INUSE_CHECKED_OUT_NOT_CHECKED_IN_BUFFERS,
@@ -135,7 +137,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                droppedBufferCounter.Increment();
+                droppedTooLargeBufferCounter.Increment();
             }
         }
 
