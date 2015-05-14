@@ -268,6 +268,7 @@ namespace Orleans.Streams
                     {
                         // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
                         logger.Info((int)ErrorCode.PersistentStreamPullingAgent_24, String.Format("Stream cache is under pressure. Backing off."));
+                        return;
                     }
 
                     // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
