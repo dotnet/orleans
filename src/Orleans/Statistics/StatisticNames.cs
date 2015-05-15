@@ -204,7 +204,8 @@ namespace Orleans.Runtime
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_ALLOCATED_BUFFERS                         = new StatisticName("Serialization.BufferPool.AllocatedBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_OUT_BUFFERS                       = new StatisticName("Serialization.BufferPool.CheckedOutBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_IN_BUFFERS                        = new StatisticName("Serialization.BufferPool.CheckedInBuffers");
-        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_IN_DROPPED_BUFFERS                = new StatisticName("Serialization.BufferPool.CheckedInDroppedBuffers");
+        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_DROPPED_BUFFERS                           = new StatisticName("Serialization.BufferPool.DroppedBuffers");
+        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_DROPPED_TOO_LARGE_BUFFERS                 = new StatisticName("Serialization.BufferPool.DroppedTooLargeBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_INUSE_CHECKED_OUT_NOT_CHECKED_IN_BUFFERS  = new StatisticName("Serialization.BufferPool.InUse.CheckedOutAndNotCheckedIn_Buffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_INUSE_ALLOCATED_NOT_INPOOL_BUFFERS        = new StatisticName("Serialization.BufferPool.InUse.AllocatedAndNotInPool_Buffers");
         public static readonly StatisticName SERIALIZATION_BODY_DEEPCOPIES                      = new StatisticName("Serialization.Body.DeepCopies");
