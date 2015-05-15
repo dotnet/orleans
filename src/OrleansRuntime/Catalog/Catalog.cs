@@ -817,26 +817,25 @@ namespace Orleans.Runtime
         {
             int number = destroyActivationsNumber;
             destroyActivationsNumber++;
+            logger.Info(ErrorCode.Catalog_DestroyActivations, "Starting DestroyActivations #{0} of {1} activations", number, list.Count);
+
             try
             {
-                logger.Info(ErrorCode.Catalog_DestroyActivations, "Starting DestroyActivations #{0} of {1} activations", number, list.Count);
-
                 // step 1 - WaitForAllTimersToFinish
                 var tasks1 = new List<Task>();
                 foreach (var activation in list)
                 {
                     tasks1.Add(activation.WaitForAllTimersToFinish());
                 }
+                await Task.WhenAll(tasks1);
+            }
+            catch (Exception exc)
+            {
+                logger.Warn(ErrorCode.Catalog_WaitForAllTimersToFinish_Exception, String.Format("WaitForAllTimersToFinish {0} failed.", list.Count), exc);
+            }
 
-                try
-                {
-                    await Task.WhenAll(tasks1);
-                }
-                catch (Exception exc)
-                {
-                    logger.Warn(ErrorCode.Catalog_WaitForAllTimersToFinish_Exception, String.Format("WaitForAllTimersToFinish {0} failed.", list.Count), exc);
-                }
-
+            try
+            {
                 // step 2 - CallGrainDeactivate
                 var tasks2 = new List<Tuple<Task, ActivationData>>();
                 foreach (var activation in list)
@@ -855,6 +854,10 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, String.Format("StartDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
+                if (tcs != null)
+                {
+                    tcs.TrySetMultipleResults(list.Count);
+                }
             }
         }
 
@@ -905,15 +908,20 @@ namespace Orleans.Runtime
                         logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Last stage of DestroyActivations failed on {0}.", activationData), exc);
                     }
                 }
+                logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done FinishDestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
+                
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.Catalog_FinishDeactivateActivation_Exception, String.Format("FinishDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
+            }
+            finally
+            {
                 // step 5 - Resolve any waiting TaskCompletionSource
                 if (tcs != null)
                 {
-                    tcs.SetMultipleResults(list.Count);
+                    tcs.TrySetMultipleResults(list.Count);
                 }
-                logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done FinishDestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
-            }catch (Exception exc)
-            {
-                logger.Error(ErrorCode.Catalog_FinishDeactivateActivation_Exception, String.Format("FinishDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
             }
         }
         private void RerouteAllQueuedMessages(ActivationData activation, ActivationAddress forwardingAddress, string failedOperation, Exception exc = null)

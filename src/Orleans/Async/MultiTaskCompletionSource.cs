@@ -84,5 +84,17 @@ namespace Orleans
                 }
             }
         }
+
+        public void TrySetMultipleResults(int num)
+        {
+            lock (lockable)
+            {
+                count = count - num;
+                if (count <= 0)
+                {
+                    tcs.SetResult(true);
+                }
+            }
+        }
     }
 }
