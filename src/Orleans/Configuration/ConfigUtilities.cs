@@ -457,16 +457,7 @@ namespace Orleans.Runtime.Configuration
                 throw new ArgumentException("The XML element must be a <Deactivate/> element.");
             if (!xmlElement.HasAttribute("AgeLimit"))
                 throw new ArgumentException("The AgeLimit attribute is required for a <Deactivate/> element.");
-            TimeSpan ageLimit = ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
-            TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
-            if (ageLimit < minAgeLimit)
-            {
-                if (GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT)
-                {
-                    throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
-                }
-            }
-            return ageLimit;
+            return ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
         }
 
         private static readonly string[] defaultClientConfigFileNames = { "ClientConfiguration.xml", "OrleansClientConfiguration.xml", "Client.config", "Client.xml" };

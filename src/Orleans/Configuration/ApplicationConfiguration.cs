@@ -120,6 +120,10 @@ namespace Orleans.Runtime.Configuration
         /// <returns></returns>
         public TimeSpan GetCollectionAgeLimit(Type type)
         {
+            if (type == null)
+            {
+                throw new ArgumentNullException("type");
+            }
             return GetCollectionAgeLimit(type.FullName);
         }
 
@@ -130,6 +134,10 @@ namespace Orleans.Runtime.Configuration
         /// <returns></returns>
         public TimeSpan GetCollectionAgeLimit(string grainTypeFullName)
         {
+            if (String.IsNullOrEmpty(grainTypeFullName))
+            {
+                throw new ArgumentNullException("grainTypeFullName");
+            }
             GrainTypeConfiguration config;
             return classSpecific.TryGetValue(grainTypeFullName, out config) && config.CollectionAgeLimit.HasValue ? 
                 config.CollectionAgeLimit.Value : DefaultCollectionAgeLimit;
@@ -143,16 +151,34 @@ namespace Orleans.Runtime.Configuration
         /// <param name="ageLimit">The age limit to use.</param>
         public void SetCollectionAgeLimit(Type type, TimeSpan ageLimit)
         {
+            if (type == null)
+            {
+                throw new ArgumentNullException("type");
+            }
+            SetCollectionAgeLimit(type.FullName, ageLimit);
+        }
+
+        /// <summary>
+        /// Sets the time period  to collect in-active activations for a given type.
+        /// </summary>
+        /// <param name="grainTypeFullName">Grain type full name string.</param>
+        /// <param name="ageLimit">The age limit to use.</param>
+        public void SetCollectionAgeLimit(string grainTypeFullName, TimeSpan ageLimit)
+        {
+            if (String.IsNullOrEmpty(grainTypeFullName))
+            {
+                throw new ArgumentNullException("grainTypeFullName");
+            }
             ThrowIfLessThanZero(ageLimit, "ageLimit");
 
             GrainTypeConfiguration config;
-            if (!classSpecific.TryGetValue(type.FullName, out config))
+            if (!classSpecific.TryGetValue(grainTypeFullName, out config))
             {
-                config = new GrainTypeConfiguration(type.FullName);
-                classSpecific[type.FullName] = config;
+                config = new GrainTypeConfiguration(grainTypeFullName);
+                classSpecific[grainTypeFullName] = config;
             }
 
-            config.CollectionAgeLimit = ageLimit;
+            config.SetCollectionAgeLimit(ageLimit);
         }
 
         /// <summary>
@@ -162,10 +188,28 @@ namespace Orleans.Runtime.Configuration
         /// <param name="ageLimit">The age limit to use.</param>
         public void ResetCollectionAgeLimitToDefault(Type type)
         {
-            GrainTypeConfiguration config;
-            if (!classSpecific.TryGetValue(type.FullName, out config)) return;
+            if (type == null)
+            {
+                throw new ArgumentNullException("type");
+            }
+            ResetCollectionAgeLimitToDefault(type.FullName);
+        }
 
-            config.CollectionAgeLimit = null;
+        /// <summary>
+        /// Resets the time period to collect in-active activations for a given type to a default value.
+        /// </summary>
+        /// <param name="type">Grain type full name string.</param>
+        /// <param name="ageLimit">The age limit to use.</param>
+        public void ResetCollectionAgeLimitToDefault(string grainTypeFullName)
+        {
+            if (String.IsNullOrEmpty(grainTypeFullName))
+            {
+                throw new ArgumentNullException("grainTypeFullName");
+            }
+            GrainTypeConfiguration config;
+            if (!classSpecific.TryGetValue(grainTypeFullName, out config)) return;
+
+            config.SetCollectionAgeLimit(null);
         }
 
         /// <summary>
@@ -175,7 +219,7 @@ namespace Orleans.Runtime.Configuration
         public void SetDefaultCollectionAgeLimit(TimeSpan ageLimit)
         {
             ThrowIfLessThanZero(ageLimit, "ageLimit");
-            defaults.CollectionAgeLimit = ageLimit;
+            defaults.SetCollectionAgeLimit(ageLimit);
         }
 
         private static void ThrowIfLessThanZero(TimeSpan timeSpan, string paramName)
@@ -235,7 +279,9 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The time period used to collect in-active activations of this type.
         /// </summary>
-        public TimeSpan?    CollectionAgeLimit { get; set; }
+        public TimeSpan? CollectionAgeLimit { get { return collectionAgeLimit; } }
+
+        private TimeSpan? collectionAgeLimit;
 
         /// <summary>
         /// Constructor.
@@ -254,7 +300,25 @@ namespace Orleans.Runtime.Configuration
         public GrainTypeConfiguration(string type, TimeSpan? ageLimit)
         {
             FullTypeName = type;
-            CollectionAgeLimit = ageLimit;
+            SetCollectionAgeLimit(ageLimit);
+        }
+
+        public void SetCollectionAgeLimit(TimeSpan? ageLimit)
+        {
+            if (ageLimit == null)
+            {
+                collectionAgeLimit = null;
+            }
+
+            TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
+            if (ageLimit < minAgeLimit)
+            {
+                if (GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT)
+                {
+                    throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
+                }
+            }
+            collectionAgeLimit = ageLimit;
         }
 
         /// <summary>
