@@ -97,7 +97,7 @@ namespace Orleans.Runtime
         /// Determine if the current silo is valid for creating new activations on or for directoy lookups.
         /// </summary>
         /// <returns>The silo so ask about.</returns>
-        bool IsValidSilo(SiloAddress siloAddress);
+        bool IsFunctionalDirectory(SiloAddress siloAddress);
 
         /// <summary>
         /// Determine if the current silo is dead.

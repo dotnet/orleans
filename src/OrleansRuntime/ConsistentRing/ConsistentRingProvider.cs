@@ -312,14 +312,14 @@ namespace Orleans.Runtime.ConsistentRing
             // This silo's status has changed
             if (updatedSilo.Equals(MyAddress))
             {
-                if (status == SiloStatus.Dead || status.Equals(SiloStatus.ShuttingDown) || status == SiloStatus.Stopping)
+                if (status.IsTerminating())
                 {
                     Stop();
                 }
             }
             else // Status change for some other silo
             {
-                if (status.Equals(SiloStatus.Dead) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping))
+                if (status.IsTerminating())
                 {
                     RemoveServer(updatedSilo);
                 }

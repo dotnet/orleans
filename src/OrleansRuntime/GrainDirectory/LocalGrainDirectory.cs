@@ -414,7 +414,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else // Status change for some other silo
             {
-                if (status.Equals(SiloStatus.Dead) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping))
+                if (status.IsTerminating())
                 {
                     // QueueAction up the "Remove" to run on a system turn
                     Scheduler.QueueAction(() => RemoveServer(updatedSilo, status), CacheValidator.SchedulingContext).Ignore();
@@ -431,8 +431,8 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (Membership == null)
                 Membership = Silo.CurrentSilo.LocalSiloStatusOracle;
-            
-            return Membership.IsValidSilo(silo);
+
+            return Membership.IsFunctionalDirectory(silo);
         }
 
         #endregion
