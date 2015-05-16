@@ -98,5 +98,10 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(T);
         }
+
+        public Task CompareGrainReferences() 
+        {
+            return TaskDone.Done;
+        }
     }
 }

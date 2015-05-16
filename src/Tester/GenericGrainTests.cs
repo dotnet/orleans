@@ -246,5 +246,14 @@ namespace UnitTests.General
             Assert.AreEqual("100", floatResult);
         }
 
+        [TestMethod, TestCategory("Failures")]
+        public async Task GenericGrainTests_UseGenericFactoryInsideGrain()
+        {
+            var grainId = GetRandomGrainId();
+
+            var grainRef1 = GetGrain<ISimpleGenericGrain<string>>(grainId);
+            await grainRef1.Set("JustString");
+            await grainRef1.CompareGrainReferences();
+        }
     }
 }

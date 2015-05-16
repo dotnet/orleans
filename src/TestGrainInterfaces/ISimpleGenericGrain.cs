@@ -38,5 +38,7 @@ namespace UnitTests.GrainInterfaces
         Task Transform();
 
         Task<T> Get();
+
+        Task CompareGrainReferences();
     }
 }
