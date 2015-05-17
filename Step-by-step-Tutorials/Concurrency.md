@@ -142,7 +142,7 @@ We see that the sample works, and Orleans is able to interleave the grain calls:
 
 ##Messages
 
-Messages are simply data passed from one actor to, we just created the `GreetingData` class to do just this.
+Messages are simply data passed from one actor to another, we just created the `GreetingData` class to do just this.
 
 In .NET, most objects are created from a class of some sort and are passed around by reference, something that doesn't work well with concurrency, and definitely not with distribution. 
 
