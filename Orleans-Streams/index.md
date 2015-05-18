@@ -69,9 +69,13 @@ A producer of a rewindable stream can pass an optional `StreamSequenceToken` to 
 
 An example of how to use streaming APIs within a grain can be found [here](https://github.com/dotnet/orleans/blob/master/src/TestGrains/SampleStreamingGrain.cs). We plan to create more samples in the future.
 
-## Steam Extensibility
+## Streams Implementation
 
-The [Orleans Streams Extensibility](Streams-Extensibility) desribes how to extend streams with new functionality.
+The [Orleans Streams Implementation](Streams-Implementation) provides a high level overview of Orleans Streams implementation.
+
+## Streams Extensibility
+
+The [Orleans Streams Extensibility](Streams-Extensibility) describes how to extend streams with new functionality.
 
 ***
 
