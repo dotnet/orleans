@@ -32,7 +32,7 @@ namespace Orleans.Streams
     internal class ConsistentRingQueueBalancer : IGrainRingRangeListener, IStreamQueueBalancer
     {
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners = new List<IStreamQueueBalanceListener>();
-        private readonly IStreamQueueMapper streamQueueMapper;
+        private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
         public ConsistentRingQueueBalancer(
@@ -47,8 +47,12 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("queueMapper");
             }
+            if (!(queueMapper is IConsistentRingStreamQueueMapper))
+            {
+                throw new ArgumentException("queueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", "queueMapper");
+            }
 
-            streamQueueMapper = queueMapper;
+            streamQueueMapper = (IConsistentRingStreamQueueMapper)queueMapper;
             myRange = ringProvider.GetMyRange();
 
             ringProvider.SubscribeToRangeChangeEvents(this);
