@@ -71,7 +71,7 @@ An example of how to use streaming APIs within a grain can be found [here](https
 
 ## Steam Extensibility
 
-The [Orleans Streams Extensibility](Streams-Extensibility.md) desribes how to extend streams with new functionality.
+The [Orleans Streams Extensibility](Streams-Extensibility) desribes how to extend streams with new functionality.
 
 ***
 
