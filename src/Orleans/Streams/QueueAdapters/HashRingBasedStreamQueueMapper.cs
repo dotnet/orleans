@@ -27,7 +27,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    public class HashRingBasedStreamQueueMapper : IStreamQueueMapper
+    public class HashRingBasedStreamQueueMapper : IConsistentRingStreamQueueMapper
     {
         private readonly int numQueues;
         private readonly HashRing<QueueId> hashRing;
