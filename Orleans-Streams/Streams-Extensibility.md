@@ -4,21 +4,23 @@ title: Orleans Streams Extensibility
 ---
 {% include JB/setup %}
 
-There is a number of ways developers can extend the currently implemented behaviour of Orleans Streaming. We will describe those below, starting from the simplest and following with more complicated cases. Please read the [Orleans Streams Implementation](Streams-Implementation) before reading this section to have ahigh level view of the internal implementation.
+There are three ways developers can extend the currently implemented behaviour of Orleans Streaming:
+
+1. Utilize or extend Stream Provider Configuration.
+2. Write a Custom Queue Adapter.
+3. Writ a New Stream Provider
+
+We will describe those below. Please read the [Orleans Streams Implementation](Streams-Implementation) before reading this section to have a high level view of the internal implementation.
 
 ## Stream Provider Configuration
 
 Currently implemented stream providers (Simple Message Stream Provider and Persistent Stream Providers) support a number of configuration options.
 
-**Simple Message Stream Provider Configuration**:
-
-SMS Stream Provider currently supports only a single configuration option:
+**Simple Message Stream Provider Configuration**. SMS Stream Provider currently supports only a single configuration option:
 
 1. **FireAndForgetDelivery**: this option specifies if the messages sent by SMS stream producer are sent as fire and forget without the way to know if they were delivered or not. When FireAndForgetDelivery is set to false (messages are sent not as FireAndForget), the stream producer's call `stream.OnNext()` returns a Task that represents the processing status of the stream consumer. If this Task succeeds, the producer knows for sure that the message was delivered and processed succesfully. If FireAndForgetDelivery is set to true, the returned Task only expresses that the Orleans runtime has accepted the message and queued it for further delivery. The default value for FireAndForgetDelivery is false. 
 
-**Persistent Stream Provider Configuration**:
-
-All persistent stream providers support the following configuration options:
+**Persistent Stream Provider Configuration**. All persistent stream providers support the following configuration options:
 
 1. **GetQueueMessagesTimerPeriod** - how much time the pulling agents wait after the last attempt to pull from the queue that did not return any itimes before the agent attemps to pull again. Default is 100 milliseconds.
 2. **InitQueueTimeout** - how much time the pulling agents waits for the adapter to initialize the connection with the queue. Default is 5 seconds.
@@ -54,7 +56,7 @@ If you want to use a different queueing technology, you need to write a queue ad
 3. Implement `MyQueueAdapterReceiver` class that implements the [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interfaces that manages access to **one queue (one queue partition)**. In addition to initilaiztion and shutwodn, it basicaly provides one method: retreave up to maxCount messages from the queue.
 
 4. Declare `public class MyQueueStreamProvider : PersistentStreamProvider<MyQueueFactory>`. This is your new Stream Provider.
-5. **Configuration**: in order to load and use you new stream provider you need to cosnfigure it properly via silo config file. If you ned to use it on the client, you need to add a similar config element to the client config file. It is also possible to configure the stream provider programatically.
+5. **Configuration**: in order to load and use you new stream provider you need to cosnfigure it properly via silo config file. If you ned to use it on the client, you need to add a similar config element to the client config file. It is also possible to configure the stream provider programatically. Below is an example of silo configuration:
 
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
@@ -68,7 +70,7 @@ If you want to use a different queueing technology, you need to write a queue ad
 
 ## Writing Completely New Stream Provider
 
-It is also posible to write a completely new Stream Provider. In such a case there is very little integration that needs to be done from Orleans perspective. You just need to implement the [`IStreamProviderImpl`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Providers/IStreamProviderImpl.cs) interface, which is a thin interface that allows application code to get a handle to the stream. Beyond that, it is totaly up to you how to implement it. Implementing a completely new Stream Provider might tunr to be a rather challangiung task, since you might need access to various internal runtime components, some of which may have internal access.
+It is also posible to write a completely new Stream Provider. In such a case there is very little integration that needs to be done from Orleans perspective. You just need to implement the [`IStreamProviderImpl`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Providers/IStreamProviderImpl.cs) interface, which is a thin interface that allows application code to get a handle to the stream. Beyond that, it is totaly up to you how to implement it. Implementing a completely new Stream Provider might turn to be a rather complicated task, since you might need access to various internal runtime components, some of which may have internal access.
 
-We currently do not envision a scenario where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenarion, we would like to hear about it and work together on simplifying a way for writing new Stream Provider.
+We currently do not envision scenarios where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenario, we would like to hear about it and work together on simplifying writing new Stream Providers.
 
