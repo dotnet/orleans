@@ -177,6 +177,7 @@
     <Compile Include="Streams\Providers\IStreamProviderRuntime.cs" />
     <Compile Include="Streams\QueueAdapters\HashRingBasedStreamQueueMapper.cs" />
     <Compile Include="Streams\QueueAdapters\DataNotAvailableException.cs" />
+    <Compile Include="Streams\QueueAdapters\IConsistentRingStreamQueueMapper.cs" />
     <Compile Include="Streams\QueueAdapters\QueueAdapterConstants.cs" />
     <Compile Include="Streams\QueueAdapters\IQueueCache.cs" />
     <Compile Include="Streams\QueueAdapters\IQueueAdapterCache.cs" />

@@ -32,8 +32,8 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     public class AzureQueueAdapterFactory : IQueueAdapterFactory
     {
-        private const string CACHE_SIZE = "CacheSizeKB";
-        private const int DEFAULT_CACHE_SIZE = 4 * (1 << 10);
+        private const string CACHE_SIZE = "CacheSize";
+        private const int DEFAULT_CACHE_SIZE = 4096;
         
         private string deploymentId;
         private string dataConnectionString;

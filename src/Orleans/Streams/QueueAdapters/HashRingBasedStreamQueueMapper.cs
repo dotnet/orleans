@@ -27,7 +27,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    public class HashRingBasedStreamQueueMapper : IStreamQueueMapper
+    public class HashRingBasedStreamQueueMapper : IConsistentRingStreamQueueMapper
     {
         private readonly int numQueues;
         private readonly HashRing<QueueId> hashRing;
@@ -66,7 +66,7 @@ namespace Orleans.Streams
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
-        public QueueId GetQueueForStream(Guid streamGuid)
+        public QueueId GetQueueForStream(Guid streamGuid, String streamNamespace)
         {
             return hashRing.CalculateResponsible(streamGuid);
         }

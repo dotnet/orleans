@@ -36,7 +36,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IStreamProviderRuntime      providerRuntime;
         private bool                        fireAndForgetDelivery;
         internal const string               FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
-        internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = true;
+        internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = false;
 
         public bool IsRewindable { get { return false; } }
 

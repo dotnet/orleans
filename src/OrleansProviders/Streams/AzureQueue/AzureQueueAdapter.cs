@@ -61,7 +61,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events)
         {
-            var queueId = streamQueueMapper.GetQueueForStream(streamGuid);
+            var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
             AzureQueueDataManager queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
