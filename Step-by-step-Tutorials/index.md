@@ -54,7 +54,7 @@ Orleans offers the developer flexible options on where to store actor state, and
 
 Many Orleans services will be private and available only to front-end services that rely on the Orleans-based code as one of several backend services.
 In some circumstances, what is needed is to put a thin HTTP layer in front of the backend service, essentially making the Orleans service itself publically available via HTTP. 
-In this walkthrough, the steps of producing a think HTTP layer based on ASP.NET Web API is described.
+In this walk-through, the steps of producing a thin HTTP layer based on ASP.NET Web API is described.
 
 ## [Cloud Deployment](Cloud-Deployment)
 
