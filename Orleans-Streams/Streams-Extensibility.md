@@ -14,7 +14,7 @@ We will describe those below. Please read the [Orleans Streams Implementation](S
 
 ## Stream Provider Configuration
 
-Currently implemented stream providers (Simple Message Stream Provider and Persistent Stream Providers) support a number of configuration options.
+Currently implemented stream providers support a number of configuration options.
 
 **Simple Message Stream Provider Configuration**. SMS Stream Provider currently supports only a single configuration option:
 
@@ -26,9 +26,7 @@ Currently implemented stream providers (Simple Message Stream Provider and Persi
 2. **InitQueueTimeout** - how much time the pulling agents waits for the adapter to initialize the connection with the queue. Default is 5 seconds.
 3. **QueueBalancerType** - the type of balancing algorithm to be used to balance queues to silos and agents. Default is ConsistentRingBalancer.
 
-**Azure Queue Stream Provider Configuration**:
-
-Azure Queue stream provider supports the following configuration options, in addition to what is supported by Persistent Stream Provider:
+**Azure Queue Stream Provider Configuration**. Azure Queue stream provider supports the following configuration options, in addition to what is supported by Persistent Stream Provider:
 
 1. **DataConnectionString** - the Azure Queue storage connection string.
 2. **DeploymentId** - the deployment id of this Orlean cluster (usualy similar to Azure Deployment Id).
