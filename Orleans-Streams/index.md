@@ -30,7 +30,7 @@ More details can be found at [Streams Programming APIs](Streams-Programming-APIs
 
 ## Stream Providers
 
-Streams can come in different shapes and forms. Orleans provides a number of different stream implemenatation, via the concept **Stream Providers**. In particular, there are unreliable TCP based streams, such as **Simple Message Stream** and Persistent Streams. Persistent Streams arefurther extended to target specific queuing technologies via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
+Streams can come in different shapes and forms. Orleans provides a number of different stream implementations, via the concept **Stream Providers**. In particular, there are unreliable TCP based streams, such as **Simple Message Stream** and **Persistent Streams**. Persistent Streams can be extended to target specific queuing technologies via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
 
 More details on Steam Providers, Queue Adapters and Rewindable Streams can be found at [Stream Providers](Stream-Providers).
 
@@ -41,14 +41,8 @@ An example of how to use streaming APIs within a grain can be found [here](https
 
 ## Streams Implementation
 
-The [Orleans Streams Implementation](Streams-Implementation) provides a high level overview of Orleans Streams implementation.
+The [Orleans Streams Implementation](Streams-Implementation) provides a high level overview of the internal implementation.
 
 ## Streams Extensibility
 
 The [Orleans Streams Extensibility](Streams-Extensibility) describes how to extend streams with new functionality.
-
-***
-
-## API Completeness
-
-The application layer streaming APIs (`IAsyncStream<T>`, `IAsyncObservable<T>`, and `IAsyncObserver<T>`) are quite stable. However, the current Queue Adapter APIs are preliminary. We are currently reconsidering and simplifying them. The end goal is to offer a simple way to implement simple persistent stream adapters, yet allow more complicated providers that use sophisticated caching, back-pressure, and more.
