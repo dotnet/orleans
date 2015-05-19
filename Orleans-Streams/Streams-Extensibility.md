@@ -37,17 +37,14 @@ It would be totaly possible and a lot of times easy to provide additional config
 
 ## Custom Queue Adapter
 
-If you want to use a duifferent queueing technology, you need to write a queue adapter that abstracts away the access to that queue. Below we provide details of this should be done.
+If you want to use a different queueing technology, you need to write a queue adapter that abstracts away the access to that queue. Below we provide details how this should be done. Please refer to [`AzureQueueAdapterFactory`](https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/Streams/AzureQueue/AzureQueueAdapterFactory.cs) for more concrete details.
 
-1. Start by defining a MyQueueFactory that implements [`IQueueAdapterFactory`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs). You need to:
+1. Start by defining a `MyQueueFactory` class that implements [`IQueueAdapterFactory`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs). You need to:
+           a. Initialize the factory. You read the passed config values, potentially allocate some data structures if you need them, etc.
+           b. Implement a method that returns your `IQueueAdapter`.
+           c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you dont have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
+           d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you dont have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
 
-     a. Initialize the factory. You read the passed config values, potentially allocate some data structures if you need them, etc
-     
-     b. Implement a method that returns your `IQueueAdapter`.
-     
-     c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you dont have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
-     
-     d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you dont have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
-
-2. Declare `public class MyQueueStreamProvider : PersistentStreamProvider<MyQueueFactory>`
-3. 
+2. Declare `public class MyQueueStreamProvider : PersistentStreamProvider<MyQueueFactory>`.
+3. Implement `MyQueueAdapter` class that implements the [`IQueueAdapter`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs) interface, which is an interfaces that manages access to a **sharded queue**. `IQueueAdapter` manages access to a set of queues/queue partitions (those are the queues that were returned by `IStreamQueueMapper`). It provides an ability to enqueue a message in a specified the queue and create an `IQueueAdapterReceiver` for a particular queue.
+5. Implement `MyQueueAdapterReceiver` class that implements the [`IQueueAdapterReceiver`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interfaces that manages access to **one queue (one queue partition)**. In addition to initilaiztion and shutwodn, it basicaly porvides one method: retreave up to maxCount messages from the queue.
