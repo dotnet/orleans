@@ -4,7 +4,12 @@ title: Orleans Streams
 ---
 {% include JB/setup %}
 
-Orleans v.1.0.0 added support for streaming extensions to the programing model. Streaming extensions provide a set of abstractions and APIs that make thinking about and working with streams simpler and more robust. Streaming extensions allow developers to write reactive applications that operate on a sequence of events in a structured way. The extensibility model of stream providers makes the programming model compatible with and portable across a wide range of existing queuing technologies, such as [EventHub](http://azure.microsoft.com/en-us/services/event-hubs/), [ServiceBus](http://azure.microsoft.com/en-us/services/service-bus/), [Azure Queues](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-queues/), and [Apache Kafka](http://kafka.apache.org/). There is no need to write special code or run dedicated processes to interact with such queues.
+Orleans v.1.0.0 added support for streaming extensions to the programing model. Streaming extensions provide a set of abstractions and APIs that make thinking about and working with streams simpler and more robust. Streaming extensions allow developers to write reactive applications that operate on a sequence of events in a structured way. The extensibility model of stream providers makes the programming model compatible with and portable across a wide range of existing queuing technologies, such as [Event Hubs](http://azure.microsoft.com/en-us/services/event-hubs/), [ServiceBus](http://azure.microsoft.com/en-us/services/service-bus/), [Azure Queues](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-queues/), and [Apache Kafka](http://kafka.apache.org/). There is no need to write special code or run dedicated processes to interact with such queues.
+
+## Why should I care?
+
+If you are already familiar about technologies like [Event Hubs](http://azure.microsoft.com/en-us/services/event-hubs/), [Kafka](http://kafka.apache.org/), [Azure Stream Analytics](http://azure.microsoft.com/en-us/services/stream-analytics/), [Stream Processing](http://blog.confluent.io/2015/01/29/making-sense-of-stream-processing/), and [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), you may ask why should you care. Why do we need yet another Stream Processing System and how Actors are related to Streams? Read this [Streaming Use-Cases and Scenarios](Streams-Why) to find out.
+
 
 ## Programming Model
 
