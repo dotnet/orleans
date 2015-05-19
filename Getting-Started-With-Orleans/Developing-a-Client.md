@@ -6,12 +6,14 @@ title: Developing a Client
 
 Once we have our grain type implemented, we can write a client application that uses the type. 
 
-The following Orleans DLLs from either the `[SDK-ROOT]\Binaries\PresenceClient` or `[SDK-ROOT]\Samples\References` directories need to be referenced in the client application project:
+The following Orleans DLLs from either the _[SDK-ROOT]\Binaries\PresenceClient_ or _[SDK-ROOT]\Samples\References_ directories need to be referenced in the client application project:
 
-* Orleans.dll 
-* OrleansRuntimeInterfaces.dll 
+* _Orleans.dll_ 
+* _OrleansRuntimeInterfaces.dll_ 
 
- Almost any client will involve use of the grain factory class. The `GetGrain()` method is used for getting a grain reference for a particular ID. As was already mentioned, grains cannot be explicitly created or deleted.
+Almost any client will involve use of the grain factory class. 
+The `GetGrain()` method is used for getting a grain reference for a particular ID. 
+As was already mentioned, grains cannot be explicitly created or deleted.
 
 ``` csharp
 OrleansClient.Initialize(); 
@@ -34,28 +36,40 @@ See the Key Concepts section for more details on the various ways to use `Task`s
 
 After establishing a connection by calling `OrleansClient.Initialize()`, static methods in the generated factory classes may be used to get a reference to a grain, such as `PlayerGrainFactory.GetGrain()` for the `PlayerGrain`.
 
-Starting with the September 2014 preview update, there is also a static class `GrainFactory` in the Orleans namespace, which can be used to create grain references without using the generated classes. The grain interface is passed as a type argument to `GrainFactory.GetGrain<T>()` when using this methodology.
+Starting with the September 2014 preview update, there is also a static class `GrainFactory` in the Orleans namespace, which can be used to create grain references without using the generated classes. 
+The grain interface is passed as a type argument to `GrainFactory.GetGrain<T>()` when using this methodology.
 
 ## Sending messages to grains
 
-The programming model for communicating with grains from a client is almost the same as from a grain. The client holds grain references which implement a grain interface like `IPlayerGrain`. It invokes methods on that grain reference, and these return asynchronous values: `Task`/`Task<T>`, or another grain interface inheriting from `IGrain`. The client can use the `await` keyword or `ContinueWith()` method to queue continuations to be executed when these asynchronous values resolve, or the `Wait()` method to block the current thread. 
+The programming model for communicating with grains from a client is almost the same as from a grain. 
+The client holds grain references which implement a grain interface like `IPlayerGrain`. 
+It invokes methods on that grain reference, and these return asynchronous values: `Task`/`Task<T>`, or another grain interface inheriting from `IGrain`. 
+The client can use the `await` keyword or `ContinueWith()` method to queue continuations to be executed when these asynchronous values resolve, or the `Wait()` method to block the current thread. 
 
-The one key difference between communicating with a grain from within a client or from within another grain is the single-threaded execution model. Grains are constrained to be single-threaded by the Orleans scheduler, while clients may be multi-threaded. The client library uses the TPL thread pool to manage continuations and callbacks, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, TPL tasks, etc.
+The one key difference between communicating with a grain from within a client or from within another grain is the single-threaded execution model. 
+Grains are constrained to be single-threaded by the Orleans scheduler, while clients may be multi-threaded. 
+The client library uses the TPL thread pool to manage continuations and callbacks, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, TPL tasks, etc.
 
 ## Receiving notifications
 
-There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications. For example, a user might want to be notified when a new message has been published by someone that she is following.
+There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications. 
+For example, a user might want to be notified when a new message has been published by someone that she is following.
 
-An observer is a one-way asynchronous interface that inherits from `IGrainObserver`, and all its methods must be `void`. The grain sends a notification to the observer by invoking it like a grain interface method, except that it has no return value, and so the grain need not depend on the result. The Orleans runtime will ensure one-way delivery of the notifications. A grain that publishes such notifications should provide an API to add or remove observers.
+An observer is a one-way asynchronous interface that inherits from `IGrainObserver`, and all its methods must be `void`. 
+The grain sends a notification to the observer by invoking it like a grain interface method, except that it has no return value, and so the grain need not depend on the result. 
+The Orleans runtime will ensure one-way delivery of the notifications. 
+A grain that publishes such notifications should provide an API to add or remove observers.
 
-To subscribe to a notification, the client must first create a local C# object that implements the observer interface. It then calls a static method on the observer factory, `CreateObjectReference()`, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.
+To subscribe to a notification, the client must first create a local C# object that implements the observer interface. 
+It then calls a static method on the observer factory, `CreateObjectReference()`, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.
 
-This model can also be used by other grains to receive asynchronous notifications. Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `ChirperViewerFactory.Cast(this)`).
+This model can also be used by other grains to receive asynchronous notifications. 
+Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `ChirperViewerFactory.Cast(this)`).
 
 
 > Note: starting with the September 2014 refresh, there is also a generic method `Cast<T>()` in the static class `GrainFactory`.
 
-Example
+###Example
 
 Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of, and prints out notifications until the program is manually terminated.
 
@@ -130,3 +144,7 @@ namespace PlayerWatcher
     } 
 } 
 ```
+
+##Next
+
+[Running the Application](Running-the-Application)
