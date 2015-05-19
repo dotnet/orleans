@@ -65,3 +65,10 @@ If you want to use a different queueing technology, you need to write a queue ad
   </Globals>
 </OrleansConfiguration>
 ```
+
+## Writing Completely New Stream Provider
+
+It is also posible to write a completely new Stream Provider. In such a case there is very little integration that needs to be done from Orleans perspective. You just need to implement the [`IStreamProviderImpl`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Providers/IStreamProviderImpl.cs) interface, which is a thin interface that allows application code to get a handle to the stream. Beyond that, it is totaly up to you how to implement it. Implementing a completely new Stream Provider might tunr to be a rather challangiung task, since you might need access to various internal runtime components, some of which may have internal access.
+
+We currently do not envision a scenario where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenarion, we would like to hear about it and work together on simplifying a way for writing new Stream Provider.
+
