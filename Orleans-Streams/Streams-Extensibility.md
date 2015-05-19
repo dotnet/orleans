@@ -30,7 +30,7 @@ Azure Queue stream provider supports the following configuration options, in add
 
 1. **DataConnectionString** - the Azure Queue storage connection string.
 2. **DeploymentId** - the deployment id of this Orlean cluster (usualy similar to Azure Deployment Id).
-3) **CacheSize** - the size of the persistent provider cache that is used to store stream message for further delivery. Default is 4096.
+3. **CacheSize** - the size of the persistent provider cache that is used to store stream message for further delivery. Default is 4096.
 
 It would be totaly possible and a lot of times easy to provide additional configuration options. For example, in some scenarios developers might want more control over  queue names used by the Queue Adapter. This is currently abstracted away with [`IStreamQueueMapper`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs), but there is currently no way to configure which `IStreamQueueMapper` to use without writing a new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a compeletely new  provider.
 
@@ -40,9 +40,13 @@ It would be totaly possible and a lot of times easy to provide additional config
 If you want to use a duifferent queueing technology, you need to write a queue adapter that abstracts away the access to that queue. Below we provide details of this should be done.
 
 1. Start by defining a MyQueueFactory that implements [`IQueueAdapterFactory`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs). You need to:
+
      a. Initialize the factory. You read the passed config values, potentially allocate some data structures if you need them, etc
+     
      b. Implement a method that returns your `IQueueAdapter`.
+     
      c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you dont have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
+     
      d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you dont have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
 
 2. Declare `public class MyQueueStreamProvider : PersistentStreamProvider<MyQueueFactory>`
