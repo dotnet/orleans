@@ -26,6 +26,13 @@ Applications interact with streams via APIs that are very similar to the well kn
 
 More details can be found at [Streams Programming APIs](Streams-Programming-APIs).
 
+## Stream Providers
+
+Streams can come in different shapes and forms. Orleans provides a number of different stream implementations, via the concept of **Stream Providers**. In particular, there are unreliable TCP based streams (such as **Simple Message Stream**) and reliable **Persistent Streams**. Persistent Streams can target specific queuing technology via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
+
+More details on Steam Providers, Queue Adapters and Rewindable Streams can be found at [Stream Providers](Stream-Providers).
+
+
 ## Stream Semantics
 
 **Stream Subsription Semantics**:
@@ -33,14 +40,6 @@ We guaratee Sequantial Consistency for Stream Subsription operations. Specifical
 
 **Individual Stream Events Delivery Guarantees**:
 Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly once delivery (we don't have such a provider yet, but it is possible to build one with our [extensability model](Streams-Extensibility)).
-
-
-## Stream Providers
-
-Streams can come in different shapes and forms. Orleans provides a number of different stream implementations, via the concept **Stream Providers**. In particular, there are unreliable TCP based streams, such as **Simple Message Stream** and **Persistent Streams**. Persistent Streams can be extended to target specific queuing technologies via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
-
-More details on Steam Providers, Queue Adapters and Rewindable Streams can be found at [Stream Providers](Stream-Providers).
-
 
 ## Code Samples
 
