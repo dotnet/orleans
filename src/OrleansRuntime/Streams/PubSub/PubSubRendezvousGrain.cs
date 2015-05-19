@@ -64,7 +64,6 @@ namespace Orleans.Streams
             logger = GetLogger(this.GetType().Name + "-" + RuntimeIdentity + "-" + IdentityString);
             LogPubSubCounts("OnActivateAsync");
 
-                await State.WriteStateAsync();
             if (State.Consumers == null)
                 State.Consumers = new HashSet<PubSubSubscriptionState>();
             if (State.Producers == null)
@@ -74,9 +73,9 @@ namespace Orleans.Streams
             if (numRemoved > 0)
             {
                 if (State.Producers.Count > 0 || State.Consumers.Count > 0)
-                    await Storage.WriteStateAsync();
+                    await WriteStateAsync();
                 else
-                    await Storage.ClearStateAsync(); //State contains no producers or consumers, remove it from storage
+                    await ClearStateAsync(); //State contains no producers or consumers, remove it from storage
             }
 
             if (logger.IsVerbose)
@@ -136,7 +135,7 @@ namespace Orleans.Streams
             counterProducersAdded.Increment();
             counterProducersTotal.Increment();
             LogPubSubCounts("RegisterProducer {0}", streamProducer);
-            await Storage.WriteStateAsync();
+            await WriteStateAsync();
             return State.Consumers;
         }
 
@@ -148,11 +147,11 @@ namespace Orleans.Streams
             LogPubSubCounts("UnregisterProducer {0} NumRemoved={1}", streamProducer, numRemoved);
 
             if (numRemoved > 0)
-                await Storage.WriteStateAsync();
+                await WriteStateAsync();
             
             if (State.Producers.Count == 0 && State.Consumers.Count == 0)
             {
-                await Storage.ClearStateAsync(); //State contains no producers or consumers, remove it from storage
+                await ClearStateAsync(); //State contains no producers or consumers, remove it from storage
                 DeactivateOnIdle(); // No producers or consumers left now, so flag ourselves to expedite Deactivation
             }
         }
@@ -178,7 +177,7 @@ namespace Orleans.Streams
             counterConsumersTotal.Increment();
 
             LogPubSubCounts("RegisterConsumer {0}", streamConsumer);
-            await Storage.WriteStateAsync();
+            await WriteStateAsync();
 
             int numProducers = State.Producers.Count;
             if (numProducers > 0)
@@ -243,7 +242,7 @@ namespace Orleans.Streams
                 }
 
                 if (someProducersRemoved)
-                    await Storage.WriteStateAsync();
+                    await WriteStateAsync();
 
                 if (exception != null)
                     throw exception;
@@ -257,7 +256,7 @@ namespace Orleans.Streams
             counterConsumersTotal.DecrementBy(numRemoved);
 
             LogPubSubCounts("UnregisterSubscription {0} NumRemoved={1}", subscriptionId, numRemoved);
-            await Storage.WriteStateAsync();
+            await WriteStateAsync();
 
             int numProducers = State.Producers.Count;
             if (numProducers > 0)
@@ -273,7 +272,7 @@ namespace Orleans.Streams
             }
             else if (State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
             {
-                await Storage.ClearStateAsync(); //State contains no producers or consumers, remove it from storage
+                await ClearStateAsync(); //State contains no producers or consumers, remove it from storage
                 // No producers or consumers left now, so flag ourselves to expedite Deactivation
                 DeactivateOnIdle();
             }
@@ -322,7 +321,7 @@ namespace Orleans.Streams
             var captureProducers = State.Producers;
             var captureConsumers = State.Consumers;
 
-            await Storage.ReadStateAsync();
+            await ReadStateAsync();
             
             if (captureProducers.Count != State.Producers.Count)
             {
