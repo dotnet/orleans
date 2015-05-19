@@ -4,7 +4,7 @@ title: Orleans Streams Implementation Details
 ---
 {% include JB/setup %}
 
-This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visibale on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading [Streams Extensibilitysection](Streams-Extensibility).
+This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visibale on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading [Streams Extensibility section](Streams-Extensibility).
 
 *Terminology*:
 
