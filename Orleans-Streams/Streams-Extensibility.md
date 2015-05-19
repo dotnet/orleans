@@ -41,21 +41,20 @@ If you want to use a different queueing technology, you need to write a queue ad
 
 1. Start by defining a `MyQueueFactory` class that implements [**`IQueueAdapterFactory`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs). You need to:
 
-           a. Initialize the factory: read the passed config values, potentially allocate some data structures if you need to, etc.
-           
-           b. Implement a method that returns your `IQueueAdapter`.
-           
-           c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you dont have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
-           
-           d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you dont have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
+     a. Initialize the factory: read the passed config values, potentially allocate some data structures if you need to, etc.
+     
+     b. Implement a method that returns your `IQueueAdapter`.
+     
+     c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you dont have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
+     
+     d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you dont have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
 
 2. Implement `MyQueueAdapter` class that implements the [**`IQueueAdapter`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs) interface, which is an interfaces that manages access to a **sharded queue**. `IQueueAdapter` manages access to a set of queues/queue partitions (those are the queues that were returned by `IStreamQueueMapper`). It provides an ability to enqueue a message in a specified the queue and create an `IQueueAdapterReceiver` for a particular queue.
 
-3. Implement `MyQueueAdapterReceiver` class that implements the [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interfaces that manages access to **one queue (one queue partition)**. In addition to initilaiztion and shutwodn, it basicaly porvides one method: retreave up to maxCount messages from the queue.
+3. Implement `MyQueueAdapterReceiver` class that implements the [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interfaces that manages access to **one queue (one queue partition)**. In addition to initilaiztion and shutwodn, it basicaly provides one method: retreave up to maxCount messages from the queue.
 
 4. Declare `public class MyQueueStreamProvider : PersistentStreamProvider<MyQueueFactory>`. This is your new Stream Provider.
-5. **Configuration**: in order to load and use you new stream provider you need to cosnfigure it properly via silo config file.
-
+5. **Configuration**: in order to load and use you new stream provider you need to cosnfigure it properly via silo config file. If you ned to use it on the client, you need to add a similar config element to the client config file. It is also possible to configure the stream provider programatically.
 
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
@@ -66,6 +65,3 @@ If you want to use a different queueing technology, you need to write a queue ad
   </Globals>
 </OrleansConfiguration>
 ```
-
-6. 
- 
