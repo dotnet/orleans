@@ -41,12 +41,12 @@ When new silo is added to the Orleans cluster, queues are automaticaly rebalance
 StreamQueueBalancer allows to customize that process. Orleans has a number of built in StreamQueueBalancers, 
 to support different balancing scenarios (large and small number of queues) and different environments (Azure, on prem, static).
 
-### Puling Agent protocol
+### Pulling Protocol
 
 Every silo runs a set of pulling agents, every agent is pulling from one queue. Pulling agents themselves are implemented by the internal runtime component, called **SystemTarget**. SystemTargets are essentially runtime grains, are subject to single threaded concurency, can use regular grain messaging and are as lightweight as grains. As opposite to grain, SystemTargets are not virtual: they are explicitely created (by the runtime) and are also not location transparrent. By implementing pulling agents as SystemTargets Orleans Streaming Runtime can rely on a lot of built-in Orleans features and can also scale to a very large number of queues, since creating a new pulling agent is as cheap as creating a new grain.
 
 Every pulling agent runs periodic timer that pulls from the queue (by invocking [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs)) `GetQueueMessagesAsync()` method. The returned messages are put in the internal per-agent data structure called `IQueueCache`. Every message is inspected to find out its destinatin stream. The agent uses the Pub Sub to find out the list of stream consumers that subsribed to this stream. Once the consumer list if retrived, the agent stores it locally (in its pub-sub cache) so it doe snot need to consuklt with Pub Sub on every message. The agent also subsribes with the pub-sub to rceive notification of any new consumers that subsribe to that stream.
-This handshake between the agent and the pub-sub guarantees **strong streaming subsription semantics**: *once the consumer has subscribed to the stream it will see all events that were generated after it has subscribed* (using `StreamSequenceToken` allows to subscribe in the past).
+This handshake between the agent and the pub-sub guarantees **strong streaming subsription semantics**: *once the consumer has subscribed to the stream it will see all events that were generated after it has subscribed* (in addition, using `StreamSequenceToken` allows to subscribe in the past).
 
 
 ### IQueueCache
