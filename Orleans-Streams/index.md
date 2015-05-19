@@ -21,29 +21,11 @@ There is a number of principles behind Orleans Streams Programming Model.
 
 ## Programming APIs
 
-Applications interact with streams via APIs that are very similar to the well known [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx). The main difference is that Orleans stream extensions are **asynchronous**, to make processing more efficient in Orleans' distributed and scalable compute fabric. 
-
-An application starts by using a *stream provider* to get a handle to a stream. We will see what a stream provider is later, but for now you can think of it as a stream factory that allows implementers to customize streams behavior and semantics:
-
-``` csharp
-IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
-IAsyncStream<int> stream = streamProvider.GetStream<int>(Guid, "MyStreamNamespace"); 
-```
-
-[`Orleans.Streams.IAsyncStream<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) is a logical, strongly-typed handle to a virtual stream. It is similar in spirit to Orleans Grain Reference. Calls to `GetStreamProvider` and `GetStream` are purely local. The arguments to `GetStream` are a GUID and an additional string, which can be null, that together comprise the stream identity (similar in sprit to the arguments to `GrainFactory.GetGrain`). 
-
-`IAsyncStream<T>` implements both 
+Applications interact with streams via APIs that are very similar to the well known [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), by using [`Orleans.Streams.IAsyncStream<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) that implements  
 [`Orleans.Streams.IAsyncObserver<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObserver.cs) and
 [`Orleans.Streams.IAsyncObservable<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObservable.cs) interfaces.
-That way an application can use the stream either to produce new events into the stream by using `Orleans.Streams.IAsyncObserver<T>` or to subscribe to and consume events from a stream by using `Orleans.Streams.IAsyncObservable<T>`.
 
-To produce events into the stream, an application just calls `stream.OnNextAsync`.
-
-To subscribe to a stream, an application calls `stream.SubscribeAsync(onNextAsync, onErrorAsync, onCompletedAsync)`. The arguments to `SubscribeAsync` can either be an object that implements the `IAsyncObserver` interface or any combination of the lambda functions to process incoming events. `SubscribeAsync` returns a [`StreamSubscriptionHandle<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs), which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of `IDisposable`).
-
-Orleans streams are **reliable** and their lifecycle is managed transparently by Orleans Streaming Runtime. Specifically, Orleans uses a runtime component called **Streaming Pub Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. In addition to Pub Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
-
-Orleans streams work **uniformly across grains and Orleans clients**. That is, exactly the same APIs can be used inside a grain and in an Orleans client to produce and consume events. This greatly simplifies the application logic, making special client-side APIs, such as Grain Observers, redundant.
+More details can be found at [Streams Programming APIs](Streams-Programming-APIs).
 
 
 ## Stream Providers
