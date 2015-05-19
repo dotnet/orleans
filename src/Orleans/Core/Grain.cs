@@ -271,12 +271,12 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The interface of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain
+    public class Grain<TGrainState> : Grain, IStorage
         where TGrainState : class, IGrainState
     {
         private IStorage stateStorageBridge;
 
-        protected internal IStorage Storage
+        private IStorage Storage
         {
             get
             {
@@ -322,6 +322,21 @@ namespace Orleans
         protected TGrainState State
         {
             get { return base.GrainState as TGrainState; }
+        }
+
+        public Task ClearStateAsync()
+        {
+            return Storage.ClearStateAsync();
+        }
+
+        public Task WriteStateAsync()
+        {
+            return Storage.WriteStateAsync();
+        }
+
+        public Task ReadStateAsync()
+        {
+            return Storage.ReadStateAsync();
         }
     }
 }

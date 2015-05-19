@@ -25,7 +25,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 namespace Orleans.Core
 {
-    public interface IStorage
+    internal interface IStorage
     {
         /// <summary>
         /// Async method to cause the current grain state data to be cleared and reset. 
