@@ -24,11 +24,11 @@ Applications interact with streams via APIs that are very similar to the well kn
 [`Orleans.Streams.IAsyncObserver<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObserver.cs) and
 [`Orleans.Streams.IAsyncObservable<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObservable.cs) interfaces.
 
-More details can be found at [Streams Programming APIs](Streams-Programming-APIs).
+More details can be found in the [Streams Programming APIs](Streams-Programming-APIs).
 
 ## Stream Providers
 
-Streams can come in different shapes and forms. Orleans provides a number of different stream implementations, via the concept of **Stream Providers**. In particular, there are unreliable TCP based streams (such as **Simple Message Stream**) and reliable **Persistent Streams**. Persistent Streams can target specific queuing technology via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
+Streams can come in different shapes and forms. Orleans provides a number of different stream implementations, via the concept of **Stream Providers**. In particular, there are unreliable TCP based streams (such as **Simple Message Stream**) and reliable **Persistent Streams** (such as **Azure Queue Stream**). Persistent Streams can work with different queuing technologies via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
 
 More details on Steam Providers, Queue Adapters and Rewindable Streams can be found at [Stream Providers](Stream-Providers).
 
@@ -39,7 +39,7 @@ More details on Steam Providers, Queue Adapters and Rewindable Streams can be fo
 We guaratee Sequantial Consistency for Stream Subsription operations. Specificaly, when consumer subscribes to a stream, once the `Task` representing the subsription operation was successfuly resolved, the consumer will see all events that were generated after it has subscribed. In addition, Rewindable streams allow to subscribe from an arbitrary point in time in the past by using `StreamSequenceToken` (more details can be found [here](Stream-Providers)).
 
 **Individual Stream Events Delivery Guarantees**:
-Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly once delivery (we don't have such a provider yet, but it is possible to build one with our [extensability model](Streams-Extensibility)).
+Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don't have such a provider yet, but it is possible to build one with our [extensability model](Streams-Extensibility)).
 
 ## Code Samples
 
