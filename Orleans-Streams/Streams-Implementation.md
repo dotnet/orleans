@@ -4,11 +4,11 @@ title: Orleans Streams Implementation Details
 ---
 {% include JB/setup %}
 
-This section provides a high level overview of Orleans Stream implementation.
+This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visibale on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading [Streams Extensibilitysection](Streams-Extensibility).
 
 *Terminology*:
 
-We refer by the word "queue" to any durable storage technology that can ingest stream events and allows either to pull events or provides a push-based mechanism to consume events. Usualy, to provide scalability, those technologies provide sharded/partitions queues. Example are Azure Queues allow to create multipe queues, Event Hubs hubs, ... 
+We refer by the word "queue" to any durable storage technology that can ingest stream events and allows either to pull events or provides a push-based mechanism to consume events. Usualy, to provide scalability, those technologies provide sharded/partitions queues. For example, Azure Queues allow to create multipe queues, Event Hubs have multiple hubs, Kafka topics, ...
 
 
 ## Persistent Streams
