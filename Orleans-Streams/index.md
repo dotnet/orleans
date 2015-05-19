@@ -18,7 +18,6 @@ There is a number of principles behind Orleans Streams Programming Model.
 6. Orleans streams *work uniformly across grains and Orleans clients*.
 
 
-
 ## Programming APIs
 
 Applications interact with streams via APIs that are very similar to the well known [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), by using [`Orleans.Streams.IAsyncStream<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) that implements  
@@ -26,6 +25,14 @@ Applications interact with streams via APIs that are very similar to the well kn
 [`Orleans.Streams.IAsyncObservable<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObservable.cs) interfaces.
 
 More details can be found at [Streams Programming APIs](Streams-Programming-APIs).
+
+## Stream Semantics
+
+**Stream Subsription Semantics**:
+We guaratee Sequantial Consistency for Stream Subsription operations. Specificaly, when consumer subscribes to a stream, once the `Task` representing the subsription operation was successfuly resolved, the consumer will see all events that were generated after it has subscribed. In addition, Rewindable streams allow to subscribe from an arbitrary point in time in the past by using `StreamSequenceToken` (more details can be found [here](Stream-Providers)).
+
+**Individual Stream Events Delivery Guarantees**:
+Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly once delivery (we don't have such a provider yet, but it is possible to build one with our [extensability model](Streams-Extensibility)).
 
 
 ## Stream Providers
