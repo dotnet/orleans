@@ -43,7 +43,7 @@ The arguments to `SubscribeAsync` can either be an object that implements the `I
 await subscriptionHandle.UnsubscribeAsync()
 ```
 
-It is important to note that **the subsription is for a garin, not for an activation**. Once the grain code subsribed to the stream, this subsription surpasses the life of this activation and stays durable forever, untill the grain code (potentialy in a different activation) explicitely unsubsribes. This is the heart of a virtual stream absraction: not only all the streams always exits, logicaly, but also that a stream subsription is durable and lives beyond a particular physical activation that issused this subsription. 
+It is important to note that **the subscription is for a garin, not for an activation**. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a virtual stream abstraction: not only all the streams always exits, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.
 
 
 ### Multiplicity
@@ -57,15 +57,15 @@ await IAsyncStream<T>.GetAllSubscriptionHandles()
 ```
 
 
-### Explicit and Implicit Subsriptions
+### Explicit and Implicit Subscriptions
 
-By default, stream consumer has to explicitelly subsribe to the stream. This subsription would usualy be triggered by some external message that the grain (or client) receive that instructs them to subsribe. For example, in a chat service when user joins a chat room his grain receives a `JoinChatGroup` message with the chat name and it will cause the user grain to subscribe to this chat stream (stream of messages published to this chat).
+By default, stream consumer has to explicitly subscribe to the stream. This subscription would usually be triggered by some external message that the grain (or client) receive that instructs them to subscribe. For example, in a chat service when user joins a chat room his grain receives a `JoinChatGroup` message with the chat name and it will cause the user grain to subscribe to this chat stream (stream of messages published to this chat).
 
-In addition, Orleans Streams also support "Implicit Subsriptions". In this model the grain does not explicitely subscribe to the stream. This grain is subsribed automaticaly, implicitely, just based on its grain identity and `ImplicitStreamSubscription`.
+In addition, Orleans Streams also support "Implicit Subscriptions". In this model the grain does not explicitely subscribe to the stream. This grain is subscribed automatically, implicitly, just based on its grain identity and `ImplicitStreamSubscription`.
 
-Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream with GUID XXX and namespace `"MyStreamNamespace"` namespace, it should be delivered to grain XXX of type `MyGrainType`. That is, the consumer grain identity is determined based on stream identity GUID and consumer grain type is determined based on the presense of `ImplicitStreamSubscription` attribute.
+Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream with GUID XXX and namespace `"MyStreamNamespace"` namespace, it should be delivered to grain XXX of type `MyGrainType`. That is, the consumer grain identity is determined based on stream identity GUID and consumer grain type is determined based on the presence  of `ImplicitStreamSubscription` attribute.
 
-The presense of `ImplicitStreamSubscription`causes the streaming runtime to automaticaly subsribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wants events to be processed. Essentialy, it need to attach the `IAsyncObserver`. Therefore, when the grain is activated, the grain code inside `OnActivateAsync` needs to call: 
+The presence  of `ImplicitStreamSubscription`causes the streaming runtime to automatically subscribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wants events to be processed. Essentially, it need to attach the `IAsyncObserver`. Therefore, when the grain is activated, the grain code inside `OnActivateAsync` needs to call: 
 
 ``` csharp
 IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
@@ -77,34 +77,32 @@ StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObs
 
 The order in which events between an individual producer and an individual consumer depends on a particular stream provider.
 
-In SMS stream the producer explicitelly controls the order of events seen by the consumer by controlling the way he publishes them. By default (if the `FireAndForget` options for SMS provider is set to false) and if the producer awaits every `OnNext` call, the events arrive in FIFO order. In SMS it is up to the producer to decide how to handle deliverty fai.ures, taht will be indicated by a broken `Task` returned by the `OnNext` call.
+In SMS stream the producer explicitly controls the order of events seen by the consumer by controlling the way he publishes them. By default (if the `FireAndForget` options for SMS provider is set to false) and if the producer awaits every `OnNext` call, the events arrive in FIFO order. In SMS it is up to the producer to decide how to handle delivery failures that will be indicated by a broken `Task` returned by the `OnNext` call.
 
-Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in failure cases (they do guarantee FIFO order in faliure free executions). When a producer produces the event into Azure Queue, if the enqueue operatin failed, it is up to the producer to attempt another enqueue and later on deal with potential duplicates messages. On the delivery side, Orleans Streaming runtime dequeue the event from the Azure Queue and attmerpts to deliver it for procesing to consmyus. Orleans Streaming runtime deletes the ecvent from the queue only upon successfull processing. If the delivety or procesing failed, the event is not dekete from the queu and will automatically re-appear in the queue much later. The Streaming runtime will try to deliver it again, thus potentially breaking the FIFO order. The described behaivour matches the regular semantics of Azure Queues. 
+Azure Queue streams do not guarantee FIFO order, since the underlying Azure Queues do not guarantee order in failure cases (they do guarantee FIFO order in failure free executions). When a producer produces the event into Azure Queue, if the enqueue operation failed, it is up to the producer to attempt another enqueue and later on deal with potential duplicates messages. On the delivery side, Orleans Streaming runtime dequeue the event from the Azure Queue and attempts to deliver it for processing to consumers. Orleans Streaming runtime deletes the event from the queue only upon successful processing. If the delivery or processing failed, the event is not delete from the queue and will automatically re-appear in the queue much later. The Streaming runtime will try to deliver it again, thus potentially breaking the FIFO order. The described behaivour matches the regular semantics of Azure Queues.  
 
 **Application Defined Order**: To deal with the above ordering issues, application can specify its own ordering. This is achived via a notion of [**`StreamSequenceToken`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs). `StreamSequenceToken` is an opaque `IComparable` object that can be used to order events. 
-A producer can pass an optional `StreamSequenceToken` to the `OnNext` call. This `StreamSequenceToken` will be passed all the way to the consumer and will be delivered together with the event. That way, application can reason and reconstruct it's order independantly from the streaming runtime.
-
+A producer can pass an optional `StreamSequenceToken` to the `OnNext` call. This `StreamSequenceToken` will be passed all the way to the consumer and will be delivered together with the event. That way, application can reason and reconstruct it's order independently from the streaming runtime.
 
 ### Rewindable Streams
 
-Some streams only allow application to subscribe to them starting at the latest point in time, while other streams allow "going back in time". The latter capability is dependent on the underlying queuing technology and the particulal stream provider. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time).Streams that support going back in time are called *Rewindable Streams*. 
+Some streams only allow application to subscribe to them starting at the latest point in time, while other streams allow "going back in time". The latter capability is dependent on the underlying queuing technology and the particular stream provider. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time).Streams that support going back in time are called *Rewindable Streams*. 
 
 The consumer of a rewindable stream can pass a `StreamSequenceToken` to the `SubscribeAsync` call and the runtime will deliver events to it starting from that `StreamSequenceToken` (a null token means the consumer wants to receive events starting from the latest).
 
 The ability to rewind a stream is very useful in recovery scenarios. For example, consider a grain that subscribes to a stream and periodically checkpoints its state together with the latest sequence token. When recovering from a failure, the grain can re-subscribe to the same stream from the latest checkpointed sequence token, thereby recovering without losing any events that were generated since the last checkpoint.
 
 **Current Status of Rewindable Streams**
-Both SMS and Azure Queue providers are not-rewinable and Orleans currentkly does not include an implementation of rewindable stream. We are actively wokring on this.
-
+Both SMS and Azure Queue providers are not-rewindable  and Orleans currently does not include an implementation of rewindable stream. We are actively working on this.
 
 
 ### Stateless Automatically Scaled-Out Processing
 
-By default Orleans streams are targeted to support a large number of relatively small streams, each is processed by one or more statefull grains. Collectively, the processing of all the stream together is sharded among a large number of regular (statefull) grains. The application code controls this sharding by assigning stream ids, grain ids and explicitely subscribing. **The goal is sharded statefull processing**. 
+By default Orleans streams are targeted to support a large number of relatively small streams, each is processed by one or more statefull grains. Collectively, the processing of all the stream together is sharded among a large number of regular (statefull) grains. The application code controls this sharding by assigning stream ids, grain ids and explicitly subscribing. **The goal is sharded statefull processing**. 
 
-However, there is also an interesting scenario of automaticaly scaled-out stateless processing. In this scenario application has a small number (or even one) large stream and the goal is a stateless processing. For example, a global stream of all messages for all my events and the processing will involve soem kind of decoding/deciphering and potentially forwarding them for further statefull processing into another set of streams. The stateless scaled-out stream processing can be suppported in Orleans via `StatelessWorker` grains.
+However, there is also an interesting scenario of automatically scaled-out stateless processing. In this scenario application has a small number (or even one) large stream and the goal is a stateless processing. For example, a global stream of all messages for all my events and the processing will involve some kind of decoding/deciphering and potentially forwarding them for further statefull processing into another set of streams. The stateless scaled-out stream processing can be suppported in Orleans via `StatelessWorker` grains.
 
-This is currently not implemented (due to priority constrains). An attempt to subsribe to a stream from a `StatelessWorker` grains will result in undefined behaivour. We are currently considering to support this option.
+This is currently not implemented (due to priority constrains). An attempt to subscribe to a stream from a `StatelessWorker` grains will result in undefined behavior. We are currently considering to support this option.
 
 ### Grains and Orleans clients
 
@@ -113,4 +111,4 @@ Orleans streams work **uniformly across grains and Orleans clients**. That is, e
 
 ### Fully Managed and Reliable Streaming Pub Sub
 
-To track stream subsriptions, Orleans uses a runtime component called **Streaming Pub Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. In addition to Pub Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
+To track stream subscriptions, Orleans uses a runtime component called **Streaming Pub Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. In addition to Pub Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
