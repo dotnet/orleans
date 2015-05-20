@@ -22,10 +22,29 @@ Some users are interested in only a particular stock and only if certain externa
 
 We identified 4 basic requirements for the our new Stream Processing system that will allow it to target the above scenarios.
 
-1. Flexibale stream processing logi
+1. Flexibale stream processing logic
 2. Support for dynamc topologies
 3. Fine grained stream granularity
 4. Distribution
 
 We detail each of those below.
+
+**Flexibale stream processing logic**
+
+Our system should allow multiple ways to express stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming paradygm. This limits the expressiveness of the processing logic. Orleans streams are indeferent to the way processing logic is expressed. It can be expressied as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), as functional program, as declarative query, or as a general imperative logic. The logic can be statefull or stateless, may have side effects and can trigger external actions.
+
+**Support for dynamc topologies**
+
+Our system shoudl allow dynamcic evolving topologies. The existing systems we mentioned above are usually limited to only static topologoes, that are expressed at compile or deploy time and cannot evolve at runtime. For example, imagine a following data-flow graph expressed in one of the above systems:
+
+``
+Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) 
+``
+
+and now imagine that you want to change the threshold condition in the Where filter. Or even add a new Select statement. In existing system tis is not possible without tearing down the entire toplogy and restaring the data-flow from scratch. Practicaly, those system will checkpoint he existing computation and will be able to restart from the latet checkpoint. Still, such a restart is desruptive and costly to online service, that produces resulst in real time.
+
+
+
+
+
 
