@@ -73,16 +73,23 @@ IAsyncStream<T> stream = streamProvider.GetStream<T>(this.GetPrimaryKey(), "MySt
 StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObserver<T>);  
 ```
 
-
-### Grains and Orleans clients
-
-Orleans streams work **uniformly across grains and Orleans clients**. That is, exactly the same APIs can be used inside a grain and in an Orleans client to produce and consume events. This greatly simplifies the application logic, making special client-side APIs, such as Grain Observers, redundant.
-
 ### Rewindable Streams
 
 Some streams only allow an application to subscribe to them starting at the latest point in time, while other streams allow "going back in time". The latter capability is dependent on the underlying queuing technology. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time). Orleans streams expose this capability via a notion of [`StreamSequenceToken`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs). `StreamSequenceToken` is an opaque `IComparable` object that orders events. Streams that support going back in time are called *Rewindable Streams*. 
 
 A producer of a rewindable stream can pass an optional `StreamSequenceToken` to the `OnNext` call. The consumer can pass a `StreamSequenceToken` to the `SubscribeAsync` call and the runtime will deliver events to it starting from that `StreamSequenceToken` (a null token means the consumer wants to receive events starting from the latest.) The ability to rewind a stream is very useful in recovery scenarios. For example, consider a grain that subscribes to a stream and periodically checkpoints its state together with the latest sequence token. When recovering from a failure, the grain can re-subscribe to the same stream from the latest checkpointed sequence token, thereby recovering without losing any events that were generated since the last checkpoint.
+
+### Stateless Automaticaly Scaled-Out Processing
+
+By default Orleans streams are targeted to support a large number of relatively small streams, each is processed by one or more statefull grains. Collectively, the processing of all the stream together is sharded among a large number of regular (statefull) grains. The application code controls this sharding by assigning stream ids, grain ids and explicitely subscribing. **The goal is sharded statefull processing**. 
+
+However, there is also an interesting scenario of automaticaly scaled-out stateless processing. In this scenario application has a small number (or even one) large stream and the goal is a stateless processing. For example, a global stream of all messages for all my events and the processing will involve soem kind of decoding/deciphering and potentially forwarding them for further statefull processing into another set of streams. The stateless scaled-out stream processing can be suppported in Orleans via `StatelessWorker` grains.
+
+This is currently not implemented (due to priority constrains). An attempt to subsribe to a stream from a `StatelessWorker` grains will result in undefined behaivour. We are currently considering to support this option.
+
+### Grains and Orleans clients
+
+Orleans streams work **uniformly across grains and Orleans clients**. That is, exactly the same APIs can be used inside a grain and in an Orleans client to produce and consume events. This greatly simplifies the application logic, making special client-side APIs, such as Grain Observers, redundant.
 
 
 ### Fully Managed and Reliable
