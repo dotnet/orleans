@@ -46,9 +46,9 @@ We want the system to allow for evolving the stream processing graph at runtime,
 
 **Fine grained stream granularity**
 
-In the existing systems the smallest unit of abstraction is usually the whole flow (topology). However, a lot of our target scenarios require individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising of multiple links, different links can have different characteristics and can be implemented over different physical transports. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategies, and their processing logic can be expressed in different models or even different languages. Such flexibility is usually not possible in existing systems.
+In the existing systems, the smallest unit of abstraction is usually the whole flow (topology). However, many of our target scenarios require individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising of multiple links, different links can have different characteristics and can be implemented over different physical transports. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategies, and their processing logic can be expressed in different models or even different languages. Such flexibility is usually not possible in existing systems.
 
-The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility, since each is essentially an independently managed ``tiny service''. Therefore, our system should allow such fine grained control.
+The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility, since each is essentially an independently managed ''tiny service''. Similarly, we want the system to allow for such a fine grained control.
 
 **Distribution**
 
@@ -60,4 +60,4 @@ And of course, our system should have all the properties of a **"good distribute
 4. _Efficiency_ - use the underlying resources efficiently
 5. _Responsiveness_ - enable near real time scenarios.
 
-With those requirements in mind we set to build [**Orleans Streaming**](index).
+These were the requirements we had in mind for building [**Orleans Streaming**](index).
