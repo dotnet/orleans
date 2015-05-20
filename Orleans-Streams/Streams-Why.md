@@ -51,7 +51,7 @@ The unit of abstraction and flexibility argument is similar to comparison of SoA
 
 **Distribution**
 
-And of course, our system should have all the properties of a **``good distributed system''**. That includes:
+And of course, our system should have all the properties of a **"good distributed system"**. That includes:
 
 1. _Scalability_ - supports large number of streams and compute elements.
 2. _Elasticity_ - allows to add/remove resources to grow/shrink based on load.
