@@ -28,11 +28,11 @@ We identified 4 basic requirements for our Stream Processing system that will al
 
 **Flexible stream processing logic**
 
-Our system should allow multiple ways to express stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming paradigm. This limits the expressiveness of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx)); as a functional program; as a declarative query; or in a general imperative logic. The logic can be statefull or stateless, may have side effects and can trigger external actions.
+Our system should allow multiple ways to express the stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming style. This limits the expressiveness of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx)); as a functional program; as a declarative query; or in a general imperative logic. The logic can be statefull or stateless, may have side effects and can trigger external actions.
 
 **Support for dynamic topologies**
 
-Our system should allow dynamic evolving topologies. The existing systems we mentioned above are usually limited to only static topologies, that are fixed at deploy time and cannot evolve at runtime. For example, imagine a following data-flow graph expressed in one of the above systems:
+Our system should allow dynamic evolving topologies. The existing systems we mentioned above are usually limited to only static topologies that are fixed at deployment time and cannot evolve at runtime. For example, imagine a following data-flow graph expressed in one of the above systems:
 
 ``
 Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) 
@@ -47,11 +47,11 @@ Our system should be able to evolve the stream processing graph at runtime, by a
 
 In the existing systems the smallest unit of abstraction is usually the whole flow (topology). However, a lot of our target scenarios require individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising of multiple links, different links can have different characteristics and can be implemented over different physical transports. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategies, and their processing logic can be expressed in different models or even different languages. Such flexibility is usually not possible in existing systems.
 
-The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility, since each is essentially an independently managed ``tiny service''. 
+The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility, since each is essentially an independently managed ``tiny service''. Therefore, our system should allow such fine grained control.
 
 **Distribution**
 
-And of course, our system should have all the properties of a **good distributed system**. That includes:
+And of course, our system should have all the properties of a **``good distributed system''**. That includes:
 
 1. _Scalability_ - supports large number of streams and compute elements.
 2. _Elasticity_ - allows to add/remove resources to grow/shrink based on load.
