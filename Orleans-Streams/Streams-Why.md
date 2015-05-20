@@ -56,10 +56,10 @@ The unit of abstraction and flexibility argument is similar to comparison of SoA
 
 And of course, our system should have all the properties of a good distributed system. That includes:
 
-1. Scalability - supports large number of streams and compute elements.
-2. Elasticity - allows to add/remove resources to grow/shrink based on load.
-3. Reliability - be resilient to failures
-4. Efficiency - use the underlying resources efficiently
-5. Responsiveness - enable near real time scenarios.
+1. _Scalability_ - supports large number of streams and compute elements.
+2. _Elasticity_ - allows to add/remove resources to grow/shrink based on load.
+3. _Reliability_ - be resilient to failures
+4. _Efficiency_ - use the underlying resources efficiently
+5. _Responsiveness_ - enable near real time scenarios.
 
 With those requirements in mind we set to build **Orleans Streaming**.
