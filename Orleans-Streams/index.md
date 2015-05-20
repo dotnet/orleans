@@ -16,11 +16,11 @@ If you already know all about [Stream Processing](http://blog.confluent.io/2015/
 There is a number of principles behind Orleans Streams Programming Model.
 
 1. Following the philosophy of [Orleans virtual actors](https://github.com/dotnet/orleans/wiki/Grains), Orleans streams are *virtual*. That is, a stream always exists. It is not explicitly created or destroyed, and it can never fail.
-2. Streams are *identified by* stream ids, which are just *logical names* comprised of GUIDs and strings.
+2. Streams are *identified by* stream IDs, which are just *logical names* comprised of GUIDs and strings.
 3. Orleans streams are *lightweight and dynamic*. Orleans Streaming Runtime is designed to handle a large number of streams that come and go at a high rate.
 4. Orleans stream *bindings are dynamic*. Orleans Streaming Runtime is designed to handle cases where grains connect to and disconnect from streams at a high rate.
 5. Orleans Streaming Runtime *transparently manages the lifecycle of streams*. After an application subscribes to a stream, from then on it will receive the stream's events, even in presence of failures.
-6. Orleans streams *work uniformly across grains and Orleans clients*.
+6. Orleans streams *work uniformly across grains and Orleans clients* (usually HTTP frontends).
 
 
 ## Programming APIs
@@ -33,7 +33,7 @@ More details can be found in the [Streams Programming APIs](Streams-Programming-
 
 ## Stream Providers
 
-Streams can come in different shapes and forms. Orleans provides a number of different stream implementations, via the concept of **Stream Providers**. In particular, there are unreliable TCP based streams (such as **Simple Message Stream**) and reliable **Persistent Streams** (such as **Azure Queue Stream**). Persistent Streams can work with different queuing technologies via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
+Streams can come via physical channels of various shapes and forms. Orleans provides a number of different stream implementations, via the concept of **Stream Providers**. In particular, there are unreliable TCP based streams (such as **Simple Message Stream**) and reliable **Persistent Streams** (such as **Azure Queue Stream**). Persistent Streams can work with different queuing technologies via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
 
 More details on Steam Providers, Queue Adapters and Rewindable Streams can be found at [Stream Providers](Stream-Providers).
 
@@ -41,13 +41,13 @@ More details on Steam Providers, Queue Adapters and Rewindable Streams can be fo
 ## Stream Semantics
 
 **Stream Subsription Semantics**:
-We guaratee Sequantial Consistency for Stream Subsription operations. Specificaly, when consumer subscribes to a stream, once the `Task` representing the subsription operation was successfuly resolved, the consumer will see all events that were generated after it has subscribed. In addition, Rewindable streams allow to subscribe from an arbitrary point in time in the past by using `StreamSequenceToken` (more details can be found [here](Stream-Providers)).
+Orleans Streams guaratee Sequantial Consistency for Stream Subsription operations. Specificaly, when consumer subscribes to a stream, once the `Task` representing the subsription operation was successfuly resolved, the consumer will see all events that were generated after it has subscribed. In addition, Rewindable streams allow to subscribe from an arbitrary point in time in the past by using `StreamSequenceToken` (more details can be found [here](Stream-Providers)).
 
 **Individual Stream Events Delivery Guarantees**:
-Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don't have such a provider yet, but it is possible to build one with our [extensability model](Streams-Extensibility)).
+Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don't have such a provider yet, but it is possible to build one with the [extensability model](Streams-Extensibility)).
 
 **Events Delivery Order**:
-Same applies for event order: event order also depends on a particular stream provider. In SMS stream the producer explicitelly controls the order of events seen by the consumer by controlling the way he publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in a failure case (in case of message delivery failure the message will re-appear in the queue much later, thus breaking the FIFO order).
+Event order also depends on a particular stream provider. In SMS stream, the producer explicitelly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in a failure case (in case of message delivery failure the message will re-appear in the queue much later, thus breaking the FIFO order).
 
 
 ## Code Samples
