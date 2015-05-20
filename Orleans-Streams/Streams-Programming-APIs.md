@@ -43,6 +43,9 @@ The arguments to `SubscribeAsync` can either be an object that implements the `I
 await subscriptionHandle.UnsubscribeAsync()
 ```
 
+It is important to note that **the subsription is for a garin, not for an activation**. Once the grain code subsribed to the stream, this subsription surpasses the life of this activation and stays durable forever, untill the grain code (potentialy in a different activation) explicitely unsubsribes. This is the heart of a virtual stream absraction: not only all the streams always exits, logicaly, but also that a stream subsription is durable and lives beyond a particular physical activation that issused this subsription. 
+
+
 ### Multiplicity
 
 An Orleans stream may have multiple producers and multiple consumers. A message published by a producer will be delivered to all consumers that were subscribed to the stream before the message was published.
