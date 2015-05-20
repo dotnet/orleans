@@ -34,14 +34,24 @@ stream.OnNextAsync(int)
 To subscribe to a stream, an application calls  
 
 ``` csharp
-StreamSubscriptionHandle<T> handle = await stream.SubscribeAsync(onNextAsync, onErrorAsync, onCompletedAsync)
+StreamSubscriptionHandle<T> subscriptionHandle = await stream.SubscribeAsync(onNextAsync, onErrorAsync, onCompletedAsync)
 ```
 
-The arguments to `SubscribeAsync` can either be an object that implements the `IAsyncObserver` interface or any combination of the lambda functions to process incoming events. `SubscribeAsync` returns a [`StreamSubscriptionHandle<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs), which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of `IDisposable`).
+The arguments to `SubscribeAsync` can either be an object that implements the `IAsyncObserver` interface or any combination of the lambda functions to process incoming events. `SubscribeAsync` returns a [`StreamSubscriptionHandle<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs), which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of `IDisposable`)
+
+``` csharp
+await subscriptionHandle.UnsubscribeAsync()
+```
 
 ### Multiplicity
 
 An Orleans stream may have multiple producers and multiple consumers. A message published by a producer will be delivered to all consumers that were subscribed to the stream before the message was published.
+
+In addition, the consumer can subscribe to the same stream multiple times. Each time it subscribes it gets back a unique `StreamSubscriptionHandle<T>`. If a grain (or client) is subscribed X times to the same stream, it will receive the same event X times, once for each subscription. The consumer can also unsubscribe from an individual subscription or find out all its current subscriptions, by calling:
+
+``` csharp
+await IAsyncStream<T>.GetAllSubscriptionHandles()
+```
 
 
 ### Explicit and Implicit Subsriptions
@@ -52,7 +62,7 @@ In addition, Orleans Streams also support "Implicit Subsriptions". In this model
 
 Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream with GUID XXX and namespace `"MyStreamNamespace"` namespace, it should be delivered to grain XXX of type `MyGrainType`. That is, the consumer grain identity is determined based on stream identity GUID and consumer grain type is determined based on the presense of `ImplicitStreamSubscription` attribute.
 
-The presense of `ImplicitStreamSubscription`causes the streaming runtime to automaticaly subsribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wanst events to be processed. Essentialy, it need to attach the `IAsyncObserver`. Therefore, when the grain is activated, the grain code inside `OnActivateAsync` needs to call: 
+The presense of `ImplicitStreamSubscription`causes the streaming runtime to automaticaly subsribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wants events to be processed. Essentialy, it need to attach the `IAsyncObserver`. Therefore, when the grain is activated, the grain code inside `OnActivateAsync` needs to call: 
 
 ``` csharp
 IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
