@@ -22,12 +22,18 @@ if "%BASE_PATH%" == "." (
 )
 @echo Using binary drop location directory %BASE_PATH%
 
-if EXIST "%VERSION%" (
-    @Echo Using version number from file %VERSION%
-    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type %VERSION%`) do set VERSION=%%i.%%j.%%k
+if "%PRODUCT_VERSION%" == "" (
+
+  if EXIST "%VERSION%" (
+      @Echo Using version number from file %VERSION%
+      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type %VERSION%`) do set VERSION=%%i.%%j.%%k
+  ) else (
+      @Echo ERROR: Unable to read version number from file %VERSION%
+      GOTO Usage
+  )
 ) else (
-    @Echo ERROR: Unable to read version number from file %VERSION%
-    GOTO Usage
+    set VERSION=%PRODUCT_VERSION%
+	@Echo Using version number %VERSION% from %%PRODUCT_VERSION%%
 )
 
 @echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%

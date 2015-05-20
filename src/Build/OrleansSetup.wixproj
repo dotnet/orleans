@@ -32,7 +32,8 @@
       <SDKDir>$(BuildRoot)\SDK</SDKDir>
       <DocsDir>$(BuildRoot)\Documentation</DocsDir>
       <OrleansDir>$(BuildRoot)</OrleansDir>
-      <ProductVersion>1.0</ProductVersion>
+      <ProductVersion>$(PRODUCT_VERSION)</ProductVersion>
+      <ProductVersion Condition="'$(ProductVersion)'==''">1.0</ProductVersion>
       <SchemaVersion>2.0</SchemaVersion>
       <OutputType>Package</OutputType>
       <DefineSolutionProperties>false</DefineSolutionProperties>
