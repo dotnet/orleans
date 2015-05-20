@@ -31,7 +31,7 @@ We detail each of those below.
 
 **Flexible stream processing logic**
 
-Our system should allow multiple ways to express stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming paradigm. This limits the expressiveness of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), as functional program, as declarative query, or as a general imperative logic. The logic can be statefull or stateless, may have side effects and can trigger external actions.
+Our system should allow multiple ways to express stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming paradigm. This limits the expressiveness of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx); as functional program; as declarative query; or as a general imperative logic). The logic can be statefull or stateless, may have side effects and can trigger external actions.
 
 **Support for dynamic topologies**
 
@@ -41,20 +41,21 @@ Our system should allow dynamic evolving topologies. The existing systems we men
 Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) 
 ``
 
-and now imagine that you want to change the threshold condition in the Where filter. Or even add a new Select statement. Or add another branch in the data-flow graph and produce new output stream.
-In existing system this is not possible without tearing down the entire topology and restarting the data-flow from scratch. Practically, those system will checkpoint he existing computation and will be able to restart from the latest checkpoint. Still, such a restart is disruptive and costly to online service, that produces results in real time.
+and now imagine that you want to change the threshold condition in the Where filter. Or even add a new Select statement. Or add another branch in the data-flow graph and produce a new output stream.
+In existing systems this is not possible without tearing down the entire topology and restarting the data-flow from scratch. Practically, those system will checkpoint the existing computation and will be able to restart from the latest checkpoint. Still, such a restart is disruptive and costly to an online service, that produces results in real time.
 
 Our system should be able to evolve the data-flow graph at runtime, by adding new links or nodes to the computation graph, or by changing the processing logic within the computation nodes.
 
 **Fine grained stream granularity**
 
-In the existing systems the smallest unit of abstraction is usually the whole flow (topology). However, a lot of our target scenarios require individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising of multiple data flow graph links, different links can have different characteristics and can be implemented over different physical transport. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategy, or their processing logic expressed in different model or even different language. Such flexibility is usually not possible in the existing systems.
+In the existing systems the smallest unit of abstraction is usually the whole flow (topology). However, a lot of our target scenarios require individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising of multiple data-flow graph links, different links can have different characteristics and can be implemented over different physical transports. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategies, and their processing logic can be expressed in different models or even different languages. Such flexibility is usually not possible in the existing systems.
 
-The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actors system allow more flexibility, since each is essentially an independently managed ``tiny service''. 
+The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility, since each is essentially an independently managed ``tiny service''. 
 
 **Distribution**
 
 And of course, our system should have all the properties of a good distributed system. That includes:
+
 1. Scalability - supports large number of streams and compute elements.
 2. Elasticity - allows to add/remove resources to grow/shrink based on load.
 3. Reliability - be resilient to failures
