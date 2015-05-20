@@ -62,4 +62,4 @@ And of course, our system should have all the properties of a good distributed s
 4. _Efficiency_ - use the underlying resources efficiently
 5. _Responsiveness_ - enable near real time scenarios.
 
-With those requirements in mind we set to build **Orleans Streaming**.
+With those requirements in mind we set to build [**Orleans Streaming**](index).
