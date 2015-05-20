@@ -12,17 +12,20 @@ Those include systems to **durably store stream data** (e.g., [Event Hubs](http:
 However, those systems are not suitable for **fine-grained free-form compute over stream data**. The Streaming Compute systems mentioned above all allow to specify a **unified data-flow graph of operations that are applied in the same way to all stream items**. This is a powerful model when data is uniform and you want to express the same set of transformations, filtering or aggregation operations over this data.
 But there are other use cases where you need to express fundamentally different operations over different data items. And in some of them as part of this processing you occasionally need to make an external call, such as invoke some arbitrary REST API. The unified data-flow stream processing engines either do not support those scenarios, support them in a very limited and constrained way, or are very inefficient in supporting those. This is because they are inherently optimized for **large volume of similar items with similar, and usually limited in terms of expressiveness, processing**. Orleans Streams target those other scenarios.
 
-### Motivation - Dynamic and Flexible Processing Logic
-Imagine a situation when you have a per user stream and you want to perform **different processing for each user**, depending on the particular application or scenario in which this user is currently interested. Some users are interested in weather and can subscribe to weather alerts, while some in sport events. Processing those events requires different logic, but you don't want to run two independent instances of stream processing.
-Some users are interested in only a particular stock and only if certain external condition applies, condition that may not necessarily be part of the stream data (thus needs to be checked dynamically at runtime as part of processing). Also imagine that those user come and go dynamically, thus **the streaming topology changes dynamically and rapidly**. And now imagine that **the processing logic per user evolves and changes dynamically as well, based on some external events**. Those external events need an ability to notify and modify the per-user processing logic. For example, in a game cheating detection system, when a new way to cheat is discovered the processing logic needs to be updated with the new rule to detect this new violation. This needs to be done of course **without disrupting the ongoing processing pipeline**. Bulk data-flow stream processing engines were not build to support those scenarios.
+### Motivation
+A typical scenario for Orleans Streams is when you have per user streams and you want to perform **different processing for each user**, within the context of an individual user. We may have millions of users but some of them are interested in weather and can subscribe to weather alerts for a particular location, while some are interested in sports events; somebody is tracking status of a particular flight. Processing those events requires different logic, but you don't want to run two independent instances of stream processing. Some users are interested in only a particular stock and only if certain external condition applies, condition that may not necessarily be part of the stream data (thus needs to be checked dynamically at runtime as part of processing).
+
+Users change their interests all the time, hence their subscriptions to psecific streams of events come and go dynamically, thus **the streaming topology changes dynamically and rapidly**. On top of that, **the processing logic per user evolves and changes dynamically as well, based on user state and external events**. External events may modify the  processing logic for a particular user. For example, in a game cheating detection system, when a new way to cheat is discovered the processing logic needs to be updated with the new rule to detect this new violation. This needs to be done of course **without disrupting the ongoing processing pipeline**. Bulk data-flow stream processing engines were not build to support such scenarios.
+
+It goes almost without saying that such a system has to run on a number of networl-connected machines, not on a signle node. Hence, the processing logic has to be distributed in a scalable and elastic manner across a cluster of servers.
 
 ### New Requirements
 
 We identified 4 basic requirements for our Stream Processing system that will allow it to target the above scenarios.
 
 1. Flexible stream processing logic
-2. Support for dynamic topologies
-3. Fine grained stream granularity
+2. Support for highly dynamic topologies
+3. Fine-grained stream granularity
 4. Distribution
 
 **Flexible stream processing logic**
