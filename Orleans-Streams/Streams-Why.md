@@ -13,38 +13,52 @@ Those include systems to **durably store events** (examples are [Event Hubs](htt
 However, those systems are not suitable for **fine-grained compute over stream data**. The Streaming Compute systems mentioned above all allow to specify a **unified data flow graph of operations that are applied in the same way to all stream items**. This is a powerful model, when data is uniform and you want to express the same set of transformations, filtering or aggregation operations over this data.
 But what if you need to express fundamentally different operations over different data items? And what if as part of this processing you occasionally need to make an external call, such as invoke some arbitrary REST API? And what if the processing, in terms of cost, is very different between different items? The unified data flow stream processing engines either do not support those scenarios, support them in a very limited and constrained way, or are very inefficient in supporting those. This is since they are inherently optimized for **large volume of similar items with similar, and usually limited in terms of expressiveness, processing**.
 
-### Motivation - Dynamic and Flexiable Processing Logic
+### Motivation - Dynamic and Flexible Processing Logic
 
-Orleans Streams target those other scenarios. Imagine a situation when you have a per user stream and you want to perform **different processing for each user**, depending on the particular application or scenario in which this user is currently interested. Some users are interested in weather and can subscribe to weather alerts, while some in sport events. Processing those events requires different logic, but you don't wnat to run two indepenedant instances of stream processing.
+Orleans Streams target those other scenarios. Imagine a situation when you have a per user stream and you want to perform **different processing for each user**, depending on the particular application or scenario in which this user is currently interested. Some users are interested in weather and can subscribe to weather alerts, while some in sport events. Processing those events requires different logic, but you don't want to run two independent instances of stream processing.
 Some users are interested in only a particular stock and only if certain external condition applies, condition that may not necessarily be part of the stream data (thus needs to be checked dynamically at runtime as part of processing). Also imagine that those user come and go dynamically, thus **the streaming topology changes dynamically and rapidly**. And now imagine that **the processing logic per user evolves and changes dynamically as well, based on some external events**. Those external events need an ability to notify and modify the per-user processing logic. For example, in a game cheating detection system, when a new way to cheat is discovered the processing logic needs to be updates to detect this new violation. This needs to be done of course **without disrupting the ongoing processing pipeline**. Bulk data flow stream processing engines were not build to support those scenarios.
 
 ### New Requirements
 
 We identified 4 basic requirements for the our new Stream Processing system that will allow it to target the above scenarios.
 
-1. Flexibale stream processing logic
-2. Support for dynamc topologies
+1. Flexible stream processing logic
+2. Support for dynamic topologies
 3. Fine grained stream granularity
 4. Distribution
 
 We detail each of those below.
 
-**Flexibale stream processing logic**
+**Flexible stream processing logic**
 
-Our system should allow multiple ways to express stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming paradygm. This limits the expressiveness of the processing logic. Orleans streams are indeferent to the way processing logic is expressed. It can be expressied as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), as functional program, as declarative query, or as a general imperative logic. The logic can be statefull or stateless, may have side effects and can trigger external actions.
+Our system should allow multiple ways to express stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming paradigm. This limits the expressiveness of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), as functional program, as declarative query, or as a general imperative logic. The logic can be statefull or stateless, may have side effects and can trigger external actions.
 
-**Support for dynamc topologies**
+**Support for dynamic topologies**
 
-Our system shoudl allow dynamcic evolving topologies. The existing systems we mentioned above are usually limited to only static topologoes, that are expressed at compile or deploy time and cannot evolve at runtime. For example, imagine a following data-flow graph expressed in one of the above systems:
+Our system should allow dynamic evolving topologies. The existing systems we mentioned above are usually limited to only static topologies, that are expressed at compile or deploy time and cannot evolve at runtime. For example, imagine a following data-flow graph expressed in one of the above systems:
 
 ``
 Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) 
 ``
 
-and now imagine that you want to change the threshold condition in the Where filter. Or even add a new Select statement. In existing system tis is not possible without tearing down the entire toplogy and restaring the data-flow from scratch. Practicaly, those system will checkpoint he existing computation and will be able to restart from the latet checkpoint. Still, such a restart is desruptive and costly to online service, that produces resulst in real time.
+and now imagine that you want to change the threshold condition in the Where filter. Or even add a new Select statement. Or add another branch in the data-flow graph and produce new output stream.
+In existing system this is not possible without tearing down the entire topology and restarting the data-flow from scratch. Practically, those system will checkpoint he existing computation and will be able to restart from the latest checkpoint. Still, such a restart is disruptive and costly to online service, that produces results in real time.
 
+Our system should be able to evolve the data-flow graph at runtime, by adding new links or nodes to the computation graph, or by changing the processing logic within the computation nodes.
 
+**Fine grained stream granularity**
 
+In the existing systems the smallest unit of abstraction is usually the whole flow (topology). However, a lot of our target scenarios require individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising of multiple data flow graph links, different links can have different characteristics and can be implemented over different physical transport. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategy, or their processing logic expressed in different model or even different language. Such flexibility is usually not possible in the existing systems.
 
+The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actors system allow more flexibility, since each is essentially an independently managed ``tiny service''. 
 
+**Distribution**
 
+And of course, our system should have all the properties of a good distributed system. That includes:
+1. Scalability - supports large number of streams and compute elements.
+2. Elasticity - allows to add/remove resources to grow/shrink based on load.
+3. Reliability - be resilient to failures
+4. Efficiency - use the underlying resources efficiently
+5. Responsiveness - enable near real time scenarios.
+
+With those requirements in mind we set to build **Orleans Streaming**.
