@@ -30,20 +30,19 @@ We identified 4 basic requirements for our Stream Processing system that will al
 
 **Flexible stream processing logic**
 
-Our system should allow multiple ways to express the stream processing logic. The existing systems we mentioned above limit the developer to write a declarative data-flow computation graph, usually by following a functional programming style. This limits the expressiveness of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx)); as a functional program; as a declarative query; or in a general imperative logic. The logic can be statefull or stateless, may have side effects and can trigger external actions.
+We want the system to support different ways of expressing the stream processing logic. The existing systems we mentioned above require the developer to write a declarative data-flow computation graph, usually by following a functional programming style. This limits the expressiveness and flexibility of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx)); as a functional program; as a declarative query; or in a general imperative logic. The logic can be stateful or stateless, may or may not have side effects, and can trigger external actions. All power goes to the developer.
 
 **Support for dynamic topologies**
 
-Our system should allow dynamic evolving topologies. The existing systems we mentioned above are usually limited to only static topologies that are fixed at deployment time and cannot evolve at runtime. For example, imagine a following data-flow graph expressed in one of the above systems:
+We want the system to allow for dynamically evolving topologies. The existing systems we mentioned above are usually limited to only static topologies that are fixed at deployment time and cannot evolve at runtime. In the following example of a dataflow expression everything is nice and simple until you need to change it.
 
 ``
 Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) 
 ``
 
-and now imagine that you want to change the threshold condition in the `Where` filter. Or even add a new `Select` statement. Or add another branch in the data-flow graph and produce a new output stream.
-In existing systems this is not possible without tearing down the entire topology and restarting the data-flow from scratch. Practically, those systems will checkpoint the existing computation and will be able to restart from the latest checkpoint. Still, such a restart is disruptive and costly to an online service that produces results in real time.
+Change the threshold condition in the `Where` filter, add an additional `Select` statement or add another branch in the data-flow graph and produce a new output stream. In existing systems this is not possible without tearing down the entire topology and restarting the data-flow from scratch. Practically, those systems will checkpoint the existing computation and will be able to restart from the latest checkpoint. Still, such a restart is disruptive and costly to an online service that produces results in real time. Such a restart becomes especially impractical when we are talking about a large number of such expressions being executed with similar but different (per-user, per-deveice, et.) parameters and that keep constantly changing.
 
-Our system should be able to evolve the stream processing graph at runtime, by adding new links or nodes to the computation graph, or by changing the processing logic within the computation nodes.
+We want the system to allow for evolving the stream processing graph at runtime, by adding new links or nodes to the computation graph, or by changing the processing logic within the computation nodes.
 
 **Fine grained stream granularity**
 
