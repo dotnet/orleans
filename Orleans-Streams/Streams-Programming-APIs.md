@@ -73,13 +73,34 @@ IAsyncStream<T> stream = streamProvider.GetStream<T>(this.GetPrimaryKey(), "MySt
 StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObserver<T>);  
 ```
 
+### Stream Order and Sequence Tokens
+
+The order in which events between an individual producer and an individual consumer depends on a particular stream provider.
+
+In SMS stream the producer explicitelly controls the order of events seen by the consumer by controlling the way he publishes them. By default (if the `FireAndForget` options for SMS provider is set to false) and if the producer awaits every `OnNext` call, the events arrive in FIFO order. In SMS it is up to the producer to decide how to handle deliverty fai.ures, taht will be indicated by a broken `Task` returned by the `OnNext` call.
+
+Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in failure cases (they do guarantee FIFO order in faliure free executions). When a producer produces the event into Azure Queue, if the enqueue operatin failed, it is up to the producer to attempt another enqueue and later on deal with potential duplicates messages. On the delivery side, Orleans Streaming runtime dequeue the event from the Azure Queue and attmerpts to deliver it for procesing to consmyus. Orleans Streaming runtime deletes the ecvent from the queue only upon successfull processing. If the delivety or procesing failed, the event is not dekete from the queu and will automatically re-appear in the queue much later. The Streaming runtime will try to deliver it again, thus potentially breaking the FIFO order. The described behaivour matches the regular semantics of Azure Queues. 
+
+To deal with the above ordering issues, application can specify its own ordering. This is achived via a notion of [`StreamSequenceToken`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs). `StreamSequenceToken` is an opaque `IComparable` object that can be used to order events. 
+A producer can pass an optional `StreamSequenceToken` to the `OnNext` call. This `StreamSequenceToken` will be passed all the way to the consumer and will be delivered together with the event. That way, application can reason and reconstruct it's order independantly from the streaming runtime.
+
+The consumer can pass a `StreamSequenceToken` to the `SubscribeAsync` call and the runtime will deliver events to it starting from that `StreamSequenceToken` (a null token means the consumer wants to receive events starting from the latest).
+
+
 ### Rewindable Streams
 
-Some streams only allow an application to subscribe to them starting at the latest point in time, while other streams allow "going back in time". The latter capability is dependent on the underlying queuing technology. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time). Orleans streams expose this capability via a notion of [`StreamSequenceToken`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs). `StreamSequenceToken` is an opaque `IComparable` object that orders events. Streams that support going back in time are called *Rewindable Streams*. 
+Some streams only allow application to subscribe to them starting at the latest point in time, while other streams allow "going back in time". The latter capability is dependent on the underlying queuing technology and the particulal stream provider. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time).Streams that support going back in time are called *Rewindable Streams*. 
 
-A producer of a rewindable stream can pass an optional `StreamSequenceToken` to the `OnNext` call. The consumer can pass a `StreamSequenceToken` to the `SubscribeAsync` call and the runtime will deliver events to it starting from that `StreamSequenceToken` (a null token means the consumer wants to receive events starting from the latest.) The ability to rewind a stream is very useful in recovery scenarios. For example, consider a grain that subscribes to a stream and periodically checkpoints its state together with the latest sequence token. When recovering from a failure, the grain can re-subscribe to the same stream from the latest checkpointed sequence token, thereby recovering without losing any events that were generated since the last checkpoint.
+The consumer of a rewindable stream can pass a `StreamSequenceToken` to the `SubscribeAsync` call and the runtime will deliver events to it starting from that `StreamSequenceToken` (a null token means the consumer wants to receive events starting from the latest).
 
-### Stateless Automaticaly Scaled-Out Processing
+The ability to rewind a stream is very useful in recovery scenarios. For example, consider a grain that subscribes to a stream and periodically checkpoints its state together with the latest sequence token. When recovering from a failure, the grain can re-subscribe to the same stream from the latest checkpointed sequence token, thereby recovering without losing any events that were generated since the last checkpoint.
+
+**Current Status of Rewindable Streams**
+Both SMS and Azure Queue providers are not-rewinable and Orleans currentkly does not include an implementation of rewindable stream. We are actively wokring on this.
+
+
+
+### Stateless Automatically Scaled-Out Processing
 
 By default Orleans streams are targeted to support a large number of relatively small streams, each is processed by one or more statefull grains. Collectively, the processing of all the stream together is sharded among a large number of regular (statefull) grains. The application code controls this sharding by assigning stream ids, grain ids and explicitely subscribing. **The goal is sharded statefull processing**. 
 
