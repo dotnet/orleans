@@ -20,7 +20,7 @@ There is a number of principles behind Orleans Streams Programming Model.
 3. Orleans streams are *lightweight and dynamic*. Orleans Streaming Runtime is designed to handle a large number of streams that come and go at a high rate.
 4. Orleans stream *bindings are dynamic*. Orleans Streaming Runtime is designed to handle cases where grains connect to and disconnect from streams at a high rate.
 5. Orleans Streaming Runtime *transparently manages the lifecycle of streams*. After an application subscribes to a stream, from then on it will receive the stream's events, even in presence of failures.
-6. Orleans streams *work uniformly across grains and Orleans clients* (usually HTTP frontends).
+6. Orleans streams *work uniformly across grains and Orleans clients*.
 
 
 ## Programming APIs
@@ -46,7 +46,7 @@ Orleans Streams guaratee Sequantial Consistency for Stream Subsription operation
 Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don't have such a provider yet, but it is possible to build one with the [extensability model](Streams-Extensibility)).
 
 **Events Delivery Order**:
-Event order also depends on a particular stream provider. In SMS stream, the producer explicitelly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in a failure case (in case of message delivery failure the message will re-appear in the queue much later, thus breaking the FIFO order).
+Event order also depends on a particular stream provider. In SMS stream, the producer explicitelly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in failure cases. Applications can also control their own stream delivery ordering, by using `StreamSequenceToken`.
 
 
 ## Code Samples
