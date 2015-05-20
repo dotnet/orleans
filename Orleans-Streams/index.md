@@ -46,6 +46,10 @@ We guaratee Sequantial Consistency for Stream Subsription operations. Specifical
 **Individual Stream Events Delivery Guarantees**:
 Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don't have such a provider yet, but it is possible to build one with our [extensability model](Streams-Extensibility)).
 
+**Events Delivery Order**:
+Same applies for event order: event order also depends on a particular stream provider. In SMS stream the producer explicitelly controls the order of events seen by the consumer by controlling the way he publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in a failure case (in case of message delivery failure the message will re-appear in the queue much later, thus breaking the FIFO order).
+
+
 ## Code Samples
 
 An example of how to use streaming APIs within a grain can be found [here](https://github.com/dotnet/orleans/blob/master/src/TestGrains/SampleStreamingGrain.cs). We plan to create more samples in the future.
