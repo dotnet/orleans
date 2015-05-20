@@ -33,9 +33,8 @@ More details can be found in the [Streams Programming APIs](Streams-Programming-
 
 ## Stream Providers
 
-Streams can come via physical channels of various shapes and forms. Orleans provides a number of different stream implementations, via the concept of **Stream Providers**. In particular, there are unreliable TCP based streams (such as **Simple Message Stream**) and reliable **Persistent Streams** (such as **Azure Queue Stream**). Persistent Streams can work with different queuing technologies via the concept of **Queue Adapters**. In addition, Orleans allows to build **Rewindable Streams**, that allow to subsribe and consume events from the past.
-
-More details on Steam Providers, Queue Adapters and Rewindable Streams can be found at [Stream Providers](Stream-Providers).
+Streams can come via physical channels of various shapes and forms and can have different semantics. Orleans Streaming is designed to support this diversity via the concept of **Stream Providers**, which is an extensibility point in the system. Orleans currently has imlemenation of two stream providers: TCP based **Simple Message Stream Provider** and Azure Queue based **Azure Queue Stream Provider**.
+More details on Steam Providers can be found at [Stream Providers](Stream-Providers).
 
 
 ## Stream Semantics
