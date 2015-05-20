@@ -38,9 +38,9 @@ An Orleans stream may have multiple producers and multiple consumers. A message 
 
 By default, stream consumer has to explicitelly subsribe to the stream. This subsription would usualy be triggered by some external message that the grain (or client) receive that instructs them to subsribe. For example, in a chat service when user joins a chat room his grain receives a `JoinChatGroup` message with the chat name and it will cause the user grain to subscribe to this chat stream (stream of messages published to this chat).
 
-In addition, Orleans Streams also support "Implicit Subsriptions". In this model the grain does not to explicitely subscribe to the stream. This grain is subsribed automaticaly, impictely, by the streaming runtime, just based on its grain identity.
+In addition, Orleans Streams also support "Implicit Subsriptions". In this model the grain does not explicitely subscribe to the stream. This grain is subsribed automaticaly, implicitely, just based on its grain identity and `ImplicitStreamSubscription`.
 
-Grain implementation class can have an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This
+Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream with GUID XXX and namespace `"MyStreamNamespace"` namespace, it should be delivered to grain XXX of type `MyGrainType`. That is, the consumer grain identity is determined based on stream identity GUID and consumer grain type is determined based on the presense of `ImplicitStreamSubscription` atttbute.
 
 
 ### Grains and Orleans clients
