@@ -43,11 +43,6 @@ In addition, Orleans Streams also support "Implicit Subsriptions". In this model
 Grain implementation class can have an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This
 
 
-
-### Fully Managed and Reliable
-
-Orleans streams are **reliable** and their lifecycle is managed transparently by Orleans Streaming Runtime. Specifically, Orleans uses a runtime component called **Streaming Pub Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. In addition to Pub Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
-
 ### Grains and Orleans clients
 
 Orleans streams work **uniformly across grains and Orleans clients**. That is, exactly the same APIs can be used inside a grain and in an Orleans client to produce and consume events. This greatly simplifies the application logic, making special client-side APIs, such as Grain Observers, redundant.
@@ -57,3 +52,8 @@ Orleans streams work **uniformly across grains and Orleans clients**. That is, e
 Some streams only allow an application to subscribe to them starting at the latest point in time, while other streams allow "going back in time". The latter capability is dependent on the underlying queuing technology. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time). Orleans streams expose this capability via a notion of [`StreamSequenceToken`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs). `StreamSequenceToken` is an opaque `IComparable` object that orders events. Streams that support going back in time are called *Rewindable Streams*. 
 
 A producer of a rewindable stream can pass an optional `StreamSequenceToken` to the `OnNext` call. The consumer can pass a `StreamSequenceToken` to the `SubscribeAsync` call and the runtime will deliver events to it starting from that `StreamSequenceToken` (a null token means the consumer wants to receive events starting from the latest.) The ability to rewind a stream is very useful in recovery scenarios. For example, consider a grain that subscribes to a stream and periodically checkpoints its state together with the latest sequence token. When recovering from a failure, the grain can re-subscribe to the same stream from the latest checkpointed sequence token, thereby recovering without losing any events that were generated since the last checkpoint.
+
+
+### Fully Managed and Reliable
+
+Orleans streams are **reliable** and their lifecycle is managed transparently by Orleans Streaming Runtime. Specifically, Orleans uses a runtime component called **Streaming Pub Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. In addition to Pub Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
