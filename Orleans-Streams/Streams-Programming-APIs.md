@@ -15,7 +15,8 @@ IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider");
 IAsyncStream<int> stream = streamProvider.GetStream<int>(Guid, "MyStreamNamespace"); 
 ```
 
-[`Orleans.Streams.IAsyncStream<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) is a logical, strongly-typed handle to a virtual stream. It is similar in spirit to Orleans Grain Reference. Calls to `GetStreamProvider` and `GetStream` are purely local. The arguments to `GetStream` are a GUID and an additional string, which can be null, that together comprise the stream identity (similar in sprit to the arguments to `GrainFactory.GetGrain`). 
+[`Orleans.Streams.IAsyncStream<T>`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) is a logical, strongly-typed handle to a virtual stream. It is similar in spirit to Orleans Grain Reference. Calls to `GetStreamProvider` and `GetStream` are purely local. The arguments to `GetStream` are a GUID and an additional string that we call a stream namespace (which can be null). Together the GUID and the namespace string comprise the stream identity (similar in sprit to the arguments to `GrainFactory.GetGrain`). The combination of GUID and namespace string provide extra flexibility in determining stream identities. Just like grain 7 may exist within the Grain type `PlayerGrain` and a different grain 7 may exist within the grain type `ChatRoomGrain`, Stream 123 may exist with the stream namespace `PlayerEventsStream` a different stream 123 may exist within the stream namespace type `ChatRoomMessagesStream`.
+
 
 ### Producing and Consuming
 
@@ -36,6 +37,11 @@ An Orleans stream may have multiple producers and multiple consumers. A message 
 ### Explicit and Implicit Subsriptions
 
 By default, stream consumer has to explicitelly subsribe to the stream. This subsription would usualy be triggered by some external message that the grain (or client) receive that instructs them to subsribe. For example, in a chat service when user joins a chat room his grain receives a `JoinChatGroup` message with the chat name and it will cause the user grain to subscribe to this chat stream (stream of messages published to this chat).
+
+In addition, Orleans Streams also support "Implicit Subsriptions". In this model the grain does not to explicitely subscribe to the stream. This grain is subsribed automaticaly, impictely, by the streaming runtime, just based on its grain identity.
+
+Grain implementation class can have an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This
+
 
 
 ### Fully Managed and Reliable
