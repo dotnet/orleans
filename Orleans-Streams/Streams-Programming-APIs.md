@@ -52,7 +52,7 @@ StreamSubscriptionHandle<T> subscriptionHandle = await stream.SubscribeAsync(IAs
 ```
 
 The argument to `SubscribeAsync` can either be an object that implements the `IAsyncObserver` interface or a combination of
-lambda functions to process incoming events. More options for `SubscribeAsync` are available via [**`AsyncObservableExtensions`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/AsyncObservableExtensionse.cs) class.
+lambda functions to process incoming events. More options for `SubscribeAsync` are available via [**`AsyncObservableExtensions`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/AsyncObservableExtensions.cs) class.
 `SubscribeAsync` returns a [**`StreamSubscriptionHandle<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs), which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of `IDisposable`).
 
 ``` csharp
