@@ -111,4 +111,20 @@ Orleans streams work **uniformly across grains and Orleans clients**. That is, e
 
 ### Fully Managed and Reliable Streaming Pub Sub
 
-To track stream subscriptions, Orleans uses a runtime component called **Streaming Pub Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. In addition to Pub Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
+To track stream subscriptions, Orleans uses a runtime component called **Streaming Pub-Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. 
+
+Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub component itself is implemented as grains (called `PubSubRendezvousGrain`) and it is using Orleans Declarative Persistence for those grain. `PubSubRendezvousGrain` uses storage provider named `PubSubStore`. As with any grain, you can designate an implementation for a storage provider.  For Streaming Pub-Sub you can change the implementation of the `PubSubStore` in the config file:
+
+``` xml
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <StorageProviders>
+      <Provider Type="Orleans.Storage.AzureTableStorage" Name="PubSubStore" />
+    </StorageProviders>
+  </Globals>
+</OrleansConfiguration>
+```
+
+That way Pub-Sub data will be durably stored in Azure Table.
+
+In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
