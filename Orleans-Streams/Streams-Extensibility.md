@@ -32,7 +32,7 @@ Currently implemented stream providers support a number of configuration options
 2. **DeploymentId** - the deployment id of this Orleans cluster (usually similar to Azure Deployment Id).
 3. **CacheSize** - the size of the persistent provider cache that is used to store stream message for further delivery. Default is 4096.
 
-It would be totaly possible and a lot of times easy to provide additional configuration options. For example, in some scenarios developers might want more control over  queue names used by the Queue Adapter. This is currently abstracted away with [`IStreamQueueMapper`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs), but there is currently no way to configure which `IStreamQueueMapper` to use without writing a new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a completely new  provider.
+It would be totally possible and a lot of times easy to provide additional configuration options. For example, in some scenarios developers might want more control over  queue names used by the Queue Adapter. This is currently abstracted away with [`IStreamQueueMapper`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs), but there is currently no way to configure which `IStreamQueueMapper` to use without writing a new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a completely new  provider.
 
 
 ## Writing a Custom Queue Adapter
@@ -45,9 +45,9 @@ If you want to use a different queueing technology, you need to write a queue ad
      
      b. Implement a method that returns your `IQueueAdapter`.
      
-     c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you dont have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
+     c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you don't have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
      
-     d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you dont have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
+     d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you don't have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
 
 2. Implement `MyQueueAdapter` class that implements the [**`IQueueAdapter`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs) interface, which is an interfaces that manages access to a **sharded queue**. `IQueueAdapter` manages access to a set of queues/queue partitions (those are the queues that were returned by `IStreamQueueMapper`). It provides an ability to enqueue a message in a specified the queue and create an `IQueueAdapterReceiver` for a particular queue.
 
