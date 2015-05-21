@@ -14,9 +14,16 @@ While the communication interface and grain implementation are identical, three 
 **OrleansAzureSilos**, the Worker Role integration logic that hosts the Orleans silo in the cloud.
 **WebRole**, which provides a simple HTML UI for the Orleans backend.
 
-The sample is configured to run inside of the Azure Compute Emulator on your desktop by default. Make sure you start Visual Studio with administrative privileges before starting the sample in the emulator.
+##Run AzureWebSample Locally
 
-To get the sample running in the cloud, open the `ServiceConfiguration.Cloud.cscfg` file in the OrleansAzureSample project.
+The sample is configured to run inside of the Azure Compute Emulator on your desktop by default, so make sure that **OrleansAzureSample** is set as the **Startup Project** in this solution and just press F5 to build and run the sample locally. 
+
+You do not need to start Visual Studio with administrative privileges to run this sample in the emulator - it is designed to use both **IIS Express** and **Express Emulator**, so make sure these options are selected in OrleansAzureSample->Properties->Web. 
+You may also need to select the "Use IIS Express for web sites and projects" in Tools->Options->Projects and Solutions->Web Projects. 
+
+##Run AzureWebSample in Azure Cloud
+
+To get the sample running in the Azure cloud, open the `ServiceConfiguration.Cloud.cscfg` file in the OrleansAzureSample project.
 
 Edit the connection strings, replacing `MYACCOUNTNAME` and `MYACCOUNTKEY` with data you get from the Azure portal, logged in to your account. It may be useful to set up a new storage account within your subscription just for samples testing. All four connection strings will look exactly the same.
 
