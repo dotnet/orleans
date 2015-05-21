@@ -100,9 +100,10 @@ Both SMS and Azure Queue providers are not-rewindable  and Orleans currently doe
 
 By default Orleans Streaming is targeted to support a large number of relatively small streams, each is processed by one or more statefull grains. Collectively, the processing of all the streams together is sharded among a large number of regular (statefull) grains. The application code controls this sharding by assigning stream ids, grain ids and explicitly subscribing. **The goal is sharded statefull processing**. 
 
-However, there is also an interesting scenario of **automatically scaled-out stateless processing**. In this scenario application has a small number (or even one) large stream and the goal is stateless processing. For example, a global stream of all messages for all events and the processing involving some kind of decoding/deciphering and potentially forwarding them for further statefull processing into another set of streams. The stateless scaled-out stream processing can be suppported in Orleans via `StatelessWorker` grains.
+However, there is also an interesting scenario of **automatically scaled-out stateless processing**. In this scenario application has a small number of streams (or even one large stream) and the goal is stateless processing. For example, a global stream of all messages for all events and the processing involving some kind of decoding/deciphering and potentially forwarding them for further statefull processing into another set of streams. The stateless scaled-out stream processing can be supported in Orleans via `StatelessWorker` grains.
 
-This is currently not implemented (due to priority constrains). An attempt to subscribe to a stream from a `StatelessWorker` grains will result in undefined behavior. [We are currently considering to support this option](https://github.com/dotnet/orleans/issues/433).
+**Current Status of Stateless Automatically Scaled-Out Processing:** 
+This is currently not implemented (due to priority constrains). An attempt to subscribe to a stream from a `StatelessWorker` grain will result in undefined behavior. [We are currently considering to support this option](https://github.com/dotnet/orleans/issues/433).
 
 ### Grains and Orleans clients
 
