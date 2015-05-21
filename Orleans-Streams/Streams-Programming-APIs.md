@@ -43,7 +43,7 @@ The arguments to `SubscribeAsync` can either be an object that implements the `I
 await subscriptionHandle.UnsubscribeAsync()
 ```
 
-It is important to note that **the subscription is for a garin, not for an activation**. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a **virtual stream abstraction**: not only all the streams always exits, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.
+It is important to note that **the subscription is for a grain, not for an activation**. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a **virtual stream abstraction**: not only all the streams always exits, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.
 
 
 ### Multiplicity
@@ -61,9 +61,9 @@ await IAsyncStream<T>.GetAllSubscriptionHandles()
 
 By default, stream consumer has to explicitly subscribe to the stream. This subscription would usually be triggered by some external message that the grain (or client) receive that instructs them to subscribe. For example, in a chat service when user joins a chat room his grain receives a `JoinChatGroup` message with the chat name and it will cause the user grain to subscribe to this chat stream.
 
-In addition, Orleans Streams also support **"Implicit Subscriptions"**. In this model the grain does not explicitely subscribe to the stream. This grain is subscribed automatically, implicitly, just based on its grain identity and `ImplicitStreamSubscription`. 
+In addition, Orleans Streams also support **"Implicit Subscriptions"**. In this model the grain does not explicitely subscribe to the stream. This grain is subscribed automatically, implicitly, just based on its grain identity and an `ImplicitStreamSubscription` attribute. 
 
-Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream with GUID XXX and `"MyStreamNamespace"` namespace, it should be delivered to grain XXX of type `MyGrainType`. That is, the consumer grain identity is determined based on stream identity GUID and consumer grain type is determined based on the presence  of `ImplicitStreamSubscription` attribute.
+Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream whose identity is GUID XXX and `"MyStreamNamespace"` namespace, it should be delivered to grain whose identity is XXX of type `MyGrainType`. That is, the runtime maps stream `<XXX, MyStreamNamespace>` to consumer grain `<XXX, MyGrainType>`.
 
 The presence  of `ImplicitStreamSubscription`causes the streaming runtime to automatically subscribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wants events to be processed. Essentially, it need to attach the `IAsyncObserver`. Therefore, when the grain is activated, the grain code inside `OnActivateAsync` needs to call: 
 
