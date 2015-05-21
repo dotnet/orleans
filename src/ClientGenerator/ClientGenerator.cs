@@ -618,6 +618,7 @@ namespace Orleans.CodeGeneration
                 var errorsString = string.Empty;
                 foreach (CompilerError error in results.Errors)
                 {
+                    Console.WriteLine(error.ToString());
                     errorsString += String.Format("{0} Line {1},{2} - {3} {4} -- {5}",
                         error.FileName,
                         error.Line,
