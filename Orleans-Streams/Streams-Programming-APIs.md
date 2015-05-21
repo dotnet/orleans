@@ -25,6 +25,20 @@ IAsyncStream<T> stream = streamProvider.GetStream<T>(Guid, "MyStreamNamespace");
 [**`Orleans.Streams.IAsyncObservable<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObservable.cs) interfaces.
 That way an application can use the stream either to produce new events into the stream by using `Orleans.Streams.IAsyncObserver<T>` or to subscribe to and consume events from a stream by using `Orleans.Streams.IAsyncObservable<T>`.
 
+``` csharp
+public interface IAsyncObserver<in T>
+{
+    Task OnNextAsync(T item, StreamSequenceToken token = null);
+    Task OnCompletedAsync();
+    Task OnErrorAsync(Exception ex);
+}
+
+public interface IAsyncObservable<T>
+{
+    Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer);
+}
+```
+
 To produce events into the stream, an application just calls 
 
 ``` csharp
@@ -34,10 +48,10 @@ await stream.OnNextAsync<T>(event)
 To subscribe to a stream, an application calls  
 
 ``` csharp
-StreamSubscriptionHandle<T> subscriptionHandle = await stream.SubscribeAsync(onNextAsync, onErrorAsync, onCompletedAsync)
+StreamSubscriptionHandle<T> subscriptionHandle = await stream.SubscribeAsync((T item) => Console.Out.Write(item))
 ```
 
-The arguments to `SubscribeAsync` can either be an object that implements the `IAsyncObserver` interface or any combination of the lambda functions to process incoming events. `SubscribeAsync` returns a [**`StreamSubscriptionHandle<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs), which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of `IDisposable`).
+The argument to `SubscribeAsync` can either be a lambda function to process incoming events or an object that implements the `IAsyncObserver` interface. `SubscribeAsync` returns a [**`StreamSubscriptionHandle<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs), which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of `IDisposable`).
 
 ``` csharp
 await subscriptionHandle.UnsubscribeAsync()
