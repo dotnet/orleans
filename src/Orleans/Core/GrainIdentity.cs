@@ -5,41 +5,41 @@ namespace Orleans.Core
 {
     internal class GrainIdentity : IGrainIdentity
     {
-        private readonly IActivationData activationData;
+        private readonly GrainId  grainId;
 
-        public GrainIdentity(IActivationData activationData)
+        public GrainIdentity(GrainId grainId)
         {
-            this.activationData = activationData;
+            this.grainId = grainId;
         }
 
         public Guid PrimaryKey
         {
-            get { return activationData.Identity.GetPrimaryKey(); }
+            get { return grainId.GetPrimaryKey(); }
         }
 
         public long PrimaryKeyLong
         {
-            get { return activationData.Identity.GetPrimaryKeyLong(); }
+            get { return grainId.GetPrimaryKeyLong(); }
         }
 
         public string PrimaryKeyString
         {
-            get { return activationData.Identity.GetPrimaryKeyString(); }
+            get { return grainId.GetPrimaryKeyString(); }
         }
 
         public string IdentityString
         {
-            get { return activationData.IdentityString; }
+            get { return grainId.ToDetailedString(); }
         }
 
         public long GetPrimaryKeyLong(out string keyExt)
         {
-            return activationData.Identity.GetPrimaryKeyLong(out keyExt);
+            return grainId.GetPrimaryKeyLong(out keyExt);
         }
 
         public Guid GetPrimaryKey(out string keyExt)
         {
-            return activationData.Identity.GetPrimaryKey(out keyExt);
+            return grainId.GetPrimaryKey(out keyExt);
         }
     }
 }

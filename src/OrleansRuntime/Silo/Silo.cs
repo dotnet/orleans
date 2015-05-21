@@ -30,7 +30,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -44,6 +44,8 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Storage;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Streams;
+using Orleans.Timers;
 
 
 namespace Orleans.Runtime
@@ -95,6 +97,8 @@ namespace Orleans.Runtime
         private readonly Catalog catalog;
         private readonly List<IHealthCheckParticipant> healthCheckParticipants;
         private readonly object lockable = new object();
+        private readonly IGrainFactory grainFactory;
+        private readonly IGrainRuntime grainRuntime;
         
         
         internal readonly string Name;
@@ -166,6 +170,13 @@ namespace Orleans.Runtime
                 TraceLogger.Initialize(nodeConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
+
+            grainFactory = new GrainFactory();
+            grainRuntime = new GrainRuntime(name, grainFactory, 
+                new TimerRegistry(), 
+                new ReminderRegistry(), 
+                new StreamProviderManager());
+            
             LimitManager.Initialize(nodeConfig);
             ActivationData.Init(config);
             StatisticsCollector.Initialize(nodeConfig);
@@ -203,7 +214,7 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.UnhandledException +=
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
-            typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback));
+            typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
 
             // Performance metrics
             siloStatistics = new SiloStatisticsManager(globalConfig, nodeConfig);
@@ -234,7 +245,7 @@ namespace Orleans.Runtime
                 : new ConsistentRingProvider(SiloAddress);
 
             Action<Dispatcher> setDispatcher;
-            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, out setDispatcher);
+            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainRuntime, out setDispatcher);
             var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
             setDispatcher(dispatcher);
 
@@ -417,7 +428,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
-            var siloStreamProviderManager = new Orleans.Streams.StreamProviderManager();
+            var siloStreamProviderManager = (StreamProviderManager) grainRuntime.StreamProviderManager;
             scheduler.QueueTask(
                 () => siloStreamProviderManager.LoadStreamProviders(this.GlobalConfig.ProviderConfigurations, SiloProviderRuntime.Instance),
                     providerManagerSystemTarget.SchedulingContext)

@@ -213,20 +213,20 @@ namespace Orleans
                         // this is probably overkill, but this ensures isFullyInitialized false
                         // before we make a call that makes RuntimeClient.Current not null
                         isFullyInitialized = false;
+                        grainFactory = new GrainFactory();
 
-                        ClientProviderRuntime.InitializeSingleton();
+                        ClientProviderRuntime.InitializeSingleton(grainFactory);
 
                         if (runtimeClient == null)
                         {
-                            runtimeClient = new OutsideRuntimeClient(config);
+                            runtimeClient = new OutsideRuntimeClient(config, grainFactory);
                         }
                         outsideRuntimeClient = runtimeClient;  // Keep reference, to avoid GC problems
                         outsideRuntimeClient.Start();
 
                         LimitManager.Initialize(config);
 
-                        grainFactory = new GrainFactory();
-
+                        
                         // this needs to be the last successful step inside the lock so 
                         // IsInitialized doesn't return true until we're fully initialized
                         isFullyInitialized = true;

@@ -26,7 +26,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Streams;
 
 using Orleans.Runtime;
@@ -39,31 +39,33 @@ namespace Orleans.Providers
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
+        private readonly IGrainFactory grainFactory;
 
-        private ClientProviderRuntime() 
+        private ClientProviderRuntime(IGrainFactory grainFactory) 
         {
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
+            this.grainFactory = grainFactory;
         }
 
         public static ClientProviderRuntime Instance { get; private set; }
 
-        public static void InitializeSingleton() 
+        public static void InitializeSingleton(IGrainFactory grainFactory) 
         {
             if (Instance != null)
             {
                 UninitializeSingleton();
             }
-            Instance = new ClientProviderRuntime();
+            Instance = new ClientProviderRuntime(grainFactory);
         }
 
-        public static void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public static void StreamingInitialize(IGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
             if (null == implicitStreamSubscriberTable)
             {
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
-            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(), implicitStreamSubscriberTable);
+            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(grainFactory), implicitStreamSubscriberTable);
             Instance.streamDirectory = new StreamDirectory();
         }
 

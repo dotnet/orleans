@@ -190,7 +190,7 @@ namespace Orleans.Counter.Control
 
                 if (GrainTypeManager.Instance == null)
                 {
-                    var typeManager = new GrainTypeManager(false);
+                    var typeManager = new GrainTypeManager(false, null); // We shouldn't need GrainFactory in this case
                     GrainTypeManager.Instance.Start(false);
                 }
                 // Register perf counters

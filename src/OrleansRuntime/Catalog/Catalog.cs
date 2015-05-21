@@ -29,6 +29,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
@@ -82,6 +83,7 @@ namespace Orleans.Runtime
         private readonly CounterStatistic activationsFailedToActivate;
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
+        private readonly IGrainRuntime grainRuntime;
 
         internal Catalog(
             GrainId grainId, 
@@ -92,6 +94,7 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler, 
             ActivationDirectory activationDirectory, 
             ClusterConfiguration config, 
+            IGrainRuntime grainRuntime,
             out Action<Dispatcher> setDispatcher)
             : base(grainId, silo)
         {
@@ -101,6 +104,7 @@ namespace Orleans.Runtime
             activations = activationDirectory;
             this.scheduler = scheduler;
             GrainTypeManager = typeManager;
+            this.grainRuntime = grainRuntime;
             collectionNumber = 0;
             destroyActivationsNumber = 0;
 
@@ -547,7 +551,11 @@ namespace Orleans.Runtime
             Type stateObjectType = grainTypeData.StateObjectType;
             lock (data)
             {
-                data.SetGrainInstance((Grain)Activator.CreateInstance(grainType));
+                var grain = (Grain) Activator.CreateInstance(grainType);
+                grain.Identity = new GrainIdentity(data.Identity);
+                grain.Runtime = grainRuntime;
+                
+                data.SetGrainInstance(grain);
                 if (stateObjectType != null)
                 {
                     var state = (GrainState)Activator.CreateInstance(stateObjectType);

@@ -38,6 +38,7 @@ namespace Orleans
     /// </summary>
     public abstract class Grain : IAddressable
     {
+        private IGrainRuntime runtime;
         internal IGrainState GrainState { get; set; }
 
         // Do not use this directly because we currently don't provide a way to inject it;
@@ -46,7 +47,17 @@ namespace Orleans
         // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
 
-        internal IGrainRuntime Runtime;
+        internal IGrainRuntime Runtime
+        {
+            get { return runtime; }
+            set
+            {
+                runtime = value;
+                GrainFactory = value.GrainFactory;
+            }
+        }
+
+        protected IGrainFactory GrainFactory { get; private set; }
 
         internal IGrainIdentity Identity;
 
@@ -56,7 +67,6 @@ namespace Orleans
         /// </summary>
         protected Grain()
         {
-            throw new OrleansException("This constructor should never be invoked");
         }
 
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
@@ -66,8 +76,7 @@ namespace Orleans
             GrainFactory = runtime.GrainFactory;
         }
 
-        public IGrainFactory GrainFactory { get; private set; }
-
+        
         /// <summary>
         /// String representation of grain's SiloIdentity including type and primary key.
         /// </summary>

@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Runtime.Providers;
 using Orleans.Serialization;
 
@@ -34,6 +35,7 @@ namespace Orleans.Runtime
     internal class GrainTypeManager
     {
         private IDictionary<string, GrainTypeData> grainTypes;
+        private readonly IGrainFactory grainFactory;
         private readonly TraceLogger logger = TraceLogger.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
@@ -48,8 +50,9 @@ namespace Orleans.Runtime
             Instance = null;
         }
 
-        public GrainTypeManager(bool localTestMode)
+        public GrainTypeManager(bool localTestMode, IGrainFactory grainFactory)
         {
+            this.grainFactory = grainFactory;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode);
             lock (lockable)
             {
@@ -189,7 +192,7 @@ namespace Orleans.Runtime
 
         private void StreamingInitialize()
         {
-            SiloProviderRuntime.StreamingInitialize(new Streams.ImplicitStreamSubscriberTable());
+            SiloProviderRuntime.StreamingInitialize(grainFactory, new Streams.ImplicitStreamSubscriberTable());
             Type[] types = grainTypes.Values.Select(t => t.Type).ToArray();
             SiloProviderRuntime.Instance.ImplicitStreamSubscriberTable.InitImplicitStreamSubscribers(types);
         }
