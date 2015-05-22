@@ -74,3 +74,8 @@ The [Orleans Streams Implementation](Streams-Implementation) provides a high lev
 ## Streams Extensibility
 
 The [Orleans Streams Extensibility](Streams-Extensibility) describes how to extend streams with new functionality.
+
+## More Material
+
+* [Orleans Virtual Meetup about Streams](https://plus.google.com/events/crdjm977pqubv81lgdhqruoqal4)
+* [Orleans Streaming Presentation from Virtual Meetup](http://dotnet.github.io/orleans/Presentations/Orleans Streaming - Virtual meetup - 5-22-2015.pptx)
