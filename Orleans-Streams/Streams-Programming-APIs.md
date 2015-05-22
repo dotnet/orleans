@@ -90,7 +90,7 @@ IList<StreamSubscriptionHandle<T>> allMyHandles = await IAsyncStream<T>.GetAllSu
 ```
 The consumer can now resume all of them, or unsubscribe from some if he wishes to.
 
-**COMMENT:** If the consumer grain implements the the `IAsyncObserver` interface directly (`public class MyGrain<T> : Grain, IAsyncObserver<T>`), it should in theory not be required to re-attach the `IAsyncObserver` and thus will not need to call `ResumeAsync`. The streaming runtime should be able to automatically figure out that the grain already implements `IAsyncObserver` and will just invoke those `IAsyncObserver` methods. The streaming runtime currently does not support this and the grain code still needs to explicitly `ResumeAsync`, even if the grain implements `IAsyncObserver` directly. Supporting this is on our TODO list.
+**COMMENT:** If the consumer grain implements the the `IAsyncObserver` interface directly (`public class MyGrain<T> : Grain, IAsyncObserver<T>`), it should in theory not be required to re-attach the `IAsyncObserver` and thus will not need to call `ResumeAsync`. The streaming runtime should be able to automatically figure out that the grain already implements `IAsyncObserver` and will just invoke those `IAsyncObserver` methods. However, the streaming runtime currently does not support this and the grain code still needs to explicitly call `ResumeAsync`, even if the grain implements `IAsyncObserver` directly. Supporting this is on our TODO list.
 
 
 ### Explicit and Implicit Subscriptions
