@@ -63,22 +63,22 @@ It is important to note that **the subscription is for a grain, not for an activ
 
 ### Recovering from failures
 
-If the producer of the stream dies (or its grain is deactivated), there is nothing it needs to do. Next time this grain wants to produce a new event it can get thestream handle again and produce new events in the same way.
+If the producer of a stream dies (or its grain is deactivated), there is nothing it needs to do. Next time this grain wants to produce more events it can get the stream handle again and produce new events in the same way.
 
-Consumer logic is a little bit more involved. As we said, once consumer grain subscribed to a stream, this subsription is valid untill it explicitely unsubsribes. If the consumer of the stream dies (or its grain is deactivated) and new event is generated on the stream, the cunsumer grain will be automaticaly re-activated (just like any regular Orlean grain is automaticaly activated upon message to it). The only thing that the grain code needs to do now is to provide a `IAsyncObserver<T>` to process the data. The consumer basically need to re-attach processing logic. To do that it can: 
+Consumer logic is a little bit more involved. As we said before, once consumer grain subscribed to a stream, this subscription is valid until it explicitly unsubscribes. If the consumer of the stream dies (or its grain is deactivated) and new event is generated on the stream, the consumer grain will be automatically re-activated (just like any regular Orleans grain is automatically activated upon message to it). The only thing that the grain code needs to do now is to provide a `IAsyncObserver<T>` to process the data. The consumer basically need to re-attach processing logic. To do that it can call: 
 
 ``` csharp
 StreamSubscriptionHandle<int> newHandle = await subscriptionHandle.ResumeAsync(IAsyncObserver)
 ```
 
-The consumer uses the previous handle it got when it first subsribed to "resume processing". Notice that `ResumeAsync` merely updates an existing subsription with the new instance of `IAsyncObserver` logic. 
+The consumer uses the previous handle it got when it first subscribed in order to "resume processing". Notice that `ResumeAsync` merely updates an existing subscription with the new instance of `IAsyncObserver` logic and does not change the fact that this consumer is already subscribed to this stream. 
 
-How the consumer has an old subscriptionHandle? There are 2 options. The consumer may have persisted the handle it was given back from the original `SubscribeAsync` operation and can use it now. Alternatively, if the consumer does not have the handle, it can ask the `IAsyncStream<T>` for all its active subsription handles, by calling:
+How the consumer has an old subscriptionHandle? There are 2 options. The consumer may have persisted the handle it was given back from the original `SubscribeAsync` operation and can use it now. Alternatively, if the consumer does not have the handle, it can ask the `IAsyncStream<T>` for all its active subscription handles, by calling:
 
 ``` csharp
 IList<StreamSubscriptionHandle<T>> allMyHandles = await IAsyncStream<T>.GetAllSubscriptionHandles()
 ```
-
+The consumer can now resume all of them, or unsubscribe from some if he wishes to.
 
 ### Multiplicity
 
