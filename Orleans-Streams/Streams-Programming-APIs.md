@@ -143,6 +143,7 @@ Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub co
 ```
 
 That way Pub-Sub data will be durably stored in Azure Table.
+In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
 
 ### Configuration
 
@@ -159,4 +160,11 @@ In order to use streams you need to enable stream providers via configuration. Y
 </OrleansConfiguration>
 ```
 
-In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
+It is also possible to register stream provider programaticaly, via calling one of the:
+
+``` csharp
+public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+
+public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStreamProvider 
+```
+on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
