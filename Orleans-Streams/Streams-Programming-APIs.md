@@ -8,7 +8,7 @@ Applications interact with streams via APIs that are very similar to the well kn
 
 ### Stream Providers and Async Streams
 
-An application starts by using a *stream provider* to get a handle to a stream. We will see in more details what a stream provider is later, but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:
+An application starts by using a *stream provider* to get a handle to a stream. You can read more aabout stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers), but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:
 
 ``` csharp
 IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
@@ -143,5 +143,20 @@ Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub co
 ```
 
 That way Pub-Sub data will be durably stored in Azure Table.
+
+### Configuration
+
+In order to use streams you need to enable stream providers via configuration. You can read morea about stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers). Sample stream providers configuration:
+
+``` xml
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <StreamProviders>
+      <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider"/>
+      <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider"/>
+    </StreamProviders>
+  </Globals>
+</OrleansConfiguration>
+```
 
 In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
