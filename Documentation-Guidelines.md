@@ -106,5 +106,5 @@ External links should be exposed as a the full link e.g. https://github.com/dotn
 
 
 #Contribution
-The Orleans documentation is managed as Markdown files in a Git repository hosted on [Github in the gh-pages branch](https://github.com/dotnet/orleans/tree/gh-pages).
+The Orleans documentation is managed as Markdown files in a Git repository hosted on [GitHub in the gh-pages branch](https://github.com/dotnet/orleans/tree/gh-pages).
 See the [GitHub Pages](https://pages.github.com/) documentation on how to use the `gh-pages` branch convention for "Project site" documents.
