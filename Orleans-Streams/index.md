@@ -33,10 +33,11 @@ Applications interact with streams via APIs that are very similar to the well kn
 In a typical example below a device generates some data, which is sent as an HTTP request to the service running in the Cloud. Orleans client running in the front end server receives this HTTP call and publishes the data into a matching device stream:
 
 ``` csharp
-public Task OnHttpCall(string deviceId, string deviceData)
+public async Task OnHttpCall(DeviceEvent deviceEvent)
 {
-     IAsyncStream<string> deviceStream = GetStream<string>(deviceId);
-     await chatStream.OnNextAsync(deviceData);
+     // Post data directly into device's stream.
+     IAsyncStream<DeviceEventData> deviceStream = GetStream<DeviceEventData>(deviceEvent.DeviceId);
+     await chatStream.OnNextAsync(deviceEvent.Data);
      return;
 }
 ```
@@ -46,7 +47,7 @@ In another example below a chat user (implemented as Orleans Grain) joins a chat
 ``` csharp
 public class ChatUser: Grain
 {
-    public Task JoinChat(string chatGroupName)
+    public async Task JoinChat(string chatGroupName)
     {
        IAsyncStream<string> chatStream = GetStream<string>(chatGroupName);
        await chatStream.SubscribeAsync((string chatEvent) => Console.Out.Write(chatEvent));
