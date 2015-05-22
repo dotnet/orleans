@@ -61,11 +61,21 @@ await subscriptionHandle.UnsubscribeAsync()
 
 It is important to note that **the subscription is for a grain, not for an activation**. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a **virtual stream abstraction**: not only all the streams always exits, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.
 
+### Multiplicity
+
+An Orleans stream may have multiple producers and multiple consumers. A message published by a producer will be delivered to all consumers that were subscribed to the stream before the message was published.
+
+In addition, the consumer can subscribe to the same stream multiple times. Each time it subscribes it gets back a unique `StreamSubscriptionHandle<T>`. If a grain (or client) is subscribed X times to the same stream, it will receive the same event X times, once for each subscription. The consumer can also unsubscribe from an individual subscription or find out all its current subscriptions, by calling:
+
+``` csharp
+IList<StreamSubscriptionHandle<T>> allMyHandles = await IAsyncStream<T>.GetAllSubscriptionHandles()
+```
+
 ### Recovering from failures
 
 If the producer of a stream dies (or its grain is deactivated), there is nothing it needs to do. Next time this grain wants to produce more events it can get the stream handle again and produce new events in the same way.
 
-Consumer logic is a little bit more involved. As we said before, once consumer grain subscribed to a stream, this subscription is valid until it explicitly unsubscribes. If the consumer of the stream dies (or its grain is deactivated) and new event is generated on the stream, the consumer grain will be automatically re-activated (just like any regular Orleans grain is automatically activated upon message to it). The only thing that the grain code needs to do now is to provide a `IAsyncObserver<T>` to process the data. The consumer basically need to re-attach processing logic. To do that it can call: 
+Consumer logic is a little bit more involved. As we said before, once consumer grain subscribed to a stream, this subscription is valid until it explicitly unsubscribes. If the consumer of the stream dies (or its grain is deactivated) and new event is generated on the stream, the consumer grain will be automatically re-activated (just like any regular Orleans grain is automatically activated upon message to it). The only thing that the grain code needs to do now is to provide a `IAsyncObserver<T>` to process the data. The consumer basically need to re-attach processing logic as part of `OnActivateAsync` method. To do that it can call: 
 
 ``` csharp
 StreamSubscriptionHandle<int> newHandle = await subscriptionHandle.ResumeAsync(IAsyncObserver)
@@ -80,15 +90,7 @@ IList<StreamSubscriptionHandle<T>> allMyHandles = await IAsyncStream<T>.GetAllSu
 ```
 The consumer can now resume all of them, or unsubscribe from some if he wishes to.
 
-### Multiplicity
-
-An Orleans stream may have multiple producers and multiple consumers. A message published by a producer will be delivered to all consumers that were subscribed to the stream before the message was published.
-
-In addition, the consumer can subscribe to the same stream multiple times. Each time it subscribes it gets back a unique `StreamSubscriptionHandle<T>`. If a grain (or client) is subscribed X times to the same stream, it will receive the same event X times, once for each subscription. The consumer can also unsubscribe from an individual subscription or find out all its current subscriptions, by calling:
-
-``` csharp
-await IAsyncStream<T>.GetAllSubscriptionHandles()
-```
+**COMMENT:** If the consumer grain implements the the `IAsyncObserver` interface directly (`public class MyGrain<T> : Grain, IAsyncObserver<T>`), it should in theory not be required to re-attach the `IAsyncObserver` and thus will not need to call `ResumeAsync`. The streaming runtime should be able to automatically figure out that the grain already implements `IAsyncObserver` and will just invoke those `IAsyncObserver` methods. The streaming runtime currently does not support this and the grain code still needs to explicitly `ResumeAsync`, even if the grain implements `IAsyncObserver` directly. Supporting this is on our TODO list.
 
 
 ### Explicit and Implicit Subscriptions
