@@ -17,9 +17,10 @@ There is a number of principles behind Orleans Streams Programming Model.
 
 1. Following the philosophy of [Orleans virtual actors](https://github.com/dotnet/orleans/wiki/Grains), Orleans streams are *virtual*. That is, a stream always exists. It is not explicitly created or destroyed, and it can never fail.
 2. Streams are *identified by* stream IDs, which are just *logical names* comprised of GUIDs and strings.
+3. Orleans Streams allow to *decouple generation of data from its processing both in time and space*. That means that stream producer and stream consumer may be on different servers, in different times and will withstand failures.
 3. Orleans streams are *lightweight and dynamic*. Orleans Streaming Runtime is designed to handle a large number of streams that come and go at a high rate.
 4. Orleans stream *bindings are dynamic*. Orleans Streaming Runtime is designed to handle cases where grains connect to and disconnect from streams at a high rate.
-5. Orleans Streaming Runtime *transparently manages the lifecycle of streams*. After an application subscribes to a stream, from then on it will receive the stream's events, even in presence of failures.
+5. Orleans Streaming Runtime *transparently manages the lifecycle of stream consumption*. After an application subscribes to a stream, from then on it will receive the stream's events, even in presence of failures.
 6. Orleans streams *work uniformly across grains and Orleans clients*.
 
 
