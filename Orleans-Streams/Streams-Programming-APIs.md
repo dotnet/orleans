@@ -188,3 +188,6 @@ public void RegisterStreamProvider(string providerTypeFullName, string providerN
 public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStreamProvider 
 ```
 on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
+
+##Next
+[Orleans Stream Providers](Stream-Providers)
