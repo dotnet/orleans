@@ -73,3 +73,5 @@ It is also possible to write a completely new Stream Provider. In such a case th
 
 We currently do not envision scenarios where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenario, we would like to hear about it and work together on simplifying writing new Stream Providers.
 
+##Next
+[Orleans Streams Extensibility](Streams-Extensibility)
