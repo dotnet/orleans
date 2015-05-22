@@ -25,9 +25,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans
@@ -45,6 +47,8 @@ namespace Orleans
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
         // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
+
+        internal GrainReference GrainReference { get { return Data.GrainReference; } }
 
         internal IGrainRuntime Runtime
         {

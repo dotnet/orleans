@@ -287,6 +287,13 @@ namespace Orleans.CodeGeneration
             Func<Type, bool> nonamespace = t => CurrentNamespace == t.Namespace || ReferencedNamespaces.Contains(t.Namespace);
 
             Type persistentInterface = GetPersistentInterface(sourceType);
+            if (persistentInterface!=null && !persistentInterface.IsInterface)
+            {
+                hasStateClass = false;
+                return null;
+            }
+
+
             Dictionary<string, PropertyInfo> asyncProperties = GrainInterfaceData.GetPersistentProperties(persistentInterface)
                 .ToDictionary(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1), p => p);
 
