@@ -160,7 +160,7 @@ In order to use streams you need to enable stream providers via configuration. Y
 </OrleansConfiguration>
 ```
 
-It is also possible to register stream provider programaticaly, via calling one of the:
+It is also possible to register a stream provider programatically, via calling one of the:
 
 ``` csharp
 public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
