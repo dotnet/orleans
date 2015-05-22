@@ -120,6 +120,7 @@
     <Compile Include="Configuration\LimitValue.cs" />
     <Compile Include="Core\Exceptions.cs" />
     <Compile Include="Core\GrainStateStorageBridge.cs" />
+    <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IGrainState.cs" />
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />

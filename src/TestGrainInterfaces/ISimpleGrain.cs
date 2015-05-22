@@ -41,8 +41,4 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetAxB(int a, int b);
         Task<int> GetA();
     }
-
-    public interface ISimpleCLIGrain : ISimpleGrain
-    {
-    }
 }
