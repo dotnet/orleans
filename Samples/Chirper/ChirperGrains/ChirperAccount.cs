@@ -44,7 +44,7 @@ namespace Orleans.Samples.Chirper.Grains
         /// <summary>Chirp messages recently received by this user</summary>
         Queue<ChirperMessage> RecentReceivedMessages { get; set; }
 
-        /// <summary>Chirp messages recently received by this user</summary>
+        /// <summary>Chirp messages recently published by this user</summary>
         Queue<ChirperMessage> MyPublishedMessages { get; set; }
 
         long UserId { get; set; }
