@@ -65,3 +65,5 @@ The latter is provided by the built-in Orleans messaging delivery mechanism. Eve
 
 With regard to bringing stream events from the queue to the agent Orleans Streaming provides a new special Backpressure mechanism. Since the agent decouples de-queuing of events from the queue and delivering them to consumers, it is possible that a single slow consumer will fall behind so much that the `IQueueCache` will fill up. To prevent `IQueueCache` from growing indefinitely, we limit its size (the size limit is configurable). However, the agent never throws away undelivered events. Instead, when the cache starts to fill up, the agents slows the rate of dequeing events from the queue. That way, we can "ride" the slow delivery periods by adjusting the rate at which we consume from the queue ("backpressure") and get back into fast consumption rate later on. To detect the "slow delivery" valleys the `IQueueCache` uses an internal data structure of cache buckets that track the progress of delivery of events to individual stream consumer. This results in a very responsive and self-adjusting systems.
 
+##Next
+[Orleans Streams Extensibility](Streams-Extensibility)
