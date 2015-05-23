@@ -167,7 +167,7 @@ In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from produ
 
 ### Configuration
 
-In order to use streams you need to enable stream providers via configuration. You can read morea about stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers). Sample stream providers configuration:
+In order to use streams you need to enable stream providers via configuration. You can read more about stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers). Sample stream providers configuration:
 
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
