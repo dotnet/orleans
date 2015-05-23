@@ -30,11 +30,11 @@ We identified 4 basic requirements for our Stream Processing system that will al
 3. Fine-grained stream granularity
 4. Distribution
 
-**Flexible stream processing logic**
+#### Flexible stream processing logic
 
 We want the system to support different ways of expressing the stream processing logic. The existing systems we mentioned above require the developer to write a declarative data-flow computation graph, usually by following a functional programming style. This limits the expressiveness and flexibility of the processing logic. Orleans streams are indifferent to the way processing logic is expressed. It can be expressed as a data-flow (e.g., by using [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx)); as a functional program; as a declarative query; or in a general imperative logic. The logic can be stateful or stateless, may or may not have side effects, and can trigger external actions. All power goes to the developer.
 
-**Support for dynamic topologies**
+#### Support for dynamic topologies
 
 We want the system to allow for dynamically evolving topologies. The existing systems we mentioned above are usually limited to only static topologies that are fixed at deployment time and cannot evolve at runtime. In the following example of a dataflow expression everything is nice and simple until you need to change it.
 
@@ -46,13 +46,13 @@ Change the threshold condition in the `Where` filter, add an additional `Select`
 
 We want the system to allow for evolving the stream processing graph at runtime, by adding new links or nodes to the computation graph, or by changing the processing logic within the computation nodes.
 
-**Fine grained stream granularity**
+#### Fine grained stream granularity
 
 In the existing systems, the smallest unit of abstraction is usually the whole flow (topology). However, many of our target scenarios require individual node/link in the topology to be a logical entity by itself. That way each entity can be potentially managed independently. For example, in the big stream topology comprising of multiple links, different links can have different characteristics and can be implemented over different physical transports. Some links can go over TCP sockets, while others over reliable queues. Different links can have different delivery guarantees. Different nodes can have different checkpointing strategies, and their processing logic can be expressed in different models or even different languages. Such flexibility is usually not possible in existing systems.
 
 The unit of abstraction and flexibility argument is similar to comparison of SoA (Service Oriented Architectures) vs. Actors. Actor systems allow more flexibility, since each is essentially an independently managed ''tiny service''. Similarly, we want the system to allow for such a fine grained control.
 
-**Distribution**
+#### Distribution
 
 And of course, our system should have all the properties of a **"good distributed system"**. That includes:
 
@@ -64,5 +64,5 @@ And of course, our system should have all the properties of a **"good distribute
 
 These were the requirements we had in mind for building [**Orleans Streaming**](index).
 
-##Next
+## Next
 [Orleans Streams Programming APIs](Streams-Programming-APIs)
