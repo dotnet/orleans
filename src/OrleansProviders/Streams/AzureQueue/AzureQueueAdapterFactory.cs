@@ -32,19 +32,21 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     public class AzureQueueAdapterFactory : IQueueAdapterFactory
     {
-        private const string CACHE_SIZE = "CacheSize";
+        private const string CACHE_SIZE_PARAM = "CacheSize";
         private const int DEFAULT_CACHE_SIZE = 4096;
+        private const string NUM_QUEUES_PARAM = "NumQueues";
+        public const int DEFAULT_NUM_QUEUES = 8; // keep as power of 2.
         
         private string deploymentId;
         private string dataConnectionString;
         private string providerName;
         private int cacheSize;
+        private int numQueues;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
 
         public const string DATA_CONNECTION_STRING = "DataConnectionString";
         public const string DEPLOYMENT_ID = "DeploymentId";
-        public const int NUM_QUEUES = 8; // keep as power of 2.
         
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger)
         {
@@ -56,13 +58,21 @@ namespace Orleans.Providers.Streams.AzureQueue
             
             string cacheSizeString;
             cacheSize = DEFAULT_CACHE_SIZE;
-            if (config.Properties.TryGetValue(CACHE_SIZE, out cacheSizeString))
+            if (config.Properties.TryGetValue(CACHE_SIZE_PARAM, out cacheSizeString))
             {
                 if (!int.TryParse(cacheSizeString, out cacheSize))
-                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", CACHE_SIZE));
+                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", CACHE_SIZE_PARAM));
             }
+            string numQueuesString;
+            numQueues = DEFAULT_NUM_QUEUES;
+            if (config.Properties.TryGetValue(NUM_QUEUES_PARAM, out numQueuesString))
+            {
+                if (!int.TryParse(numQueuesString, out numQueues))
+                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", NUM_QUEUES_PARAM));
+            }
+
             this.providerName = providerName;
-            streamQueueMapper = new HashRingBasedStreamQueueMapper(NUM_QUEUES, providerName);
+            streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
             adapterCache = new SimpleQueueAdapterCache(this, cacheSize, logger);
         }
 
