@@ -122,14 +122,16 @@
   </PropertyGroup>
   <!-- Set path to ClientGenerator.exe -->
   <Choose>
-    <When Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <When Condition="'$(builduri)' != ''">
       <PropertyGroup>
-        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+	    <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
       </PropertyGroup>
     </When>
     <Otherwise>
       <PropertyGroup>
-        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+	    <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
       </PropertyGroup>
     </Otherwise>
   </Choose>

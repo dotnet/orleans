@@ -20,6 +20,8 @@ if EXIST "%VERSION_FILE%" (
     SET PRODUCT_VERSION=1.0
 )
 
+if "%builduri%" == "" set builduri=Build.cmd
+
 set PROJ=%CMDHOME%\Orleans.sln
 
 @echo ===== Building %PROJ% =====
