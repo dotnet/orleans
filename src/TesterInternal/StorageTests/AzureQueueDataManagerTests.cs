@@ -61,7 +61,7 @@ namespace UnitTests.StorageTests
         {
             AzureQueueDataManager manager = new AzureQueueDataManager(qName, DeploymentId, StorageTestConstants.DataConnectionString);
             await manager.InitQueueAsync();
-            return manager;
+            return await Task.FromResult(manager);
         }
 
         [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]

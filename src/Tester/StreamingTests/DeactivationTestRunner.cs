@@ -83,7 +83,7 @@ namespace Tester.StreamingTests
             Assert.AreEqual(count[subscriptionHandle], 1, "Consumer grain has not received stream message");
 
             //TODO: trigger deactivation programmatically
-            Thread.Sleep(130000); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+            await Task.Delay(TimeSpan.FromMilliseconds(130000)); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:
@@ -113,7 +113,7 @@ namespace Tester.StreamingTests
             Assert.AreEqual(count.Value, 1, "Client consumer grain has not received stream message");
 
             //TODO: trigger deactivation programmatically
-            Thread.Sleep(130000); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
+            await Task.Delay(TimeSpan.FromMilliseconds(130000)); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
 
             // deactivating PubSubRendezvousGrain and SampleStreaming_ProducerGrain during the same GC cycle causes a deadlock
             // resume producing after the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain grains have been deactivated:

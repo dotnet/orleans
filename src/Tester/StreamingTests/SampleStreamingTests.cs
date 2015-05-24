@@ -127,7 +127,7 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
 
@@ -147,10 +147,10 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
-            //int numProduced = producer.NumberProduced.Result;
+            //int numProduced = await producer.NumberProduced;
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
@@ -168,10 +168,10 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep( 1000 );
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
-            //int numProduced = producer.NumberProduced.Result;
+            //int numProduced = await producer.NumberProduced;
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
