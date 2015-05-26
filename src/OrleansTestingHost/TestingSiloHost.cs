@@ -21,6 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -28,11 +31,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Remoting;
-using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.TestingHost.Extensions;
 
 namespace Orleans.TestingHost
 {
@@ -117,7 +116,7 @@ namespace Orleans.TestingHost
 
             try
             {
-                Initialize(siloOptions, clientOptions);
+                InitializeAsync(siloOptions, clientOptions).Wait();
                 string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
                 WriteLog(startMsg);
             }
@@ -171,11 +170,11 @@ namespace Orleans.TestingHost
         /// Wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
         /// </summary>
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
-        public void WaitForLivenessToStabilize(bool didKill = false)
+        public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
             TimeSpan stabilizationTime = _livenessStabilizationTime;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-            Thread.Sleep(stabilizationTime);
+            await Task.Delay(stabilizationTime);           
             WriteLog("WaitForLivenessToStabilize is done sleeping");
         }
 
@@ -286,7 +285,7 @@ namespace Orleans.TestingHost
 
             Primary = StartOrleansSilo(Silo.SiloType.Primary, primarySiloOptions, InstanceCounter++);
             Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, InstanceCounter++);
-            WaitForLivenessToStabilize();
+            WaitForLivenessToStabilizeAsync().Wait();
             GrainClient.Initialize();
         }
 
@@ -335,7 +334,7 @@ namespace Orleans.TestingHost
 
         #region Private methods
 
-        private void Initialize(TestingSiloOptions options, TestingClientOptions clientOptions)
+        private async Task InitializeAsync(TestingSiloOptions options, TestingClientOptions clientOptions)
         {
             bool doStartPrimary = false;
             bool doStartSecondary = false;
@@ -389,14 +388,14 @@ namespace Orleans.TestingHost
                     int instanceCount = InstanceCounter++;
                     handles.Add(Task.Run(() => StartOrleansSilo(Silo.SiloType.Secondary, options, instanceCount)));
                 }
-                Task.WhenAll(handles.ToArray()).Wait();
+                await Task.WhenAll(handles.ToArray());
                 if (doStartPrimary)
                 {
-                    Primary = handles[0].Result;
+                    Primary = await handles[0];
                 }
                 if (doStartSecondary)
                 {
-                    Secondary = handles[1].Result;
+                    Secondary = await handles[1];
                 }
             }else
             {

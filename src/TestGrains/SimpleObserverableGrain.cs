@@ -52,33 +52,42 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
 
-        public Task SetA(int a)
+        public async Task SetA(int a)
         {
             logger.Info("SetA={0}", a);
             A = a;
-            Task.Factory.StartNew(() =>
+
+            //If this were run with Task.Run there were no need for the added Unwrap call.
+            //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
+            //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
+            //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
+            //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
+            await Task.Factory.StartNew(async () =>
             {
-                Thread.Sleep(EventDelay);
+                await Task.Delay(EventDelay);
                 RaiseStateUpdateEvent();
-            }).Ignore();
-            return TaskDone.Done;
+            }).Unwrap();            
         }
 
-        public Task SetB(int b)
+        public async Task SetB(int b)
         {
             this.B = b;
-            Task.Factory.StartNew(() =>
+
+            //If this were run with Task.Run there were no need for the added Unwrap call.
+            //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
+            //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
+            //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
+            //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
+            await Task.Factory.StartNew(async () =>
             {
-                Thread.Sleep(EventDelay);
+                await Task.Delay(EventDelay);
                 RaiseStateUpdateEvent();
-            }).Ignore();
-            return TaskDone.Done;
+            }).Unwrap();            
         }
 
-        public Task IncrementA()
+        public async Task IncrementA()
         {
-            SetA(A + 1);
-            return TaskDone.Done;
+            await SetA(A + 1);            
         }
 
         public Task<int> GetAxB()

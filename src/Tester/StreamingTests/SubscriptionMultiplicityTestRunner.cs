@@ -21,15 +21,14 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using TestGrainInterfaces;
 using UnitTests.SampleStreaming;
 
@@ -65,7 +64,7 @@ namespace Tester.StreamingTests
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             // check
@@ -88,7 +87,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -101,7 +100,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> secondSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
@@ -114,7 +113,7 @@ namespace Tester.StreamingTests
             await consumer.StopConsuming(firstSubscriptionHandle);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -135,7 +134,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -146,7 +145,7 @@ namespace Tester.StreamingTests
             Assert.AreEqual(firstSubscriptionHandle, resumeHandle, "Handle matches");
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -167,7 +166,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -176,7 +175,7 @@ namespace Tester.StreamingTests
             await consumer.Deactivate();
 
             // make sure grain has time to deactivate.
-            Thread.Sleep(100);
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
 
             // clear producer counts
             await producer.ClearNumberProduced();
@@ -187,7 +186,7 @@ namespace Tester.StreamingTests
             Assert.AreEqual(firstSubscriptionHandle, resumeHandle, "Handle matches");
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);

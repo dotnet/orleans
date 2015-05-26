@@ -86,7 +86,7 @@ namespace UnitTests.StorageTests
         {
             if (membership != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                membership.DeleteMembershipTableEntries(deploymentId);
+                membership.DeleteMembershipTableEntries(deploymentId).Wait();
                 membership = null;
             }
         }
