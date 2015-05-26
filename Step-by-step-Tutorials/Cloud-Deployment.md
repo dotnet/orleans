@@ -78,7 +78,9 @@ public class WorkerRole : RoleEntryPoint
         // Configure storage providers
         
         silo = new AzureSilo();
-        bool ok = silo.Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance, config);
+        bool ok = silo.Start(RoleEnvironment.DeploymentId,
+                             RoleEnvironment.CurrentRoleInstance,
+                             config);
 
         silo.Run(); // Call will block until silo is shutdown
     } 
