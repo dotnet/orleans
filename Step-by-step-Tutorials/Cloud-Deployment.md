@@ -55,21 +55,37 @@ The worker role initialization class needs to create an instance of `Orleans.Hos
 ``` csharp
 public class WorkerRole : RoleEntryPoint 
 { 
-    Orleans.Host.Azure.OrleansAzureSilo silo; 
+    Orleans.Runtime.Host.AzureSilo silo; 
 
     public override bool OnStart() 
     { 
         // Do other silo initialization – for example: Azure diagnostics, etc 
-
-        silo = new OrleansAzureSilo(); 
-
-        return silo.Start( 
-            RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance); 
+        
+        return base.OnStart();
     } 
-    public override void OnStop() { silo.Stop(); } 
-    public override void Run()    { silo.Run(); } 
+    
+    public override void OnStop()
+    {
+        silo.Stop();
+        base.Stop();
+    }
+    
+    public override void Run()
+    {
+        var config = new ClusterConfiguration();
+        config.StandardLoad();
+        
+        // Configure storage providers
+        
+        silo = new AzureSilo();
+        bool ok = silo.Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance, config);
+
+        silo.Run(); // Call will block until silo is shutdown
+    } 
 } 
 ```
+
+It is IMPORTANT to start the silo not in OnStart but in Run. Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.
 
 Then, in the `ServiceDefinition.csdef` file for this role, add some required configuration items used by the Orleans Azure hosting library to the WorkerRole configuration:
 
