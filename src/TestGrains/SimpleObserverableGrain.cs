@@ -58,7 +58,7 @@ namespace UnitTests.Grains
             A = a;
 
             //If this were run with Task.Run there were no need for the added Unwrap call.
-            //However, Task.Run runs in Thread Pool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
+            //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
             //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
             //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
             //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
@@ -74,7 +74,7 @@ namespace UnitTests.Grains
             this.B = b;
 
             //If this were run with Task.Run there were no need for the added Unwrap call.
-            //However, Task.Run runs in Thread Pool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
+            //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
             //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
             //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
             //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
