@@ -227,6 +227,15 @@ namespace Orleans.Runtime.Host
             if (orleans != null) orleans.Stop();
         }
 
+        /// <summary>
+        /// Gracefully shutdown this silo.
+        /// </summary>
+        public void ShutdownOrleansSilo()
+        {
+            IsStarted = false;
+            if (orleans != null) orleans.Shutdown();
+        }
+
 		/// <summary>
 		/// Wait for this silo to shutdown.
 		/// </summary>
@@ -507,7 +516,7 @@ namespace Orleans.Runtime.Host
 		{
 			// Try to perform gracefull shutdown of Silo when we a cancellation request has been made
 			logger.Info(ErrorCode.SiloStopping, "External cancellation triggered, starting to shutdown silo.");
-			StopOrleansSilo();
+            ShutdownOrleansSilo();
 		}
 
         /// <summary>

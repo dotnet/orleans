@@ -772,6 +772,13 @@ namespace Orleans.Runtime
             }
         }
 
+        public Task ShutdownActivations_DeactivateAll()
+        {
+            logger.Info(ErrorCode.Catalog_ShutdownActivations_DeactivateAll, "ShutdownActivations_DeactivateAll.");
+            var activationsToShutdown = activations.Select(kv => kv.Value).ToList();
+            return ShutdownActivations_DirectShutdown(activationsToShutdown);
+        }
+
         /// <summary>
         /// Deletes activation immediately regardless of active transactions etc.
         /// For use by grain delete, transaction abort, etc.

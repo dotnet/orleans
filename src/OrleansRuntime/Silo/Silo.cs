@@ -529,13 +529,33 @@ namespace Orleans.Runtime
             ServicePointManager.UseNagleAlgorithm = nodeConfig.UseNagleAlgorithm;
         }
 
+        /// <summary>
+        /// Gracefully stop the run time system only, but not the application. 
+        /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
+        /// Grains are not deactivated.
+        /// </summary>
+        public void Stop()
+        {
+            Terminate(false);
+        }
+
+        /// <summary>
+        /// Gracefully stop the run time system and the application. 
+        /// All grains will be properly deactivated.
+        /// All in-flight applications requests would be awaited and finished gracefully.
+        /// </summary>
+        public void Shutdown()
+        {
+            Terminate(true);
+        }
 
         /// <summary>
         /// Gracefully stop the run time system only, but not the application. 
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
-        public void Stop()
+        private void Terminate(bool gracefully)
         {
+            string operation = gracefully ? "Shutdown()" : "Stop()";
             bool stopAlreadyInProgress = false;
             lock (lockable)
             {
@@ -548,21 +568,24 @@ namespace Orleans.Runtime
                 }
                 else if (!SystemStatus.Current.Equals(SystemStatus.Running))
                 {
-                    throw new InvalidOperationException(String.Format("Calling Silo.Stop() on a silo which is not in the Running state. This silo is in the {0} state.", SystemStatus.Current));
+                    throw new InvalidOperationException(String.Format("Calling Silo.{0} on a silo which is not in the Running state. This silo is in the {1} state.", operation, SystemStatus.Current));
                 }
                 else
                 {
-                    SystemStatus.Current = SystemStatus.Stopping;
+                    if (gracefully)
+                        SystemStatus.Current = SystemStatus.ShuttingDown;
+                    else
+                        SystemStatus.Current = SystemStatus.Stopping;
                 }
             }
 
             if (stopAlreadyInProgress)
             {
-                logger.Info(ErrorCode.SiloStopInProgress, "Silo stop is in progress - Will wait for stop to finish");
+                logger.Info(ErrorCode.SiloStopInProgress, "Silo termination is in progress - Will wait for it to finish");
                 var pause = TimeSpan.FromSeconds(1);
                 while (!SystemStatus.Current.Equals(SystemStatus.Terminated))
                 {
-                    logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for stop to complete", pause);
+                    logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
                     Thread.Sleep(pause);
                 }
                 return;
@@ -572,36 +595,54 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
-                    // 1: Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
-                    scheduler.QueueTask(LocalSiloStatusOracle.Stop, ((SystemTarget)LocalSiloStatusOracle).SchedulingContext)
-                        .WaitWithThrow(stopTimeout);
+                    if (gracefully)
+                    {
+                        logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
+                        // 1: Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
+                        scheduler.QueueTask(LocalSiloStatusOracle.ShutDown, ((SystemTarget)LocalSiloStatusOracle).SchedulingContext)
+                            .WaitWithThrow(stopTimeout);
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
+                        // 1: Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
+                        scheduler.QueueTask(LocalSiloStatusOracle.Stop, ((SystemTarget)LocalSiloStatusOracle).SchedulingContext)
+                            .WaitWithThrow(stopTimeout);
+                    }
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.SiloFailedToStopMembership, "Failed to Stop() LocalSiloStatusOracle. About to FastKill this silo.", exc);
+                    logger.Error(ErrorCode.SiloFailedToStopMembership, String.Format("Failed to {0} LocalSiloStatusOracle. About to FastKill this silo.", operation), exc);
                     return; // will go to finally
                 }
-            
-                // 2: Stop the gateway
-                SafeExecute(messageCenter.StopAcceptingClientMessages);
 
-                // 3: Start rejecting all silo to silo application messages
-                SafeExecute(messageCenter.BlockApplicationMessages);
-
-                // 4: Stop scheduling/executing application turns
-                SafeExecute(scheduler.StopApplicationTurns);
-
-                // 5: Directory: Speed up directory handoff
-                // will be started automatically when directory receives SiloStatusChangeNotification(Stopping)
-
-                // 6. Stop reminder service
+                // 2: Stop reminder service
                 scheduler.QueueTask(reminderService.Stop, ((SystemTarget)reminderService).SchedulingContext)
                     .WaitWithThrow(stopTimeout);
-                
-                // 7
-                SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(TimeSpan.FromSeconds(5)));
 
+                if (gracefully)
+                {
+                    // 3: Deactivate all grains
+                    SafeExecute(() => catalog.ShutdownActivations_DeactivateAll().WaitWithThrow(stopTimeout));
+                }
+
+
+                // 3: Stop the gateway
+                SafeExecute(messageCenter.StopAcceptingClientMessages);
+
+                // 4: Start rejecting all silo to silo application messages
+                SafeExecute(messageCenter.BlockApplicationMessages);
+
+                // 5: Stop scheduling/executing application turns
+                SafeExecute(scheduler.StopApplicationTurns);
+
+                // 6: Directory: Speed up directory handoff
+                // will be started automatically when directory receives SiloStatusChangeNotification(Stopping)
+
+                // 7:
+                SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
+
+                // 8:
                 SafeExecute(storageProviderManager.UnloadStorageProviders);
             }
             finally
