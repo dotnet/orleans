@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace Orleans.Runtime.Counters
 {
@@ -119,7 +119,7 @@ namespace Orleans.Runtime.Counters
             new PerfCounterConfigData {Name = StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH},
             new PerfCounterConfigData {Name = StatisticNames.SCHEDULER_PENDINGWORKITEMS},
             new PerfCounterConfigData {Name = StatisticNames.CATALOG_ACTIVATION_COUNT},
-            new PerfCounterConfigData {Name = StatisticNames.CATALOG_DUPLICATE_ACTIVATIONS},
+            new PerfCounterConfigData {Name = StatisticNames.CATALOG_ACTIVATION_DUPLICATE_ACTIVATIONS},
             new PerfCounterConfigData {Name = StatisticNames.RUNTIME_GC_TOTALMEMORYKB},
             new PerfCounterConfigData {Name = StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS},
             new PerfCounterConfigData {Name = StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS},

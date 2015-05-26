@@ -21,8 +21,10 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Net;
+﻿using System.Runtime.InteropServices.WindowsRuntime;
+﻿using System.Threading;
 
 
 namespace Orleans.Runtime.Host
@@ -51,7 +53,7 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
-        /// Run fucntion for the Silo.
+        /// Run the Silo.
         /// </summary>
         /// <remarks>
         /// If the Silo starts up successfully, then this method will block and not return 
@@ -62,34 +64,71 @@ namespace Orleans.Runtime.Host
         /// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
         public int Run()
         {
-            bool ok;
-
-            try
-            {
-                SiloHost.InitializeOrleansSilo();
-                ok = SiloHost.StartOrleansSilo();
-
-                if (ok)
-                {
-                    ConsoleText.WriteStatus(string.Format("Successfully started Orleans silo '{0}' as a {1} node.", SiloHost.Name, SiloHost.Type));
-                    SiloHost.WaitForOrleansSiloShutdown();
-                }
-                else
-                {
-                    ConsoleText.WriteError(string.Format("Failed to start Orleans silo '{0}' as a {1} node.", SiloHost.Name, SiloHost.Type));
-                }
-
-                ConsoleText.WriteStatus(string.Format("Orleans silo '{0}' shutdown.", SiloHost.Name));
-            }
-            catch (Exception exc)
-            {
-                SiloHost.ReportStartupError(exc);
-                TraceLogger.CreateMiniDump();
-                ok = false;
-            }
-
-            return ok ? 0 : 1;
+			return RunImpl();
         }
+
+		/// <summary>
+		/// Run the Silo.
+		/// </summary>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <remarks>
+		/// If the Silo starts up successfully, then this method will block and not return 
+		/// until the silo shutdown event is triggered or the silo shuts down for some other reason or 
+		/// an external request for cancellation has been issued.
+		/// If the silo fails to star, then a StartupError.txt summary file will be written, 
+		/// and a process mini-dump will be created in the current working directory.
+		/// </remarks>
+		/// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
+		public int Run(CancellationToken cancellationToken)
+		{
+			return RunImpl(cancellationToken);
+		}
+
+		/// <summary>
+		/// Run method helper.
+		/// </summary>
+		/// <param name="cancellationToken">Optional cancellation token.</param>
+		/// <remarks>
+		/// If the Silo starts up successfully, then this method will block and not return 
+		/// until the silo shutdown event is triggered or the silo shuts down for some other reason or 
+		/// an external request for cancellation has been issued.
+		/// If the silo fails to star, then a StartupError.txt summary file will be written, 
+		/// and a process mini-dump will be created in the current working directory.
+		/// </remarks>
+		/// <returns>Returns <c>false</c> is Silo failed to start up correctly.</returns>
+		private int RunImpl(CancellationToken? cancellationToken = null)
+		{
+			bool ok;
+
+			try
+			{
+				SiloHost.InitializeOrleansSilo();
+				ok = SiloHost.StartOrleansSilo();
+
+				if (ok)
+				{
+					ConsoleText.WriteStatus(string.Format("Successfully started Orleans silo '{0}' as a {1} node.", SiloHost.Name, SiloHost.Type));
+					if (cancellationToken.HasValue)
+						SiloHost.WaitForOrleansSiloShutdown(cancellationToken.Value);
+					else
+						SiloHost.WaitForOrleansSiloShutdown();
+				}
+				else
+				{
+					ConsoleText.WriteError(string.Format("Failed to start Orleans silo '{0}' as a {1} node.", SiloHost.Name, SiloHost.Type));
+				}
+
+				ConsoleText.WriteStatus(string.Format("Orleans silo '{0}' shutdown.", SiloHost.Name));
+			}
+			catch (Exception exc)
+			{
+				SiloHost.ReportStartupError(exc);
+				TraceLogger.CreateMiniDump();
+				ok = false;
+			}
+
+			return ok ? 0 : 1;
+		}
 
         /// <summary>
         /// Parse command line arguments, to allow override of some silo runtime config settings.

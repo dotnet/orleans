@@ -21,14 +21,13 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
+using Orleans.Providers;
 
 namespace Orleans.Streams
 {
-    internal interface IStreamProviderImpl
+    public interface IStreamProviderImpl : IStreamProvider, IProvider
     {
         Task Start();
-        IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId);
-        IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId);
     }
 }

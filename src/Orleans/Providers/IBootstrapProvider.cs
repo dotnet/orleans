@@ -29,12 +29,4 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
     public interface IBootstrapProvider : IProvider
     {
     }
-
-    /// <summary>
-    /// Some constant values used by bootstrap provider loader
-    /// </summary>
-    internal static class BootstrapProviderConstants
-    {
-        public const string CONFIG_CATEGORY_NAME = "Bootstrap";
-    }
 }

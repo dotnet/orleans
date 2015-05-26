@@ -104,7 +104,7 @@ namespace GPSTracker.GrainImplementation
         {
             // add a message to the send queue
             messageQueue.Add(message);
-            if (messageQueue.Count < 25)
+            if (messageQueue.Count > 25)
             {
                 // if the queue size is greater than 25, flush the queue
                 Flush();

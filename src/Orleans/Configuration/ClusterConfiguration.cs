@@ -145,10 +145,14 @@ namespace Orleans.Runtime.Configuration
 
         private static string WriteXml(XmlElement element)
         {
-            var text = new StringWriter();
-            var xml = new XmlTextWriter(text);
-            element.WriteTo(xml);
-            return text.ToString();
+            using(var text = new StringWriter())
+            {
+                using(var xml = new XmlTextWriter(text))
+                { 
+                    element.WriteTo(xml);
+                    return text.ToString();
+                }
+            }
         }
 
         private void CalculateOverrides()
@@ -197,11 +201,6 @@ namespace Orleans.Runtime.Configuration
                 InitNodeSettingsFromGlobals(n);
                 Overrides[n.SiloName] = n;
             }
-        }
-
-        internal void AdjustConfiguration()
-        {
-            GlobalConfiguration.AdjustConfiguration(Globals.ProviderConfigurations, Globals.DeploymentId);
         }
 
         private void InitNodeSettingsFromGlobals(NodeConfiguration n)
@@ -432,6 +431,10 @@ namespace Orleans.Runtime.Configuration
                 if (String.IsNullOrEmpty(addrOrHost))
                 {
                     addrOrHost = Dns.GetHostName();
+
+                    // If for some reason we get "localhost" back. This seems to have happened to somebody.
+                    if (addrOrHost.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+                        return loopback;
                 }
 
                 var candidates = new List<IPAddress>();

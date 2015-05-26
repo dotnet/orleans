@@ -23,26 +23,26 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Data.Services.Client;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.WindowsAzure.Storage.Table.Queryable;
 using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
 {
     /// <summary>
-    /// Utility class to encapsulate row-based access to Azure table storage .
+    /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <remarks>
     /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
     /// </remarks>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
-    public class AzureTableDataManager<T> where T : TableServiceEntity, new()
+    public class AzureTableDataManager<T> where T : class, ITableEntity, new()
     {
         /// <summary> Name of the table this instance is managing. </summary>
         public string TableName { get; private set; }
@@ -53,10 +53,7 @@ namespace Orleans.AzureUtils
         /// <summary> Connection string for the Azure storage account used to host this table. </summary>
         protected string ConnectionString { get; set; }
 
-        private readonly CloudTableClient tableOperationsClient;
-
-        private const string ANY_ETAG = null; // Any Tag value is NULL and not "*" in WCF APIs (it is "*" in REST APIs);
-        // See http://msdn.microsoft.com/en-us/library/windowsazure/dd894038.aspx
+        private CloudTable tableReference;
 
         private readonly CounterStatistic numServerBusy = CounterStatistic.FindOrCreate(StatisticNames.AZURE_SERVER_BUSY, true);
 
@@ -73,7 +70,6 @@ namespace Orleans.AzureUtils
             ConnectionString = storageConnectionString;
 
             AzureStorageUtils.ValidateTableName(tableName);
-            tableOperationsClient = GetCloudTableOperationsClient();            
         }
 
         /// <summary>
@@ -88,18 +84,20 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-
+                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
                 bool didCreate = await Task<bool>.Factory.FromAsync(
-                     tableCreationClient.BeginCreateTableIfNotExist,
-                     tableCreationClient.EndCreateTableIfNotExist,
-                     TableName,
+                     tableRef.BeginCreateIfNotExists,
+                     tableRef.EndCreateIfNotExists,
                      null);
 
                 Logger.Info(ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
-                
-                await InitializeTableSchemaFromEntity(tableCreationClient);
+
+                await InitializeTableSchemaFromEntity(tableRef);
 
                 Logger.Info(ErrorCode.AzureTable_36, "Initialized schema for Azure storage table {0}", TableName);
+
+                CloudTableClient tableOperationsClient = GetCloudTableOperationsClient();
+                tableReference = tableOperationsClient.GetTableReference(TableName);
             }
             catch (Exception exc)
             {
@@ -124,11 +122,10 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-
+                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
                 bool didDelete = await Task<bool>.Factory.FromAsync(
-                        tableCreationClient.BeginDeleteTableIfExist,
-                        tableCreationClient.EndDeleteTableIfExist,
-                        TableName,
+                        tableRef.BeginDeleteIfExists,
+                        tableRef.EndDeleteIfExists,
                         null);
 
                 if (didDelete)
@@ -162,23 +159,24 @@ namespace Orleans.AzureUtils
 
             try
             {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
-                svc.AddObject(TableName, data);
+                // WAS:
+                // svc.AddObject(TableName, data);
+                // SaveChangesOptions.None
 
                 try
                 {
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries,
-                        svc.EndSaveChangesWithRetries,
-                        SaveChangesOptions.None,
+                    // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then CreateIfNotExistsAsync.
+                    var opResult = await Task<TableResult>.Factory.FromAsync(
+                        tableReference.BeginExecute,
+                        tableReference.EndExecute,
+                        TableOperation.Insert(data),
                         null);
 
-                    return svc.GetEntityDescriptor(data).ETag;
+                    return opResult.Etag;
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_05, String.Format("Intermediate error creating entry {0} in the table {1}",
-                                (data == null ? "null" : data.ToString()), TableName), exc);
+                    CheckAlertWriteError(operation, data, null, exc);
                     throw;
                 }
             }
@@ -201,51 +199,68 @@ namespace Orleans.AzureUtils
 
             try
             {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
                 try
                 {
-                    Task<DataServiceResponse> savePromise;
+                    // WAS:
+                    // svc.AttachTo(TableName, data, null);
+                    // svc.UpdateObject(data);
+                    // SaveChangesOptions.ReplaceOnUpdate,
 
-                    Func<int, Task<DataServiceResponse>> doSaveChanges = retryNum =>
-                    {
-                        if (retryNum > 0) svc.Detach(data);
-
-                        // Try to do update first
-                        svc.AttachTo(TableName, data, ANY_ETAG);
-                        svc.UpdateObject(data);
-
-                        return Task<DataServiceResponse>.Factory.FromAsync(
-                                svc.BeginSaveChangesWithRetries,
-                                svc.EndSaveChangesWithRetries,
-                                SaveChangesOptions.ReplaceOnUpdate,
-                                null);
-                    };
-
-
-                    if (AzureTableDefaultPolicies.MaxBusyRetries > 0)
-                    {
-                        IBackoffProvider backoff = new FixedBackoff(AzureTableDefaultPolicies.PauseBetweenBusyRetries);
-                        
-                        savePromise = AsyncExecutorWithRetries.ExecuteWithRetries(
-                            doSaveChanges,
-                            AzureTableDefaultPolicies.MaxBusyRetries,
-                            // Retry automatically iff we get ServerBusy reply from Azure storage
-                            (exc, retryNum) => IsServerBusy(exc),
-                            AzureTableDefaultPolicies.BusyRetriesTimeout,
-                            backoff);
-                    }
-                    else
-                    {
-                        // Try single Write only once
-                        savePromise = doSaveChanges(0);
-                    }
-                    await savePromise;
-                    EntityDescriptor result = svc.GetEntityDescriptor(data);
-                    return result.ETag;
+                    var opResult = await Task<TableResult>.Factory.FromAsync(
+                       tableReference.BeginExecute,
+                       tableReference.EndExecute,
+                       TableOperation.InsertOrReplace(data),
+                       null);
+                    
+                    return opResult.Etag;                                                           
                 }
                 catch (Exception exc)
                 {
                     Logger.Warn(ErrorCode.AzureTable_06, String.Format("Intermediate error upserting entry {0} to the table {1}",
+                        (data == null ? "null" : data.ToString()), TableName), exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+
+
+        /// <summary>
+        /// Merges a data entry in the Azure table.
+        /// </summary>
+        /// <param name="data">Data to be merged in the table.</param>
+        /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
+        public async Task<string> MergeTableEntryAsync(T data, string eTag)
+        {
+            const string operation = "MergeTableEntry";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} entry {1} into table {2}", operation, data, TableName);
+
+            try
+            {
+               
+                try
+                {
+                    // WAS:
+                    // svc.AttachTo(TableName, data, ANY_ETAG);
+                    // svc.UpdateObject(data);
+
+                    data.ETag = eTag;
+                    // Merge requires an ETag (which may be the '*' wildcard).
+                    var opResult = await Task<TableResult>.Factory.FromAsync(
+                          tableReference.BeginExecute,
+                          tableReference.EndExecute,
+                          TableOperation.Merge(data),
+                          null);
+
+                    return opResult.Etag;
+                }
+                catch (Exception exc)
+                {
+                    Logger.Warn(ErrorCode.AzureTable_07, String.Format("Intermediate error merging entry {0} to the table {1}",
                         (data == null ? "null" : data.ToString()), TableName), exc);
                     throw;
                 }
@@ -262,9 +277,37 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="data">Data to be updated into the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public Task<string> UpdateTableEntryAsync(T data, string dataEtag)
+        public async Task<string> UpdateTableEntryAsync(T data, string dataEtag)
         {
-            return UpdateTableEntryConditionallyAsync(data, dataEtag, null, null);
+            const string operation = "UpdateTableEntryAsync";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1}  entry {2}", operation, TableName, data);
+
+            try
+            {
+                try
+                {
+                    data.ETag = dataEtag;
+
+                    var opResult = await Task<TableResult>.Factory.FromAsync(
+                        tableReference.BeginExecute,
+                        tableReference.EndExecute,
+                        TableOperation.Replace(data),
+                        null);
+
+                    //The ETag of data is needed in further operations.                                        
+                    return opResult.Etag;
+                }
+                catch (Exception exc)
+                {
+                    CheckAlertWriteError(operation, data, null, exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
         }
 
         /// <summary>
@@ -274,9 +317,36 @@ namespace Orleans.AzureUtils
         /// <param name="data">Data entry to be deleted from the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
         public async Task DeleteTableEntryAsync(T data, string eTag)
-        {
-            var list = new List<Tuple<T, string>> {new Tuple<T, string>(data, eTag)};
-            await DeleteTableEntriesAsync(list);
+        {            
+            const string operation = "DeleteTableEntryAsync";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1}  entry {2}", operation, TableName, data);
+
+            try
+            {   
+                data.ETag = eTag;
+                
+                try
+                {
+                    // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then DeleteIfExistsAsync.
+                    await Task<TableResult>.Factory.FromAsync(
+                        tableReference.BeginExecute,
+                        tableReference.EndExecute,
+                        TableOperation.Delete(data),
+                        null);
+                }
+                catch (Exception exc)
+                {
+                    Logger.Warn(ErrorCode.AzureTable_08,
+                        String.Format("Intermediate error deleting entry {0} from the table {1}.",
+                            data, TableName), exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
         }
 
         /// <summary>
@@ -287,16 +357,30 @@ namespace Orleans.AzureUtils
         /// <returns>Value promise for tuple containing the data entry and its corresponding etag.</returns>
         public async Task<Tuple<T, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
-            Expression<Func<T, bool>> query = instance =>
-                instance.PartitionKey == partitionKey
-                && instance.RowKey == rowKey;
+            const string operation = "ReadSingleTableEntryAsync";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1} partitionKey {2} rowKey = {3}", operation, TableName, partitionKey, rowKey);
 
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
-            var data = queryResults.ToList();
-            if (data.Count >= 1) return data.First();
+            try
+            {
+                TableResult retrievedResult = await Task<TableResult>.Factory.FromAsync(
+                    tableReference.BeginExecute,
+                    tableReference.EndExecute,
+                    TableOperation.Retrieve<T>(partitionKey, rowKey),
+                    null);
+                if (retrievedResult == null || retrievedResult.Result == null || AzureStorageUtils.IsNotFoundError((HttpStatusCode)retrievedResult.HttpStatusCode))
+                {
+                    if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
+                    return null;  // No data
+                }
+                //The ETag of data is needed in further operations.                                        
+                return new Tuple<T, string>(retrievedResult.Result as T, retrievedResult.Etag);
 
-            if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey); 
-            return null;  // No data
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
         }
 
         /// <summary>
@@ -317,130 +401,11 @@ namespace Orleans.AzureUtils
         /// Read all entries in the table.
         /// NOTE: This could be a very expensive and slow operation for large tables!
         /// </summary>
-        /// <returns>Enumeration of all entries in the table</returns>
+        /// <returns>Enumeration of all entries in the table.</returns>
         public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesAsync()
         {
             Expression<Func<T, bool>> query = _ => true;
             return ReadTableEntriesAndEtagsAsync(query);
-        }
-
-        #region Internal functions
-
-        internal async Task<string> InsertTableEntryConditionallyAsync(T data, T tableVersion, string tableVersionEtag, bool updateTableVersion = true)
-        {
-            const string operation = "InsertTableEntryConditionally";
-            string tableVersionData = (tableVersion == null ? "null" : tableVersion.ToString());
-            var startTime = DateTime.UtcNow;
-            
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} into table {1} version {2} entry {3}", operation, TableName, tableVersionData, data);
-
-            try
-            {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
-                // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
-                svc.AddObject(TableName, data);
-                if (updateTableVersion)
-                {
-                    svc.AttachTo(TableName, tableVersion, tableVersionEtag);
-                    svc.UpdateObject(tableVersion);
-                }
-                try
-                {
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries, 
-                        svc.EndSaveChangesWithRetries, 
-                        SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch, 
-                        null);
-
-                    EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
-                    return dataResult.ETag;
-                }
-                catch (Exception exc)
-                {
-                    CheckAlertWriteError(operation, data, tableVersionData, exc);
-                    throw;
-                }
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
-        }
-
-        internal async Task<string> UpdateTableEntryConditionallyAsync(T data, string dataEtag, T tableVersion, string tableVersionEtag)
-        {
-            const string operation = "UpdateTableEntryConditionally";
-            string tableVersionData = (tableVersion == null ? "null" : tableVersion.ToString());
-            var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1} version {2} entry {3}", operation, TableName, tableVersionData, data);
-
-            try
-            {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
-                svc.AttachTo(TableName, data, dataEtag);
-                svc.UpdateObject(data);
-                if (tableVersion != null && tableVersionEtag != null)
-                {
-                    svc.AttachTo(TableName, tableVersion, tableVersionEtag);
-                    svc.UpdateObject(tableVersion);
-                }
-
-                try
-                {
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries,
-                        svc.EndSaveChangesWithRetries,
-                        SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
-                        null);
-
-                    EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
-                    return dataResult.ETag;
-                }
-                catch (Exception exc)
-                {
-                    CheckAlertWriteError(operation, data, tableVersionData, exc);
-                    throw;
-                }
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
-        }
-
-        internal async Task<string> MergeTableEntryAsync(T data)
-        {
-            const string operation = "MergeTableEntry";
-            var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("{0} entry {1} into table {2}", operation, data, TableName);
-
-            try
-            {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
-                svc.AttachTo(TableName, data, ANY_ETAG);
-                svc.UpdateObject(data);
-
-                try
-                {
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries,
-                        svc.EndSaveChangesWithRetries,
-                        SaveChangesOptions.None,
-                        null);
-
-                    return svc.GetEntityDescriptor(data).ETag;
-                }
-                catch (Exception exc)
-                {
-                    Logger.Warn(ErrorCode.AzureTable_07, String.Format("Intermediate error merging entry {0} to the table {1}",
-                        (data == null ? "null" : data.ToString()), TableName), exc);
-                    throw;
-                }
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
         }
 
         /// <summary>
@@ -449,33 +414,52 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="list">List of data entries and their corresponding etags to be deleted from the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
-        internal async Task DeleteTableEntriesAsync(IReadOnlyCollection<Tuple<T, string>> list)
+        public async Task DeleteTableEntriesAsync(IReadOnlyCollection<Tuple<T, string>> collection)
         {
             const string operation = "DeleteTableEntries";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("Deleting {0} table entries: {1}", TableName, Utils.EnumerableToString(list));
+            if (Logger.IsVerbose2) Logger.Verbose2("Deleting {0} table entries: {1}", TableName, Utils.EnumerableToString(collection));
+
+            if (collection == null) throw new ArgumentNullException("collection");
+
+            if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            {
+                throw new ArgumentOutOfRangeException("collection", collection.Count,
+                        "Too many rows for bulk delete - max " + AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
+            }
+
+            if (collection.Count == 0)
+            {
+                return;
+            }
 
             try
             {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
-                foreach (var tuple in list)
+                var entityBatch = new TableBatchOperation();
+                foreach (var tuple in collection)
                 {
-                    svc.AttachTo(TableName, tuple.Item1, tuple.Item2);
-                    svc.DeleteObject(tuple.Item1);
+                    // WAS:
+                    // svc.AttachTo(TableName, tuple.Item1, tuple.Item2);
+                    // svc.DeleteObject(tuple.Item1);
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
+                    T item = tuple.Item1;
+                    item.ETag = tuple.Item2;
+                    entityBatch.Delete(item);
                 }
+
                 try
                 {
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries,
-                        svc.EndSaveChangesWithRetries,
-                        SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch,
+                    await Task<IList<TableResult>>.Factory.FromAsync(
+                        tableReference.BeginExecuteBatch,
+                        tableReference.EndExecuteBatch,
+                        entityBatch,
                         null);
                 }
                 catch (Exception exc)
                 {
                     Logger.Warn(ErrorCode.AzureTable_08,
                         String.Format("Intermediate error deleting entries {0} from the table {1}.",
-                            Utils.EnumerableToString(list), TableName), exc);
+                            Utils.EnumerableToString(collection), TableName), exc);
                     throw;
                 }
             }
@@ -485,81 +469,29 @@ namespace Orleans.AzureUtils
             }
         }
 
-        private List<Tuple<T, string>> PairEntitiesWithEtags(DataServiceContext svcContext, List<T> entities)
-        {
-            var result = new List<Tuple<T, string>>(entities.Count);
-            foreach (var entity in entities)
-            {
-                EntityDescriptor eDesc = svcContext.GetEntityDescriptor(entity);
-                string etag = eDesc.ETag;
-                result.Add(Tuple.Create(entity, etag));
-            }
-            return result;
-        }
-
         /// <summary>
         /// Read data entries and their corresponding eTags from the Azure table.
         /// </summary>
         /// <param name="predicate">Predicate function to use for querying the table and filtering the results.</param>
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-        internal async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsAsync(Expression<Func<T, bool>> predicate)
+        public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsAsync(Expression<Func<T, bool>> predicate)
         {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
 
             try
             {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
-                // Improve performance when table name differs from class name
-                // http://www.gtrifonov.com/2011/06/15/improving-performance-for-windows-azure-tables/
-                svc.ResolveType = ResolveEntityType;
-
-                //IQueryable<T> query = svc.CreateQuery<T>(TableName).Where(predicate);
-                CloudTableQuery<T> cloudTableQuery = svc.CreateQuery<T>(TableName).Where(predicate).AsTableServiceQuery(); // turn IQueryable into CloudTableQuery
-
+                TableQuery<T> cloudTableQuery = tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
                 try
                 {
                     Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
                     {
-                        // Read table with continuation token
-                        // http://convective.wordpress.com/2013/11/03/queries-in-the-windows-azure-storage-client-library-v2-1/
-
-                        // 1) First wrong sync way to read:
-                        // List<T> queryResults = query.ToList(); // ToList will actually execute the query and add entities to svc. However, this will not handle continuation tokens.
-                        // 2) Second correct sync way to read:
-                        // http://convective.wordpress.com/2010/02/06/queries-in-azure-tables/
-                        // CloudTableQuery.Execute will properly retrieve all the records from a table through the automatic handling of continuation tokens:
-                        Task<ResultSegment<T>> firstSegmentPromise = Task<ResultSegment<T>>.Factory.FromAsync(
-                            cloudTableQuery.BeginExecuteSegmented,
-                            cloudTableQuery.EndExecuteSegmented,
-                            null);
-                        // 3) Third wrong async way to read:
-                        // return firstSegmentPromise;
-                        // 4) Forth correct async way to read - handles continuation tokens:
-
+                        TableQuerySegment<T> querySegment = null;
                         var list = new List<T>();
-
-                        Task<ResultSegment<T>> nextSegmentAsync = firstSegmentPromise;
-                        while (true)
+                        while (querySegment == null || querySegment.ContinuationToken != null)
                         {
-                            ResultSegment<T> resultSegment = await nextSegmentAsync;
-                            var capture = resultSegment.Results;
-                            if (capture != null) // don't call Count or Any or anything else that can potentialy cause multiple evaluations of the IEnumerable
-                            {
-                                list.AddRange(capture);
-                            }
-
-                            if (!resultSegment.HasMoreResults)
-                            {
-                                // All data was read successfully if we got to here
-                                break;
-                            }
-
-                            // ask to read the next segment
-                            nextSegmentAsync = Task<ResultSegment<T>>.Factory.FromAsync(
-                                resultSegment.BeginGetNext,
-                                resultSegment.EndGetNext,
-                                null);
+                            querySegment = await cloudTableQuery.ExecuteSegmentedAsync(querySegment != null ? querySegment.ContinuationToken : null);
+                            list.AddRange(querySegment);
                         }
 
                         return list;
@@ -574,8 +506,8 @@ namespace Orleans.AzureUtils
                         AzureTableDefaultPolicies.TableOperationTimeout,
                         backoff);
 
-                    // Data was read successfully if we got to here
-                    return PairEntitiesWithEtags(svc, results);
+                    // Data was read successfully if we got to here                    
+                    return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
                 }
                 catch (Exception exc)
                 {
@@ -594,72 +526,171 @@ namespace Orleans.AzureUtils
             }
         }
 
-        internal async Task BulkInsertTableEntries(IReadOnlyCollection<T> data)
+        /// <summary>
+        /// Inserts a set of new data entries into the table.
+        /// Fails if the data does already exists.
+        /// </summary>
+        /// <param name="list">List of data entries to be inserted into the table.</param>
+        /// <returns>Completion promise for this storage operation.</returns>
+        public async Task BulkInsertTableEntries(IReadOnlyCollection<T> collection)
         {
             const string operation = "BulkInsertTableEntries";
-            if (data == null) throw new ArgumentNullException("data");
-            if (data.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (collection == null) throw new ArgumentNullException("collection");
+            if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
             {
-                throw new ArgumentOutOfRangeException("data", data.Count,
+                throw new ArgumentOutOfRangeException("collection", collection.Count,
                         "Too many rows for bulk update - max " + AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
             }
 
+            if (collection.Count == 0)
+            {
+                return;
+            }
+
             var startTime = DateTime.UtcNow;
-            if (Logger.IsVerbose2) Logger.Verbose2("Bulk inserting {0} entries to {1} table", data.Count, TableName);
+            if (Logger.IsVerbose2) Logger.Verbose2("Bulk inserting {0} entries to {1} table", collection.Count, TableName);
 
             try
             {
-                TableServiceContext svc = tableOperationsClient.GetDataServiceContext();
-                foreach (T entry in data)
+
+                // WAS:
+                // svc.AttachTo(TableName, entry);
+                // svc.UpdateObject(entry);
+                // SaveChangesOptions.None | SaveChangesOptions.Batch,
+                // SaveChangesOptions.None == Insert-or-merge operation, SaveChangesOptions.Batch == Batch transaction
+                // http://msdn.microsoft.com/en-us/library/hh452241.aspx
+
+                var entityBatch = new TableBatchOperation();
+                foreach (T entry in collection)
                 {
-                    svc.AttachTo(TableName, entry);
-                    svc.UpdateObject(entry);
+                    entityBatch.Insert(entry);
                 }
 
-                bool fallbackToInsertOneByOne = false;
                 try
                 {
-                    // SaveChangesOptions.None == Insert-or-merge operation, SaveChangesOptions.Batch == Batch transaction
                     // http://msdn.microsoft.com/en-us/library/hh452241.aspx
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries,
-                        svc.EndSaveChangesWithRetries,
-                        SaveChangesOptions.None | SaveChangesOptions.Batch,
+                    await Task<IList<TableResult>>.Factory.FromAsync(
+                        tableReference.BeginExecuteBatch,
+                        tableReference.EndExecuteBatch,
+                        entityBatch,
                         null);
-
-                    return;
                 }
                 catch (Exception exc)
                 {
                     Logger.Warn(ErrorCode.AzureTable_37, String.Format("Intermediate error bulk inserting {0} entries in the table {1}",
-                        data.Count, TableName), exc);
-
-                    var dsre = exc.GetBaseException() as DataServiceRequestException;
-                    if (dsre != null)
-                    {
-                        var dsce = dsre.GetBaseException() as DataServiceClientException;
-                        if (dsce != null)
-                        {
-                            // Fallback to insert rows one by one
-                            fallbackToInsertOneByOne = true;
-                        }
-                    }
-
-                    if (!fallbackToInsertOneByOne) throw;
+                        collection.Count, TableName), exc);
                 }
-
-                // Bulk insert failed, so try to insert rows one by one instead
-                var promises = new List<Task>();
-                foreach (T entry in data)
-                {
-                    promises.Add(UpsertTableEntryAsync(entry));
-                }
-                await Task.WhenAll(promises);
             }
             finally
             {
                 CheckAlertSlowAccess(startTime, operation);
             }
+        }
+
+        #region Internal functions
+
+        internal async Task<Tuple<string, string>> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
+        {
+            const string operation = "InsertTableEntryConditionally";
+            string data2Str = (data2 == null ? "null" : data2.ToString());
+            var startTime = DateTime.UtcNow;
+
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} into table {1} data1 {2} data2 {3}", operation, TableName, data1, data2Str);
+
+            try
+            {                                
+                try
+                {
+                    // WAS:
+                    // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
+                    // svc.AddObject(TableName, data);
+                    // --- 
+                    // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
+                    // svc.UpdateObject(tableVersion);
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch, 
+                    // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
+                    // return dataResult.ETag;
+
+                    var entityBatch = new TableBatchOperation();
+                    entityBatch.Add(TableOperation.Insert(data1));
+                    data2.ETag = data2Etag;
+                    entityBatch.Add(TableOperation.Replace(data2));
+                                                                               
+                    var opResults = await Task<IList<TableResult>>.Factory.FromAsync(
+                        tableReference.BeginExecuteBatch,
+                        tableReference.EndExecuteBatch,
+                        entityBatch,
+                        null);
+
+                    //The batch results are returned in order of execution,
+                    //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
+                    //The ETag of data is needed in further operations.                    
+                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);                                                                                                                                                              
+                }
+                catch (Exception exc)
+                {
+                    CheckAlertWriteError(operation, data1, data2Str, exc);
+                    throw;
+                }                              
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+
+        internal async Task<Tuple<string, string>> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
+        {
+            const string operation = "UpdateTableEntryConditionally";
+            string data2Str = (data2 == null ? "null" : data2.ToString());
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1} data1 {2} data2 {3}", operation, TableName, data1, data2Str);
+
+            try
+            {
+                try
+                {
+                    // WAS:
+                    // Only AddObject, do NOT AttachTo. If we did both UpdateObject and AttachTo, it would have been equivalent to InsertOrReplace.
+                    // svc.AttachTo(TableName, data, dataEtag);
+                    // svc.UpdateObject(data);
+                    // ----
+                    // svc.AttachTo(TableName, tableVersion, tableVersionEtag);
+                    // svc.UpdateObject(tableVersion);
+                    // SaveChangesOptions.ReplaceOnUpdate | SaveChangesOptions.Batch, 
+                    // EntityDescriptor dataResult = svc.GetEntityDescriptor(data);
+                    // return dataResult.ETag;
+
+                    var entityBatch = new TableBatchOperation();
+                    data1.ETag = data1Etag;
+                    entityBatch.Add(TableOperation.Replace(data1));
+                    if (data2 != null && data2Etag != null)
+                    {
+                        data2.ETag = data2Etag;
+                        entityBatch.Add(TableOperation.Replace(data2));
+                    }
+                                        
+                    var opResults = await Task<IList<TableResult>>.Factory.FromAsync(
+                        tableReference.BeginExecuteBatch,
+                        tableReference.EndExecuteBatch,
+                        entityBatch,
+                        null);
+
+                    //The batch results are returned in order of execution,
+                    //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
+                    //The ETag of data is needed in further operations.                                        
+                    return new Tuple<string, string>(opResults[0].Etag, opResults[1].Etag);                   
+                }
+                catch (Exception exc)
+                {
+                    CheckAlertWriteError(operation, data1, data2Str, exc);
+                    throw;                
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }            
         }
 
         // Utility methods
@@ -670,8 +701,10 @@ namespace Orleans.AzureUtils
             {
                 CloudStorageAccount storageAccount = AzureStorageUtils.GetCloudStorageAccount(ConnectionString);
                 CloudTableClient operationsClient = storageAccount.CreateCloudTableClient();
-                operationsClient.RetryPolicy = AzureTableDefaultPolicies.TableOperationRetryPolicy;
-                operationsClient.Timeout = AzureTableDefaultPolicies.TableOperationTimeout;
+                operationsClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableOperationRetryPolicy;
+                operationsClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableOperationTimeout;
+                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
+                operationsClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return operationsClient;
             }
             catch (Exception exc)
@@ -686,10 +719,12 @@ namespace Orleans.AzureUtils
             try
             {
                 CloudStorageAccount storageAccount = AzureStorageUtils.GetCloudStorageAccount(ConnectionString);
-                CloudTableClient client = storageAccount.CreateCloudTableClient();
-                client.RetryPolicy = AzureTableDefaultPolicies.TableCreationRetryPolicy;
-                client.Timeout = AzureTableDefaultPolicies.TableCreationTimeout;
-                return client;
+                CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
+                creationClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableCreationRetryPolicy;
+                creationClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
+                creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
+                return creationClient;
             }
             catch (Exception exc)
             {
@@ -699,12 +734,12 @@ namespace Orleans.AzureUtils
         }
 
         // Based on: http://blogs.msdn.com/b/cesardelatorre/archive/2011/03/12/typical-issue-one-of-the-request-inputs-is-not-valid-when-working-with-the-wa-development-storage.aspx
-        private async Task InitializeTableSchemaFromEntity(CloudTableClient tableClient)
+        private async Task InitializeTableSchemaFromEntity(CloudTable tableRef)
         {
             const string operation = "InitializeTableSchemaFromEntity";
             var startTime = DateTime.UtcNow;
 
-            TableServiceEntity entity = new T();
+            ITableEntity entity = new T();
             entity.PartitionKey = Guid.NewGuid().ToString();
             entity.RowKey = Guid.NewGuid().ToString();
             Array.ForEach(
@@ -726,15 +761,16 @@ namespace Orleans.AzureUtils
 
             try
             {
-                TableServiceContext svc = tableClient.GetDataServiceContext();
-                svc.AddObject(TableName, entity);
+                // WAS:
+                // svc.AddObject(TableName, entity);
+                // SaveChangesOptions.None,
 
                 try
                 {
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries,
-                        svc.EndSaveChangesWithRetries,
-                        SaveChangesOptions.None,
+                    await Task<TableResult>.Factory.FromAsync(
+                        tableRef.BeginExecute,
+                        tableRef.EndExecute,
+                        TableOperation.Insert(entity),
                         null);
                 }
                 catch (Exception exc)
@@ -745,11 +781,14 @@ namespace Orleans.AzureUtils
 
                 try
                 {
-                    svc.DeleteObject(entity);
-                    await Task<DataServiceResponse>.Factory.FromAsync(
-                        svc.BeginSaveChangesWithRetries,
-                        svc.EndSaveChangesWithRetries,
-                        SaveChangesOptions.None,
+                    // WAS:
+                    // svc.DeleteObject(entity);
+                    // SaveChangesOptions.None,
+
+                    await Task<TableResult>.Factory.FromAsync(
+                        tableRef.BeginExecute,
+                        tableRef.EndExecute,
+                        TableOperation.Delete(entity),
                         null);
                 }
                 catch (Exception exc)
@@ -766,28 +805,27 @@ namespace Orleans.AzureUtils
 
         private bool IsServerBusy(Exception exc)
         {
-            string strCode = AzureStorageUtils.ExtractRestErrorCode(exc);
-            bool serverBusy = StorageErrorCodeStrings.ServerBusy.Equals(strCode);
+            bool serverBusy = AzureStorageUtils.IsServerBusy(exc);
             if (serverBusy) numServerBusy.Increment();
             return serverBusy;
         }
 
-        private void CheckAlertWriteError(string operation, object data, string tableVersionData, Exception exc)
+        private void CheckAlertWriteError(string operation, object data1, string data2, Exception exc)
         {
             HttpStatusCode httpStatusCode;
             string restStatus;
-            if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus) && AzureStorageUtils.IsContentionError(httpStatusCode))
+            if(AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus) && AzureStorageUtils.IsContentionError(httpStatusCode))
             {
                 // log at Verbose, since failure on conditional is not not an error. Will analyze and warn later, if required.
-                if (Logger.IsVerbose) Logger.Verbose(ErrorCode.AzureTable_13,
-                    String.Format("Intermediate Azure table write error {0} to table {1} version {2} entry {3}",
-                    operation, TableName, (tableVersionData ?? "null"), (data ?? "null")), exc);
-                
+                if(Logger.IsVerbose) Logger.Verbose(ErrorCode.AzureTable_13,
+                   String.Format("Intermediate Azure table write error {0} to table {1} data1 {2} data2 {3}",
+                   operation, TableName, (data1 ?? "null"), (data2 ?? "null")), exc);
+
             }
             else
             {
                 Logger.Error(ErrorCode.AzureTable_14,
-                    string.Format("Azure table access write error {0} to table {1} entry {2}", operation, TableName, data), exc);
+                    string.Format("Azure table access write error {0} to table {1} entry {2}", operation, TableName, data1), exc);
             }
         }
 

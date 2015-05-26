@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 
@@ -97,7 +97,7 @@ namespace Orleans.Runtime
         /// Determine if the current silo is valid for creating new activations on or for directoy lookups.
         /// </summary>
         /// <returns>The silo so ask about.</returns>
-        bool IsValidSilo(SiloAddress siloAddress);
+        bool IsFunctionalDirectory(SiloAddress siloAddress);
 
         /// <summary>
         /// Determine if the current silo is dead.

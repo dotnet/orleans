@@ -21,7 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -35,15 +36,17 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerData
     {
+        public GuidId SubscriptionId;
         public StreamId StreamId;
         public IStreamConsumerExtension StreamConsumer;
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
-        public IQueueAdapterCacheCursor Cursor;
+        public IQueueCacheCursor Cursor;
         public StreamSequenceToken Token;
         public IStreamFilterPredicateWrapper Filter;
 
-        public StreamConsumerData(StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
+            SubscriptionId = subscriptionId;
             StreamId = streamId;
             StreamConsumer = streamConsumer;
             Filter = filter;

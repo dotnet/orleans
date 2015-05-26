@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Reflection;
@@ -40,7 +40,7 @@ namespace Orleans.CodeGeneration
     internal class VBCodeGenerator : NamespaceGenerator
     {
         public VBCodeGenerator(Assembly grainAssembly, string nameSpace)
-            : base(grainAssembly, nameSpace)
+            : base(grainAssembly, nameSpace, Language.VisualBasic)
         {}
 
         protected override string FixupTypeName(string str)
@@ -56,12 +56,14 @@ namespace Orleans.CodeGeneration
 
             referred(type);
 
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type);
+            var name = (noNamespace(type) && !type.IsNested) ? 
+                    TypeUtils.GetTemplatedName(type, language: Language.VisualBasic) 
+                    : TypeUtils.GetFullName(type, Language.VisualBasic);
 
             if (!type.IsGenericType)
             {
-                if (type.FullName == null) 
-                    return type.Name;
+                if (type.FullName == null)
+                    return TypeUtils.GetTemplatedName(type, language: Language.VisualBasic);
 
                 var result = GetNestedClassName(name);
                 return result == "Void" ? "void" : result;
@@ -171,9 +173,9 @@ End If", pair.Key, pair.Value);
             factoryClass.Members.Add(createObjectReferenceMethod);
 
             methodImpl = String.Format(@"
-        Public Shared Sub DeleteObjectReference(reference As {0}) As System.Threading.Tasks.Task
+        Public Shared Function DeleteObjectReference(reference As {0}) As System.Threading.Tasks.Task
             Return Global.Orleans.Runtime.GrainReference.DeleteObjectReference(reference)
-        End Sub",
+        End Function",
             grainInterfaceData.TypeName);
             var deleteObjectReferenceMethod = new CodeSnippetTypeMember(methodImpl);
             factoryClass.Members.Add(deleteObjectReferenceMethod);
@@ -246,7 +248,7 @@ End If", pair.Key, pair.Value);
             Dim t = New System.Threading.Tasks.TaskCompletionSource(Of Object)()
             t.SetException(New NotImplementedException(""No grain interfaces for type {0}""))
             Return t.Task
-                ", TypeUtils.GetFullName(grainType));
+                ", TypeUtils.GetFullName(grainType, Language.VisualBasic));
             }
 
             var builder = new StringBuilder();
@@ -383,14 +385,15 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 factoryClass.Members.Add(new CodeSnippetTypeMember(
                      String.Format(codeFmt, FixupTypeName(interfaceName), interfaceId)));
 
-            bool hasKeyExt = GrainInterfaceData.UsesPrimaryKeyExtension(iface.Type);
+            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
+            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
 
             bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
             bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
             bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
             bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
 
-            if (isDefaultKey && hasKeyExt)
+            if (isLongCompoundKey)
             {
                 // the programmer has specified [ExtendedPrimaryKey] on the interface.
                 add(
@@ -403,7 +406,9 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                         Public Shared Function GetGrain(primaryKey as System.Int64, keyExt as System.String, grainClassNamePrefix As System.String) As {0}
                             Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), {1}, primaryKey, keyExt, grainClassNamePrefix))
                         End Function");
-
+            }
+            else if (isGuidCompoundKey)
+            {
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey As System.Guid, keyExt as System.String) As {0}
@@ -523,10 +528,9 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
             foreach (ParameterInfo paramInfo in parameters)
             {
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
-                    invokeArguments += string.Format("If(typeof({0}) is Global.Orleans.Grain,{2}.{1}.Cast({0}.AsReference()),{0})",
+                    invokeArguments += string.Format("If(typeof({0}) is Global.Orleans.Grain, {0}.AsReference<{1}>(),{0})",
                         GetParameterName(paramInfo),
-                        GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType),
-                        paramInfo.ParameterType.Namespace);
+                        TypeUtils.GetTemplatedName(paramInfo.ParameterType, _ => true, Language.VisualBasic));
                 else
                     invokeArguments += GetParameterName(paramInfo);
 
@@ -618,13 +622,14 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 }
 
                 var snippet = new StringBuilder();
-                snippet.AppendFormat("Public Function {0}({1}) As {2} Implements {3}.{0}\n",
+                snippet.AppendFormat("Public Function {0}({1}) As {2} Implements {3}.{0}",
                     methodInfo.Name,
                     parameterList,
                     GetGenericTypeName(methodInfo.ReturnType, type => { }, t => false),
-                    GetGenericTypeName(methodInfo.DeclaringType, type => { }, t => false));
-                snippet.AppendFormat("            {0}\n", GetBasicMethodImpl(methodInfo));
-                snippet.Append("        End Function\n");
+                    GetGenericTypeName(methodInfo.DeclaringType, type => { }, t => false))
+                    .AppendLine();
+                snippet.AppendFormat("            {0}", GetBasicMethodImpl(methodInfo)).AppendLine();
+                snippet.AppendLine("        End Function");
                 return new CodeSnippetTypeMember(snippet.ToString());
             }
 
@@ -675,7 +680,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 foreach (Type argument in type.GetGenericArguments())
                     AddReferencedAssembly(argument);
 
-            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace));
+            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace), Language.VisualBasic);
             typeName = GetNestedClassName(typeName);
             typeName = typeName.Replace("<", "(Of ").Replace(">", ")");
             return typeName;

@@ -21,10 +21,12 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.Remoting.Messaging;
+﻿using System.Linq;
+﻿using System.Runtime.Remoting.Messaging;
+﻿using Orleans.Serialization;
 
 
 namespace Orleans.Runtime
@@ -58,6 +60,7 @@ namespace Orleans.Runtime
         internal const string CALL_CHAIN_REQUEST_CONTEXT_HEADER = "#RC_CCH";
         internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
         internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
+        internal const string PING_APPLICATION_HEADER = "Ping";
 
         /// <summary>
         /// Retrieve a value from the RequestContext key-value bag.
@@ -121,9 +124,10 @@ namespace Orleans.Runtime
 
         internal static void ImportFromMessage(Message msg)
         {
-            var values = new Dictionary<string, object>();
-
-            msg.GetApplicationHeaders(values);
+            var contextData = msg.RequestContextData;
+            var values = contextData != null
+                ? contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                : new Dictionary<string, object>();
 
             if (PropagateActivityId)
             {
@@ -163,7 +167,7 @@ namespace Orleans.Runtime
                 }
             }
             if (values != null && values.Count != 0)
-                msg.SetApplicationHeaders(values);
+                msg.RequestContextData = values.ToDictionary(kvp => kvp.Key, kvp => SerializationManager.DeepCopy(kvp.Value));
         }
 
         internal static void Clear()

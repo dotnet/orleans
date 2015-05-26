@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 
 
 namespace Orleans.Runtime
@@ -35,9 +35,10 @@ namespace Orleans.Runtime
     }
 
     // Used for gateway -> Client messaging
-    internal class OutgoingClientMessage : Tuple<Guid, Message>, IOutgoingMessage
+    internal class OutgoingClientMessage : Tuple<GrainId, Message>, IOutgoingMessage
     {
-        public OutgoingClientMessage(Guid clientGuid, Message message) : base(clientGuid, message)
+        public OutgoingClientMessage(GrainId clientId, Message message)
+            : base(clientId, message)
         {
         }
 

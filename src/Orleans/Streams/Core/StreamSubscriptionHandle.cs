@@ -21,7 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -30,14 +32,26 @@ namespace Orleans.Streams
     /// Consumer may serialize and store the handle in order to unsubsribe later, for example
     /// in another activation on this grain.
     /// </summary>
-    // TODO:
-    //  Add Task StreamSubscriptionHandle.ResubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token)
-    //  Add Task StreamSubscriptionHandle.UnsubscribeAsync()
-    //  Remove UnsubscribeAsync from IAsyncObservable.
     [Serializable]
     public abstract class StreamSubscriptionHandle<T> : IEquatable<StreamSubscriptionHandle<T>>
     {
-        public abstract IAsyncStream<T> Stream { get; }
+        public abstract IStreamIdentity StreamIdentity { get; }
+
+        /// <summary>
+        /// Unsubscribe a stream consumer from this observable.
+        /// </summary>
+        /// <param name="handle">The stream handle to unsubscribe.</param>
+        /// <returns>A promise to unsubscription action.
+        /// </returns>
+        public abstract Task UnsubscribeAsync();
+
+        /// <summary>
+        /// Resumed consumption from a subscription to a stream.
+        /// </summary>
+        /// <param name="handle">The stream handle to consume from.</param>
+        /// <returns>A promise with an updates subscription handle.
+        /// </returns>
+        public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken token = null);
 
         #region IEquatable<StreamSubscriptionHandle<T>> Members
 

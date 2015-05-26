@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -42,11 +42,11 @@ namespace Orleans.Runtime.Storage
         {
             storageProviderLoader = new ProviderLoader<IStorageProvider>();
             providerRuntime = SiloProviderRuntime.Instance;
-            
-            if(!configs.ContainsKey("Storage"))
+
+            if (!configs.ContainsKey(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
                 return TaskDone.Done;
 
-            storageProviderLoader.LoadProviders(configs["Storage"].Providers, this);
+            storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME].Providers, this);
             return storageProviderLoader.InitProviders(providerRuntime);
         }
 

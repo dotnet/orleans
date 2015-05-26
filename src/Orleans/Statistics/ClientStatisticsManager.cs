@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
@@ -41,7 +41,7 @@ namespace Orleans.Runtime
             logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false);
         }
 
-        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, Guid clientId)
+        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
         {
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);
@@ -93,7 +93,8 @@ namespace Orleans.Runtime
                 }
                 else if (config.UseAzureSystemStore)
                 {
-                    var statsDataPublisher = await StatsTableDataManager.GetManager(false, config.DataConnectionString, config.DeploymentId, transport.MyAddress.Endpoint.ToString(), clientId.ToString(), config.DNSHostName);
+                    var statsDataPublisher = await StatsTableDataManager.GetManager(false, config.DataConnectionString, config.DeploymentId,
+                        transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
                     logStatistics.StatsTablePublisher = statsDataPublisher;
                 }
             }

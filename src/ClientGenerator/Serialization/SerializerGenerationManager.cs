@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -135,7 +135,7 @@ namespace Orleans.CodeGeneration.Serialization
             return true;
         }
 
-        internal static void GenerateSerializers(Assembly grainAssembly, Dictionary<string, NamespaceGenerator> namespaceDictionary, string outputAssemblyName, GrainClientGenerator.Language language)
+        internal static void GenerateSerializers(Assembly grainAssembly, Dictionary<string, NamespaceGenerator> namespaceDictionary, string outputAssemblyName, Language language)
         {
             Type toGen;
             NamespaceGenerator extraNamespace = null;
@@ -150,7 +150,7 @@ namespace Orleans.CodeGeneration.Serialization
                     if (extraNamespace == null)
                     {
                         // Calculate a unique namespace name based on the output assembly name
-                        extraNamespace = new NamespaceGenerator(grainAssembly, outputAssemblyName + "Serializers");
+                        extraNamespace = new NamespaceGenerator(grainAssembly, outputAssemblyName + "Serializers", language);
                         namespaceDictionary.Add("OrleansSerializers", extraNamespace);
                     }
 
@@ -165,7 +165,7 @@ namespace Orleans.CodeGeneration.Serialization
                     }
                 }
 
-                SerializationGenerator.GenerateSerializationForClass(toGen, typeNamespace.ReferencedNamespace, typeNamespace.ReferencedNamespaces, language);
+                SerializationGenerator.GenerateSerializationForClass(grainAssembly, toGen, typeNamespace.ReferencedNamespace, typeNamespace.ReferencedNamespaces, language);
             }
         }
     }

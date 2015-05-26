@@ -31,12 +31,7 @@ namespace Orleans
     /// </summary>
     public static class GrainExtensions
     {
-        /// <summary>
-        /// Converts this grain to a <c>GrainReference</c>
-        /// </summary>
-        /// <param name="grain">The grain to convert.</param>
-        /// <returns>A <c>GrainReference</c> for this grain.</returns>
-        public static GrainReference AsReference(this Runtime.IAddressable grain)
+        private static GrainReference AsWeaklyTypedReference(this Runtime.IAddressable grain)
         {
             var reference = grain as Runtime.GrainReference;
             // When called against an instance of a grain reference class, do nothing
@@ -50,7 +45,18 @@ namespace Orleans
             if (systemTarget != null)
                 return GrainReference.FromGrainId(systemTarget.GrainId, null, systemTarget.Silo);
 
-            throw new OrleansException(String.Format("AsReference has been called on an unexpected type: {0}.", grain.GetType().FullName));
+            throw new OrleansException(String.Format("AsWeaklyTypedReference has been called on an unexpected type: {0}.", grain.GetType().FullName));
+        }
+
+        /// <summary>
+        /// Converts this grain to a specific grain interface.
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The type of the grain interface.</typeparam>
+        /// <param name="grain">The grain to convert.</param>
+        /// <returns>A strongly typed <c>GrainReference</c> of grain interface type TGrainInterface.</returns>
+        public static TGrainInterface AsReference<TGrainInterface>(this Runtime.IAddressable grain)
+        {
+            return GrainFactory.Cast<TGrainInterface>(grain.AsWeaklyTypedReference());
         }
 
         /// <summary>

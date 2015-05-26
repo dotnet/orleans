@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -246,7 +246,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_STATS_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
         internal static readonly StatisticsLevel DEFAULT_STATS_COLLECTION_LEVEL = StatisticsLevel.Info;
-        private static readonly int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(1, System.Environment.ProcessorCount);
+        private static readonly int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(4, System.Environment.ProcessorCount);
         internal static readonly int DEFAULT_MAX_LOCAL_ACTIVATIONS = System.Environment.ProcessorCount;
         private const int DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE = 200;
         private static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;

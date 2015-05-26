@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
@@ -63,44 +63,48 @@ namespace Orleans.CodeGeneration
         
         public string FactoryClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(FactoryClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(FactoryClassBaseName, Type, language: language); }
         }
 
         public string ReferenceClassBaseName { get; set; }
 
         public string ReferenceClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(ReferenceClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(ReferenceClassBaseName, Type, language: language); }
         }
 
         public string InterfaceTypeName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(Type, language: language); }
         }
 
         public string StateClassBaseName { get; internal set; }
 
         public string StateClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(StateClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(StateClassBaseName, Type, language: language); }
         }
 
         public string InvokerClassBaseName { get; internal set; }
 
         public string InvokerClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(InvokerClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(InvokerClassBaseName, Type, language: language); }
         }
 
         public string TypeFullName
         {
-            get { return Namespace + "." + TypeUtils.GetParameterizedTemplateName(Type); }
+            get { return Namespace + "." + TypeUtils.GetParameterizedTemplateName(Type, language: language); }
         }
 
-        public GrainInterfaceData()
-        {}
+        private readonly Language language;
 
-        public GrainInterfaceData(Type type)
+        public GrainInterfaceData(Language language)
+        {
+            this.language = language;
+        }
+
+        public GrainInterfaceData(Language language, Type type) : this(language)
         {
             if (!IsGrainInterface(type))
                 throw new ArgumentException(String.Format("{0} is not a grain interface", type.FullName));
@@ -116,9 +120,9 @@ namespace Orleans.CodeGeneration
             DefineClassNames(true);
         }
 
-        public static GrainInterfaceData FromGrainClass(Type grainType)
+        public static GrainInterfaceData FromGrainClass(Type grainType, Language language)
         {
-            var gi = new GrainInterfaceData {Type = grainType};
+            var gi = new GrainInterfaceData(language) { Type = grainType };
             gi.DefineClassNames(false);
             return gi;
         }
@@ -159,13 +163,13 @@ namespace Orleans.CodeGeneration
             return methodInfos.ToArray();
         }
 
-        public static string GetFactoryClassForInterface(Type referenceInterface)
+        public static string GetFactoryClassForInterface(Type referenceInterface, Language language)
         {
             // remove "Reference" from the end of the type name
             var name = referenceInterface.Name;
             if (name.EndsWith("Reference", StringComparison.Ordinal)) 
                 name = name.Substring(0, name.Length - 9);
-            return TypeUtils.GetParameterizedTemplateName(GetFactoryNameBase(name), referenceInterface);
+            return TypeUtils.GetParameterizedTemplateName(GetFactoryNameBase(name), referenceInterface, language: language);
         }
 
         public static string GetFactoryNameBase(string typeName)
@@ -300,11 +304,6 @@ namespace Orleans.CodeGeneration
             return Utils.CalculateIdHash(strMethodId.ToString());
         }
 
-        public static bool UsesPrimaryKeyExtension(Type grainIfaceType)
-        {
-            return HasAttribute<ExtendedPrimaryKeyAttribute>(grainIfaceType, inherit: false);
-        }
-
         public bool IsSystemTarget
         {
             get { return IsSystemTargetType(Type); }
@@ -342,7 +341,7 @@ namespace Orleans.CodeGeneration
         
         private void DefineClassNames(bool client)
         {
-            var typeNameBase = TypeUtils.GetSimpleTypeName(Type, t => false);
+            var typeNameBase = TypeUtils.GetSimpleTypeName(Type, t => false, language);
             if (Type.IsInterface && typeNameBase.Length > 1 && typeNameBase[0] == 'I' && Char.IsUpper(typeNameBase[1]))
                 typeNameBase = typeNameBase.Substring(1);
 
@@ -350,7 +349,7 @@ namespace Orleans.CodeGeneration
             IsGeneric = Type.IsGenericType;
             if (IsGeneric)
             {
-                Name = TypeUtils.GetParameterizedTemplateName(Type);
+                Name = TypeUtils.GetParameterizedTemplateName(Type, language: language);
                 GenericTypeParams = TypeUtils.GenericTypeParameters(Type);
             }
             else
@@ -358,7 +357,7 @@ namespace Orleans.CodeGeneration
                 Name = Type.Name;
             }
 
-            TypeName = client ? InterfaceTypeName : TypeUtils.GetParameterizedTemplateName(Type);
+            TypeName = client ? InterfaceTypeName : TypeUtils.GetParameterizedTemplateName(Type, language:language);
             FactoryClassBaseName = GetFactoryNameBase(typeNameBase);
             InvokerClassBaseName = typeNameBase + "MethodInvoker";
             StateClassBaseName = typeNameBase + "State";
@@ -551,27 +550,6 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        private static int CountAttributes<T>(Type grainIfaceType, bool inherit)
-        {
-            return grainIfaceType.GetCustomAttributes(typeof (T), inherit).Length;
-        }
-
-        private static bool HasAttribute<T>(Type grainIfaceType, bool inherit)
-        {
-            switch (CountAttributes<T>(grainIfaceType, inherit))
-            {
-                case 0:
-                    return false;
-                case 1:
-                    return true;
-                default:
-                    throw new InvalidOperationException(string.Format(
-                        "More than one {0} cannot be specified for grain interface {1}",
-                        typeof (T).Name,
-                        grainIfaceType.Name));
-            }
-        }
-        
         private static int GetTypeCode(Type grainInterfaceOrClass)
         {
             var attrs = grainInterfaceOrClass.GetCustomAttributes(typeof(TypeCodeOverrideAttribute), false);

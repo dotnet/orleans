@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -40,7 +40,7 @@ namespace Orleans.Runtime
                 Assembly thisProg = Assembly.GetExecutingAssembly();
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
                 bool isDebug = IsAssemblyDebugBuild(thisProg);
-                string productVersion = progVersionInfo.ProductVersion + (isDebug ? " IsDebug." : " IsRelease."); // progVersionInfo.IsDebug; does not work
+                string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
                 return string.IsNullOrEmpty(productVersion) ? ApiVersion : productVersion;
             }
         }
@@ -92,7 +92,9 @@ namespace Orleans.Runtime
         {
             string progTitle = string.Format("{0} v{1}", ProgramName, Current);
             ConsoleText.WriteStatus(progTitle);
+#if DEBUG
             Console.Title = progTitle;
+#endif
         }
 
         private static bool IsAssemblyDebugBuild(Assembly assembly)

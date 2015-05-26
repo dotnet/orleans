@@ -54,4 +54,15 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
         /// </summary>
         Dead = 6
     }
+
+    public static class SiloStatusExtensions
+    {
+        /// <summary>
+        /// Return true if this silo is currently terminating: ShuttingDown, Stopping or Dead.
+        /// </summary>
+        public static bool IsTerminating(this SiloStatus siloStatus)
+        {
+            return siloStatus.Equals(SiloStatus.ShuttingDown) || siloStatus.Equals(SiloStatus.Stopping) || siloStatus.Equals(SiloStatus.Dead);
+        }
+    }
 }

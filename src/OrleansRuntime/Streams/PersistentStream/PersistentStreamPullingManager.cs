@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,12 +44,14 @@ namespace Orleans.Streams
 
         private int latestRingNotificationSequenceNumber;
         private IQueueAdapter queueAdapter;
-        private IStreamQueueBalancer queueBalancer;
+        private readonly IQueueAdapterCache queueAdapterCache;
+        private readonly IStreamQueueBalancer queueBalancer;
 
         internal PersistentStreamPullingManager(
             GrainId id, 
             string strProviderName, 
             IStreamProviderRuntime runtime,
+            IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             TimeSpan queueGetPeriod, 
             TimeSpan initQueueTimeout)
@@ -77,6 +79,7 @@ namespace Orleans.Streams
             latestRingNotificationSequenceNumber = 0;
             queueBalancer = streamQueueBalancer;
 
+            queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = providerRuntime.GetLogger(GetType().Name + "-" + streamProviderName);
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
 
@@ -92,11 +95,11 @@ namespace Orleans.Streams
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
 
-            var meAsQueueBalanceListener = StreamQueueBalanceListenerFactory.Cast(this.AsReference());
+            var meAsQueueBalanceListener = this.AsReference<IStreamQueueBalanceListener>();
             queueBalancer.SubscribeToQueueDistributionChangeEvents(meAsQueueBalanceListener);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
-            logger.Info((int)ErrorCode.PersistentStreamPullingManager_03, ToString(myQueues));
+            logger.Info((int)ErrorCode.PersistentStreamPullingManager_03, PrintMyState(myQueues));
 
             return AddNewQueues(myQueues, true);
         }
@@ -137,7 +140,7 @@ namespace Orleans.Streams
             List<QueueId> currentQueues = queueBalancer.GetMyQueues().ToList();
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_06,
                 "Executing QueueChangeNotification number {0} from the queue allocator. Current queues: {1}",
-                notificationSeqNumber, ToString(currentQueues));
+                notificationSeqNumber, PrintMyState(currentQueues));
 
             Task t1 = AddNewQueues(currentQueues, false);
             Task t2 = RemoveQueues(currentQueues);
@@ -186,15 +189,16 @@ namespace Orleans.Streams
                 foreach (var agent in agents)
                 {
                     // Init the agent only after it was registered locally.
-                    var agentGrainRef = PersistentStreamPullingAgentFactory.Cast(agent.AsReference());
+                    var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
+                    var queueAdapterCacheAsImmutable = queueAdapterCache != null ? queueAdapterCache.AsImmutable() : new Immutable<IQueueAdapterCache>(null);
                     // Need to call it as a grain reference.
-                    var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(((IQueueAdapter)queueAdapter).AsImmutable()));
+                    var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(queueAdapter.AsImmutable(), queueAdapterCacheAsImmutable));
                     task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_08, String.Format("PersistentStreamPullingAgent {0} failed to Initialize.", agent.QueueId));
                     initTasks.Add(task);
                 }
                 await Task.WhenAll(initTasks);
             }
-            catch (Exception)
+            catch
             {
                 // Just ignore this exception and proceed as if Initialize has succeeded.
                 // We already logged individual exceptions for individual calls to Initialize. No need to log again.
@@ -218,7 +222,7 @@ namespace Orleans.Streams
 
                 agents.Add(agent);
                 queuesToAgentsMap.Remove(queueId);
-                var agentGrainRef = PersistentStreamPullingAgentFactory.Cast(agent.AsReference());
+                var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
                 var task = OrleansTaskExtentions.SafeExecute(agentGrainRef.Shutdown);
                 task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_11,
                     String.Format("PersistentStreamPullingAgent {0} failed to Shutdown.", agent.QueueId));
@@ -228,7 +232,7 @@ namespace Orleans.Streams
             {
                 await Task.WhenAll(removeTasks);
             }
-            catch (Exception)
+            catch
             {
                 // Just ignore this exception and proceed as if Initialize has succeeded.
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
@@ -250,15 +254,10 @@ namespace Orleans.Streams
 
         #endregion
 
-        private string ToString(IReadOnlyCollection<QueueId> myQueues)
+        private static string PrintMyState(IReadOnlyCollection<QueueId> myQueues)
         {
             return String.Format("I am now responsible for {0} queues: {1}.",
-                myQueues.Count, EnumerateQueuesToString(myQueues));
-        }
-
-        private string EnumerateQueuesToString(IReadOnlyCollection<QueueId> myQueues)
-        {
-            return Utils.EnumerableToString(myQueues, q => q.ToStringWithHashCode());
+                myQueues.Count, Utils.EnumerableToString(myQueues, q => q.ToStringWithHashCode()));
         }
     }
 }

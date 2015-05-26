@@ -8,7 +8,7 @@
     <SortOrder>1000</SortOrder>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
     <CreateNewFolder>true</CreateNewFolder>
-    <DefaultName>MyGrainInterfaces</DefaultName>
+    <DefaultName>IGrain1</DefaultName>
     <ProvideDefaultName>true</ProvideDefaultName>
     <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
   </TemplateData>

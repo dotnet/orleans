@@ -21,11 +21,10 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.WindowsAzure.StorageClient;
-
+using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -92,7 +91,8 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public override string ToString()
         {
-            return string.Format("AzureQueueBatchContainer:Stream={0},#Items={1}", StreamGuid, events.Count);
+            return string.Format("[AzureQueueBatchContainer:Stream={0},#Items={1}]", StreamGuid, events.Count);
+            //return string.Format("[AzureBatch:#Items={0},Items{1}]", events.Count, Utils.EnumerableToString(events.Select((e, i) => String.Format("{0}-{1}", e, sequenceToken.CreateSequenceTokenForEvent(i)))));
         }
     }
 }

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -457,15 +457,7 @@ namespace Orleans.Runtime.Configuration
                 throw new ArgumentException("The XML element must be a <Deactivate/> element.");
             if (!xmlElement.HasAttribute("AgeLimit"))
                 throw new ArgumentException("The AgeLimit attribute is required for a <Deactivate/> element.");
-            TimeSpan ageLimit = ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
-#if DEBUG
-            TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
-            if (ageLimit < minAgeLimit)
-            {
-                throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
-            }
-#endif
-            return ageLimit;
+            return ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
         }
 
         private static readonly string[] defaultClientConfigFileNames = { "ClientConfiguration.xml", "OrleansClientConfiguration.xml", "Client.config", "Client.xml" };

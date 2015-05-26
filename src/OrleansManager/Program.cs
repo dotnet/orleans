@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -240,12 +240,12 @@ namespace OrleansManager
             if (Int32.TryParse(interfaceTypeCodeOrImplClassName, out interfaceTypeCodeDataLong))
             {
                 // parsed it as int, so it is an interface type code.
-                implementationTypeCode = TypeCodeMapper.GetImplementationTypeCode(interfaceTypeCodeDataLong);
+                implementationTypeCode = TypeCodeMapper.GetImplementation(interfaceTypeCodeDataLong).GrainTypeCode;
             }
             else
             {
                 // interfaceTypeCodeOrImplClassName is the implementation class name
-                implementationTypeCode = TypeCodeMapper.GetImplementationTypeCode(interfaceTypeCodeOrImplClassName);
+                implementationTypeCode = TypeCodeMapper.GetImplementation(interfaceTypeCodeOrImplClassName).GrainTypeCode;
             }
 
             var grainIdStr = args[1];

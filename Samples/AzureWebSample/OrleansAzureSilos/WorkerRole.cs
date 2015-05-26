@@ -15,17 +15,21 @@
 //*********************************************************
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.ServiceRuntime;
+using Orleans.Providers;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace Orleans.Azure.Silos
 {
     public class WorkerRole : RoleEntryPoint
     {
+        private const string DATA_CONNECTION_STRING_KEY = "DataConnectionString";
+
         private AzureSilo orleansAzureSilo;
 
         public WorkerRole()
@@ -59,10 +63,18 @@ namespace Orleans.Azure.Silos
 
             Trace.WriteLine("OrleansAzureSilos-OnStart Starting Orleans silo", "Information");
 
+            var config = new ClusterConfiguration();
+            config.StandardLoad();
+
+            // First example of how to configure an existing provider
+            Example_ConfigureExistingStorageProvider(config);
+            Example_ConfigureNewStorageProvider(config);
+            Example_ConfigureNewBootstrapProvider(config);
+
             // It is IMPORTANT to start the silo not in OnStart but in Run.
             // Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.
             orleansAzureSilo = new AzureSilo();
-            bool ok = orleansAzureSilo.Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance);
+            bool ok = orleansAzureSilo.Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance, config);
 
             Trace.WriteLine("OrleansAzureSilos-OnStart Orleans silo started ok=" + ok, "Information");
 
@@ -100,34 +112,89 @@ namespace Orleans.Azure.Silos
         private static void SetupEnvironmentChangeHandlers()
         {
             // For information on handling configuration changes see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
+        }
 
-            #region Setup CloudStorageAccount Configuration Setting Publisher
-            // From: http://www.tsjensen.com/blog/2009/11/30/Windows+Azure+10+CloudTableClient+Minimal+Configuration.aspx
-            // This code sets up a handler to update CloudStorageAccount instances when their corresponding
-            // configuration settings change in the service configuration file.
-            CloudStorageAccount.SetConfigurationSettingPublisher((string configName, Func<string, bool> configSetter) =>
+        // Storage Provider is already configured in the OrleansConfiguration.xml as:
+        // <Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="UseDevelopmentStorage=true" />
+        // Below is an example of how to set the storage key in the ProviderConfiguration and how to add a new custom configuration property.
+        private void Example_ConfigureExistingStorageProvider(ClusterConfiguration config)
+        {
+            IProviderConfiguration storageProvider = null;
+
+            const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage"; // Alternatively, can be something like typeof(AzureTableStorage).FullName
+            const string myProviderName = "AzureStore"; // what ever arbitrary name you want to give to your provider
+            if (config.Globals.TryGetProviderConfiguration(myProviderFullTypeName, myProviderName, out storageProvider))
             {
-                // Provide the configSetter with the initial value
-                configSetter(RoleEnvironment.GetConfigurationSettingValue(configName));
+                // provider configuration already exists, modify it.
+                string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
+                storageProvider.SetProperty(DATA_CONNECTION_STRING_KEY, connectionString);
+                storageProvider.SetProperty("MyCustomProperty1", "MyCustomPropertyValue1");
+            }
+            else
+            {
+                // provider configuration does not exists, add a new one.
+                var properties = new Dictionary<string, string>();
+                string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
+                properties.Add(DATA_CONNECTION_STRING_KEY, connectionString);
+                properties.Add("MyCustomProperty2", "MyCustomPropertyValue2");
 
-                RoleEnvironment.Changed += (object sender, RoleEnvironmentChangedEventArgs e) =>
+                config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
+            }
+
+            // Alternatively, find all storage providers and modify them as necessary
+            foreach (IProviderConfiguration providerConfig in config.Globals.GetAllProviderConfigurations())//storageConfiguration.Providers.Values.Where(provider => provider is ProviderConfiguration).Cast<ProviderConfiguration>())
+            {
+                if (providerConfig.Type.Equals(myProviderFullTypeName))
                 {
-                    if (e.Changes.OfType<RoleEnvironmentConfigurationSettingChange>()
-                        .Any((RoleEnvironmentConfigurationSettingChange change) => (change.ConfigurationSettingName == configName)))
-                    {
-                        // The corresponding configuration setting has changed, propagate the value
-                        if (!configSetter(RoleEnvironment.GetConfigurationSettingValue(configName)))
-                        {
-                            // In this case, the change to the storage account credentials in the
-                            // service configuration is significant enough that the role needs to be
-                            // recycled in order to use the latest settings. (for example, the 
-                            // endpoint has changed)
-                            RoleEnvironment.RequestRecycle();
-                        }
-                    }
-                };
-            });
-            #endregion
+                    string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
+                    providerConfig.SetProperty(DATA_CONNECTION_STRING_KEY, connectionString);
+                    providerConfig.SetProperty("MyCustomProperty3", "MyCustomPropertyValue3");
+                }
+            }
+
+            // Once silo starts you can see that it prints in the log:
+            //   Providers:
+            //      StorageProviders:
+            //          Name=AzureStore, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty, MyCustomProperty1, MyCustomProperty3]
+        }
+
+        // Below is an example of how to define a full configuration for a new storage provider that is not already specified in the config file.
+        private void Example_ConfigureNewStorageProvider(ClusterConfiguration config)
+        {
+            const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage"; // Alternatively, can be something like typeof(AzureTableStorage).FullName
+            const string myProviderName = "MyNewAzureStoreProvider"; // what ever arbitrary name you want to give to your provider
+
+            var properties = new Dictionary<string, string>();
+            string connectionString = RoleEnvironment.GetConfigurationSettingValue(DATA_CONNECTION_STRING_KEY);
+            properties.Add(DATA_CONNECTION_STRING_KEY, connectionString);
+            properties.Add("MyCustomProperty4", "MyCustomPropertyValue4");
+
+            config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
+
+            // Once silo starts you can see that it prints in the log:
+            //  Providers:
+            //      StorageProviders:
+            //          Name=MyNewAzureStoreProvider, Type=Orleans.Storage.AzureTableStorage, Properties=[DataConnectionString, MyCustomProperty4]
+        }
+
+        // Below is an example of how to define a full configuration for a new Bootstrap provider that is not already specified in the config file.
+        private void Example_ConfigureNewBootstrapProvider(ClusterConfiguration config)
+        {
+            //const string myProviderFullTypeName = "FullNameSpace.NewBootstrapProviderType"; // Alternatively, can be something like typeof(EventStoreInitBootstrapProvider).FullName
+            //const string myProviderName = "MyNewBootstrapProvider"; // what ever arbitrary name you want to give to your provider
+            //var properties = new Dictionary<string, string>();
+            
+            //config.Globals.RegisterBootstrapProvider(myProviderFullTypeName, myProviderName, properties);
+
+            // The last line, config.Globals.RegisterBootstrapProvider, is commented out because the assembly with "FullNameSpace.NewBootstrapProviderType" is not added to the project,
+            // this the silo will fail to load the new bootstrap provider upon startup.
+            // !!!!!!!!!! Provider of type FullNameSpace.NewBootstrapProviderType name MyNewBootstrapProvider was not loaded.
+            // Once you add your new provider to the project, uncommnet this line.
+
+            // Once silo starts you can see that it prints in the log:
+            // Providers:
+            //      BootstrapProviders:
+            //          Name=MyNewBootstrapProvider, Type=FullNameSpace.NewBootstrapProviderType, Properties=[]
         }
     }
 }

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.Services.Common;
 using System.Linq;
@@ -29,14 +29,13 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
 using Orleans.AzureUtils;
-
+using Microsoft.WindowsAzure.Storage.Table;
+                                     
 
 namespace Orleans.Runtime.ReminderService
-{
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class ReminderTableEntry : TableServiceEntity
+{    
+    internal class ReminderTableEntry : TableEntity
     {
         public string GrainReference        { get; set; }    // Part of RowKey
         public string ReminderName          { get; set; }    // Part of RowKey
@@ -45,8 +44,7 @@ namespace Orleans.Runtime.ReminderService
         public string StartAt               { get; set; }    
         public string Period                { get; set; }    
         public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
-        public string ETag                  { get; set; }    
-        
+                
 
         public static string ConstructRowKey(GrainReference grainRef, string reminderName)
         {
@@ -113,15 +111,20 @@ namespace Orleans.Runtime.ReminderService
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and deploymentId {1}.", serviceId, deploymentId);
-                await singleton.InitTableAsync().WithTimeout(initTimeout);
+                await singleton.InitTableAsync()
+                    .WithTimeout(initTimeout);
             }
-            catch (TimeoutException)
+            catch (TimeoutException te)
             {
-                singleton.Logger.Fail(ErrorCode.AzureTable_38, String.Format("Unable to create or connect to the Azure table in {0}", initTimeout));
+                string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
+                singleton.Logger.Error(ErrorCode.AzureTable_38, errorMsg, te);
+                throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
-                singleton.Logger.Fail(ErrorCode.AzureTable_39, String.Format("Exception trying to create or connect to the Azure table: {0}", ex));
+                string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
+                singleton.Logger.Error(ErrorCode.AzureTable_39, errorMsg, ex);
+                throw new OrleansException(errorMsg, ex);
             }
             return singleton;
         }
@@ -231,7 +234,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                await DeleteTableEntryAsync(reminderEntry, eTag); //"*")
+                await DeleteTableEntryAsync(reminderEntry, eTag);
                 return true;
             }catch(Exception exc)
             {
@@ -266,8 +269,13 @@ namespace Orleans.Runtime.ReminderService
                     .GroupBy(x => x.Item1.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
 
                 foreach (var entriesPerPartition in groupedByHash.Values)
-                    tasks.Add(DeleteTableEntriesAsync(entriesPerPartition));
-                
+                {
+                    foreach (var batch in entriesPerPartition.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                    {
+                        tasks.Add(DeleteTableEntriesAsync(batch));
+                    }
+                }
+
                 await Task.WhenAll(tasks);
             }
         }

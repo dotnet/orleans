@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using Orleans.Runtime;
@@ -31,38 +31,42 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerCollection
     {
-        private readonly Dictionary<GrainReference, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
+        private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
 
         public StreamConsumerCollection()
         {
-            queueData = new Dictionary<GrainReference, StreamConsumerData>();
+            queueData = new Dictionary<GuidId, StreamConsumerData>();
         }
 
-        public StreamConsumerData AddConsumer(StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
-            var consumerData = new StreamConsumerData(streamId, streamConsumer, filter);
-            queueData.Add(streamConsumer.AsReference(), consumerData);
+            var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filter);
+            queueData.Add(subscriptionId, consumerData);
             return consumerData;
         }
 
-        public bool RemoveConsumer(IAddressable consumerAddress)
+        public bool RemoveConsumer(GuidId subscriptionId)
         {
             StreamConsumerData consumer;
-            var consumerReference = consumerAddress.AsReference();
-            if (!queueData.TryGetValue(consumerReference, out consumer)) return false;
+            if (!queueData.TryGetValue(subscriptionId, out consumer)) return false;
 
-            consumer.Cursor = null; // kill cursor activity and ensure it does not start again on this consumer data.
-            return queueData.Remove(consumerReference);
+            if (consumer.Cursor != null)
+            {
+                // kill cursor activity and ensure it does not start again on this consumer data.
+                consumer.Cursor.Dispose();
+                consumer.Cursor = null; 
+            }
+            return queueData.Remove(subscriptionId);
         }
 
-        public bool Contains(IAddressable consumer)
+        public bool Contains(GuidId subscriptionId)
         {
-            return queueData.ContainsKey(consumer.AsReference());
+            return queueData.ContainsKey(subscriptionId);
         }
 
-        public bool TryGetConsumer(IAddressable consumer, out StreamConsumerData data)
+        public bool TryGetConsumer(GuidId subscriptionId, out StreamConsumerData data)
         {
-            return queueData.TryGetValue(consumer.AsReference(), out data);
+            return queueData.TryGetValue(subscriptionId, out data);
         }
 
         public IEnumerable<StreamConsumerData> AllConsumersForStream(StreamId streamId)

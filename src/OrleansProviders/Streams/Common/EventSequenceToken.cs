@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Globalization;
 
 using Orleans.Streams;
@@ -34,16 +34,16 @@ namespace Orleans.Providers.Streams.Common
         private readonly long sequenceNumber;
         private readonly int eventIndex;
 
-        internal EventSequenceToken(long seqNumber, int eventInd)
-        {
-            sequenceNumber = seqNumber;
-            eventIndex = eventInd;
-        }
-
         public EventSequenceToken(long seqNumber)
         {
             sequenceNumber = seqNumber;
             eventIndex = 0;
+        }
+
+        internal EventSequenceToken(long seqNumber, int eventInd)
+        {
+            sequenceNumber = seqNumber;
+            eventIndex = eventInd;
         }
 
         internal EventSequenceToken NextSequenceNumber()
@@ -59,11 +59,6 @@ namespace Orleans.Providers.Streams.Common
         internal static long Distance(EventSequenceToken first, EventSequenceToken second)
         {
             return first.sequenceNumber - second.sequenceNumber;
-        }
-
-        internal bool IsInvalid()
-        {
-            return sequenceNumber == -1;
         }
 
         public override bool Equals(object obj)
@@ -99,7 +94,7 @@ namespace Orleans.Providers.Streams.Common
 
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "EventSequenceToken: SequenceNumber={0}, EventIndex={1}", sequenceNumber, eventIndex);
+            return string.Format(CultureInfo.InvariantCulture, "[EventSequenceToken: SeqNum={0}, EventIndex={1}]", sequenceNumber, eventIndex);
         }
     }
 }

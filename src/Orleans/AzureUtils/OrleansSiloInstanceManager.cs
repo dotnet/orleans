@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.Services.Common;
 using System.Diagnostics;
@@ -31,13 +31,13 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.StorageClient;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
+
 
 namespace Orleans.AzureUtils
 {
-    [DataServiceKey("PartitionKey", "RowKey")]
-    internal class SiloInstanceTableEntry : TableServiceEntity
+    internal class SiloInstanceTableEntry : TableEntity
     {
         public string DeploymentId { get; set; }    // PartitionKey
         public string Address { get; set; }         // RowKey
@@ -47,7 +47,6 @@ namespace Orleans.AzureUtils
         public string HostName { get; set; }        // Mandatory
         public string Status { get; set; }          // Mandatory
         public string ProxyPort { get; set; }       // Optional
-        public string Primary { get; set; }         // Optional - should be depricated
 
         public string RoleName { get; set; }        // Optional - only for Azure role
         public string InstanceName { get; set; }    // Optional - only for Azure role
@@ -121,7 +120,6 @@ namespace Orleans.AzureUtils
                 sb.Append(" Host=").Append(HostName);
                 sb.Append(" Status=").Append(Status);
                 sb.Append(" ProxyPort=").Append(ProxyPort);
-                sb.Append(" Primary=").Append(Primary);
 
                 if (!string.IsNullOrEmpty(RoleName)) sb.Append(" RoleName=").Append(RoleName);
                 sb.Append(" Instance=").Append(InstanceName);
@@ -151,7 +149,7 @@ namespace Orleans.AzureUtils
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
         private readonly TraceLogger logger;
 
-        private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+        internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         public string DeploymentId { get; private set; }
 
@@ -170,15 +168,18 @@ namespace Orleans.AzureUtils
             {
                 await instance.storage.InitTableAsync()
                     .WithTimeout(initTimeout);
-
             }
-            catch (TimeoutException)
+            catch (TimeoutException te)
             {
-                instance.logger.Fail(ErrorCode.AzureTable_32, String.Format("Unable to create or connect to the Azure table in {0}", initTimeout));
+                string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
+                instance.logger.Error(ErrorCode.AzureTable_32, errorMsg, te);
+                throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
-                instance.logger.Fail(ErrorCode.AzureTable_33, String.Format("Exception trying to create or connect to the Azure table: {0}", ex));
+                string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
+                instance.logger.Error(ErrorCode.AzureTable_33, errorMsg, ex);
+                throw new OrleansException(errorMsg, ex);
             }
             return instance;
         }
@@ -218,51 +219,10 @@ namespace Orleans.AzureUtils
                 .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
         }
 
-        public IPEndPoint FindPrimarySiloEndpoint()
-        {
-            SiloInstanceTableEntry primarySilo = FindPrimarySilo();
-            if (primarySilo == null) return null;
-
-            int port = 0;
-            if (!string.IsNullOrEmpty(primarySilo.Port))
-            {
-                int.TryParse(primarySilo.Port, out port);
-            }
-            return new IPEndPoint(IPAddress.Parse(primarySilo.Address), port);
-        }
-
         public List<Uri> FindAllGatewayProxyEndpoints()
         {
             IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = FindAllGatewaySilos();
             return gatewaySiloInstances.Select(gateway => gateway.ToGatewayUri()).ToList();
-        }
-
-        private SiloInstanceTableEntry FindPrimarySilo()
-        {
-            logger.Info(ErrorCode.Runtime_Error_100275, "Searching for active primary silo for deployment {0} ...", this.DeploymentId);
-            string primary = true.ToString();
-
-            Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
-                instance.PartitionKey == this.DeploymentId
-                && instance.Status == INSTANCE_STATUS_ACTIVE
-                && instance.Primary == primary;
-
-            var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
-                                 .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
-
-            var primarySilo = default(SiloInstanceTableEntry);
-            List<SiloInstanceTableEntry> primarySilosList = queryResults.Select(entity => entity.Item1).ToList();
-
-            if (primarySilosList.Count == 0)
-            {
-                logger.Error(ErrorCode.Runtime_Error_100310, "Could not find Primary Silo");
-            }
-            else
-            {
-                primarySilo = primarySilosList.FirstOrDefault();
-                logger.Info(ErrorCode.Runtime_Error_100276, "Found Primary Silo: {0}", primarySilo);
-            }
-            return primarySilo;
         }
 
         private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()
@@ -315,10 +275,10 @@ namespace Orleans.AzureUtils
 
         internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
         {
-            return storage.MergeTableEntryAsync(data);
+            return storage.MergeTableEntryAsync(data, AzureStorageUtils.ANY_ETAG); // we merge this without checking eTags.
         }
 
-        public Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
+        internal Task<Tuple<SiloInstanceTableEntry, string>> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
         {
             return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -329,7 +289,18 @@ namespace Orleans.AzureUtils
 
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(deploymentId);
             var entriesList = new List<Tuple<SiloInstanceTableEntry, string>>(entries);
-            await storage.DeleteTableEntriesAsync(entriesList);
+            if (entriesList.Count <= AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            {
+                await storage.DeleteTableEntriesAsync(entriesList);
+            }else
+            {
+                List<Task> tasks = new List<Task>();
+                foreach (var batch in entriesList.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                {
+                    tasks.Add(storage.DeleteTableEntriesAsync(batch));
+                }
+                await Task.WhenAll(tasks);
+            }
             return entriesList.Count();
         }
 
@@ -378,11 +349,41 @@ namespace Orleans.AzureUtils
         /// Insert (create new) row entry
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
-        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string versionEtag, bool updateTableVersion = true)
+        internal async Task<bool> TryCreateTableVersionEntryAsync()
         {
             try
             {
-                await storage.InsertTableEntryConditionallyAsync(siloEntry, tableVersionEntry, versionEtag, updateTableVersion);
+                var versionRow = await storage.ReadSingleTableEntryAsync(DeploymentId, SiloInstanceTableEntry.TABLE_VERSION_ROW);
+                if (versionRow != null && versionRow.Item1 != null)
+                {
+                    return false;
+                }
+                SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
+                await storage.CreateTableEntryAsync(entry);
+                return true;
+            }
+            catch (Exception exc)
+            {
+                HttpStatusCode httpStatusCode;
+                string restStatus;
+                if (!AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
+
+                if (logger.IsVerbose2) logger.Verbose2("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
+
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Insert (create new) row entry
+        /// </summary>
+        /// <param name="siloEntry">Silo Entry to be written</param>
+        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag)
+        {
+            try
+            {
+                await storage.InsertTwoTableEntriesConditionallyAsync(siloEntry, tableVersionEntry, tableVersionEtag);
                 return true;
             }
             catch (Exception exc)
@@ -408,7 +409,7 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                await storage.UpdateTableEntryConditionallyAsync(siloEntry, entryEtag, tableVersionEntry, versionEtag);
+                await storage.UpdateTwoTableEntriesConditionallyAsync(siloEntry, entryEtag, tableVersionEntry, versionEtag);
                 return true;
             }
             catch (Exception exc)

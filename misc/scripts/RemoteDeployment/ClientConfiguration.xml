@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<!-- 
+	This is a sample client configuration file. 
+-->
+<ClientConfiguration xmlns="urn:orleans">
+	<Gateway Address="MACHINE1" Port="30000" />
+</ClientConfiguration>

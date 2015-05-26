@@ -445,6 +445,8 @@ namespace Orleans
         Catalog_ShutdownActivations_2                   = CatalogBase + 40,
         Catalog_ShutdownActivations_3                   = CatalogBase + 41,
         Catalog_DeactivateStreamResources_Exception     = CatalogBase + 42,
+        Catalog_FinishDeactivateActivation_Exception    = CatalogBase + 43,
+        Catalog_FinishGrainDeactivateAndCleanupStreams_Exception = CatalogBase + 44,
 
         MembershipBase                         = Runtime + 600,
         MembershipCantWriteLivenessDisabled    = Runtime_Error_100225, // Backward compatability
@@ -659,6 +661,7 @@ namespace Orleans
         ProxyClient_OGC_UnhandledExceptionInOneWayInvoke = ProxyClientBase + 27,
         ProxyClient_ClientInvokeCallback_Error      = ProxyClientBase + 28,
         ProxyClient_StartDone                       = ProxyClientBase + 29,
+        ProxyClient_OGC_TargetNotFound_2            = ProxyClientBase + 30,
 
         MessagingBase                           = Runtime + 1000,
         Messaging_IMA_DroppingConnection        = MessagingBase + 1,
@@ -748,6 +751,11 @@ namespace Orleans
         MessageAcceptor_UnexpectedProxiedConnection = GatewayBase + 12,
         GatewayManager_NoGateways               = GatewayBase + 13,
         GatewayNetworkError                     = GatewayBase + 14,
+        GatewayFailedToParse                    = GatewayBase + 15,
+        ClientRegistrarFailedToRegister         = GatewayBase + 16,
+        ClientRegistrarFailedToRegister_2       = GatewayBase + 17,
+        ClientRegistrarFailedToUnregister       = GatewayBase + 18,
+        ClientRegistrarTimerFailed              = GatewayBase + 19,
 
         TimerBase                               = Runtime + 1400,
         TimerChangeError                        = PerfCounterTimerError, // Backward compatability
@@ -852,7 +860,9 @@ namespace Orleans
         Loader_IgnoreNonPublicGrainClass        = LoaderBase + 15,
         Loader_UnexpectedException              = LoaderBase + 16,
         Loader_SkippingBadAssembly              = LoaderBase + 17,
-
+        Loader_TypeLoadError_2                  = LoaderBase + 18,
+        Loader_TypeLoadError_3                  = LoaderBase + 19,
+        Loader_TypeLoadError_4                  = LoaderBase + 20,
 
         PlacementBase                               = Runtime + 1800,
         Placement_RuntimeStatisticsUpdateFailure_1  = PlacementBase + 1,
@@ -996,6 +1006,8 @@ namespace Orleans
         PersistentStreamPullingAgent_20 = PersistentStreamPullingAgentBase + 20,
         PersistentStreamPullingAgent_21 = PersistentStreamPullingAgentBase + 21,
         PersistentStreamPullingAgent_22 = PersistentStreamPullingAgentBase + 22,
+        PersistentStreamPullingAgent_23 = PersistentStreamPullingAgentBase + 23,
+        PersistentStreamPullingAgent_24 = PersistentStreamPullingAgentBase + 24,
 
         StreamProviderManagerBase = Runtime +3400,
         StreamProvider_FailedToDispose              = StreamProviderManagerBase + 1,
@@ -1018,7 +1030,10 @@ namespace Orleans
         PersistentStreamPullingManager_09 = PersistentStreamPullingManagerBase + 9,
         PersistentStreamPullingManager_10 = PersistentStreamPullingManagerBase + 10,
         PersistentStreamPullingManager_11 = PersistentStreamPullingManagerBase + 11,
-        PersistentStreamPullingManager_12 = PersistentStreamPullingManagerBase + 12
+        PersistentStreamPullingManager_12 = PersistentStreamPullingManagerBase + 12,
+
+        StreamProviderBase = Runtime + 3600,
+        StreamProvider_FailedToUnsubscribeFromPubSub = StreamProviderBase + 1,
     }
 }
 // ReSharper restore InconsistentNaming

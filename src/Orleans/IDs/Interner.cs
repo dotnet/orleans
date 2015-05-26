@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -109,7 +109,7 @@ namespace Orleans
                 cacheCleanupTimer = new SafeTimer(InternCacheCleanupTimerCallback, null, cacheCleanupInterval, cacheCleanupInterval);
             }
 #if DEBUG_INTERNER
-            StringValueStatistic.FindOrCreate(internCacheName, () => String.Format("Size={0}, Content=\n{1}", internCache.Count, PrintInternerContent()));
+            StringValueStatistic.FindOrCreate(internCacheName, () => String.Format("Size={0}, Content=" + Environment.NewLine + "{1}", internCache.Count, PrintInternerContent()));
 #endif
         }
 

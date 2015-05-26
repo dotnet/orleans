@@ -11,7 +11,7 @@
     <TemplateGroupID>Orleans</TemplateGroupID>
     <ShowByDefault>false</ShowByDefault>
     <CreateNewFolder>true</CreateNewFolder>
-    <DefaultName>GrainCollection</DefaultName>
+    <DefaultName>Grain1</DefaultName>
     <ProvideDefaultName>true</ProvideDefaultName>
   </TemplateData>
   <TemplateContent>

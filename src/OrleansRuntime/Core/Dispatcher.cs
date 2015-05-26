@@ -266,7 +266,7 @@ namespace Orleans.Runtime
             if (Message.WriteMessagingTraces)
                 message.AddTimestamp(Message.LifecycleTag.TaskIncoming);
 
-            return catalog.SiloStatusOracle.CurrentStatus != SiloStatus.ShuttingDown;
+            return !catalog.SiloStatusOracle.CurrentStatus.IsTerminating();
         }
 
         /// <summary>
@@ -357,8 +357,11 @@ namespace Orleans.Runtime
         /// <param name="message">Message to analyze</param>
         private void CheckDeadlock(Message message)
         {
-            object obj = message.GetApplicationHeader(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
-            if (obj == null) return; // first call in a chain
+            var requestContext = message.RequestContextData;
+            object obj;
+            if (requestContext == null ||
+                !requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out obj) ||
+                obj == null) return; // first call in a chain
 
             var prevChain = ((IList)obj);
             ActivationId nextActivationId = message.TargetActivation;
@@ -577,7 +580,7 @@ namespace Orleans.Runtime
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {
                 logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, String.Format("AddressMessage could not find target for client pseudo-grain {0}", message));
-                throw new KeyNotFoundException("Attempting to send a message to an unregistered client pseudo-grain");
+                throw new KeyNotFoundException(String.Format("Attempting to send a message {0} to an unregistered client pseudo-grain {1}", message, targetAddress.Grain));
             }
 
             message.SetTargetPlacement(placementResult);
@@ -654,7 +657,7 @@ namespace Orleans.Runtime
 #endif
                 activation.ResetRunning(message);
 
-                if (catalog.SiloStatusOracle.CurrentStatus == SiloStatus.ShuttingDown) return;
+                if (catalog.SiloStatusOracle.CurrentStatus.IsTerminating()) return;
 
                 // ensure inactive callbacks get run even with transactions disabled
                 if (!activation.IsCurrentlyExecuting)

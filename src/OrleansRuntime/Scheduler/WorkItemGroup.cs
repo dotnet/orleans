@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
@@ -204,8 +204,9 @@ namespace Orleans.Runtime.Scheduler
 
                 if (state == WorkGroupStatus.Shutdown)
                 {
-                    ReportWorkGroupProblemWithBacktrace(
-                        String.Format("Enqueuing task {0} to a stopped work item group. Going to ignore and not execute it.", task),
+                    ReportWorkGroupProblem(
+                        String.Format("Enqueuing task {0} to a stopped work item group. Going to ignore and not execute it. "
+                        + "The likely reason is that the task is not being 'awaited' properly.", task),
                         ErrorCode.SchedulerNotEnqueuWorkWhenShutdown);
                     return;
                 }
@@ -246,8 +247,9 @@ namespace Orleans.Runtime.Scheduler
             {
                 if (IsActive)
                 {
-                    ReportWorkGroupProblemWithBacktrace(
-                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}", WorkItemCount),
+                    ReportWorkGroupProblem(
+                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}." 
+                        + "The likely reason is that the task is not being 'awaited' properly.", WorkItemCount),
                         ErrorCode.SchedulerWorkGroupStopping); // Throws InvalidOperationException
                 }
 
@@ -450,7 +452,13 @@ namespace Orleans.Runtime.Scheduler
         {
             var st = new StackTrace();
             var msg = string.Format("{0} {1}", what, DumpStatus());
-            log.Warn(errorCode, msg + " \nCalled from " + st);
+            log.Warn(errorCode, msg + Environment.NewLine + " Called from " + st);
+        }
+
+        private void ReportWorkGroupProblem(string what, ErrorCode errorCode)
+        {
+            var msg = string.Format("{0} {1}", what, DumpStatus());
+            log.Warn(errorCode, msg);
         }
     }
 }

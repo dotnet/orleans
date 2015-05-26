@@ -57,8 +57,9 @@ namespace Orleans.Runtime.MembershipService
             // so we always have a first table version row, before this silo starts working.
             if (tryInitTableVersion)
             {
-                var entry = table.tableManager.CreateTableVersionEntry(0);
-                await table.tableManager.InsertSiloEntryConditionally(entry, null, null, false).WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);   // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                bool created = await table.tableManager.TryCreateTableVersionEntryAsync().WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+                if(created) table.logger.Info("Created new table version row.");
             }
             return table;
         }
@@ -74,7 +75,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=\n{1}", key.ToLongString(), data.ToString());
+                if (logger.IsVerbose2) logger.Verbose2("Read my entry {0} Table=" + Environment.NewLine + "{1}", key.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -91,7 +92,7 @@ namespace Orleans.Runtime.MembershipService
              {
                 var entries = await tableManager.FindAllSiloEntries();   
                 MembershipTableData data = Convert(entries);
-                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=\n{0}", data.ToString());
+                if (logger.IsVerbose2) logger.Verbose2("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data; 
             }
@@ -214,8 +215,7 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrEmpty(tableEntry.ProxyPort))
                 parse.ProxyPort = int.Parse(tableEntry.ProxyPort);
 
-            if (!string.IsNullOrEmpty(tableEntry.Primary))
-                parse.IsPrimary = bool.Parse(tableEntry.Primary);
+            parse.IsPrimary = false; // there are no primaries with in Azure table.
 
             int port = 0;
             if (!string.IsNullOrEmpty(tableEntry.Port))
@@ -280,7 +280,6 @@ namespace Orleans.Runtime.MembershipService
                 HostName = memEntry.HostName,
                 Status = memEntry.Status.ToString(),
                 ProxyPort = memEntry.ProxyPort.ToString(CultureInfo.InvariantCulture),
-                Primary = memEntry.IsPrimary.ToString(),
                 RoleName = memEntry.RoleName,
                 InstanceName = memEntry.InstanceName,
                 UpdateZone = memEntry.UpdateZone.ToString(CultureInfo.InvariantCulture),

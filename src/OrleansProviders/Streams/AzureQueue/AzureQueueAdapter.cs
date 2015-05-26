@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -33,41 +33,35 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     internal class AzureQueueAdapter : IQueueAdapter
     {
-        private readonly int cachSize;
-
         protected readonly string DeploymentId;
         protected readonly string DataConnectionString;
-        protected readonly AzureQueueStreamQueueMapper StreamQueueMapper;
+        private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
 
         public string Name { get ; private set; }
         public bool IsRewindable { get { return false; } }
 
-        public AzureQueueAdapter(string dataConnectionString, string deploymentId, string providerName, int cacheSize)
+        public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
+
+        public AzureQueueAdapter(HashRingBasedStreamQueueMapper streamQueueMapper, string dataConnectionString, string deploymentId, string providerName)
         {
             if (String.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (String.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
             
             DataConnectionString = dataConnectionString;
             DeploymentId = deploymentId;
-            cachSize = cacheSize;
             Name = providerName;
-            StreamQueueMapper = new AzureQueueStreamQueueMapper(providerName);
+            this.streamQueueMapper = streamQueueMapper;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId, cachSize);
-        }
-
-        public IStreamQueueMapper GetStreamQueueMapper()
-        {
-            return StreamQueueMapper;
+            return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events)
         {
-            var queueId = StreamQueueMapper.GetQueueForStream(streamGuid);
+            var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
             AzureQueueDataManager queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {

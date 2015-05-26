@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System;
 
@@ -54,6 +54,8 @@ namespace Orleans.Runtime
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 
         public static readonly GrainId SystemMembershipTableId = GrainId.GetSystemGrainId(new Guid("01145FEC-C21E-11E0-9105-D0FB4724019B"));
+        public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
+
         internal const long ReminderTableGrainId = 12345;
          
         /// <summary>
@@ -113,7 +115,8 @@ namespace Orleans.Runtime
 
         private static readonly Dictionary<GrainId, string> systemGrainNames = new Dictionary<GrainId, string>
         {
-            {SystemMembershipTableId, "MembershipTableGrain"}
+            {SystemMembershipTableId, "MembershipTableGrain"},
+            {SiloDirectConnectionId, "SiloDirectConnectionId"}
         };
 
         public static bool TryGetSystemGrainName(GrainId id, out string name)

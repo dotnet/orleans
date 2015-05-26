@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 
 namespace Orleans.Streams
 {
@@ -44,5 +44,18 @@ namespace Orleans.Streams
         public abstract int CompareTo(StreamSequenceToken other);
 
         #endregion
+    }
+
+    public static class StreamSequenceTokenUtilities
+    {
+        static public bool Newer(this StreamSequenceToken me, StreamSequenceToken other)
+        {
+            return me.CompareTo(other) > 0;
+        }
+
+        static public bool Older(this StreamSequenceToken me, StreamSequenceToken other)
+        {
+            return me.CompareTo(other) < 0;
+        }
     }
 }

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -39,8 +39,7 @@ namespace Orleans.Runtime
         Dictionary<ActivationId, IActivationInfo> Instances { get; }
         int VersionTag { get; }
         bool SingleInstance { get; }
-        void AddActivation(ActivationAddress addr);
-        void AddActivation(ActivationId act, SiloAddress silo);
+        bool AddActivation(ActivationId act, SiloAddress silo);
         ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo);
         bool RemoveActivation(ActivationAddress addr);
         bool RemoveActivation(ActivationId act, bool force);

@@ -201,8 +201,7 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (!status.Equals(SiloStatus.Stopping) && !status.Equals(SiloStatus.ShuttingDown) &&
-                !status.Equals(SiloStatus.Dead)) return;
+            if (!status.IsTerminating()) return;
 
             SiloRuntimeStatistics ignore;
             periodicStats.TryRemove(updatedSilo, out ignore);

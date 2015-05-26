@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging
@@ -34,13 +34,7 @@ namespace Orleans.Runtime.Messaging
 
         void RerouteMessage(Message message);
 
-        Action<List<GrainId>> ClientDropHandler { set; }
-
         bool IsProxying { get; }
-
-        void RecordProxiedGrain(GrainId id, Guid client);
-
-        void RecordUnproxiedGrain(GrainId id);
 
         bool TryDeliverToProxy(Message msg);
 

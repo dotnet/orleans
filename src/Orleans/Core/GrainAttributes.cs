@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 
 namespace Orleans
 {
@@ -222,17 +222,6 @@ namespace Orleans
             public string ProviderName { get; set; }
         }
     }
-
-    /// <summary>
-    /// Used to make a grain interface as using extended keys.
-    /// </summary>
-    /// <remarks>
-    /// If a grain interface uses extended keys, then an additional set of grain reference 
-    /// factory methods will be generated which accept both primary and extended key parts.
-    /// </remarks>
-    [AttributeUsage(AttributeTargets.Interface)]
-    public sealed class ExtendedPrimaryKeyAttribute : Attribute
-    { }
 
     [AttributeUsage(AttributeTargets.Interface)]
     internal sealed class FactoryAttribute : Attribute

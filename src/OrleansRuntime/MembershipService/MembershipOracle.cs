@@ -182,7 +182,7 @@ namespace Orleans.Runtime.MembershipService
                     timerProbeOtherSilos.Start();
                 };
                 orleansConfig.OnConfigChange(
-                    "Globals/Liveness", () => InsideRuntimeClient.Current.Scheduler.RunOrQueueAction(configure, this.SchedulingContext), false);
+                    "Globals/Liveness", () => InsideRuntimeClient.Current.Scheduler.RunOrQueueAction(configure, SchedulingContext), false);
 
                 configure();
                 logger.Info(ErrorCode.MembershipFinishBecomeActive, "-Finished BecomeActive.");
@@ -270,14 +270,25 @@ namespace Orleans.Runtime.MembershipService
             return membershipOracleData.TryGetSiloName(siloAddress, out siloName);
         }
 
-        public bool IsValidSilo(SiloAddress silo)
+        private bool IsFunctionalMBR(SiloStatus status)
         {
-            return membershipOracleData.IsValidSilo(silo);
+            return status.Equals(SiloStatus.Active) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping);
+        }
+
+        public bool IsFunctionalDirectory(SiloAddress silo)
+        {
+            if (silo.Equals(MyAddress)) return true;
+
+            var status = membershipOracleData.GetApproximateSiloStatus(silo);
+            return !status.IsTerminating();
         }
 
         public bool IsDeadSilo(SiloAddress silo)
         {
-            return membershipOracleData.IsDeadSilo(silo);
+            if (silo.Equals(MyAddress)) return false;
+
+            var status = membershipOracleData.GetApproximateSiloStatus(silo);
+            return status == SiloStatus.Dead;
         }
 
         public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer)
@@ -300,7 +311,7 @@ namespace Orleans.Runtime.MembershipService
         public async Task SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             if (logger.IsVerbose2) logger.Verbose2("-Received GOSSIP SiloStatusChangeNotification about {0} status {1}. Going to read the table.", updatedSilo, status);
-            if (membershipOracleData.IsFunctional(CurrentStatus))
+            if (IsFunctionalMBR(CurrentStatus))
             {
                 try
                 {
@@ -392,7 +403,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (logger.IsVerbose) logger.Verbose("-Attempting CleanupTableEntries #{0}", counter);
                 MembershipTableData table = await membershipTableProvider.ReadAll();
-                logger.Info(ErrorCode.MembershipReadAll_Cleanup, "-CleanupTable called on silo startup. Membership table {0}",
+                logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.MembershipReadAll_Cleanup, "-CleanupTable called on silo startup. Membership table {0}",
                     table.ToString());
 
                 return await CleanupTableEntries(table);
@@ -508,8 +519,8 @@ namespace Orleans.Runtime.MembershipService
                         !entry.SiloAddress.Equals(MyAddress) &&
                         !HasMissedIAmAlives(entry, false)).ToList();
 
-            logger.Info(ErrorCode.MembershipSendingPreJoinPing, "About to send pings to {0} nodes in order to validate communication in the Joining state. Pinged nodes = {1}",
-                members.Count, Utils.EnumerableToString(members, entry => entry.SiloAddress.ToLongString()));
+            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.MembershipSendingPreJoinPing, "About to send pings to {0} nodes in order to validate communication in the Joining state. Pinged nodes = {1}",
+                members.Count, Utils.EnumerableToString(members, entry => entry.ToFullString(true)));
 
             var pingPromises = new List<Task>();
             foreach (var entry in members)
@@ -537,7 +548,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task ProcessTableUpdate(MembershipTableData table, string caller, bool logAtInfoLevel = false)
         {
-            if (logAtInfoLevel) logger.Info(ErrorCode.MembershipReadAll_1, "-ReadAll (called from {0}) Membership table {1}", caller, table.ToString());
+            if (logAtInfoLevel) logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.MembershipReadAll_1, "-ReadAll (called from {0}) Membership table {1}", caller, table.ToString());
             else if (logger.IsVerbose) logger.Verbose("-ReadAll (called from {0}) Membership table {1}", caller, table.ToString());
 
             // Even if failed to clean up old entries from the table, still process the new entries. Will retry cleanup next time.
@@ -554,7 +565,7 @@ namespace Orleans.Runtime.MembershipService
             bool localViewChanged = false;
             CheckMissedIAmAlives(table);
             // only process the table if in the active or ShuttingDown state. In other states I am not ready yet.
-            if (membershipOracleData.IsFunctional(CurrentStatus))
+            if (IsFunctionalMBR(CurrentStatus))
             {
                 foreach (var entry in table.Members.Select(tuple => tuple.Item1).Where(
                     item => !item.SiloAddress.Endpoint.Equals(MyAddress.Endpoint)))
@@ -566,7 +577,7 @@ namespace Orleans.Runtime.MembershipService
                     UpdateListOfProbedSilos();
             }
 
-            if (localViewChanged) logger.Info(ErrorCode.MembershipReadAll_2,
+            if (localViewChanged) logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.MembershipReadAll_2,
                 "-ReadAll (called from {0}, after local view changed, with removed duplicate deads) Membership table: {1}",
                 caller, table.SupressDuplicateDeads().ToString());
         }
@@ -678,8 +689,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var msg = "I have been told I am dead, so this silo will commit suicide! " + reason;
             logger.Error(ErrorCode.MembershipKillMyselfLocally, msg);
-            bool alreadyStopping = CurrentStatus == SiloStatus.Dead || 
-                CurrentStatus == SiloStatus.ShuttingDown || CurrentStatus == SiloStatus.Stopping;
+            bool alreadyStopping = CurrentStatus.IsTerminating();
 
             DisposeTimers();
             membershipOracleData.UpdateMyStatusLocal(SiloStatus.Dead);
@@ -701,7 +711,7 @@ namespace Orleans.Runtime.MembershipService
             if (!orleansConfig.Globals.UseLivenessGossip) return;
 
             // spread the rumor that some silo has just been marked dead
-            foreach (var silo in membershipOracleData.GetSiloStatuses(status => membershipOracleData.IsFunctional(status), false).Keys)
+            foreach (var silo in membershipOracleData.GetSiloStatuses(IsFunctionalMBR, false).Keys)
             {
                 if (logger.IsVerbose2) logger.Verbose2("-Sending status update GOSSIP notification about silo {0}, status {1}, to silo {2}", updatedSilo.ToLongString(), updatedStatus, silo.ToLongString());
                 GetOracleReference(silo)
@@ -723,11 +733,10 @@ namespace Orleans.Runtime.MembershipService
         private void UpdateListOfProbedSilos()
         {
             // if I am still not fully functional, I should not be probing others.
-            if (!membershipOracleData.IsFunctional(CurrentStatus)) return;
+            if (!IsFunctionalMBR(CurrentStatus)) return;
 
             // keep watching shutting-down silos as well, so we can properly ensure they are dead.
-            List<SiloAddress> tmpList = membershipOracleData.GetSiloStatuses(
-                status => membershipOracleData.IsFunctional(status), true).Keys.ToList();
+            List<SiloAddress> tmpList = membershipOracleData.GetSiloStatuses(IsFunctionalMBR, true).Keys.ToList();
 
             tmpList.Sort((x, y) => x.GetConsistentHashCode().CompareTo(y.GetConsistentHashCode()));
 
@@ -772,7 +781,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (!AreTheSame(probedSilos.Keys, newProbedSilos.Keys))
             {
-                logger.Info(ErrorCode.MembershipWatchList, "Will watch (actively ping) {0} silos: {1}",
+                logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.MembershipWatchList, "Will watch (actively ping) {0} silos: {1}",
                     newProbedSilos.Count, Utils.EnumerableToString(newProbedSilos.Keys, silo => silo.ToLongString()));
             }
 
@@ -885,7 +894,7 @@ namespace Orleans.Runtime.MembershipService
             Task pingTask;
             try
             {
-                RequestContext.Set(Message.Header.PING_APPLICATION_HEADER, true);
+                RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
                 pingTask = GetOracleReference(siloAddress).Ping(pingNumber);
 
                 // Update stats counters -- only count Pings that were successfuly sent [but not necessarily replied to]
@@ -893,7 +902,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                RequestContext.Remove(Message.Header.PING_APPLICATION_HEADER);
+                RequestContext.Remove(RequestContext.PING_APPLICATION_HEADER);
             }
             return pingTask;
         }

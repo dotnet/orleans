@@ -35,8 +35,6 @@ namespace Orleans.Runtime.Messaging
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
 
-        internal static readonly string PingHeader = Message.Header.APPLICATION_HEADER_FLAG + Message.Header.PING_APPLICATION_HEADER;
-
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;
         protected HashSet<Socket> OpenReceiveSockets;
@@ -76,7 +74,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
-                AcceptingSocket.BeginAccept(new AsyncCallback(AcceptCallback), this);
+                AcceptingSocket.BeginAccept(AcceptCallback, this);
             }
             catch (Exception ex)
             {
@@ -111,51 +109,30 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual bool RecordOpenedSocket(Socket sock)
         {
-            Guid client;
+            GrainId client;
             if (!ReceiveSocketPreample(sock, false, out client)) return false;
 
             NetworkingStatisticsGroup.OnOpenedReceiveSocket();
             return true;
         }
 
-        protected bool ReceiveSocketPreample(Socket sock, bool expectProxiedConnection, out Guid client)
+        protected bool ReceiveSocketPreample(Socket sock, bool expectProxiedConnection, out GrainId client)
         {
-            client = default(Guid);
+            client = null;
 
-            if (Cts.IsCancellationRequested) return false; 
+            if (Cts.IsCancellationRequested) return false;
 
-            // Receive the client ID
-            var buffer = new byte[16];
-            int offset = 0;
-
-            while (offset < buffer.Length)
+            if (!ReadConnectionPreemble(sock, out client))
             {
-                try
-                {
-                    int bytesRead = sock.Receive(buffer, offset, buffer.Length - offset, SocketFlags.None);
-                    if (bytesRead == 0)
-                    {
-                        Log.Warn(ErrorCode.GatewayAcceptor_SocketClosed, 
-                            "Remote socket closed while receiving client ID from endpoint {0}.", sock.RemoteEndPoint);
-                        return false;
-                    }
-                    offset += bytesRead;
-                }
-                catch (Exception ex)
-                {
-                    Log.Warn(ErrorCode.GatewayAcceptor_ExceptionReceiving, "Exception receiving client ID from endpoint " + sock.RemoteEndPoint, ex);
-                    return false;
-                }
+                return false;
             }
-
-            client = new Guid(buffer);
 
             if (Log.IsVerbose2) Log.Verbose2(ErrorCode.MessageAcceptor_Connection, "Received connection from {0} at source address {1}", client, sock.RemoteEndPoint.ToString());
 
             if (expectProxiedConnection)
             {
                 // Proxied Gateway Connection - must have sender id
-                if (client == SocketManager.SiloDirectConnectionId)
+                if (client.Equals(Constants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_NotAProxiedConnection, string.Format("Gateway received unexpected non-proxied connection from {0} at source address {1}", client, sock.RemoteEndPoint));
                     return false;
@@ -164,7 +141,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Direct connection - should not have sender id
-                if (client != SocketManager.SiloDirectConnectionId)
+                if (!client.Equals(Constants.SiloDirectConnectionId))
                 {
                     Log.Error(ErrorCode.MessageAcceptor_UnexpectedProxiedConnection, string.Format("Silo received unexpected proxied connection from {0} at source address {1}", client, sock.RemoteEndPoint));
                     return false;
@@ -178,6 +155,61 @@ namespace Orleans.Runtime.Messaging
 
             return true;
         }
+
+        private bool ReadConnectionPreemble(Socket socket, out GrainId grainId)
+        {
+            grainId = null;
+            byte[] buffer = null;
+            try
+            {
+                buffer = ReadFromSocket(socket, sizeof(int)); // Read the size 
+                if (buffer == null) return false;
+                Int32 size = BitConverter.ToInt32(buffer, 0);
+
+                if (size > 0)
+                {
+                    buffer = ReadFromSocket(socket, size); // Receive the client ID
+                    if (buffer == null) return false;
+                    grainId = GrainId.FromByteArray(buffer);
+                }
+                return true;
+            }
+            catch (Exception exc)
+            {
+                Log.Error(ErrorCode.GatewayFailedToParse,
+                            String.Format("Failed to convert the data that read from the socket. buffer = {0}, from endpoint {1}.", 
+                            Utils.EnumerableToString(buffer), socket.RemoteEndPoint), exc);
+                return false;
+            }
+        }
+
+        private byte[] ReadFromSocket(Socket sock, int expected)
+        {
+            var buffer = new byte[expected];
+            int offset = 0;
+            while (offset < buffer.Length)
+            {
+                try
+                {
+                    int bytesRead = sock.Receive(buffer, offset, buffer.Length - offset, SocketFlags.None);
+                    if (bytesRead == 0)
+                    {
+                        Log.Warn(ErrorCode.GatewayAcceptor_SocketClosed,
+                            "Remote socket closed while receiving connection preemble data from endpoint {0}.", sock.RemoteEndPoint);
+                        return null;
+                    }
+                    offset += bytesRead;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn(ErrorCode.GatewayAcceptor_ExceptionReceiving,
+                        "Exception receiving connection preemble data from endpoint " + sock.RemoteEndPoint, ex);
+                    return null;
+                }
+            }
+            return buffer;
+        }
+
         protected virtual void RecordClosedSocket(Socket sock)
         {
             if (TryRemoveClosedSocket(sock))
@@ -227,7 +259,7 @@ namespace Orleans.Runtime.Messaging
                 // Then, start a new Accept
                 try
                 {
-                    ima.AcceptingSocket.BeginAccept(new AsyncCallback(AcceptCallback), ima);
+                    ima.AcceptingSocket.BeginAccept(AcceptCallback, ima);
                 }
                 catch (Exception ex)
                 {
@@ -272,7 +304,7 @@ namespace Orleans.Runtime.Messaging
                     var rcc = new ReceiveCallbackContext(sock, ima);
                     try
                     {
-                        rcc.BeginReceive(new AsyncCallback(ReceiveCallback));
+                        rcc.BeginReceive(ReceiveCallback);
                     }
                     catch (Exception exception)
                     {
@@ -316,7 +348,7 @@ namespace Orleans.Runtime.Messaging
                     rcc.IMA.SafeCloseSocket(rcc.Sock);
                 }
 
-                int bytes = 0;
+                int bytes;
                 // Complete the receive
                 try
                 {
@@ -377,7 +409,12 @@ namespace Orleans.Runtime.Messaging
                 msg.AddTimestamp(Message.LifecycleTag.ReceiveIncoming);
 
             // See it's a Ping message, and if so, short-circuit it
-            if (msg.GetScalarHeader<bool>(PingHeader))
+            object pingObj;
+            var requestContext = msg.RequestContextData;
+            if (requestContext != null &&
+                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out pingObj) &&
+                pingObj is bool &&
+                (bool)pingObj)
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
@@ -388,7 +425,7 @@ namespace Orleans.Runtime.Messaging
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
                     Message rejection = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable,
                         string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected ping message is {2}.",
-                            msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg.ToString()));
+                            msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
                     MessageCenter.OutboundQueue.SendMessage(rejection);
                 }
                 else
@@ -413,7 +450,7 @@ namespace Orleans.Runtime.Messaging
 
             // If we've stopped application message processing, then filter those out now
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.SendingGrain != Constants.SystemMembershipTableId))
+            if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableId.Equals(msg.SendingGrain))
             {
                 // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request) return;
@@ -452,10 +489,10 @@ namespace Orleans.Runtime.Messaging
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = msg.CreateRejectionResponse(Message.RejectionTypes.Transient,
                     string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.", 
-                        msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg.ToString()));
+                        msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
                 MessageCenter.OutboundQueue.SendMessage(rejection);
                 if (Log.IsVerbose) Log.Verbose("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
-                    msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg.ToString());
+                    msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg);
             }
         }
 
@@ -466,7 +503,7 @@ namespace Orleans.Runtime.Messaging
                 SocketManager.CloseSocket(AcceptingSocket);
                 AcceptingSocket = SocketManager.GetAcceptingSocketForEndpoint(listenAddress);
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
-                AcceptingSocket.BeginAccept(new AsyncCallback(AcceptCallback), this);
+                AcceptingSocket.BeginAccept(AcceptCallback, this);
             }
             catch (Exception ex)
             {
@@ -484,7 +521,7 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
-            internal enum ReceivePhase
+            private enum ReceivePhase
             {
                 Lengths,
                 Header,
@@ -644,11 +681,13 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            // Builds the list of buffer segments to pass to Socket.BeginReceive, based on the total list (CurrentBuffer)
-            // and how much we've already filled in (Offset). We have to do this because the scatter/gather variant of
-            // the BeginReceive API doesn't allow you to specify an offset into the list of segments.
-            // To build the list, we walk through the complete buffer, skipping segments that we've already filled up; 
-            // add the partial segment for whatever's left in the first unfilled buffer, and then add any remaining buffers.
+            /// <summary>
+            /// Builds the list of buffer segments to pass to Socket.BeginReceive, based on the total list (CurrentBuffer)
+            /// and how much we've already filled in (Offset). We have to do this because the scatter/gather variant of
+            /// the BeginReceive API doesn't allow you to specify an offset into the list of segments.
+            /// To build the list, we walk through the complete buffer, skipping segments that we've already filled up; 
+            /// add the partial segment for whatever's left in the first unfilled buffer, and then add any remaining buffers.
+            /// </summary>
             private List<ArraySegment<byte>> BuildSegmentList()
             {
                 return ByteArrayBuilder.BuildSegmentList(CurrentBuffer, offset);
@@ -812,16 +851,16 @@ namespace Orleans.Runtime.Messaging
 
                     throw;
                 }
+#if TRACK_DETAILED_STATS
                 finally
                 {
-#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectThreadTimeTrackingStats)
                     {
                         tracker.IncrementNumberOfProcessed();
                         tracker.OnStopProcessing();
                     }
-#endif
                 }
+#endif
             }
         }
     }

@@ -21,18 +21,21 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 
 namespace Orleans.Streams
 {
     [Serializable]
     internal class PubSubPublisherState : IEquatable<PubSubPublisherState>
     {
-        // Those fields have to be public non-readonly for JSonSerialization to work!
-        public readonly StreamId Stream;
+        // These fields have to be public non-readonly for JSonSerialization to work!
+        // Implement ISerializable if changing any of them to readonly
+        public StreamId Stream;
         public IStreamProducerExtension Producer;
 
-        internal PubSubPublisherState(StreamId streamId, IStreamProducerExtension streamProducer)
+        // This constructor has to be public for JSonSerialization to work!
+        // Implement ISerializable if changing it to non-public
+        public PubSubPublisherState(StreamId streamId, IStreamProducerExtension streamProducer)
         {
             Stream = streamId;
             Producer = streamProducer;

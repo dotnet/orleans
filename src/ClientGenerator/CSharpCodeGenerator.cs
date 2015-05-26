@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Reflection;
@@ -39,7 +39,7 @@ namespace Orleans.CodeGeneration
     internal class CSharpCodeGenerator : NamespaceGenerator
     {
         public CSharpCodeGenerator(Assembly grainAssembly, string nameSpace)
-            : base(grainAssembly, nameSpace)
+            : base(grainAssembly, nameSpace, Language.CSharp)
         {}
 
         protected override string GetGenericTypeName(Type type, Action<Type> referred, Func<Type, bool> noNamespace = null)
@@ -50,7 +50,7 @@ namespace Orleans.CodeGeneration
 
             referred(type);
 
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.CSharp);
 
             if (!type.IsGenericType)
             {
@@ -193,7 +193,7 @@ namespace Orleans.CodeGeneration
                 var t = new System.Threading.Tasks.TaskCompletionSource<object>();
                 t.SetException(new NotImplementedException(""No grain interfaces for type {0}""));
                 return t.Task;
-                ", TypeUtils.GetFullName(grainType));
+                ", TypeUtils.GetFullName(grainType, Language.CSharp));
             }
 
             var builder = new StringBuilder();
@@ -381,13 +381,14 @@ namespace Orleans.CodeGeneration
             Action<string> add = codeFmt => factoryClass.Members.Add(
                 new CodeSnippetTypeMember(String.Format(codeFmt, iface.InterfaceTypeName, interfaceId)));
 
-            bool hasKeyExt = GrainInterfaceData.UsesPrimaryKeyExtension(iface.Type);
+            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
+            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
             bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
             bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
             bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
             bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
 
-            if (isDefaultKey && hasKeyExt)
+            if (isLongCompoundKey)
             {
                 // the programmer has specified [ExtendedPrimaryKey] on the interface.
                 add(@"
@@ -401,7 +402,9 @@ namespace Orleans.CodeGeneration
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt, grainClassNamePrefix));
                         }}");
-
+            }
+            else if (isGuidCompoundKey)
+            {
                 add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt)
                         {{
@@ -521,10 +524,9 @@ namespace Orleans.CodeGeneration
             foreach (var paramInfo in parameters)
             {
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
-                    invokeArguments += string.Format("{0} is global::Orleans.Grain ? {2}.{1}.Cast({0}.AsReference()) : {0}",
+                    invokeArguments += string.Format("{0} is global::Orleans.Grain ? {0}.AsReference<{1}>() : {0}",
                         GetParameterName(paramInfo),
-                        GrainInterfaceData.GetFactoryClassForInterface(paramInfo.ParameterType),
-                        paramInfo.ParameterType.Namespace);
+                        TypeUtils.GetTemplatedName(paramInfo.ParameterType, _ => true, Language.CSharp));
                 else
                     invokeArguments += GetParameterName(paramInfo);
 
@@ -567,26 +569,28 @@ namespace Orleans.CodeGeneration
             if (methodInfo.ReturnType == typeof(void))
             {
                 methodImpl = string.Format(@"
-                base.InvokeOneWayMethod({0}, new object[] {{{1}}} {2});",
-                methodId, invokeArguments, optional);
+                    base.InvokeOneWayMethod({0}, {1} {2});",
+                    methodId, 
+                    invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
+                    optional);
             }
             else
             {
                 if (methodInfo.ReturnType == typeof(Task))
                 {
                     methodImpl = string.Format(@"
-                return base.InvokeMethodAsync<object>({0}, new object[] {{{1}}} {2});",
+                return base.InvokeMethodAsync<object>({0}, {1} {2});",
                         methodId,
-                        invokeArguments,
+                        invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
                         optional);
                 }
                 else
                 {
                     methodImpl = string.Format(@"
-                return base.InvokeMethodAsync<{0}>({1}, new object[] {{{2}}} {3});",
+                return base.InvokeMethodAsync<{0}>({1}, {2} {3});",
                         GetActualMethodReturnType(methodInfo.ReturnType, SerializeFlag.NoSerialize),
                         methodId,
-                        invokeArguments,
+                        invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
                         optional);
                 }
             }

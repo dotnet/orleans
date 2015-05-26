@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -264,9 +264,14 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return string.Format("\n**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}\n" +
-                                    "   LocalCacheActivationAddresses={4}\n   LocalDirectoryActivationAddresses={5}\n   PrimaryForGrain={6}\n" +
-                                    "   GrainClassTypeName={7}\n    LocalActivations:\n{3}.\n",
+            return string.Format(Environment.NewLine 
+                + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine 
+                + "   LocalCacheActivationAddresses={4}" + Environment.NewLine
+                + "   LocalDirectoryActivationAddresses={5}"  + Environment.NewLine
+                + "   PrimaryForGrain={6}" + Environment.NewLine 
+                + "   GrainClassTypeName={7}" + Environment.NewLine
+                + "   LocalActivations:" + Environment.NewLine
+                + "{3}." + Environment.NewLine,
                         Grain.ToDetailedString(), 
                         SiloName,
                         SiloAddress.ToLongString(),

@@ -1,4 +1,4 @@
-﻿using GPSTracker.Common;
+using GPSTracker.Common;
 using Microsoft.AspNet.SignalR;
 
 namespace GPSTracker.Web.Controllers

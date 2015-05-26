@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -47,6 +47,7 @@ namespace Orleans.Streams
         private int numMessages;
 
         private IQueueAdapter queueAdapter;
+        private IQueueCache queueCache;
         private IQueueAdapterReceiver receiver;
         private IDisposable timer;
 
@@ -63,6 +64,7 @@ namespace Orleans.Streams
             : base(id, runtime.ExecutingSiloAddress, true)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
+            if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
 
             QueueId = queueId;
             streamProviderName = strProviderName;
@@ -74,10 +76,10 @@ namespace Orleans.Streams
             this.initQueueTimeout = initQueueTimeout;
             numMessages = 0;
 
-            logger = providerRuntime.GetLogger(this.GrainId.ToString() + "-" + streamProviderName);
+            logger = providerRuntime.GetLogger(GrainId + "-" + streamProviderName);
             logger.Info((int)ErrorCode.PersistentStreamPullingAgent_01, 
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
-                this.GetType().Name, this.GrainId.ToDetailedString(), streamProviderName, base.Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
 
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, strProviderName));
             numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, strProviderName));
@@ -94,34 +96,48 @@ namespace Orleans.Streams
         ///     Same applies to shutdown.
         /// </summary>
         /// <param name="qAdapter"></param>
+        /// <param name="queueAdapterCache"></param>
         /// <returns></returns>
-        public async Task Initialize(Immutable<IQueueAdapter> qAdapter)
+        public async Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IQueueAdapterCache> queueAdapterCache)
         {
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
 
             logger.Info((int)ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
-                this.GetType().Name, this.GrainId.ToDetailedString(), base.Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
             
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
-     
+
             try
             {
                 receiver = queueAdapter.CreateReceiver(QueueId);
             }
             catch (Exception exc)
             {
-                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_02, String.Format("Exception while calling INewQueueAdapter.CreateNewReceiver."), exc);
+                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_02, String.Format("Exception while calling IQueueAdapter.CreateNewReceiver."), exc);
                 return;
             }
 
+            try
+            {
+                if (queueAdapterCache.Value != null)
+                {
+                    queueCache = queueAdapterCache.Value.CreateQueueCache(QueueId);
+                }
+            }
+            catch (Exception exc)
+            {
+                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_23, String.Format("Exception while calling IQueueAdapterCache.CreateQueueCache."), exc);
+                return;
+            }
+            
             try
             {
                 var task = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(initQueueTimeout));
                 task = task.LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, String.Format("QueueAdapterReceiver {0} failed to Initialize.", QueueId.ToStringWithHashCode()));
                 await task;
             }
-            catch (Exception)
+            catch
             {
                 // Just ignore this exception and proceed as if Initialize has succeeded.
                 // We already logged individual exceptions for individual calls to Initialize. No need to log again.
@@ -137,7 +153,7 @@ namespace Orleans.Streams
         public async Task Shutdown()
         {
             // Stop pulling from queues that are not in my range anymore.
-            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {0} responsible for queue: {1}", this.GetType().Name, QueueId.ToStringWithHashCode());
+            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {0} responsible for queue: {1}", GetType().Name, QueueId.ToStringWithHashCode());
             if (timer != null)
             {
                 var tmp = timer;
@@ -146,7 +162,7 @@ namespace Orleans.Streams
             }
 
             var unregisterTasks = new List<Task>();
-            var meAsStreamProducer = StreamProducerExtensionFactory.Cast(this.AsReference());
+            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
             foreach (var streamId in pubSubCache.Keys)
             {
                 logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
@@ -160,7 +176,7 @@ namespace Orleans.Streams
                     String.Format("QueueAdapterReceiver {0} failed to Shutdown.", QueueId));
                 await task;
             }
-            catch (Exception)
+            catch
             {
                 // Just ignore this exception and proceed as if Shutdown has succeeded.
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
@@ -178,18 +194,20 @@ namespace Orleans.Streams
         }
 
         public Task AddSubscriber(
+            GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
             StreamSequenceToken token,
             IStreamFilterPredicateWrapper filter)
         {
             if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1} Token={2}.", streamId, streamConsumer, token);
-            AddSubscriber_Impl(streamId, streamConsumer, token, filter);
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, token, filter);
             return TaskDone.Done;
         }
 
         // Called by rendezvous when new remote subscriber subscribes to this stream.
         private void AddSubscriber_Impl(
+            GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
             StreamSequenceToken token,
@@ -203,31 +221,31 @@ namespace Orleans.Streams
             }
 
             StreamConsumerData data;
-            if (!streamDataCollection.TryGetConsumer(streamConsumer, out data))
-                data = streamDataCollection.AddConsumer(streamId, streamConsumer, token, filter);
+            if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, token, filter);
             
             // Set cursor if not cursor is set, or if subscription provides new token
-            if (data.Cursor == null || token != null)
-                data.Cursor = this.receiver.GetCacheCursor(streamId.Guid, streamId.Namespace, token);
+            if ((data.Cursor == null || token != null) && queueCache != null)
+                data.Cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, token);
             
             if (data.State == StreamConsumerDataState.Inactive)
                 RunConsumerCursor(data, filter).Ignore(); // Start delivering events if not actively doing so
         }
 
-        public Task RemoveSubscriber(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
         {
-            RemoveSubscriber_Impl(streamId, streamConsumer);
+            RemoveSubscriber_Impl(subscriptionId, streamId);
             return TaskDone.Done;
         }
 
-        public void RemoveSubscriber_Impl(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public void RemoveSubscriber_Impl(GuidId subscriptionId, StreamId streamId)
         {
             StreamConsumerCollection streamData;
             if (!pubSubCache.TryGetValue(streamId, out streamData)) return;
 
             // remove consumer
-            bool removed = streamData.RemoveConsumer(streamConsumer);
-            if (removed && logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscriber={0}, for stream {1}.", streamConsumer, streamId);
+            bool removed = streamData.RemoveConsumer(subscriptionId);
+            if (removed && logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
             
             if (streamData.Count == 0)
                 pubSubCache.Remove(streamId);
@@ -241,19 +259,27 @@ namespace Orleans.Streams
                 if (timer == null) return; // timer was already removed, last tick
                 
                 IQueueAdapterReceiver rcvr = receiver;
+                int maxCacheAddCount = queueCache != null ? queueCache.MaxAddCount : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (true)
                 {
+                    if (queueCache != null && queueCache.IsUnderPressure())
+                    {
+                        // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
+                        logger.Info((int)ErrorCode.PersistentStreamPullingAgent_24, String.Format("Stream cache is under pressure. Backing off."));
+                        return;
+                    }
+
                     // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
-                    IEnumerable<IBatchContainer> msgsEnumerable = await rcvr.GetQueueMessagesAsync();
-                    List<IBatchContainer> multiBatch = null;
-                    if (msgsEnumerable != null)
-                        multiBatch = msgsEnumerable.ToList();
+                    IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
                     
                     if (multiBatch == null || multiBatch.Count == 0) return; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
-                    
-                    rcvr.AddToCache(multiBatch);
+
+                    if (queueCache != null)
+                    {
+                        queueCache.AddToCache(multiBatch);
+                    }
                     numMessages += multiBatch.Count;
                     numReadMessagesCounter.IncrementBy(multiBatch.Count);
                     if (logger.IsVerbose2) logger.Verbose2((int)ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
@@ -267,7 +293,7 @@ namespace Orleans.Streams
                         if (pubSubCache.TryGetValue(streamId, out streamData))
                             StartInactiveCursors(streamId, streamData); // if this is an existing stream, start any inactive cursors
                         else
-                            RegisterStream(streamId, group.First().SequenceToken); // if this is a new stream register as producer of stream in pub sub system
+                            RegisterStream(streamId, group.First().SequenceToken).Ignore(); ; // if this is a new stream register as producer of stream in pub sub system
                     }
                 }
             }
@@ -278,23 +304,36 @@ namespace Orleans.Streams
             }
         }
 
-        private void RegisterStream(StreamId streamId, StreamSequenceToken firstToken)
+        private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken)
         {
             var streamData = new StreamConsumerCollection();
             pubSubCache.Add(streamId, streamData);
-            RegisterAsStreamProducer(streamId, firstToken).Ignore();
+            // Create a fake cursor to point into a cache.
+            // That way we will not purge the event from the cache, until we talk to pub sub.
+            // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer) 
+            // and later production.
+            var pinCursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, firstToken);
+
+            try
+            {
+                await RegisterAsStreamProducer(streamId, firstToken);
+            }finally
+            {
+                // Cleanup the fake pinning cursor.
+                pinCursor.Dispose();
+            }
         }
 
         private void StartInactiveCursors(StreamId streamId, StreamConsumerCollection streamData)
         {
             // if stream is already registered, just wake inactive consumers
             // get list of inactive consumers
-            var streamConsumers = streamData.AllConsumersForStream(streamId)
+            var inactiveStreamConsumers = streamData.AllConsumersForStream(streamId)
                 .Where(consumer => consumer.State == StreamConsumerDataState.Inactive)
                 .ToList();
 
             // for each inactive stream
-            foreach (StreamConsumerData consumerData in streamConsumers)
+            foreach (StreamConsumerData consumerData in inactiveStreamConsumers)
                 RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
         }
 
@@ -341,16 +380,15 @@ namespace Orleans.Streams
 
                     if (batch != null)
                     {
-                        deliveryTask = consumerData.StreamConsumer
-                            .DeliverBatch(consumerData.StreamId, batch.AsImmutable());
+                        deliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
                     }
                     else if (ex == null)
                     {
-                        deliveryTask = consumerData.StreamConsumer.CompleteStream(consumerData.StreamId);
+                        deliveryTask = consumerData.StreamConsumer.CompleteStream(consumerData.SubscriptionId);
                     }
                     else
                     {
-                        deliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.StreamId, ex);
+                        deliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, ex);
                     }
 
                     try
@@ -379,15 +417,15 @@ namespace Orleans.Streams
             try
             {
                 if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetreaveNewStream");
-                
-                IStreamProducerExtension meAsStreamProducer = StreamProducerExtensionFactory.Cast(this.AsReference());
+
+                IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
                 if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
                 
                 foreach (PubSubSubscriptionState item in streamData)
                 {
                     var token = item.StreamSequenceToken ?? streamStartToken;
-                    AddSubscriber_Impl(item.Stream, item.Consumer, token, item.FilterWrapper);
+                    AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, token, item.FilterWrapper);
                 }
             }
             catch (Exception exc)

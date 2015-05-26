@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -33,6 +33,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.WindowsAzure.Storage;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
@@ -217,6 +218,8 @@ namespace Orleans.Runtime
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static void Initialize(ITraceConfiguration config, bool configChange = false)
         {
+            if (config == null) throw new ArgumentNullException("config", "No logger config data provided.");
+
             lock (lockable)
             {
                 if (IsInitialized && !configChange) return; // Already initialized
@@ -938,13 +941,42 @@ namespace Orleans.Runtime
             string stack = String.Empty;
             if (includeStackTrace && exception.StackTrace != null)
             {
-                stack = String.Format("\n{0} \n ", exception.StackTrace);
+                stack = String.Format(Environment.NewLine + exception.StackTrace);
             }
-            return String.Format("\nExc level {0}: {1}: {2}{3}",
+            string message = exception.Message;
+            if (exception is StorageException)
+            {
+                message = PrintStorageException(exception as StorageException);
+            }
+            return String.Format(Environment.NewLine + "Exc level {0}: {1}: {2}{3}",
                 level,
                 exception.GetType(),
-                exception.Message,
+                message,
                 stack);
+        }
+
+        private static string PrintStorageException(StorageException storeExc)
+        {
+            var result = storeExc.RequestInformation;
+            if (result == null) return storeExc.Message;
+            var extendedError = storeExc.RequestInformation.ExtendedErrorInformation;
+            if (extendedError==null)
+            {
+                return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage);
+
+            }
+            return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}, " +
+                                   "ExtendedErrorInformation.ErrorCode = {3}, ExtendedErrorInformation.ErrorMessage = {4}{5}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage,
+                        extendedError.ErrorCode,
+                        extendedError.ErrorMessage,
+                        (extendedError.AdditionalDetails != null && extendedError.AdditionalDetails.Count > 0) ?
+                            String.Format(", ExtendedErrorInformation.AdditionalDetails = {0}", Utils.DictionaryToString(extendedError.AdditionalDetails)) : String.Empty);
         }
 
         internal void Assert(ErrorCode errorCode, bool condition, string message = null)
@@ -971,7 +1003,7 @@ namespace Orleans.Runtime
                 errorCode = ErrorCode.Runtime;
             }
 
-            Error(errorCode, "INTERNAL FAILURE! About to crash! Fail message is: " + message + "\n" + Environment.StackTrace);
+            Error(errorCode, "INTERNAL FAILURE! About to crash! Fail message is: " + message + Environment.NewLine + Environment.StackTrace);
 
             // Create mini-dump of this failure, for later diagnosis
             var dumpFile = CreateMiniDump();

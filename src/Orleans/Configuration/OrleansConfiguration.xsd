@@ -190,6 +190,13 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+	<xs:attribute name="ResendOnTimeout" type="xs:boolean" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          The ResendOnTimeout attribute specifies the behavior to redeliver a message if a response is not received within the ResponseTimeout limit.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
     <xs:attribute name="MaxResendCount" type="xs:int" use="optional">
       <xs:annotation>
         <xs:documentation>

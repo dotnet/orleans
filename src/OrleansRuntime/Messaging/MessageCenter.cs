@@ -22,7 +22,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 
@@ -37,13 +36,12 @@ namespace Orleans.Runtime.Messaging
         private IncomingMessageAcceptor ima;
         private static readonly TraceLogger log = TraceLogger.GetLogger("Orleans.Messaging.MessageCenter");
         private Action<Message> rerouteHandler;
-        private Action<List<GrainId>> clientDropHandler;
 
-        // ReSharper disable UnaccessedField.Local
+        // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;
         private IntValueStatistic receiveQueueLengthCounter;
-        // ReSharper restore UnaccessedField.Local
-        
+        // ReSharper restore NotAccessedField.Local
+
         internal IOutboundMessageQueue OutboundQueue { get; set; }
         internal IInboundMessageQueue InboundQueue { get; set; }
         internal SocketManager SocketManager;
@@ -91,18 +89,6 @@ namespace Orleans.Runtime.Messaging
             Gateway = new Gateway(this, gatewayAddress);
         }
 
-        public void RecordProxiedGrain(GrainId grainId, Guid clientId)
-        {
-            if (Gateway != null)
-                Gateway.RecordProxiedGrain(grainId, clientId);
-        }
-
-        public void RecordUnproxiedGrain(GrainId grainId)
-        {
-            if (Gateway != null)
-                Gateway.RecordUnproxiedGrain(grainId);
-        }
-
         public void Start()
         {
             IsBlockingApplicationMessages = false;
@@ -110,10 +96,10 @@ namespace Orleans.Runtime.Messaging
             OutboundQueue.Start();
         }
 
-        public void StartGateway()
+        public void StartGateway(ClientObserverRegistrar clientRegistrar)
         {
             if (Gateway != null)
-                Gateway.Start();
+                Gateway.Start(clientRegistrar);
         }
 
         public void PrepareToStop()
@@ -199,7 +185,7 @@ namespace Orleans.Runtime.Messaging
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.Result != Message.ResponseTypes.Rejection)
-                && (msg.TargetGrain != Constants.SystemMembershipTableId))
+                && !Constants.SystemMembershipTableId.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
             }
@@ -209,23 +195,6 @@ namespace Orleans.Runtime.Messaging
                     msg.SendingSilo = MyAddress;
                 OutboundQueue.SendMessage(msg);
             }
-        }
-
-        public Action<List<GrainId>> ClientDropHandler
-        {
-            set
-            {
-                if (clientDropHandler != null)
-                    throw new InvalidOperationException("MessageCenter ClientDropHandler already set");
-                
-                clientDropHandler = value;
-            }
-        }
-
-        internal void RecordClientDrop(List<GrainId> client)
-        {
-            if (clientDropHandler != null && client != null)
-                clientDropHandler(client);
         }
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)

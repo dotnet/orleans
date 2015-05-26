@@ -28,6 +28,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Xml;
+using Orleans.Providers;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -225,9 +226,6 @@ namespace Orleans.Runtime.Configuration
             XmlElement root = xml.DocumentElement;
 
             LoadFromXml(root);
-
-            // Fix up any deployment specific values [eg DeploymentId] in [stream] provider configs.
-            AdjustConfiguration(); 
         }
 
         internal void LoadFromXml(XmlElement root)
@@ -311,9 +309,17 @@ namespace Orleans.Runtime.Configuration
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                             {
-                                var providerConfig = new ProviderCategoryConfiguration();
-                                providerConfig.Load(child);
-                                ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                                var providerCategory = ProviderCategoryConfiguration.Load(child);
+
+                                if (ProviderConfigurations.ContainsKey(providerCategory.Name))
+                                {
+                                    var existingCategory = ProviderConfigurations[providerCategory.Name];
+                                    existingCategory.Merge(providerCategory);
+                                }
+                                else
+                                {
+                                    ProviderConfigurations.Add(providerCategory.Name, providerCategory);
+                                }
                             }
                             break;
                     }
@@ -342,9 +348,53 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal void AdjustConfiguration()
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="Orleans.Streams.IStreamProvider"/> stream</typeparam>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
+        public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            GlobalConfiguration.AdjustConfiguration(ProviderConfigurations, DeploymentId);
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given stream provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
+        public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Retrieves an existing provider configuration
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="config">The provider configuration, if exists</param>
+        /// <returns>True if a configuration for this provider already exists, false otherwise.</returns>
+        public bool TryGetProviderConfiguration(string providerTypeFullName, string providerName, out IProviderConfiguration config)
+        {
+            return ProviderConfigurationUtility.TryGetProviderConfiguration(ProviderConfigurations, providerTypeFullName, providerName, out config);
+        }
+
+        /// <summary>
+        /// Retrieves an enumeration of all currently configured provider configurations.
+        /// </summary>
+        /// <returns>An enumeration of all currently configured provider configurations.</returns>
+        public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
+        {
+            return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
         }
 
         /// <summary>
@@ -422,7 +472,7 @@ namespace Orleans.Runtime.Configuration
             }
             sb.AppendFormat(base.ToString());
             sb.AppendFormat("   Providers:").AppendLine();
-            sb.Append(GlobalConfiguration.PrintProviderConfigurations(ProviderConfigurations));
+            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();
         }
 
