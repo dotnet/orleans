@@ -119,7 +119,6 @@
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
     <Compile Include="Core\Exceptions.cs" />
-    <Compile Include="Core\GrainIdentity.cs" />
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IGrainState.cs" />
     <Compile Include="GlobalSuppressions.cs" />

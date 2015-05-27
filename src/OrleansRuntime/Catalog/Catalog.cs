@@ -552,7 +552,7 @@ namespace Orleans.Runtime
             lock (data)
             {
                 var grain = (Grain) Activator.CreateInstance(grainType);
-                grain.Identity = new GrainIdentity(data.Identity);
+                grain.Identity = data.Identity;
                 grain.Runtime = grainRuntime;
                 
                 data.SetGrainInstance(grain);

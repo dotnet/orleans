@@ -69,6 +69,13 @@ namespace Orleans
         {
         }
 
+        /// <summary>
+        /// Grain implementers do NOT have to expose this constructor but can choose to do so.
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
+        /// </summary>
+        /// <param name="identity"></param>
+        /// <param name="runtime"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
         {
             Identity = identity;
@@ -276,6 +283,14 @@ namespace Orleans
         {
         }
 
+        /// <summary>
+        /// Grain implementers do NOT have to expose this constructor but can choose to do so.
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="identity"></param>
+        /// <param name="runtime"></param>
         protected Grain(TGrainState state, IGrainIdentity identity, IGrainRuntime runtime) : this(identity, runtime)
         {
             GrainState = state;

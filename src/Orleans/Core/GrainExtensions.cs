@@ -87,7 +87,7 @@ namespace Orleans
             if (grainBase != null) return grainBase.Identity;
 
             var grainReference = grain as GrainReference;
-            if (grainReference != null) return new GrainIdentity(grainReference.GrainId);
+            if (grainReference != null) return (grainReference.GrainId);
 
             throw new OrleansException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName));
         }
