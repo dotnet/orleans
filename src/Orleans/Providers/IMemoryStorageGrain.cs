@@ -29,7 +29,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Grain interface for internal memory storage grain used by Orleans in-memory storage provider.
     /// </summary>
-    public interface IMemoryStorageGrain : IGrain
+    public interface IMemoryStorageGrain : IGrainWithIntegerKey
     {
         /// <summary>
         /// Async method to cause retrieval of the specified grain state data from memory store.

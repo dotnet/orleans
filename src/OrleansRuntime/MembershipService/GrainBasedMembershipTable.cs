@@ -40,6 +40,12 @@ namespace Orleans.Runtime.MembershipService
             return TaskDone.Done;
         }
 
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("GrainBasedMembershipTable Deactivated.");
+            return TaskDone.Done;
+        }
+
         public Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             return Task.FromResult(table.Read(key));
