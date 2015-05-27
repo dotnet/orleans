@@ -21,17 +21,19 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.TestingHost.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Remoting;
 using System.Threading.Tasks;
+using Orleans.Core;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Extensions;
 
 namespace Orleans.TestingHost
 {
@@ -70,7 +72,9 @@ namespace Orleans.TestingHost
         public const int ProxyBasePort = 40000;
 
         private static int InstanceCounter = 0;
-        
+
+        public IGrainFactory GrainFactory { get; private set; }
+
         public Logger logger 
         {
             get { return GrainClient.Logger; }
@@ -434,7 +438,7 @@ namespace Orleans.TestingHost
                 {
                     clientConfig.DeploymentId = DeploymentId;
                 }
-                if (System.Diagnostics.Debugger.IsAttached)
+                if (Debugger.IsAttached)
                 {
                     // Test is running inside debugger - Make timeout ~= infinite
                     clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
@@ -451,6 +455,7 @@ namespace Orleans.TestingHost
                 clientConfig.AdjustForTestEnvironment();
 
                 GrainClient.Initialize(clientConfig);
+                GrainFactory = GrainClient.GrainFactory;
             }
         }
 

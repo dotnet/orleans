@@ -29,7 +29,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Messaging;
 using Orleans.Providers;
@@ -44,6 +44,7 @@ namespace Orleans
 {
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable
     {
+
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private readonly TraceLogger logger;
@@ -68,6 +69,8 @@ namespace Orleans
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         private const string BARS = "----------";
+
+        private readonly IGrainFactory grainFactory;
 
         /// <summary>
         /// Response timeout.
@@ -124,8 +127,9 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
+        public OutsideRuntimeClient(ClientConfiguration cfg, IGrainFactory grainFactory, bool secondary = false)
         {
+            this.grainFactory = grainFactory;
             this.clientId = GrainId.NewClientId();
 
             if (cfg == null)
@@ -218,7 +222,7 @@ namespace Orleans
         private void StreamingInitialize()
         {
             var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable().Result;
-            ClientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
+            ClientProviderRuntime.StreamingInitialize(grainFactory, implicitSubscriberTable);
             var streamProviderManager = new Streams.StreamProviderManager();
             streamProviderManager
                 .LoadStreamProviders(

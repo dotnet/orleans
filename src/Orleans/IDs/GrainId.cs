@@ -24,12 +24,13 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using Orleans.Core;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class GrainId : UniqueIdentifier, IEquatable<GrainId>
+    internal class GrainId : UniqueIdentifier, IEquatable<GrainId>, IGrainIdentity
     {
         private static readonly object lockable = new object();
         private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_LARGE;
@@ -107,7 +108,27 @@ namespace Orleans.Runtime
                 typeCode, primaryKey));
         }
 
-        internal long GetPrimaryKeyLong(out string keyExt)
+        public Guid PrimaryKey
+        {
+            get { return GetPrimaryKey(); }
+        }
+
+        public long PrimaryKeyLong
+        {
+            get { return GetPrimaryKeyLong(); }
+        }
+
+        public string PrimaryKeyString
+        {
+            get { return GetPrimaryKeyString(); }
+        }
+
+        public string IdentityString
+        {
+            get { return ToDetailedString(); }
+        }
+
+        public long GetPrimaryKeyLong(out string keyExt)
         {
             return Key.PrimaryKeyToLong(out keyExt);
         }
@@ -118,7 +139,7 @@ namespace Orleans.Runtime
             return Key.PrimaryKeyToLong();
         }
 
-        internal Guid GetPrimaryKey(out string keyExt)
+        public Guid GetPrimaryKey(out string keyExt)
         {
             return Key.PrimaryKeyToGuid(out keyExt);
         }

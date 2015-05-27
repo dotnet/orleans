@@ -30,6 +30,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -39,6 +40,7 @@ namespace Orleans
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
+    /// TODO: Make this class non-static and inject it where it is needed.
     public static class GrainClient
     {
         /// <summary>
@@ -55,6 +57,22 @@ namespace Orleans
         private static OutsideRuntimeClient outsideRuntimeClient;
 
         private static readonly object initLock = new Object();
+
+        private static IGrainFactory grainFactory;
+
+        //TODO: prevent client code from using this from inside a Grain
+        public static IGrainFactory GrainFactory
+        {
+            get
+            {
+                if (!IsInitialized)
+                {
+                    throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
+                }
+
+                return grainFactory;
+            }
+        }
 
         /// <summary>
         /// Initializes the client runtime from the standard client configuration file.
@@ -195,18 +213,20 @@ namespace Orleans
                         // this is probably overkill, but this ensures isFullyInitialized false
                         // before we make a call that makes RuntimeClient.Current not null
                         isFullyInitialized = false;
+                        grainFactory = new GrainFactory();
 
-                        ClientProviderRuntime.InitializeSingleton();
+                        ClientProviderRuntime.InitializeSingleton(grainFactory);
 
                         if (runtimeClient == null)
                         {
-                            runtimeClient = new OutsideRuntimeClient(config);
+                            runtimeClient = new OutsideRuntimeClient(config, grainFactory);
                         }
                         outsideRuntimeClient = runtimeClient;  // Keep reference, to avoid GC problems
                         outsideRuntimeClient.Start();
 
                         LimitManager.Initialize(config);
 
+                        
                         // this needs to be the last successful step inside the lock so 
                         // IsInitialized doesn't return true until we're fully initialized
                         isFullyInitialized = true;
@@ -265,7 +285,7 @@ namespace Orleans
                 catch (Exception) { }
             }
             outsideRuntimeClient = null;
-
+            grainFactory = null;
         }
 
         /// <summary>

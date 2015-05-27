@@ -25,13 +25,20 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
     internal class GrainBasedPubSubRuntime : IStreamPubSub
     {
+        private IGrainFactory grainFactory;
+
+        public GrainBasedPubSubRuntime(IGrainFactory grainFactory)
+        {
+            this.grainFactory = grainFactory;
+        }
+
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
@@ -76,9 +83,9 @@ namespace Orleans.Streams
             return streamRendezvous.GetAllSubscriptions(streamId, streamConsumer);
         }
 
-        private static IPubSubRendezvousGrain GetRendezvousGrain(StreamId streamId)
+        private IPubSubRendezvousGrain GetRendezvousGrain(StreamId streamId)
         {
-            return GrainFactory.GetGrain<IPubSubRendezvousGrain>(
+            return grainFactory.GetGrain<IPubSubRendezvousGrain>(
                 primaryKey: streamId.Guid,
                 keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
         }

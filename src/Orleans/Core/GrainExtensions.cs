@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using Orleans.Core;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -39,7 +40,7 @@ namespace Orleans
 
             var grainBase = grain as Grain;
             if (grainBase != null)
-                return ((Grain) grain).GrainReference;
+                return ((Grain) grain).Data.GrainReference;
 
             var systemTarget = grain as ISystemTargetBase;
             if (systemTarget != null)
@@ -75,9 +76,20 @@ namespace Orleans
             if (reference != null) return reference.GrainId;
 
             var grainBase = grain as Grain;
-            if (grainBase != null) return grainBase.Identity;
+            if (grainBase != null) return grainBase.Data.Identity;
             
             throw new OrleansException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName));
+        }
+
+        internal static IGrainIdentity GetGrainIdentity(IGrain grain)
+        {
+            var grainBase = grain as Grain;
+            if (grainBase != null) return grainBase.Identity;
+
+            var grainReference = grain as GrainReference;
+            if (grainReference != null) return (grainReference.GrainId);
+
+            throw new OrleansException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName));
         }
 
         /// <summary>
@@ -123,24 +135,24 @@ namespace Orleans
 
         public static long GetPrimaryKeyLong(this IGrain grain, out string keyExt)
         {
-            return GetGrainId(grain).GetPrimaryKeyLong(out keyExt);
+            return GetGrainIdentity(grain).GetPrimaryKeyLong(out keyExt);
         }
         public static long GetPrimaryKeyLong(this IGrain grain)
         {
-            return GetGrainId(grain).GetPrimaryKeyLong();
+            return GetGrainIdentity(grain).PrimaryKeyLong;
         }
         public static Guid GetPrimaryKey(this IGrain grain, out string keyExt)
         {
-            return GetGrainId(grain).GetPrimaryKey(out keyExt);
+            return GetGrainIdentity(grain).GetPrimaryKey(out keyExt);
         }
         public static Guid GetPrimaryKey(this IGrain grain)
         {
-            return GetGrainId(grain).GetPrimaryKey();
+            return GetGrainIdentity(grain).PrimaryKey;
         }
 
         public static string GetPrimaryKeyString(this IGrainWithStringKey grain)
         {
-            return GetGrainId(grain).GetPrimaryKeyString();
+            return GetGrainIdentity(grain).PrimaryKeyString;
         }
     }
 }
