@@ -727,7 +727,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) logger.Verbose("DeactivateActivations: {0} activations.", list.Count);
             List<ActivationData> destroyNow = null;
             List<MultiTaskCompletionSource> destroyLater = null;
-            int alreadBeingDestroyed = 0;
+            int alreadyBeingDestroyed = 0;
             foreach (var d in list)
             {
                 var activationData = d; // capture
@@ -758,7 +758,7 @@ namespace Orleans.Runtime
                     }
                     else
                     {
-                        alreadBeingDestroyed++;
+                        alreadyBeingDestroyed++;
                     }
                 }
             }
@@ -767,7 +767,7 @@ namespace Orleans.Runtime
             int numDestroyLater = destroyLater == null ? 0 : destroyLater.Count;
             logger.Info(ErrorCode.Catalog_ShutdownActivations_3,
                 "DeactivateActivations: total {0} to shutdown, out of them {1} promptly, {2} later when become idle and {3} are already being destroyed or invalid.",
-                list.Count, numDestroyNow, numDestroyLater, alreadBeingDestroyed);
+                list.Count, numDestroyNow, numDestroyLater, alreadyBeingDestroyed);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DIRECT_SHUTDOWN).IncrementBy(list.Count);
 
             if (destroyNow != null && destroyNow.Count > 0)
@@ -1098,14 +1098,14 @@ namespace Orleans.Runtime
             return addresses != null;
         }
 
-        public List<SiloAddress> AllSilos
+        public List<SiloAddress> AllActiveSilos
         {
             get
             {
                 var result = SiloStatusOracle.GetApproximateSiloStatuses(true).Select(s => s.Key).ToList();
                 if (result.Count > 0) return result;
 
-                logger.Warn(ErrorCode.Catalog_GetApproximateSiloStatuses, "AllSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
+                logger.Warn(ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
                 return new List<SiloAddress> { LocalSilo };
             }
         }
