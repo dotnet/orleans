@@ -84,5 +84,11 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(A);
         }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("OnDeactivateAsync.");
+            return TaskDone.Done;
+        }
     }
 }
