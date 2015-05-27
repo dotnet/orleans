@@ -22,14 +22,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.TestingHost
 {
     /// <summary>
     /// This class is for internal testing use only.
     /// </summary>
-    public class ResultHandle : MarshalByRefObject
+    public class AsyncResultHandle : MarshalByRefObject
     {
         bool done = false;
         bool continueFlag = false;
@@ -62,29 +62,29 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="timeout"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
-        public bool WaitForFinished(TimeSpan timeout)
+        public Task<bool> WaitForFinished(TimeSpan timeout)
         {
-            return WaitFor(timeout, ref done);
+            return WaitFor(timeout, () => done);
         }
 
         /// <summary>
         /// </summary>
         /// <param name="timeout"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
-        public bool WaitForContinue(TimeSpan timeout)
+        public Task<bool> WaitForContinue(TimeSpan timeout)
         {
-            return WaitFor(timeout, ref continueFlag);
+            return WaitFor(timeout, () => continueFlag);
         }
 
         /// <summary>
         /// </summary>
         /// <param name="timeout"></param>
-        /// <param name="flag"></param>
+        /// <param name="checkFlag"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
-        public bool WaitFor(TimeSpan timeout, ref bool flag)
+        public async Task<bool> WaitFor(TimeSpan timeout, Func<bool> checkFlag)
         {
-            int remaining = (int)timeout.TotalMilliseconds;
-            while (!flag)
+            double remaining = timeout.TotalMilliseconds;
+            while (!checkFlag())
             {
                 if (remaining < 0)
                 {
@@ -92,7 +92,7 @@ namespace Orleans.TestingHost
                     return false;
                 }
 
-                Thread.Sleep(200);
+                await Task.Delay(TimeSpan.FromMilliseconds(200));
                 remaining -= 200;
             }
 
