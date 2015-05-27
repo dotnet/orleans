@@ -447,6 +447,7 @@ namespace Orleans
         Catalog_DeactivateStreamResources_Exception     = CatalogBase + 42,
         Catalog_FinishDeactivateActivation_Exception    = CatalogBase + 43,
         Catalog_FinishGrainDeactivateAndCleanupStreams_Exception = CatalogBase + 44,
+        Catalog_DeactivateAllActivations = CatalogBase + 45,
 
         MembershipBase                         = Runtime + 600,
         MembershipCantWriteLivenessDisabled    = Runtime_Error_100225, // Backward compatability

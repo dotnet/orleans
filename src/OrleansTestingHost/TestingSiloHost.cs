@@ -545,7 +545,7 @@ namespace Orleans.TestingHost
         {
             if (stopGracefully)
             {
-                try { if (instance.Silo != null) instance.Silo.Stop(); }
+                try { if (instance.Silo != null) instance.Silo.Shutdown(); }
                 catch (RemotingException re) { Console.WriteLine(re); /* Ignore error */ }
                 catch (Exception exc) { Console.WriteLine(exc); throw; }
             }

@@ -242,7 +242,7 @@ namespace Orleans.Runtime.Host
         {
             logger.Info(ErrorCode.Runtime_Error_100290, "Stopping {0}", this.GetType().FullName);
             RoleEnvironment.Stopping -= HandleAzureRoleStopping;
-            host.StopOrleansSilo();
+            host.ShutdownOrleansSilo();
             logger.Info(ErrorCode.Runtime_Error_100291, "Orleans silo '{0}' shutdown.", host.Name);
         }
 
@@ -266,7 +266,7 @@ namespace Orleans.Runtime.Host
         {
             // Try to perform gracefull shutdown of Silo when we detect Azure role instance is being stopped
             logger.Info(ErrorCode.SiloStopping, "HandleAzureRoleStopping - starting to shutdown silo");
-            host.StopOrleansSilo();
+            host.ShutdownOrleansSilo();
         }
 
 		/// <summary>

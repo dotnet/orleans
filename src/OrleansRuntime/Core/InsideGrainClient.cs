@@ -659,7 +659,7 @@ namespace Orleans.Runtime
             if (!Catalog.TryGetActivationData(id, out data)) return; // already gone
 
             data.ResetKeepAliveRequest(); // DeactivateOnIdle method would undo / override any current “keep alive” setting, making this grain immideately avaliable for deactivation.
-            Catalog.ShutdownActivation_DeactivateOnIdle(data);
+            Catalog.DeactivateActivationOnIdle(data);
         }
 
         #endregion
