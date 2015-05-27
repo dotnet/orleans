@@ -54,7 +54,7 @@
     </Compile>
     <Compile Include="Extensions\TestConfigurationExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ResultHandle.cs" />
+    <Compile Include="AsyncResultHandle.cs" />
     <Compile Include="StorageTestConstants.cs" />
     <Compile Include="SiloHandle.cs" />
     <Compile Include="TestingClientOptions.cs" />

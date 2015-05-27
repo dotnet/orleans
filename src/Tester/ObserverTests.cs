@@ -82,7 +82,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
         public async Task ObserverTest_SimpleNotification()
         {
-            ResultHandle result = new ResultHandle();
+            var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
             this.observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
@@ -91,7 +91,7 @@ namespace UnitTests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.IsTrue(result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.IsTrue(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -99,7 +99,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
         public async Task ObserverTest_SimpleNotification_GeneratedFactory()
         {
-            ResultHandle result = new ResultHandle();
+            var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
             this.observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
@@ -108,12 +108,12 @@ namespace UnitTests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.IsTrue(result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.IsTrue(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
 
             await SimpleGrainObserverFactory.DeleteObjectReference(reference);
         }
 
-        void ObserverTest_SimpleNotification_Callback(int a, int b, ResultHandle result)
+        void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
@@ -144,7 +144,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
         public async Task ObserverTest_DoubleSubscriptionSameReference()
         {
-            ResultHandle result = new ResultHandle();
+            var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
             this.observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionSameReference_Callback, result);
@@ -171,12 +171,12 @@ namespace UnitTests.General
             }
             await grain.SetA(2); // Use grain
 
-            Assert.IsFalse(result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetA(2)");
+            Assert.IsFalse(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetA(2)");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, ResultHandle result)
+        void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", callbackCounter, a, b);
@@ -191,23 +191,23 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
         public async Task ObserverTest_SubscribeUnsubscribe()
         {
-            ResultHandle result = new ResultHandle();
+            var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
             this.observer1 = new SimpleGrainObserver(ObserverTest_SubscribeUnsubscribe_Callback, result);
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.IsTrue(result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.IsTrue(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
             await grain.Unsubscribe(reference);
             await grain.SetB(3);
 
-            Assert.IsFalse(result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.IsFalse(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, ResultHandle result)
+        void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
@@ -247,7 +247,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
         public async Task ObserverTest_DoubleSubscriptionDifferentReferences()
         {
-            ResultHandle result = new ResultHandle();
+            var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
             this.observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result);
@@ -258,13 +258,13 @@ namespace UnitTests.General
             await grain.Subscribe(reference2);
             grain.SetA(6).Ignore();
 
-            Assert.IsTrue(result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.IsTrue(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference1);
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference2);
         }
 
-        void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, ResultHandle result)
+        void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
@@ -281,21 +281,21 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
         public async Task ObserverTest_DeleteObject()
         {
-            ResultHandle result = new ResultHandle();
+            var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
             this.observer1 = new SimpleGrainObserver(ObserverTest_DeleteObject_Callback, result);
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.IsTrue(result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.IsTrue(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             await grain.SetB(3);
 
-            Assert.IsFalse(result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.IsFalse(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
         }
 
-        void ObserverTest_DeleteObject_Callback(int a, int b, ResultHandle result)
+        void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_DeleteObject_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
@@ -311,7 +311,7 @@ namespace UnitTests.General
         [ExpectedException(typeof(NotSupportedException))]
         public async Task ObserverTest_SubscriberMustBeGrainReference()
         {
-            ResultHandle result = new ResultHandle();
+            var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
             this.observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
@@ -323,10 +323,10 @@ namespace UnitTests.General
 
         internal class SimpleGrainObserver : ISimpleGrainObserver
         {
-            readonly Action<int, int, ResultHandle> action;
-            readonly ResultHandle result;
+            readonly Action<int, int, AsyncResultHandle> action;
+            readonly AsyncResultHandle result;
 
-            public SimpleGrainObserver(Action<int, int, ResultHandle> action, ResultHandle result)
+            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result)
             {
                 this.action = action;
                 this.result = result;
