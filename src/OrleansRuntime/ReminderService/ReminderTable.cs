@@ -57,7 +57,7 @@ namespace Orleans.Runtime.ReminderService
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
-                    Singleton = GrainFactory.GetGrain<IReminderTable>(Constants.ReminderTableGrainId);
+                    Singleton = ReminderTableFactory.GetGrain(Constants.ReminderTableGrainId);
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.MockTable:

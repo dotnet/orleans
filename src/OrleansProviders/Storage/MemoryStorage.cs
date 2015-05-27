@@ -108,7 +108,7 @@ namespace Orleans.Storage
             for (int i = 0; i < numStorageGrains; i++)
             {
                 int idx = i; // Capture variable to avoid modified closure error
-                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => GrainFactory.GetGrain<IMemoryStorageGrain>(idx));
+                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => MemoryStorageGrainFactory.GetGrain(idx));
             }
             return TaskDone.Done;
         }
