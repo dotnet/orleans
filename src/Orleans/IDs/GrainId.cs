@@ -128,14 +128,9 @@ namespace Orleans.Runtime
             get { return ToDetailedString(); }
         }
 
-        internal long GetPrimaryKeyLong(out string keyExt)
+        public long GetPrimaryKeyLong(out string keyExt)
         {
             return Key.PrimaryKeyToLong(out keyExt);
-        }
-
-        Guid IGrainIdentity.GetPrimaryKey(out string keyExt)
-        {
-            return GetPrimaryKey(out keyExt);
         }
 
         [Pure]
@@ -144,12 +139,7 @@ namespace Orleans.Runtime
             return Key.PrimaryKeyToLong();
         }
 
-        long IGrainIdentity.GetPrimaryKeyLong(out string keyExt)
-        {
-            return GetPrimaryKeyLong(out keyExt);
-        }
-
-        internal Guid GetPrimaryKey(out string keyExt)
+        public Guid GetPrimaryKey(out string keyExt)
         {
             return Key.PrimaryKeyToGuid(out keyExt);
         }
