@@ -35,12 +35,6 @@ namespace Orleans.Samples.Chirper.Grains
         /// <summary>The list of subscribers who are following this user</summary>
         Dictionary<ChirperUserInfo, IChirperSubscriber> Followers { get; set; }
 
-        /// <summary>Size for the recently received message cache</summary>
-        int ReceivedMessagesCacheSize { get; set; }
-
-        /// <summary>Size for the published message cache</summary>
-        int PublishedMessagesCacheSize { get; set; }
-
         /// <summary>Chirp messages recently received by this user</summary>
         Queue<ChirperMessage> RecentReceivedMessages { get; set; }
 
@@ -57,10 +51,12 @@ namespace Orleans.Samples.Chirper.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class ChirperAccount : Grain<IChirperAccountState>, IChirperAccount
     {
-        [NonSerialized]
-        private ObserverSubscriptionManager<IChirperViewer> viewers;
+        /// <summary>Size for the recently received message cache</summary>
+        private int ReceivedMessagesCacheSize;
 
-        [NonSerialized]
+        /// <summary>Size for the published message cache</summary>
+        private int PublishedMessagesCacheSize;
+        private ObserverSubscriptionManager<IChirperViewer> viewers;
         private Logger logger;
 
         private const int MAX_MESSAGE_LENGTH = 280;
@@ -75,32 +71,44 @@ namespace Orleans.Samples.Chirper.Grains
 
         #region Grain overrides
 
-        public override Task OnActivateAsync()
+        public override async Task OnActivateAsync()
         {
-            State.ReceivedMessagesCacheSize = 100;
-            State.PublishedMessagesCacheSize = 100;
-            State.RecentReceivedMessages = new Queue<ChirperMessage>(State.ReceivedMessagesCacheSize);
-            State.MyPublishedMessages = new Queue<ChirperMessage>(State.PublishedMessagesCacheSize);
-            State.Followers = new Dictionary<ChirperUserInfo, IChirperSubscriber>();
-            State.Subscriptions = new Dictionary<ChirperUserInfo, IChirperPublisher>();
-
-            this.logger = this.GetLogger("ChirperAccountGrain");
+            ReceivedMessagesCacheSize = 100;
+            PublishedMessagesCacheSize = 100;
+            if (State.RecentReceivedMessages == null)
+            {
+                State.RecentReceivedMessages = new Queue<ChirperMessage>(ReceivedMessagesCacheSize);
+            }
+            if (State.MyPublishedMessages == null)
+            {
+                State.MyPublishedMessages = new Queue<ChirperMessage>(PublishedMessagesCacheSize);
+            }
+            if (State.Followers == null)
+            {
+                State.Followers = new Dictionary<ChirperUserInfo, IChirperSubscriber>();
+            }
+            if (State.Subscriptions == null)
+            {
+                State.Subscriptions = new Dictionary<ChirperUserInfo, IChirperPublisher>();
+            }
 
             State.UserId = this.GetPrimaryKeyLong();
 
+            await State.WriteStateAsync();
+
+            logger = GetLogger("ChirperAccountGrain");
+
             if (logger.IsVerbose) logger.Verbose("{0}: Created activation of ChirperAccount grain.", Me);
 
-            this.viewers = new ObserverSubscriptionManager<IChirperViewer>();
+            viewers = new ObserverSubscriptionManager<IChirperViewer>();
             // Viewers are transient connections -- they will need to reconnect themselves
-
-            return TaskDone.Done;
         }
 
         #endregion
 
         #region IChirperAccountGrain interface methods
 
-        public Task SetUserDetails(ChirperUserInfo userInfo)
+        public async Task SetUserDetails(ChirperUserInfo userInfo)
         {
             string alias = userInfo.UserAlias;
             if (alias != null)
@@ -108,8 +116,8 @@ namespace Orleans.Samples.Chirper.Grains
                 if (logger.IsVerbose)
                     logger.Verbose("{0} Setting UserAlias = {1}.", Me, alias);
                 State.UserAlias = alias;
+                await State.WriteStateAsync();
             }
-            return TaskDone.Done;
         }
 
         public async Task PublishMessage(string message)
@@ -122,10 +130,12 @@ namespace Orleans.Samples.Chirper.Grains
             State.MyPublishedMessages.Enqueue(chirp);
 
             // only relevant when not using fixed queue
-            while (State.MyPublishedMessages.Count > State.PublishedMessagesCacheSize) // to keep not more than the max number of messages
+            while (State.MyPublishedMessages.Count > PublishedMessagesCacheSize) // to keep not more than the max number of messages
             {
                 State.MyPublishedMessages.Dequeue();
             }
+
+            await State.WriteStateAsync();
 
             List<Task> promises = new List<Task>();
 
@@ -149,7 +159,7 @@ namespace Orleans.Samples.Chirper.Grains
                     v => v.NewChirpArrived(chirp)
                 );
             }
-
+            
             await Task.WhenAll(promises.ToArray());
         }
         public Task<List<ChirperMessage>> GetReceivedMessages(int n, int start)
@@ -224,35 +234,37 @@ namespace Orleans.Samples.Chirper.Grains
                 State.Followers.Remove(userInfo);
             }
             State.Followers[userInfo] = follower;
-            return TaskDone.Done;
+            return State.WriteStateAsync();
         }
 
-        public Task RemoveFollower(string alias, IChirperSubscriber follower)
+        public async Task RemoveFollower(string alias, IChirperSubscriber follower)
         {
             IEnumerable<KeyValuePair<ChirperUserInfo, IChirperSubscriber>> found = State.Followers.Where(f => f.Key.UserAlias == alias).ToList();
             if (found.Any())
             {
                 ChirperUserInfo userInfo = found.FirstOrDefault().Key;
                 State.Followers.Remove(userInfo);
+                await State.WriteStateAsync();
             }
-            return TaskDone.Done;
         }
 
         #endregion
 
         #region IChirperSubscriber notification callback interface
 
-        public Task NewChirp(ChirperMessage chirp)
+        public async Task NewChirp(ChirperMessage chirp)
         {
             if (logger.IsVerbose) logger.Verbose("{0} Received chirp message = {1}", Me, chirp);
 
             State.RecentReceivedMessages.Enqueue(chirp);
 
             // only relevant when not using fixed queue
-            while (State.MyPublishedMessages.Count > State.PublishedMessagesCacheSize) // to keep not more than the max number of messages
+            while (State.MyPublishedMessages.Count > PublishedMessagesCacheSize) // to keep not more than the max number of messages
             {
                 State.MyPublishedMessages.Dequeue();
             }
+
+            await State.WriteStateAsync();
 
             if (viewers.Count > 0)
             {
@@ -279,8 +291,6 @@ namespace Orleans.Samples.Chirper.Grains
                 watch.Stop();
             }
 #endif
-
-            return TaskDone.Done;
         }
         #endregion
 
@@ -292,7 +302,9 @@ namespace Orleans.Samples.Chirper.Grains
 
             ChirperUserInfo userInfo = ChirperUserInfo.GetUserInfo(userId, userAlias);
             State.Subscriptions[userInfo] = userToFollow;
-            
+
+            await State.WriteStateAsync();
+
             // Notify any viewers that a subscription has been added for this user
             viewers.Notify(
                 v => v.SubscriptionAdded(userInfo)
@@ -305,6 +317,8 @@ namespace Orleans.Samples.Chirper.Grains
             ChirperUserInfo userInfo = ChirperUserInfo.GetUserInfo(userId, userAlias);
             State.Subscriptions.Remove(userInfo);
 
+            await State.WriteStateAsync();
+
             // Notify any viewers that a subscription has been removed for this user
             viewers.Notify(
                 v => v.SubscriptionRemoved(userInfo)
@@ -312,7 +326,7 @@ namespace Orleans.Samples.Chirper.Grains
         }
         private ChirperMessage CreateNewChirpMessage(string message)
         {
-            ChirperMessage chirp = new ChirperMessage();
+            var chirp = new ChirperMessage();
             chirp.PublisherId = State.UserId;
             chirp.PublisherAlias = State.UserAlias;
             chirp.Timestamp = DateTime.Now;
