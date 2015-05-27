@@ -13,7 +13,7 @@ namespace Orleans.Timers
         {
             if (period < Constants.MinReminderPeriod)
             {
-                string msg = string.Format("Cannot register reminder {0}=>{1} as requested period ({2}) is less than minimum allowed reminder period ({3})", reminderName, period, Constants.MinReminderPeriod);
+                string msg = string.Format("Cannot register reminder {0} as requested period ({1}) is less than minimum allowed reminder period ({2})", reminderName, period, Constants.MinReminderPeriod);
                 throw new ArgumentException(msg);
             }
             return RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, dueTime, period);
