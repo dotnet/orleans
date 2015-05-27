@@ -6,7 +6,7 @@ title: Orleans Streams Programming APIs
 
 Applications interact with streams via APIs that are very similar to the well known [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx). The main difference is that Orleans stream extensions are **asynchronous**, to make processing more efficient in Orleans' distributed and scalable compute fabric. 
 
-### Async Stream<a name="Async-Stream"/>
+### Async Stream<a name="Async-Stream"></a>
 
 An application starts by using a *stream provider* to get a handle to a stream. You can read more aabout stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers), but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:
 
@@ -18,7 +18,7 @@ IAsyncStream<T> stream = streamProvider.GetStream<T>(Guid, "MyStreamNamespace");
 [**`Orleans.Streams.IAsyncStream<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) is a **logical, strongly-typed handle to a virtual stream**. It is similar in spirit to Orleans Grain Reference. Calls to `GetStreamProvider` and `GetStream` are purely local. The arguments to `GetStream` are a GUID and an additional string that we call a stream namespace (which can be null). Together the GUID and the namespace string comprise the stream identity (similar in sprit to the arguments to `GrainFactory.GetGrain`). The combination of GUID and namespace string provide extra flexibility in determining stream identities. Just like grain 7 may exist within the Grain type `PlayerGrain` and a different grain 7 may exist within the grain type `ChatRoomGrain`, Stream 123 may exist with the stream namespace `PlayerEventsStream` and a different stream 123 may exist within the stream namespace `ChatRoomMessagesStream`.
 
 
-### Producing and Consuming<a name="Producing-Consuming"/>
+### Producing and Consuming<a name="Producing-Consuming"></a>
 
 `IAsyncStream<T>` implements both 
 [**`Orleans.Streams.IAsyncObserver<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObserver.cs) and
