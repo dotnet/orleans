@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -42,6 +43,12 @@ namespace Orleans
 
         internal IActivationData Data;
 
+        protected Grain()
+        {
+            GrainLocator = new GrainLocator();
+            Identifier = new GrainIdentifier(this);
+        }
+
         internal GrainReference GrainReference { get { return Data.GrainReference; } }
 
         /// <summary>
@@ -51,6 +58,8 @@ namespace Orleans
         {
             get { return Data.Identity; }
         }
+
+        
 
         /// <summary>
         /// String representation of grain's identity including type and primary key.
@@ -68,6 +77,10 @@ namespace Orleans
         {
             get { return Data.RuntimeIdentity; }
         }
+
+        public IGrainLocator GrainLocator { get; set; }
+
+        public IGrainIdentifier Identifier { get; set; }
 
         /// <summary>
         /// Registers a timer to send periodic callbacks to this grain.
