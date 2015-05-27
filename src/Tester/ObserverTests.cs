@@ -153,8 +153,7 @@ namespace UnitTests.General
             await grain.SetA(1); // Use grain
             try
             {
-                bool ok = grain.Subscribe(reference).Wait(timeout);
-                if (!ok) throw new TimeoutException();
+                await grain.Subscribe(reference);
             }
             catch (TimeoutException)
             {
@@ -229,8 +228,7 @@ namespace UnitTests.General
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
             try
             {
-                bool ok = grain.Unsubscribe(reference).Wait(timeout);
-                if (!ok) throw new TimeoutException();
+                await grain.Unsubscribe(reference);
 
                 await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             }
