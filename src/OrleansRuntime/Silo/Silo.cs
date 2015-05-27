@@ -623,7 +623,7 @@ namespace Orleans.Runtime
                 if (gracefully)
                 {
                     // 3: Deactivate all grains
-                    SafeExecute(() => catalog.ShutdownActivations_DeactivateAll().WaitWithThrow(stopTimeout));
+                    SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
                 }
 
 
