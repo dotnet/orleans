@@ -36,7 +36,7 @@ namespace Orleans
     /// Defined as a grain interface for the development emulator grain case.
     /// </summary>
     [Unordered]
-    internal interface IReminderTable : IGrain
+    internal interface IReminderTable : IGrainWithIntegerKey
     {
         Task Init();
 
