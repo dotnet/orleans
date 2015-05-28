@@ -71,7 +71,7 @@ namespace Orleans.Samples.Chirper.Grains
 
         #region Grain overrides
 
-        public override async Task OnActivateAsync()
+        public override Task OnActivateAsync()
         {
             ReceivedMessagesCacheSize = 100;
             PublishedMessagesCacheSize = 100;
@@ -94,14 +94,13 @@ namespace Orleans.Samples.Chirper.Grains
 
             State.UserId = this.GetPrimaryKeyLong();
 
-            await State.WriteStateAsync();
-
             logger = GetLogger("ChirperAccountGrain");
 
             if (logger.IsVerbose) logger.Verbose("{0}: Created activation of ChirperAccount grain.", Me);
 
             viewers = new ObserverSubscriptionManager<IChirperViewer>();
             // Viewers are transient connections -- they will need to reconnect themselves
+            return TaskDone.Done;
         }
 
         #endregion
