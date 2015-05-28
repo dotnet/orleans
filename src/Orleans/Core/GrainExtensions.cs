@@ -32,21 +32,29 @@ namespace Orleans
     /// </summary>
     public static class GrainExtensions
     {
-        private static GrainReference AsWeaklyTypedReference(this Runtime.IAddressable grain)
+        private const string WRONG_GRAIN_ERROR_MSG = "Passing a half baked grain as an argument. It is possible that you instantiated a grain class explicitely, as a regular object and not via Orleans runtime or via proper test mocking";
+
+        private static GrainReference AsWeaklyTypedReference(this IAddressable grain)
         {
-            var reference = grain as Runtime.GrainReference;
+            var reference = grain as GrainReference;
             // When called against an instance of a grain reference class, do nothing
             if (reference != null) return reference;
 
             var grainBase = grain as Grain;
             if (grainBase != null)
-                return ((Grain) grain).Data.GrainReference;
+            {
+                if (grainBase.Data == null || grainBase.Data.GrainReference == null)
+                {
+                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                }
+                return grainBase.Data.GrainReference;
+            }
 
             var systemTarget = grain as ISystemTargetBase;
             if (systemTarget != null)
                 return GrainReference.FromGrainId(systemTarget.GrainId, null, systemTarget.Silo);
 
-            throw new OrleansException(String.Format("AsWeaklyTypedReference has been called on an unexpected type: {0}.", grain.GetType().FullName));
+            throw new ArgumentException(String.Format("AsWeaklyTypedReference has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
         /// <summary>
@@ -55,8 +63,13 @@ namespace Orleans
         /// <typeparam name="TGrainInterface">The type of the grain interface.</typeparam>
         /// <param name="grain">The grain to convert.</param>
         /// <returns>A strongly typed <c>GrainReference</c> of grain interface type TGrainInterface.</returns>
-        public static TGrainInterface AsReference<TGrainInterface>(this Runtime.IAddressable grain)
+        public static TGrainInterface AsReference<TGrainInterface>(this IAddressable grain)
         {
+            if (grain == null)
+            {
+                throw new ArgumentNullException("grain", "Cannot pass null as an argument to AsReference");
+            }
+
             return GrainFactory.Cast<TGrainInterface>(grain.AsWeaklyTypedReference());
         }
 
@@ -65,7 +78,7 @@ namespace Orleans
         /// </summary>
         /// <typeparam name="TGrainInterface">The type of the grain interface.</typeparam>
         /// <param name="grain">The grain to cast.</param>
-        public static TGrainInterface Cast<TGrainInterface>(this Runtime.IAddressable grain)
+        public static TGrainInterface Cast<TGrainInterface>(this IAddressable grain)
         {
             return GrainFactory.Cast<TGrainInterface>(grain);
         }
@@ -73,23 +86,51 @@ namespace Orleans
         internal static GrainId GetGrainId(IAddressable grain)
         {
             var reference = grain as GrainReference;
-            if (reference != null) return reference.GrainId;
+            if (reference != null)
+            {
+                if (reference.GrainId == null)
+                {
+                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                }
+                return reference.GrainId;
+            }
 
             var grainBase = grain as Grain;
-            if (grainBase != null) return grainBase.Data.Identity;
-            
-            throw new OrleansException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName));
+            if (grainBase != null)
+            {
+                if (grainBase.Data == null || grainBase.Data.Identity == null)
+                {
+                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                }
+                return grainBase.Data.Identity;
+            }
+
+            throw new ArgumentException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
         internal static IGrainIdentity GetGrainIdentity(IGrain grain)
         {
             var grainBase = grain as Grain;
-            if (grainBase != null) return grainBase.Identity;
+            if (grainBase != null)
+            {
+                if (grainBase.Identity == null)
+                {
+                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                }
+                return grainBase.Identity;
+            }
 
             var grainReference = grain as GrainReference;
-            if (grainReference != null) return (grainReference.GrainId);
+            if (grainReference != null)
+            {
+                if (grainReference.GrainId == null)
+                {
+                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                }
+                return grainReference.GrainId;
+            }
 
-            throw new OrleansException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName));
+            throw new ArgumentException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
         /// <summary>
