@@ -473,18 +473,6 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsUsable
-        {
-            get
-            {
-                if (State == ActivationState.Create) return false;
-                if (State == ActivationState.Activating) return false;
-                if (State == ActivationState.Deactivating) return false;
-                if (State == ActivationState.Invalid) return false;
-                return true;
-            }
-        }
-
         /// <summary>
         /// Insert in a FIFO order
         /// </summary>

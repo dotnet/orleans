@@ -898,7 +898,7 @@ namespace Orleans.Runtime
                     continue;
                 }
 
-                if (all || activationData.IsUsable)
+                if (all || activationData.State.Equals(ActivationState.Valid))
                 {
                     sb.AppendLine(workItemGroup.DumpStatus());
                     sb.AppendLine(activationData.DumpStatus());
