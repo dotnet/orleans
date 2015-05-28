@@ -42,7 +42,7 @@ namespace Orleans.TestingHost
         /// Get-Process | Format-Table Id, ProcessName -autosize. If there were multiple storage emulator
         /// processes running, they would named WASTOR~1, WASTOR~2, ... WASTOR~n.
         /// </summary>
-        private const string storageEmulatorProcessName = "WAStorageEmulatorx";
+        private const string storageEmulatorProcessName = "WAStorageEmulator";
 
 
         /// <summary>
