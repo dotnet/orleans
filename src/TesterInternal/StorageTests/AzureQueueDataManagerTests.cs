@@ -49,6 +49,16 @@ namespace UnitTests.StorageTests
             logger = TraceLogger.GetLogger("AzureQueueDataManagerTests", TraceLogger.LoggerType.Application);
         }
 
+        [ClassInitialize]
+        public static void ClassInitialize(TestContext testContext)
+        {
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if(!StorageEmulator.TryStart())
+            {
+                Console.WriteLine("Azure Storage Emulator could not be started.");
+            }
+        }
+
         [TestCleanup]
         public void TestCleanup()
         {

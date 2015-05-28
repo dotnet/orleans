@@ -72,6 +72,12 @@ namespace UnitTests.StorageTests
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
+
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if(!StorageEmulator.TryStart())
+            {
+                Console.WriteLine("Azure Storage Emulator could not be started.");
+            }
         }
 
         // Use TestInitialize to run code before running each test 
@@ -93,7 +99,7 @@ namespace UnitTests.StorageTests
         [TestCleanup]
         public void TestCleanup()
         {
-            if (manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
+            if(manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
                 TimeSpan timeout = SiloInstanceTableTestConstants.Timeout;
 

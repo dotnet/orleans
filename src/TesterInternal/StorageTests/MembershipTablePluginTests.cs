@@ -56,6 +56,12 @@ namespace UnitTests.LivenessTests
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
+
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if(!StorageEmulator.TryStart())
+            {
+                Console.WriteLine("Azure Storage Emulator could not be started.");
+            }
         }
 
         [ClassCleanup]
@@ -90,10 +96,10 @@ namespace UnitTests.LivenessTests
         [TestMethod, TestCategory("Nightly"), TestCategory("Liveness"), TestCategory("Azure")]
         public async Task MT_InsertRow_Azure()
         {
-            var membership = await GetMemebershipTable_Azure(); 
+            var membership = await GetMemebershipTable_Azure();
             await MembershipTable_InsertRow(membership);
         }
-        
+
         [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_Init_SqlServer()
         {
@@ -108,7 +114,7 @@ namespace UnitTests.LivenessTests
             await MembershipTable_ReadAll(membership);
         }
 
-        [TestMethod,TestCategory("Liveness"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_InsertRow_SqlServer()
         {
             var membership = await GetMemebershipTable_SQL();
@@ -175,11 +181,11 @@ namespace UnitTests.LivenessTests
         {
             string runId = Guid.NewGuid().ToString("N");
 
-            var config = new GlobalConfiguration {LivenessType = membershipType, DeploymentId = runId};
+            var config = new GlobalConfiguration { LivenessType = membershipType, DeploymentId = runId };
 
             IMembershipTable membership;
 
-            switch (membershipType)
+            switch(membershipType)
             {
                 case GlobalConfiguration.LivenessProviderType.AzureTable:
                     config.DataConnectionString = StorageTestConstants.DataConnectionString;
