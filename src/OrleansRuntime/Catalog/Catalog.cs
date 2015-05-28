@@ -350,7 +350,7 @@ namespace Orleans.Runtime
                     return result;
                 }
                 
-                if (newPlacement)
+                if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     // create a dummy activation that will queue up messages until the real data arrives
                     PlacementStrategy placement;
