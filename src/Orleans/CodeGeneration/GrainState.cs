@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -166,27 +167,53 @@ namespace Orleans.CodeGeneration
 
         /// <summary>
         /// Converts this property bag into a dictionary.
-        /// Overridded with type-specific implementation in generated code.
+        /// This is a default Reflection-based implemenation that can be overridded in the subcalss or generated code.
         /// </summary>
         /// <returns>A Dictionary from string property name to property value.</returns>
         public virtual IDictionary<string, object> AsDictionary()
         {
             var result = new Dictionary<string, object>();
+
+            var properties = this.GetType().GetProperties();
+            foreach(var property in properties)
+                if (property.Name != "Etag")
+                    result[property.Name] = property.GetValue(this);
+
             return result;
         }
 
         /// <summary>
         /// Populates this property bag from a dictionary.
-        /// Overridded with type-specific implementation in generated code.
+        /// This is a default Reflection-based implemenation that can be overridded in the subcalss or generated code.
         /// </summary>
         /// <param name="values">The Dictionary from string to object that contains the values
         /// for this property bag.</param>
         public virtual void SetAll(IDictionary<string, object> values)
         {
-            // Nothing to do here. 
-            // All relevant implementation logic for handling application data will be in sub-class.
-            // All system data is handled by SetAllInternal method, which calls this.
+            if (values == null)
+            {
+                ReesetProperties();
+                return;
+            }
+
+            var type = this.GetType();
+            foreach (var key in values.Keys)
+            {
+                var property = type.GetProperty(key);
+                property.SetValue(this, values[key]);
+            }
         }
+
         #endregion
+        
+        /// <summary>
+        /// Resets properties of the state object to their default values.
+        /// </summary>
+        private void ReesetProperties()
+        {
+            var properties = this.GetType().GetProperties();
+            foreach (var property in properties)
+                property.SetValue(this, null);
+        }
     }
  }
