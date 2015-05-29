@@ -25,7 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Providers;
@@ -37,7 +37,12 @@ namespace Orleans.Runtime.Storage
     {
         private ProviderLoader<IStorageProvider> storageProviderLoader;
         private IProviderRuntime providerRuntime;
-        
+
+        public StorageProviderManager(IGrainFactory grainFactory)
+        {
+            GrainFactory = grainFactory;
+        }
+
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
             storageProviderLoader = new ProviderLoader<IStorageProvider>();
@@ -74,6 +79,8 @@ namespace Orleans.Runtime.Storage
         {
             get { return providerRuntime.ServiceId; }
         }
+
+        public IGrainFactory GrainFactory { get; private set; }
 
         /// <summary>
         /// Get list of providers loaded in this silo.
