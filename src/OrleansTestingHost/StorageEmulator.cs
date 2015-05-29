@@ -99,13 +99,20 @@ namespace Orleans.TestingHost
         public static bool TryStart()
         {
             bool isSuccess = StorageEmulator.Exists;
-            if(!IsStarted())
+            if (!IsStarted())
             {
-                //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("start")))
+                try
                 {
-                    process.WaitForExit();
-                    isSuccess = process.ExitCode == 0;
+                    //This process handle returns immediately.
+                    using (var process = Process.Start(CreateProcessArguments("start")))
+                    {
+                        process.WaitForExit();
+                        isSuccess = process.ExitCode == 0;
+                    }
+                }
+                catch (Exception)
+                {
+                    return false;
                 }
             }
 
