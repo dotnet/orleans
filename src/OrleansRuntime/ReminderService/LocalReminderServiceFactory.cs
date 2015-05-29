@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Configuration;
 
@@ -39,12 +39,12 @@ namespace Orleans.Runtime
             logger = TraceLogger.GetLogger("ReminderFactory", TraceLogger.LoggerType.Runtime);
         }
 
-        internal async Task<IReminderService> CreateReminderService(Silo silo)
+        internal async Task<IReminderService> CreateReminderService(Silo silo, IGrainFactory grainFactory)
         {
             var reminderServiceType = silo.GlobalConfig.ReminderServiceType;
             logger.Info("Creating reminder system target for type={0}", Enum.GetName(typeof(GlobalConfiguration.ReminderServiceProviderType), reminderServiceType));
 
-            await ReminderTable.Initialize(silo);
+            await ReminderTable.Initialize(silo, grainFactory);
             return new LocalReminderService(silo.SiloAddress, Constants.ReminderServiceId, silo.RingProvider, silo.LocalScheduler, ReminderTable.Singleton);
         }
     }

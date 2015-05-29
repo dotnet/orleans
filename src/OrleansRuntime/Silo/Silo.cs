@@ -326,7 +326,7 @@ namespace Orleans.Runtime
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents(DeploymentLoadPublisher.Instance);
 
             // start the reminder service system target
-            reminderService = reminderFactory.CreateReminderService(this).WithTimeout(initTimeout).Result;
+            reminderService = reminderFactory.CreateReminderService(this, grainFactory).WithTimeout(initTimeout).Result;
             RegisterSystemTarget((SystemTarget)reminderService);
             
             RegisterSystemTarget(catalog);
