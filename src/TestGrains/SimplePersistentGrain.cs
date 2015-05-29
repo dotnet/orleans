@@ -29,76 +29,83 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections;
 using Orleans;
+using Orleans.CodeGeneration;
+using Orleans.Providers;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 
 namespace UnitTests.Grains
 {
-    public class SimplePersistentGrain_State : IGrainState
+    public class SimplePersistentGrain_State : GrainState
     {
-        public int IntProperty { get; set; }
-        public string StringProperty { get; set; }
-        public string Etag { get; set; }
-        public Task ClearStateAsync()
-        {
-            throw new NotImplementedException();
-        }
+        public SimplePersistentGrain_State()
+            : base(typeof(SimplePersistentGrain).FullName) 
+            // TODO: GrainState takes name of the grain type here, which is probably a mistake
+            // since multiple grain classes can use the same state object interface/class.
+            // Need to figure out the right story for mapping grain classes to storage entity types (tables).
+        {}
 
-        public Task WriteStateAsync()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task ReadStateAsync()
-        {
-            throw new NotImplementedException();
-        }
-
-        public IDictionary<string, object> AsDictionary()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void SetAll(IDictionary<string, object> values)
-        {
-            throw new NotImplementedException();
-        }
+        public int A { get; set; }
+        public int B { get; set; }
     }
 
     /// <summary>
     /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
-    public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimpleGrain
+    [StorageProvider(ProviderName = "MemoryStore")]
+    public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimplePersistentGrain
     {
+        private Guid version;
+
+        public override Task OnActivateAsync()
+        {
+            version = Guid.NewGuid();
+            return base.OnActivateAsync();
+        }
         public Task SetA(int a)
         {
-            throw new NotImplementedException();
+            State.A = a;
+            return WriteStateAsync();
         }
 
-        public Task SetB(int a)
+        public Task SetA(int a, bool deactivate)
         {
-            throw new NotImplementedException();
+            if(deactivate)
+                DeactivateOnIdle();
+            return SetA(a);
+        }
+
+        public Task SetB(int b)
+        {
+            State.B = b;
+            return WriteStateAsync();
         }
 
         public Task IncrementA()
         {
-            throw new NotImplementedException();
+            State.A++;
+            return WriteStateAsync();
         }
 
         public Task<int> GetAxB()
         {
-            throw new NotImplementedException();
+            return Task.FromResult(State.A*State.B);
         }
 
         public Task<int> GetAxB(int a, int b)
         {
-            throw new NotImplementedException();
+            return Task.FromResult(a * b);
         }
 
         public Task<int> GetA()
         {
-            throw new NotImplementedException();
+            return Task.FromResult(State.A);
+        }
+
+        public Task<Guid> GetVersion()
+        {
+            return Task.FromResult(version);
         }
     }
 }

@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -22,23 +22,39 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using Orleans;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans.TestingHost;
+using UnitTests.GrainInterfaces;
+using UnitTests.Tester;
 
-namespace UnitTests.GrainInterfaces
+namespace UnitTests.General
 {
-    public interface ISimpleGrain : IGrainWithIntegerKey
+    /// <summary>
+    /// Summary description for SimpleGrain
+    /// </summary>
+    [TestClass]
+    public class ConcreteStateClassTests : UnitTestSiloHost
     {
-        Task SetA(int a);
-        Task SetB(int b);
-        Task IncrementA();
-        Task<int> GetAxB();
-        Task<int> GetAxB(int a, int b);
-        Task<int> GetA();
+        Random rand = new Random();
+
+        public ConcreteStateClassTests()
+            : base(new TestingSiloOptions {StartPrimary = true, StartSecondary = false})
+        {
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        public async Task ConcreteStateClassTests_1()
+        {
+            var x = rand.Next();
+            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(x);
+            var originalVersion = await grain.GetVersion();
+            await grain.SetA(x, true); // deactivate grain after setting A
+
+            var newVersion = await grain.GetVersion(); // get a new version from the new activation
+            Assert.AreNotEqual(originalVersion, newVersion);
+            var a = await grain.GetA();
+            Assert.AreEqual(x, a); // value of A survive deactivation and reactivation of the grain
+        }
     }
 }
