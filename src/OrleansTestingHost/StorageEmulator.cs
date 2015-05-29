@@ -73,22 +73,27 @@ namespace Orleans.TestingHost
         /// <returns>Storage emulator help.</returns>
         public static string Help()
         {
-            string help = "Error happened. Has StorageEmulator.Start() been called?";
-            if(IsStarted())
+            if (!IsStarted()) return "Error happened. Has StorageEmulator.Start() been called?";
+
+            try
             {
                 //This process handle returns immediately.
                 using(var process = Process.Start(CreateProcessArguments("help")))
                 {
                     process.WaitForExit();
-                    help = string.Empty;
+                    var help = string.Empty;
                     while(!process.StandardOutput.EndOfStream)
                     {
                         help += process.StandardOutput.ReadLine();
                     }
+
+                    return help;
                 }
             }
-
-            return help;
+            catch (Exception exc)
+            {
+                return exc.ToString();
+            }
         }
 
 
@@ -98,18 +103,10 @@ namespace Orleans.TestingHost
         /// <returns><em>TRUE</em> if the process was started sucessfully. <em>FALSE</em> otherwise.</returns>
         public static bool TryStart()
         {
-            bool isSuccess = StorageEmulator.Exists;
-            if(!IsStarted())
-            {
-                //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("start")))
-                {
-                    process.WaitForExit();
-                    isSuccess = process.ExitCode == 0;
-                }
-            }
+            if (!StorageEmulator.Exists)
+                return false;
 
-            return isSuccess;
+            return Start();
         }
 
 
@@ -119,18 +116,21 @@ namespace Orleans.TestingHost
         /// <returns><em>TRUE</em> if the process was stopped succesfully or was already started. <em>FALSE</em> otherwise.</returns>
         public static bool Start()
         {
-            bool isSuccess = true;
-            if(!IsStarted())
+            if (IsStarted()) return true;
+
+            try
             {
                 //This process handle returns immediately.
                 using(var process = Process.Start(CreateProcessArguments("start")))
                 {
                     process.WaitForExit();
-                    isSuccess = process.ExitCode == 0;
+                    return process.ExitCode == 0;
                 }
             }
-
-            return isSuccess;
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
 
@@ -140,18 +140,21 @@ namespace Orleans.TestingHost
         /// <returns><em>TRUE</em> if the process was stopped succesfully or was already stopped. <em>FALSE</em> otherwise.</returns>
         public static bool Stop()
         {
-            bool isSuccess = true;
-            if(IsStarted())
+            if (!IsStarted()) return false;
+
+            try
             {
                 //This process handle returns immediately.
                 using(var process = Process.Start(CreateProcessArguments("stop")))
                 {
                     process.WaitForExit();
-                    isSuccess = process.ExitCode == 0;
+                    return process.ExitCode == 0;
                 }
             }
-
-            return isSuccess;
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
 
