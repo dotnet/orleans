@@ -8,18 +8,15 @@ namespace Orleans.Runtime
     internal class GrainRuntime : IGrainRuntime
     {
         private readonly string id;
-        private readonly IGrainFactory grainFactory;
-        private readonly ITimerRegistry timerRegistry;
-        private readonly IReminderRegistry reminderRegistry;
-        private readonly IStreamProviderManager streamProviderManager;
 
-        public GrainRuntime(string id, IGrainFactory grainFactory, ITimerRegistry timerRegistry, IReminderRegistry reminderRegistry, IStreamProviderManager streamProviderManager)
+        public GrainRuntime(string id, IGrainFactory grainFactory, ITimerRegistry timerRegistry, IReminderRegistry reminderRegistry, IStreamProviderManager streamProviderManager, IStorage storage=null)
         {
             this.id = id;
-            this.grainFactory = grainFactory;
-            this.timerRegistry = timerRegistry;
-            this.reminderRegistry = reminderRegistry;
-            this.streamProviderManager = streamProviderManager;
+            GrainFactory = grainFactory;
+            TimerRegistry = timerRegistry;
+            ReminderRegistry = reminderRegistry;
+            StreamProviderManager = streamProviderManager;
+            Storage = storage;
         }
 
         public string SiloIdentity
@@ -27,26 +24,16 @@ namespace Orleans.Runtime
             get { return id; }
         }
 
-        public IGrainFactory GrainFactory
-        {
-            get { return grainFactory; }
-        }
+        public IGrainFactory GrainFactory { get; private set; }
+        
+        public ITimerRegistry TimerRegistry { get; private set; }
+        
+        public IReminderRegistry ReminderRegistry { get; private set; }
+        
+        public IStreamProviderManager StreamProviderManager { get; private set;}
 
-        public ITimerRegistry TimerRegistry
-        {
-            get { return timerRegistry; }
-        }
-
-        public IReminderRegistry ReminderRegistry
-        {
-            get { return reminderRegistry; }
-        }
-
-        public IStreamProviderManager StreamProviderManager
-        {
-            get { return streamProviderManager; }
-        }
-
+        public IStorage Storage { get; private set; }
+        
         public Logger GetLogger(string loggerName, TraceLogger.LoggerType logType)
         {
             return TraceLogger.GetLogger(loggerName, logType);

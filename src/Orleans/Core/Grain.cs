@@ -278,20 +278,20 @@ namespace Orleans
     public class Grain<TGrainState> : Grain, IStorage
         where TGrainState : class, IGrainState
     {
-        private IStorage stateStorageBridge;
+        private IStorage storage;
 
         private IStorage Storage
         {
             get
             {
-                if (stateStorageBridge == null)
+                if (storage == null) // Of storage has been injected via DI, we'll use it. Otherwise, we initialize here.
                 {
                     // Lazy create the storage bridge
                     IStorageProvider store = Data.StorageProvider;
                     string grainTypeName = Data.GrainTypeName;
-                    stateStorageBridge = new GrainStateStorageBridge<TGrainState>(grainTypeName, this, store);
+                    storage = new GrainStateStorageBridge<TGrainState>(grainTypeName, this, store);
                 }
-                return stateStorageBridge;
+                return storage;
             }
         }
         /// <summary>
@@ -313,6 +313,7 @@ namespace Orleans
         protected Grain(TGrainState state, IGrainIdentity identity, IGrainRuntime runtime) : this(identity, runtime)
         {
             GrainState = state;
+            storage = runtime.Storage;
         }
 
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
