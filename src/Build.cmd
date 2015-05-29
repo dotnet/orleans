@@ -9,7 +9,7 @@ if "%FrameworkVersion%" == "" set FrameworkVersion=v4.0.30319
 
 SET MSBUILDEXEDIR=%FrameworkDir%\%FrameworkVersion%
 SET MSBUILDEXE=%MSBUILDEXEDIR%\MSBuild.exe
-SET VERSION_FILE=%CMDHOME%\Build\Version.txt
+SET VERSION_FILE="%CMDHOME%\Build\Version.txt"
 
 if EXIST "%VERSION_FILE%" (
     @Echo Using version number from file %VERSION_FILE%
