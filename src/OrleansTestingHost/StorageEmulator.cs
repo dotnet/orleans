@@ -127,7 +127,7 @@ namespace Orleans.TestingHost
                     return process.ExitCode == 0;
                 }
             }
-            catch (Exception)
+            catch
             {
                 return false;
             }
@@ -151,7 +151,7 @@ namespace Orleans.TestingHost
                     return process.ExitCode == 0;
                 }
             }
-            catch (Exception)
+            catch
             {
                 return false;
             }
