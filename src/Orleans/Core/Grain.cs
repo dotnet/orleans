@@ -40,7 +40,10 @@ namespace Orleans
     public abstract class Grain : IAddressable
     {
         private IGrainRuntime runtime;
+
         internal IGrainState GrainState { get; set; }
+
+        internal IStorage Storage { get; set; }
 
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
@@ -278,22 +281,7 @@ namespace Orleans
     public class Grain<TGrainState> : Grain, IStorage
         where TGrainState : class, IGrainState
     {
-        private IStorage storage;
 
-        private IStorage Storage
-        {
-            get
-            {
-                if (storage == null) // Of storage has been injected via DI, we'll use it. Otherwise, we initialize here.
-                {
-                    // Lazy create the storage bridge
-                    IStorageProvider store = Data.StorageProvider;
-                    string grainTypeName = Data.GrainTypeName;
-                    storage = new GrainStateStorageBridge<TGrainState>(grainTypeName, this, store);
-                }
-                return storage;
-            }
-        }
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
         /// Client code should use the GrainFactory to get a reference to a Grain.
@@ -310,15 +298,11 @@ namespace Orleans
         /// <param name="state"></param>
         /// <param name="identity"></param>
         /// <param name="runtime"></param>
-        protected Grain(TGrainState state, IGrainIdentity identity, IGrainRuntime runtime) : this(identity, runtime)
-        {
-            GrainState = state;
-            storage = runtime.Storage;
-        }
-
-        protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
+        protected Grain(TGrainState state, IGrainIdentity identity, IGrainRuntime runtime, IStorage storage) 
             : base(identity, runtime)
         {
+            GrainState = state;
+            Storage = storage;
         }
 
         /// <summary>

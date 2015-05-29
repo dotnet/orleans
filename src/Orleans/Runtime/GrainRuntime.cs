@@ -9,14 +9,13 @@ namespace Orleans.Runtime
     {
         private readonly string id;
 
-        public GrainRuntime(string id, IGrainFactory grainFactory, ITimerRegistry timerRegistry, IReminderRegistry reminderRegistry, IStreamProviderManager streamProviderManager, IStorage storage=null)
+        public GrainRuntime(string id, IGrainFactory grainFactory, ITimerRegistry timerRegistry, IReminderRegistry reminderRegistry, IStreamProviderManager streamProviderManager)
         {
             this.id = id;
             GrainFactory = grainFactory;
             TimerRegistry = timerRegistry;
             ReminderRegistry = reminderRegistry;
             StreamProviderManager = streamProviderManager;
-            Storage = storage;
         }
 
         public string SiloIdentity
@@ -32,8 +31,6 @@ namespace Orleans.Runtime
         
         public IStreamProviderManager StreamProviderManager { get; private set;}
 
-        public IStorage Storage { get; private set; }
-        
         public Logger GetLogger(string loggerName, TraceLogger.LoggerType logType)
         {
             return TraceLogger.GetLogger(loggerName, logType);

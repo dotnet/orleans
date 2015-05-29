@@ -545,6 +545,7 @@ namespace Orleans.Runtime
                     grainClassName = grainTypeName;
                 }
             }
+
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
             Type grainType = grainTypeData.Type;
@@ -554,20 +555,26 @@ namespace Orleans.Runtime
                 var grain = (Grain) Activator.CreateInstance(grainType);
                 grain.Identity = data.Identity;
                 grain.Runtime = grainRuntime;
-                
                 data.SetGrainInstance(grain);
+
                 if (stateObjectType != null)
                 {
+                    SetupStorageProvider(data);
+
                     var state = (GrainState)Activator.CreateInstance(stateObjectType);
                     state.InitState(null);
                     data.GrainInstance.GrainState = state;
+
+                    var bridgeType = typeof (GrainStateStorageBridge<>).MakeGenericType(stateObjectType);
+                    data.GrainInstance.Storage = (IStorage)Activator.CreateInstance(
+                        bridgeType, 
+                        new object[]{data.GrainTypeName, data.GrainInstance, data.StorageProvider});
                 }
             }
 
             activations.IncrementGrainCounter(grainClassName);
 
             data.GrainInstance.Data = data;
-            SetupStorageProvider(data);
 
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }

@@ -40,7 +40,7 @@ namespace Orleans.Core
         private readonly Grain<TGrainState> grain;
         private readonly string grainTypeName;
 
-        internal GrainStateStorageBridge(string grainTypeName, Grain<TGrainState> grain, IStorageProvider store)
+        public GrainStateStorageBridge(string grainTypeName, Grain<TGrainState> grain, IStorageProvider store)
         {
             if (grainTypeName == null)
             {
