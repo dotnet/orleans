@@ -60,7 +60,7 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             var grainType = context.GetGrainTypeName(grain);
-            var allSilos = context.AllSilos;
+            var allSilos = context.AllActiveSilos;
             return Task.FromResult(
                 PlacementResult.SpecifyCreation(allSilos[random.Next(allSilos.Count)], strategy, grainType));
         }
