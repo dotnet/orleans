@@ -564,11 +564,7 @@ namespace Orleans.Runtime
                     var state = (GrainState)Activator.CreateInstance(stateObjectType);
                     state.InitState(null);
                     data.GrainInstance.GrainState = state;
-
-                    var bridgeType = typeof (GrainStateStorageBridge<>).MakeGenericType(stateObjectType);
-                    data.GrainInstance.Storage = (IStorage)Activator.CreateInstance(
-                        bridgeType, 
-                        new object[]{data.GrainTypeName, data.GrainInstance, data.StorageProvider});
+                    data.GrainInstance.Storage = new GrainStateStorageBridge(data.GrainTypeName, data.GrainInstance, data.StorageProvider);
                 }
             }
 
