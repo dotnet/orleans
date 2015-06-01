@@ -298,7 +298,7 @@ namespace Orleans
         /// <param name="state"></param>
         /// <param name="identity"></param>
         /// <param name="runtime"></param>
-        protected Grain(TGrainState state, IGrainIdentity identity, IGrainRuntime runtime, IStorage storage) 
+        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
             : base(identity, runtime)
         {
             GrainState = state;
