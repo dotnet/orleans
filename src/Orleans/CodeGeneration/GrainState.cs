@@ -126,7 +126,7 @@ namespace Orleans.CodeGeneration
             {
                 throw new NullReferenceException("No GrainInstance has been set up.");
             }
-            await grain.ReadStateAsync();
+            await grain.Storage.ReadStateAsync();
         }
 
         /// <summary>
@@ -140,7 +140,7 @@ namespace Orleans.CodeGeneration
             {
                 throw new NullReferenceException("No GrainInstance has been set up.");
             }
-            await grain.WriteStateAsync();
+            await grain.Storage.WriteStateAsync();
         }
 
         /// <summary>
@@ -154,7 +154,7 @@ namespace Orleans.CodeGeneration
             {
                 throw new NullReferenceException("No GrainInstance has been set up.");
             }
-            await grain.ClearStateAsync();
+            await grain.Storage.ClearStateAsync();
         }
         #endregion
 
