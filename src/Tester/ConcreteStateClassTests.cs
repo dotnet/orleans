@@ -34,20 +34,31 @@ namespace UnitTests.General
     /// Summary description for SimpleGrain
     /// </summary>
     [TestClass]
-    public class ConcreteStateClassTests : UnitTestSiloHost
+    public class StateClassTests : UnitTestSiloHost
     {
-        Random rand = new Random();
+        private readonly Random rand = new Random();
 
-        public ConcreteStateClassTests()
+        public StateClassTests()
             : base(new TestingSiloOptions {StartPrimary = true, StartSecondary = false})
         {
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
-        public async Task ConcreteStateClassTests_1()
+        public async Task StateClassTests_StateClass()
+        {
+            await StateClassTests_Test("UnitTests.Grains.SimplePersistentGrain");
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        public async Task StateClassTests_StateInterface()
+        {
+            await StateClassTests_Test("UnitTests.Grains.SimpleInterfacePersistentGrain");
+        }
+
+        private async Task StateClassTests_Test(string grainClass)
         {
             var x = rand.Next();
-            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(x);
+            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(x, grainClass);
             var originalVersion = await grain.GetVersion();
             await grain.SetA(x, true); // deactivate grain after setting A
 
