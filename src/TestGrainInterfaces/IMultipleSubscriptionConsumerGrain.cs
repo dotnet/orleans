@@ -29,7 +29,7 @@ using Orleans.Streams;
 
 namespace TestGrainInterfaces
 {
-    public interface IMultipleSubscriptionConsumerGrain : IGrain
+    public interface IMultipleSubscriptionConsumerGrain : IGrainWithGuidKey
     {
         Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 

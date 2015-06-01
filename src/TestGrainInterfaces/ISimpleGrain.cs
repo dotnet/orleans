@@ -21,18 +21,12 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
-    public interface ISimpleGrain : IGrain
+    public interface ISimpleGrain : IGrainWithIntegerKey
     {
         Task SetA(int a);
         Task SetB(int a);

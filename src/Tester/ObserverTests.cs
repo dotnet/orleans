@@ -49,9 +49,6 @@ namespace UnitTests.General
         private SimpleGrainObserver observer2;
 
 
-        public ObserverTests()
-            : base() { }
-
         [ClassCleanup]
         public static void MyClassCleanup()
         {
@@ -65,13 +62,13 @@ namespace UnitTests.General
             callbacksRecieved[0] = false;
             callbacksRecieved[1] = false;
 
-            this.observer1 = null;
-            this.observer2 = null;
+            observer1 = null;
+            observer2 = null;
         }
 
         private ISimpleObserverableGrain GetGrain()
         {
-            return SimpleObserverableGrainFactory.GetGrain(GetRandomGrainId());
+            return GrainFactory.GetGrain<ISimpleObserverableGrain>(GetRandomGrainId());
         }
 
         private static int GetRandomGrainId()
@@ -85,7 +82,7 @@ namespace UnitTests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
+            observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
             await grain.Subscribe(reference);
             await grain.SetA(3);
@@ -102,15 +99,15 @@ namespace UnitTests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
-            ISimpleGrainObserver reference = await SimpleGrainObserverFactory.CreateObjectReference(this.observer1);
+            observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
+            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(3);
             await grain.SetB(2);
 
             Assert.IsTrue(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
 
-            await SimpleGrainObserverFactory.DeleteObjectReference(reference);
+            await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
         void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
@@ -147,8 +144,8 @@ namespace UnitTests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionSameReference_Callback, result);
-            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
+            observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionSameReference_Callback, result);
+            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(1); // Use grain
             try
@@ -194,8 +191,8 @@ namespace UnitTests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(ObserverTest_SubscribeUnsubscribe_Callback, result);
-            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
+            observer1 = new SimpleGrainObserver(ObserverTest_SubscribeUnsubscribe_Callback, result);
+            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
             Assert.IsTrue(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
@@ -224,8 +221,8 @@ namespace UnitTests.General
         public async Task ObserverTest_Unsubscribe()
         {
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(null, null);
-            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
+            observer1 = new SimpleGrainObserver(null, null);
+            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             try
             {
                 await grain.Unsubscribe(reference);
@@ -250,10 +247,10 @@ namespace UnitTests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result);
-            ISimpleGrainObserver reference1 = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
-            this.observer2 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result);
-            ISimpleGrainObserver reference2 = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer2);
+            observer1 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result);
+            ISimpleGrainObserver reference1 = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
+            observer2 = new SimpleGrainObserver(ObserverTest_DoubleSubscriptionDifferentReferences_Callback, result);
+            ISimpleGrainObserver reference2 = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer2);
             await grain.Subscribe(reference1);
             await grain.Subscribe(reference2);
             grain.SetA(6).Ignore();
@@ -284,8 +281,8 @@ namespace UnitTests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(ObserverTest_DeleteObject_Callback, result);
-            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(this.observer1);
+            observer1 = new SimpleGrainObserver(ObserverTest_DeleteObject_Callback, result);
+            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
             Assert.IsTrue(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
@@ -314,8 +311,8 @@ namespace UnitTests.General
             var result = new AsyncResultHandle();
 
             ISimpleObserverableGrain grain = GetGrain();
-            this.observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
-            ISimpleGrainObserver reference = this.observer1;
+            observer1 = new SimpleGrainObserver(ObserverTest_SimpleNotification_Callback, result);
+            ISimpleGrainObserver reference = observer1;
             // Should be: GrainFactory.CreateObjectReference<ISimpleGrainObserver>(obj);
             await grain.Subscribe(reference);
             // Not reached

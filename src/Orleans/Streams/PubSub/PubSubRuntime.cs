@@ -23,7 +23,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -32,7 +31,7 @@ namespace Orleans.Streams
 {
     internal class GrainBasedPubSubRuntime : IStreamPubSub
     {
-        private IGrainFactory grainFactory;
+        private readonly IGrainFactory grainFactory;
 
         public GrainBasedPubSubRuntime(IGrainFactory grainFactory)
         {

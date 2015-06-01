@@ -27,7 +27,7 @@ using Orleans;
 ﻿
 namespace UnitTests.SampleStreaming
 {
-    public interface ISampleStreaming_ProducerGrain : IGrain
+    public interface ISampleStreaming_ProducerGrain : IGrainWithGuidKey
     {
         Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
 
@@ -41,7 +41,7 @@ namespace UnitTests.SampleStreaming
         Task Produce();
     }
 
-    public interface ISampleStreaming_ConsumerGrain : IGrain
+    public interface ISampleStreaming_ConsumerGrain : IGrainWithGuidKey
     {
         Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
