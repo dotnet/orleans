@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using Orleans.Core;
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -52,6 +53,11 @@ namespace Orleans.Providers
         /// </summary>
         /// <returns>ServiceID Guid for this service.</returns>
         Guid ServiceId { get; }
+
+        /// <summary>
+        /// Factory for getting references to grains.
+        /// </summary>
+        IGrainFactory GrainFactory { get; }
     }
 
     /// <summary>

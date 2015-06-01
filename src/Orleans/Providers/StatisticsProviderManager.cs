@@ -25,7 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -42,6 +42,8 @@ namespace Orleans.Providers
             providerKind = kind;
             this.runtime = runtime;
         }
+
+        public IGrainFactory GrainFactory { get { return runtime.GrainFactory; }}
         
         public async Task<string> LoadProvider(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
