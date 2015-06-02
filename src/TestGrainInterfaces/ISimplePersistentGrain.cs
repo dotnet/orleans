@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,18 +21,15 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Threading.Tasks;
 using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
-    public interface ISimpleGrain : IGrainWithIntegerKey
+    public interface ISimplePersistentGrain : ISimpleGrain
     {
-        Task SetA(int a);
-        Task SetB(int b);
-        Task IncrementA();
-        Task<int> GetAxB();
-        Task<int> GetAxB(int a, int b);
-        Task<int> GetA();
+        Task SetA(int a, bool deactivate);
+        Task<Guid> GetVersion();
     }
 }
