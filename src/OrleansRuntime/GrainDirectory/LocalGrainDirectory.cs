@@ -953,7 +953,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
         {
-            return RemoteGrainDirectoryFactory.GetSystemTarget(Constants.DirectoryServiceId, silo);
+            return GrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
         }
     }
 }

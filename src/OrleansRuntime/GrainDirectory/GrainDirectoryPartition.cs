@@ -172,7 +172,7 @@ namespace Orleans.Runtime.GrainDirectory
                 foreach (var activation in activationsToDrop.Select(keyValuePair => ActivationAddress.GetAddress(keyValuePair.Value.SiloAddress, grain, keyValuePair.Key)))
                 {
                     list.Add(activation);
-                    CatalogFactory.GetSystemTarget(Constants.CatalogId, activation.Silo).
+                    GrainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, activation.Silo).
                         DeleteActivations(list).Ignore();
 
                     list.Clear();

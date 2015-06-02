@@ -117,6 +117,7 @@ namespace Orleans.Messaging
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
             PendingInboundMessages = new RuntimeQueue<Message>();
+            //TODO - move to generic factory
             registrarGetSystemTarget = GrainClient.GetStaticMethodThroughReflection("Orleans", "Orleans.Runtime.ClientObserverRegistrarFactory", "GetSystemTarget", null);
             typeManagerGetSystemTarget = GrainClient.GetStaticMethodThroughReflection("Orleans", "Orleans.Runtime.TypeManagerFactory", "GetSystemTarget", null);
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();

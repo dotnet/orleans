@@ -66,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
             GlobalConfiguration.LivenessProviderType livenessType = config.LivenessType;
             if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
             {
-                membershipTable = MembershipTableFactory.Cast(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+                membershipTable = GrainFactory.Cast<IMembershipTable>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
             {

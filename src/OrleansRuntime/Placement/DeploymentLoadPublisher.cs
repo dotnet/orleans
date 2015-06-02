@@ -91,7 +91,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        tasks.Add(DeploymentLoadPublisherFactory.GetSystemTarget(
+                        tasks.Add(GrainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
                             Constants.DeploymentLoadPublisherSystemTargetId, siloAddress)
                             .UpdateRuntimeStatistics(silo.SiloAddress, myStats));
                     }
@@ -137,7 +137,7 @@ namespace Orleans.Runtime
                     foreach (var siloAddress in members)
                     {
                         var capture = siloAddress;
-                        Task task = SiloControlFactory.GetSystemTarget(Constants.SiloControlId, capture)
+                        Task task = GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
                                 .GetRuntimeStatistics()
                                 .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
                                     {

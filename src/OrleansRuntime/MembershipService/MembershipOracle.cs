@@ -1159,7 +1159,7 @@ namespace Orleans.Runtime.MembershipService
 
         private static IMembershipService GetOracleReference(SiloAddress silo)
         {
-            return MembershipServiceFactory.GetSystemTarget(Constants.MembershipOracleId, silo);
+            return GrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
         }
     }
 }

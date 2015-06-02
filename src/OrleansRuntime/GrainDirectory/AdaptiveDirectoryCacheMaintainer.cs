@@ -152,7 +152,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 router.CacheValidationsSent.Increment();
                 // Send all of the items in one large request
-                var validator = RemoteGrainDirectoryFactory.GetSystemTarget(Constants.DirectoryCacheValidatorId, capture);
+                var validator = GrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorId, capture);
                                 
                 router.Scheduler.QueueTask(async () =>
                 {
