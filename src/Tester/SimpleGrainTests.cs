@@ -42,14 +42,9 @@ namespace UnitTests.General
         {
         }
 
-        public static ISimpleGrain GetSimpleGrain()
+        public ISimpleGrain GetSimpleGrain()
         {
-            return SimpleGrainFactory.GetGrain(GetRandomGrainId(), SimpleGrainNamePrefix);
-        }
-
-        public static ISimpleGrain GetSimpleGrain(long grainId)
-        {
-            return SimpleGrainFactory.GetGrain(grainId, SimpleGrainNamePrefix);
+            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
         }
 
         private static int GetRandomGrainId()

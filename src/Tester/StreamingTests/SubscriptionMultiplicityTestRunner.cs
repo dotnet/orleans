@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -53,8 +54,8 @@ namespace Tester.StreamingTests
         public async Task MultipleSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             // setup two subscriptions
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
@@ -78,8 +79,8 @@ namespace Tester.StreamingTests
         public async Task AddAndRemoveSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
@@ -125,8 +126,8 @@ namespace Tester.StreamingTests
         public async Task ResubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
@@ -157,8 +158,8 @@ namespace Tester.StreamingTests
         public async Task ResubscriptionAfterDeactivationTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
@@ -200,7 +201,7 @@ namespace Tester.StreamingTests
             const int subscriptionCount = 10;
 
             // get producer and consumer
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             // create expected subscriptions
             IEnumerable<Task<StreamSubscriptionHandle<int>>> subscriptionTasks =
