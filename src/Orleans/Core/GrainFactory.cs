@@ -40,7 +40,7 @@ namespace Orleans
         /// <summary>
         /// The collection of <see cref="IGrainObserver"/> <c>CreateObjectReference</c> delegates.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Delegate> referenceCreators =
+        private static readonly ConcurrentDictionary<Type, Delegate> referenceCreators =
             new ConcurrentDictionary<Type, Delegate>();
 
         /// <summary>
@@ -153,6 +153,36 @@ namespace Orleans
         /// <returns>The reference to <paramref name="obj"/>.</returns>
         public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
+        {
+            var interfaceType = typeof(TGrainObserverInterface);
+            if (!interfaceType.IsInterface)
+            {
+                throw new ArgumentException(
+                    string.Format(
+                        "The provided type parameter must be an interface. '{0}' is not an interface.",
+                        interfaceType.FullName));
+            }
+
+            if (!interfaceType.IsInstanceOfType(obj))
+            {
+                throw new ArgumentException(
+                    string.Format("The provided object must implement '{0}'.", interfaceType.FullName),
+                    "obj");
+            }
+
+            Delegate creator;
+
+            if (!referenceCreators.TryGetValue(interfaceType, out creator))
+            {
+                creator = referenceCreators.GetOrAdd(interfaceType, MakeCreateObjectReferenceDelegate);
+            }
+
+            var resultTask = ((Func<TGrainObserverInterface, Task<TGrainObserverInterface>>)creator)((TGrainObserverInterface)obj);
+            return resultTask;
+        }
+
+        internal static Task<TGrainObserverInterface> CreateObjectReference_2<TGrainObserverInterface>(IGrainExtension obj)
+                where TGrainObserverInterface : IGrainExtension
         {
             var interfaceType = typeof(TGrainObserverInterface);
             if (!interfaceType.IsInterface)
