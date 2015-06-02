@@ -258,7 +258,7 @@ namespace Orleans
 
         #region SystemTargets
 
-        private static readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedReferenceCache =
+        private static readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
                     new Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>>();
 
         internal static TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
@@ -266,14 +266,14 @@ namespace Orleans
         {
             Dictionary<SiloAddress, ISystemTarget> cache;
 
-            lock (typedReferenceCache)
+            lock (typedSystemTargetReferenceCache)
             {
-                if (typedReferenceCache.ContainsKey(grainId))
-                    cache = typedReferenceCache[grainId];
+                if (typedSystemTargetReferenceCache.ContainsKey(grainId))
+                    cache = typedSystemTargetReferenceCache[grainId];
                 else
                 {
                     cache = new Dictionary<SiloAddress, ISystemTarget>();
-                    typedReferenceCache[grainId] = cache;
+                    typedSystemTargetReferenceCache[grainId] = cache;
                 }
             }
             lock (cache)
