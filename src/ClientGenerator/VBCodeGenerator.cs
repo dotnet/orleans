@@ -506,17 +506,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 castImplCode,
                 "Public");
 
-            string getSystemTarget = null;
-            if (isFactory && si.IsSystemTarget)
-            {
-                getSystemTarget = string.Format(@"
-            Friend Shared Function GetSystemTarget(grainId As Global.Orleans.Runtime.GrainId, silo As Global.Orleans.Runtime.SiloAddress) As {0}
-                Return Global.Orleans.Runtime.GrainReference.GetSystemTarget(grainId, silo, Cast)
-            End Function",
-                FixupTypeName(si.InterfaceTypeName));
-            }
-
-            var castMethod = new CodeSnippetTypeMember(methodImpl + getSystemTarget);
+            var castMethod = new CodeSnippetTypeMember(methodImpl);
             referenceClass.Members.Add(castMethod);
         }
 

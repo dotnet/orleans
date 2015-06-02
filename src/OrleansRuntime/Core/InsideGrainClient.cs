@@ -619,7 +619,7 @@ namespace Orleans.Runtime
                     destination.GetConsistentHashCode(),
                     ConsistentRingProvider.ToString());
             }
-            return ReminderServiceFactory.GetSystemTarget(Constants.ReminderServiceId, destination);
+            return GrainFactory.GetSystemTarget<IReminderService>(Constants.ReminderServiceId, destination);
         }
 
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context)
