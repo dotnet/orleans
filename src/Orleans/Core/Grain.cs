@@ -29,6 +29,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans
@@ -39,13 +40,18 @@ namespace Orleans
     public abstract class Grain : IAddressable
     {
         private IGrainRuntime runtime;
+
         internal IGrainState GrainState { get; set; }
+
+        internal IStorage Storage { get; set; }
 
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
         // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
+
+        internal GrainReference GrainReference { get { return Data.GrainReference; } }
 
         internal IGrainRuntime Runtime
         {
@@ -275,6 +281,7 @@ namespace Orleans
     public class Grain<TGrainState> : Grain
         where TGrainState : class, IGrainState
     {
+
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
         /// Client code should use the GrainFactory to get a reference to a Grain.
@@ -291,14 +298,11 @@ namespace Orleans
         /// <param name="state"></param>
         /// <param name="identity"></param>
         /// <param name="runtime"></param>
-        protected Grain(TGrainState state, IGrainIdentity identity, IGrainRuntime runtime) : this(identity, runtime)
-        {
-            GrainState = state;
-        }
-
-        protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
+        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
             : base(identity, runtime)
         {
+            GrainState = state;
+            Storage = storage;
         }
 
         /// <summary>
@@ -307,6 +311,21 @@ namespace Orleans
         protected TGrainState State
         {
             get { return base.GrainState as TGrainState; }
+        }
+
+        protected Task ClearStateAsync()
+        {
+            return Storage.ClearStateAsync();
+        }
+
+        protected Task WriteStateAsync()
+        {
+            return Storage.WriteStateAsync();
+        }
+
+        protected Task ReadStateAsync()
+        {
+            return Storage.ReadStateAsync();
         }
     }
 }

@@ -89,6 +89,30 @@ namespace Orleans.Runtime
                 var parameterizedName = grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType);
                 Type grainStateType;
                 grainStateTypes.TryGetValue(parameterizedName, out grainStateType);
+
+                if (grainStateType == null) // check if grainType derives from Grain<T> where T is a concrete class
+                {
+                    var parentType = grainType.BaseType;
+                    while (parentType != typeof (Grain) && parentType != typeof(object))
+                    {
+                        if (parentType.IsGenericType)
+                        {
+                            var definition = parentType.GetGenericTypeDefinition();
+                            if (definition == typeof (Grain<>))
+                            {
+                                var stateArg = parentType.GetGenericArguments()[0];
+                                if (stateArg.IsClass)
+                                {
+                                    grainStateType = stateArg;
+                                    break;
+                                }
+                            }
+                        }
+
+                        parentType = parentType.BaseType;
+                    }
+                }
+
                 GrainTypeData typeData = GetTypeData(grainType, grainStateType);
                 result.Add(className, typeData);
             }
