@@ -40,7 +40,10 @@ namespace Orleans
     public abstract class Grain : IAddressable
     {
         private IGrainRuntime runtime;
+
         internal IGrainState GrainState { get; set; }
+
+        internal IStorage Storage { get; set; }
 
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
@@ -275,25 +278,10 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The interface of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, IStorage
+    public class Grain<TGrainState> : Grain
         where TGrainState : class, IGrainState
     {
-        private IStorage stateStorageBridge;
 
-        private IStorage Storage
-        {
-            get
-            {
-                if (stateStorageBridge == null)
-                {
-                    // Lazy create the storage bridge
-                    IStorageProvider store = Data.StorageProvider;
-                    string grainTypeName = Data.GrainTypeName;
-                    stateStorageBridge = new GrainStateStorageBridge<TGrainState>(grainTypeName, this, store);
-                }
-                return stateStorageBridge;
-            }
-        }
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
         /// Client code should use the GrainFactory to get a reference to a Grain.
@@ -310,14 +298,11 @@ namespace Orleans
         /// <param name="state"></param>
         /// <param name="identity"></param>
         /// <param name="runtime"></param>
-        protected Grain(TGrainState state, IGrainIdentity identity, IGrainRuntime runtime) : this(identity, runtime)
-        {
-            GrainState = state;
-        }
-
-        protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
+        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
             : base(identity, runtime)
         {
+            GrainState = state;
+            Storage = storage;
         }
 
         /// <summary>
@@ -328,17 +313,17 @@ namespace Orleans
             get { return base.GrainState as TGrainState; }
         }
 
-        public Task ClearStateAsync()
+        protected Task ClearStateAsync()
         {
             return Storage.ClearStateAsync();
         }
 
-        public Task WriteStateAsync()
+        protected Task WriteStateAsync()
         {
             return Storage.WriteStateAsync();
         }
 
-        public Task ReadStateAsync()
+        protected Task ReadStateAsync()
         {
             return Storage.ReadStateAsync();
         }

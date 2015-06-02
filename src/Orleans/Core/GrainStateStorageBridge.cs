@@ -33,14 +33,13 @@ using Orleans.Storage;
 
 namespace Orleans.Core
 {
-    internal class GrainStateStorageBridge<TGrainState> : IStorage
-        where TGrainState : class, IGrainState
+    internal class GrainStateStorageBridge : IStorage
     {
         private readonly IStorageProvider store;
-        private readonly Grain<TGrainState> grain;
+        private readonly Grain grain;
         private readonly string grainTypeName;
 
-        internal GrainStateStorageBridge(string grainTypeName, Grain<TGrainState> grain, IStorageProvider store)
+        public GrainStateStorageBridge(string grainTypeName, Grain grain, IStorageProvider store)
         {
             if (grainTypeName == null)
             {
