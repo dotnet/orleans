@@ -577,13 +577,19 @@ namespace Orleans.Runtime
 
         private void SetupStorageProvider(ActivationData data)
         {
-            object[] attrs = data.GrainInstanceType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
-            StorageProviderAttribute attr = attrs.Length > 0 ? attrs[0] as StorageProviderAttribute : null;
-            if (attr == null) return;
+            var grainTypeName = data.GrainInstanceType.FullName;
+
+            var attrs = data.GrainInstanceType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
+            var attr = attrs.Length > 0 ? attrs[0] as StorageProviderAttribute : null;
+            if (attr == null)
+            {
+                var errMsg = string.Format("No storage providers specified for grain type {0}", grainTypeName);
+                logger.Error(ErrorCode.Provider_CatalogNoStorageProvider_3, errMsg);
+                throw new BadProviderConfigException(errMsg);
+            }
 
             var storageProviderName = attr.ProviderName;
             IStorageProvider provider;
-            var grainTypeName = data.GrainInstanceType.FullName;
             if (storageProviderManager == null || storageProviderManager.GetNumLoadedProviders() == 0)
             {
                 var errMsg = string.Format("No storage providers found loading grain type {0}", grainTypeName);

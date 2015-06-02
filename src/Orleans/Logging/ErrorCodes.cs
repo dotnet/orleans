@@ -967,6 +967,7 @@ namespace Orleans
         Provider_IgnoringExplicitSet            = ProviderManagerBase + 10,
         Provider_NotLoaded                      = ProviderManagerBase + 11,
         Provider_Manager_Already_Loaded         = ProviderManagerBase + 12,
+        Provider_CatalogNoStorageProvider_3     = ProviderManagerBase + 13,
 
         AzureQueueBase = Runtime + 3200,
         AzureQueue_01 = AzureQueueBase + 1,
