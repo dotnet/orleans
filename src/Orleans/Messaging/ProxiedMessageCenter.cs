@@ -92,8 +92,6 @@ namespace Orleans.Messaging
 
         internal readonly GatewayManager GatewayManager;
         internal readonly RuntimeQueue<Message> PendingInboundMessages;
-        private readonly MethodInfo registrarGetSystemTarget;
-        private readonly MethodInfo typeManagerGetSystemTarget;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
@@ -117,8 +115,6 @@ namespace Orleans.Messaging
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
             PendingInboundMessages = new RuntimeQueue<Message>();
-            registrarGetSystemTarget = GrainClient.GetStaticMethodThroughReflection("Orleans", "Orleans.Runtime.ClientObserverRegistrarFactory", "GetSystemTarget", null);
-            typeManagerGetSystemTarget = GrainClient.GetStaticMethodThroughReflection("Orleans", "Orleans.Runtime.TypeManagerFactory", "GetSystemTarget", null);
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
@@ -400,14 +396,9 @@ namespace Orleans.Messaging
 
         #endregion
 
-        private IClientObserverRegistrar GetRegistrar(SiloAddress destination)
-        {
-            return (IClientObserverRegistrar)registrarGetSystemTarget.Invoke(null, new object[] { Constants.ClientObserverRegistrarId, destination });
-        }
-
         private ITypeManager GetTypeManager(SiloAddress destination)
         {
-            return (ITypeManager)typeManagerGetSystemTarget.Invoke(null, new object[] { Constants.TypeManagerId, destination });
+            return GrainFactory.GetSystemTarget<ITypeManager>(Constants.TypeManagerId, destination);
         }
 
         private SiloAddress GetLiveGatewaySiloAddress()

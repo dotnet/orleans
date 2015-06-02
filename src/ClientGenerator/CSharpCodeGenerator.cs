@@ -501,18 +501,7 @@ namespace Orleans.CodeGeneration
                 return {2};
             }}", si.InterfaceTypeName, checkCode, castImplCode, "public");
 
-            string getSystemTarget = null;
-            if (isFactory && si.IsSystemTarget)
-            {
-                getSystemTarget = string.Format(@"
-            internal static {0} GetSystemTarget(global::Orleans.Runtime.GrainId grainId, global::Orleans.Runtime.SiloAddress silo)
-            {{
-                return global::Orleans.Runtime.GrainReference.GetSystemTarget(grainId, silo, Cast);
-            }}",
-                si.InterfaceTypeName);
-            }
-
-            var castMethod = new CodeSnippetTypeMember(methodImpl + getSystemTarget);
+            var castMethod = new CodeSnippetTypeMember(methodImpl);
             referenceClass.Members.Add(castMethod);
         }
 

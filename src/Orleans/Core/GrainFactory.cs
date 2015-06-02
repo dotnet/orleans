@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -253,6 +254,39 @@ namespace Orleans
             var delegateType = typeof(Func<IAddressable, object>);
             return (Func<IAddressable, object>)MakeFactoryDelegate(interfaceType, "Cast", delegateType);
         }
+        #endregion
+
+        #region SystemTargets
+
+        private static readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
+                    new Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>>();
+
+        internal static TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
+            where TGrainInterface : ISystemTarget
+        {
+            Dictionary<SiloAddress, ISystemTarget> cache;
+
+            lock (typedSystemTargetReferenceCache)
+            {
+                if (typedSystemTargetReferenceCache.ContainsKey(grainId))
+                    cache = typedSystemTargetReferenceCache[grainId];
+                else
+                {
+                    cache = new Dictionary<SiloAddress, ISystemTarget>();
+                    typedSystemTargetReferenceCache[grainId] = cache;
+                }
+            }
+            lock (cache)
+            {
+                if (cache.ContainsKey(destination))
+                    return (TGrainInterface)cache[destination];
+
+                var reference = Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
+                cache[destination] = reference;
+                return reference;
+            }
+        }
+
         #endregion
 
         #region Utility functions
