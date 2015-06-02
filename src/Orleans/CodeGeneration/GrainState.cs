@@ -118,7 +118,7 @@ namespace Orleans.CodeGeneration
         /// Async method to cause refresh of the current grain state data from backing store.
         /// Any previous contents of the grain state data will be overwritten.
         /// </summary>
-        [Obsolete("Use Grain.Storage.ReadStateAsync method instead.")]
+        [Obsolete("Use Grain.ReadStateAsync method instead.")]
         public async Task ReadStateAsync()
         {
             var grain = RuntimeClient.Current.CurrentActivationData.GrainInstance as Grain<IGrainState>;
@@ -132,7 +132,7 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// Async method to cause write of the current grain state data into backing store.
         /// </summary>
-        [Obsolete("Use Grain.Storage.WriteStateAsync method instead.")]
+        [Obsolete("Use Grain.WriteStateAsync method instead.")]
         public async Task WriteStateAsync()
         {
             var grain = RuntimeClient.Current.CurrentActivationData.GrainInstance as Grain<IGrainState>;
@@ -146,7 +146,7 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// Async method to cause write of the current grain state data into backing store.
         /// </summary>
-        [Obsolete("Use Grain.Storage.ClearStateAsync method instead.")]
+        [Obsolete("Use Grain.ClearStateAsync method instead.")]
         public async Task ClearStateAsync()
         {
             var grain = RuntimeClient.Current.CurrentActivationData.GrainInstance as Grain<IGrainState>;
@@ -192,7 +192,7 @@ namespace Orleans.CodeGeneration
         {
             if (values == null)
             {
-                ReesetProperties();
+                ResetProperties();
                 return;
             }
 
@@ -209,7 +209,7 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// Resets properties of the state object to their default values.
         /// </summary>
-        private void ReesetProperties()
+        private void ResetProperties()
         {
             var properties = this.GetType().GetProperties();
             foreach (var property in properties)
