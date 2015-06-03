@@ -169,15 +169,17 @@ namespace Orleans.Runtime
                 number, memBefore, activations.Count, ActivationCollector.ToString());
             List<ActivationData> list = scanStale ? ActivationCollector.ScanStale() : ActivationCollector.ScanAll(ageLimit);
             collectionCounter.Increment();
+            var count = 0;
             if (list != null && list.Count > 0)
             {
+                count = list.Count;
                 if (logger.IsVerbose) logger.Verbose("CollectActivations{0}", list.ToStrings(d => d.Grain.ToString() + d.ActivationId));
                 await DeactivateActivationsFromCollector(list);
             }
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
             logger.Info(ErrorCode.Catalog_AfterCollection, "After collection#{0}: memory={1}MB, #activations={2}, collected {3} activations, collector={4}, collection time={5}.",
-                number, memAfter, activations.Count, list.Count, ActivationCollector.ToString(), watch.Elapsed);
+                number, memAfter, activations.Count, count, ActivationCollector.ToString(), watch.Elapsed);
         }
 
         public List<Tuple<GrainId, string, int>> GetGrainStatistics()

@@ -274,6 +274,8 @@ namespace Orleans.Runtime.Management
 
         private static void AddXPathValue(XmlNode xml, IEnumerable<string> path, string value)
         {
+            if (path == null) return;
+
             var first = path.FirstOrDefault();
             if (first == null) return;
 

@@ -32,7 +32,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Scheduler
 {
-    [DebuggerDisplay("WorkItemGroup State={state} PendingContinuations={pendingContinuationCount} Context={_schedulingContext.Name}")]
+    [DebuggerDisplay("WorkItemGroup State={state} WorkItemCount={WorkItemCount} Context={SchedulingContext.Name}")]
     internal class WorkItemGroup : IWorkItem
     {
         private enum WorkGroupStatus

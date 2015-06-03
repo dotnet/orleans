@@ -472,7 +472,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return Seed;
             }
 
-            SiloAddress s;
+            SiloAddress siloAddress;
             int hash = unchecked((int)grain.GetUniformHashCode());
 
             lock (membershipCache)
@@ -487,22 +487,22 @@ namespace Orleans.Runtime.GrainDirectory
                 bool excludeMySelf = !Running && excludeThisSiloIfStopping; 
 
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-                s = membershipRingList.FindLast(siloAddr => (siloAddr.GetConsistentHashCode() <= hash) &&
+                siloAddress = membershipRingList.FindLast(siloAddr => (siloAddr.GetConsistentHashCode() <= hash) &&
                                     (!siloAddr.Equals(MyAddress) || !excludeMySelf));
-                if (s == null)
+                if (siloAddress == null)
                 {
                     // If not found in the traversal, last silo will do (we are on a ring).
                     // We checked above to make sure that the list isn't empty, so this should always be safe.
-                    s = membershipRingList[membershipRingList.Count - 1];
+                    siloAddress = membershipRingList[membershipRingList.Count - 1];
                     // Make sure it's not us...
-                    if (s.Equals(MyAddress) && excludeMySelf)
+                    if (siloAddress.Equals(MyAddress) && excludeMySelf)
                     {
-                        s = membershipRingList.Count > 1 ? membershipRingList[membershipRingList.Count - 2] : null;
+                        siloAddress = membershipRingList.Count > 1 ? membershipRingList[membershipRingList.Count - 2] : null;
                     }
                 }
             }
-            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, s, grain, hash, s.GetConsistentHashCode());
-            return s;
+            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grain, hash, siloAddress.GetConsistentHashCode());
+            return siloAddress;
         }
 
         #region Implementation of ILocalGrainDirectory
