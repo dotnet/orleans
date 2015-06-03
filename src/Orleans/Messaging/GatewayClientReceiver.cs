@@ -62,7 +62,7 @@ namespace Orleans.Messaging
             {
                 while (!Cts.IsCancellationRequested)
                 {
-                    int bytesRead = FillBuffer(buffer.RecieveBuffer);
+                    int bytesRead = FillBuffer(buffer.ReceiveBuffer);
                     if (bytesRead == 0)
                     {
                         continue;

@@ -28,9 +28,9 @@ namespace Orleans.Runtime
 {
     internal class IncomingMessageBuffer
     {
-        public List<ArraySegment<byte>> RecieveBuffer
+        public List<ArraySegment<byte>> ReceiveBuffer
         {
-            get { return ByteArrayBuilder.BuildSegmentList(readBuffer, recieveOffset); }
+            get { return ByteArrayBuilder.BuildSegmentList(readBuffer, receiveOffset); }
         }
 
         private const int Kb = 1024;
@@ -46,7 +46,7 @@ namespace Orleans.Runtime
         private int headerLength;
         private int bodyLength;
 
-        private int recieveOffset;
+        private int receiveOffset;
         private int decodeOffset;
 
         private readonly bool supportForwarding;
@@ -60,7 +60,7 @@ namespace Orleans.Runtime
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
             readBuffer = BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
-            recieveOffset = 0;
+            receiveOffset = 0;
             decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
@@ -68,12 +68,12 @@ namespace Orleans.Runtime
 
         public void UpdateReceivedData(int bytesRead)
         {
-            recieveOffset += bytesRead;
+            receiveOffset += bytesRead;
         }
 
         public void Reset()
         {
-            recieveOffset = 0;
+            receiveOffset = 0;
             decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
@@ -84,7 +84,7 @@ namespace Orleans.Runtime
             msg = null;
 
             // Is there enough read into the buffer to continue (at least read the lengths?)
-            if (recieveOffset - decodeOffset < KnownMessageSize())
+            if (receiveOffset - decodeOffset < KnownMessageSize())
                 return false;
 
             // parse lengths if needed
@@ -118,7 +118,7 @@ namespace Orleans.Runtime
             }
 
             // Is there enough read into the buffer to read full message
-            if (recieveOffset - decodeOffset < KnownMessageSize())
+            if (receiveOffset - decodeOffset < KnownMessageSize())
                 return false;
 
             // decode header
@@ -146,12 +146,12 @@ namespace Orleans.Runtime
                 if (Log.IsVerbose3) Log.Verbose3("Received large message {0}", msg.ToLongString());
             }
 
-            // update parse recieveOffset and clear lengths
+            // update parse receiveOffset and clear lengths
             decodeOffset = bodyOffset + bodyLength;
             headerLength = 0;
             bodyLength = 0;
 
-            // drop buffers consumed in message and adjust parse recieveOffset
+            // drop buffers consumed in message and adjust parse receiveOffset
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
             while (readBuffer.Count != 0)
@@ -169,7 +169,7 @@ namespace Orleans.Runtime
                 }
             }
             decodeOffset -= consumedBytes;
-            recieveOffset -= consumedBytes;
+            receiveOffset -= consumedBytes;
 
             if (consumedBytes != 0)
             {
