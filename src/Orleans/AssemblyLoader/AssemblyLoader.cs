@@ -189,12 +189,12 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        if(logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.");
+                        if (logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.", j);
                         Assembly.ReflectionOnlyLoadFrom(j);
                     }
-                    catch (Exception exc)
+                    catch (Exception)
                     {
-                        if (logger.IsVerbose) logger.Verbose("Failed to pre-load assembly {0} in reflection-only context.", exc);
+                        if (logger.IsVerbose) logger.Verbose("Failed to pre-load assembly {0} in reflection-only context.", j);
                     }
                 }
 
