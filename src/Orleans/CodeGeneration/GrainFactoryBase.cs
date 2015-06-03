@@ -38,14 +38,12 @@ namespace Orleans.CodeGeneration
         /// Fabricate a grain reference for a grain with the specified Int64 primary key
         /// </summary>
         /// <param name="grainInterfaceType">Grain type</param>
-        /// <param name="interfaceId">Type code value for this grain type</param>
         /// <param name="primaryKey">Primary key for the grain</param>
         /// <param name="grainClassNamePrefix">Prefix or full name of the grain class to disambiguate multiple implementations.</param>
         /// <returns><c>GrainReference</c> for connecting to the grain with the specified primary key</returns>
         /// <exception cref="System.ArgumentException">If called for a grain type that is not a valid grain type.</exception>
         public static IAddressable MakeGrainReferenceInternal(
             Type grainInterfaceType,
-            int interfaceId,
             long primaryKey,
             string grainClassNamePrefix = null)
         {
@@ -60,14 +58,12 @@ namespace Orleans.CodeGeneration
         /// Fabricate a grain reference for a grain with the specified Guid primary key
         /// </summary>
         /// <param name="grainInterfaceType">Grain type</param>
-        /// <param name="interfaceId">Type code value for this self-managed grain type</param>
         /// <param name="primaryKey">Primary key for the grain</param>
         /// <param name="grainClassNamePrefix">Prefix or full name of the grain class to disambiguate multiple implementations.</param>
         /// <returns><c>GrainReference</c> for connecting to the self-managed grain with the specified primary key</returns>
         /// <exception cref="System.ArgumentException">If called for a grain type that is not a valid grain type.</exception>
         public static IAddressable MakeGrainReferenceInternal(
             Type grainInterfaceType,
-            int interfaceId,
             Guid primaryKey,
             string grainClassNamePrefix = null)
         {
@@ -82,14 +78,12 @@ namespace Orleans.CodeGeneration
         /// Fabricate a grain reference for a grain with the specified Guid primary key
         /// </summary>
         /// <param name="grainInterfaceType">Grain type</param>
-        /// <param name="interfaceId">Type code value for this self-managed grain type</param>
         /// <param name="primaryKey">Primary key for the grain</param>
         /// <param name="grainClassNamePrefix">Prefix or full name of the grain class to disambiguate multiple implementations.</param>
         /// <returns><c>GrainReference</c> for connecting to the self-managed grain with the specified primary key</returns>
         /// <exception cref="System.ArgumentException">If called for a grain type that is not a valid grain type.</exception>
         public static IAddressable MakeGrainReferenceInternal(
             Type grainInterfaceType,
-            int interfaceId,
             string primaryKey,
             string grainClassNamePrefix = null)
         {
@@ -104,7 +98,6 @@ namespace Orleans.CodeGeneration
         /// Fabricate a grain reference for an extended-key grain with the specified Guid primary key
         /// </summary>
         /// <param name="grainInterfaceType">Grain type</param>
-        /// <param name="interfaceId">Type code value for this grain type</param>
         /// <param name="primaryKey">Primary key for the grain</param>
         /// <param name="keyExt">Extended key for the grain</param>
         /// <param name="grainClassNamePrefix">Prefix or full name of the grain class to disambiguate multiple implementations.</param>
@@ -112,7 +105,6 @@ namespace Orleans.CodeGeneration
         /// <exception cref="System.ArgumentException">If called for a grain type that is not a valid grain type.</exception>
         public static IAddressable MakeKeyExtendedGrainReferenceInternal(
             Type grainInterfaceType,
-            int interfaceId,
             Guid primaryKey,
             string keyExt,
             string grainClassNamePrefix = null)
@@ -130,7 +122,6 @@ namespace Orleans.CodeGeneration
         /// Fabricate a grain reference for an extended-key grain with the specified Int64 primary key
         /// </summary>
         /// <param name="grainInterfaceType">Grain type</param>
-        /// <param name="interfaceId">Type code value for this grain type</param>
         /// <param name="primaryKey">Primary key for the grain</param>
         /// <param name="keyExt">Extended key for the grain</param>
         /// <param name="grainClassNamePrefix">Prefix or full name of the grain class to disambiguate multiple implementations.</param>
@@ -138,7 +129,6 @@ namespace Orleans.CodeGeneration
         /// <exception cref="System.ArgumentException">If called for a grain type that is not a valid grain type.</exception>
         public static IAddressable MakeKeyExtendedGrainReferenceInternal(
             Type grainInterfaceType,
-            int interfaceId,
             long primaryKey,
             string keyExt,
             string grainClassNamePrefix = null)
