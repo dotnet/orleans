@@ -141,15 +141,7 @@ namespace Orleans.Providers
                 else
                 { 
                     extension = newExtensionFunc();
-                    var obj = Orleans.GrainFactory.CreateObjectReference_2<TExtensionInterface>(extension);
-
-                    //// until we have the means to get the factory related to a grain interface, we have to search linearly for the factory. 
-                    //var factoryName = String.Format("{0}.{1}Factory", typeof(TExtensionInterface).Namespace, typeof(TExtensionInterface).Name.Substring(1)); // skip the I
-                    //var factoryType = TypeUtils.ResolveType(factoryName);
-
-                    //var obj2 = factoryType.InvokeMember("CreateObjectReference", 
-                    //    BindingFlags.Default | BindingFlags.InvokeMethod, 
-                    //    null, null, new object[]{ extension }, CultureInfo.InvariantCulture);
+                    var obj = ((Orleans.GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
 
                     addressable = (IAddressable) await (Task<TExtensionInterface>) obj;
 

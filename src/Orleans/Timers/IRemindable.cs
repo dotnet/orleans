@@ -21,6 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using Orleans.Runtime;
 using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
@@ -30,7 +31,7 @@ namespace Orleans
     /// <summary>
     /// Callback interface that grains must implement inorder to be able to register and receive Reminders.
     /// </summary>
-    public interface IRemindable : IGrain
+    public interface IRemindable : IAddressable
     {
         /// <summary>
         /// Receieve a new Reminder.

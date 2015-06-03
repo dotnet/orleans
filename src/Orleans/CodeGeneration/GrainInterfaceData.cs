@@ -131,7 +131,7 @@ namespace Orleans.CodeGeneration
         {
             if (t.IsClass)
                 return false;
-            if (t == typeof (IGrainObserver) || t == typeof (IAddressable))
+            if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
                 return false;
             if (t == typeof (IGrain))
                 return false;
