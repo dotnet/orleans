@@ -341,7 +341,7 @@ namespace Orleans.Runtime.ConsistentRing
         /// <returns></returns>
         public SiloAddress CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
         {
-            SiloAddress s;
+            SiloAddress siloAddress;
 
             lock (membershipRingList)
             {
@@ -357,25 +357,25 @@ namespace Orleans.Runtime.ConsistentRing
                 // use clockwise ... current code in membershipOracle.CalculateTargetSilo() does counter-clockwise ...
                 // if you want to stick to counter-clockwise, change the responsibility definition in 'In()' method & responsibility defs in OrleansReminderMemory
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-                s = membershipRingList.Find(siloAddr => (siloAddr.GetConsistentHashCode() >= hash) && // <= hash for counter-clockwise responsibilities
+                siloAddress = membershipRingList.Find(siloAddr => (siloAddr.GetConsistentHashCode() >= hash) && // <= hash for counter-clockwise responsibilities
                                     (!siloAddr.Equals(MyAddress) || !excludeMySelf));
 
-                if (s == null)
+                if (siloAddress == null)
                 {
                     // if not found in traversal, then first silo should be returned (we are on a ring)
                     // if you go back to their counter-clockwise policy, then change the 'In()' method in OrleansReminderMemory
-                    s = membershipRingList[0]; // vs [membershipRingList.Count - 1]; for counter-clockwise policy
+                    siloAddress = membershipRingList[0]; // vs [membershipRingList.Count - 1]; for counter-clockwise policy
                     // Make sure it's not us...
-                    if (s.Equals(MyAddress) && excludeMySelf)
+                    if (siloAddress.Equals(MyAddress) && excludeMySelf)
                     {
                         // vs [membershipRingList.Count - 2]; for counter-clockwise policy
-                        s = membershipRingList.Count > 1 ? membershipRingList[1] : null;
+                        siloAddress = membershipRingList.Count > 1 ? membershipRingList[1] : null;
                     }
                 }
             }
 
-            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, s, hash, hash, s.GetConsistentHashCode());
-            return s;
+            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
+            return siloAddress;
         }
     }
 }
