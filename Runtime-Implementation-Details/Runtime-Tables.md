@@ -48,13 +48,14 @@ There is also a special row in this table, called membership version row, with t
 
 ### Naming:
 The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
-First, it is importanmt to note that [Orleans cluster protocol](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html) does not use any of these names for distoigushing between silos. Instead it uses IP:port:epoch as a unique identity of a silo instance. Therefore, setting of those 3 names has no impcat on runtime correctness. It is in the table merely for help diagnostics and opeartional troubleshooting.
+First, it is important to note that [Orleans cluster protocol](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html) does not use any of these names for distinguishing between silos. Instead it uses `IP:port:epoch` as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.
 
 Hostname is always set to the name of this host, as returned by `Dns.GetHostName()`.
 Role name is a logical name of the whole service and instance name is the name of this specific silo instance within this service.
+
 Role name and Instance name depend on the hosting - where the silo runs. Each silo host can set those differently.
-Azure host (`azureSiloHost`) sets the role name to Azure role name (`myRoleInstance.Role.Name`) and instance name to Azure role Instance name (`myRoleInstance.Id`).
-On premises (`SiloHost`) the role name is the executing  assembly name (`Assembly.GetExecutingAssembly().GetName().Name`) and the instance name is the name thre host gave to that silo when it was started.
+Azure host (`AzureSiloHost`) sets the role name to Azure role name (`myRoleInstance.Role.Name`) and instance name to Azure role Instance name (`myRoleInstance.Id`).
+On premises (`SiloHost`) the role name is the executing  assembly name (`Assembly.GetExecutingAssembly().GetName().Name`) and the instance name is the name the host gave to that silo when it was started.
 
 
 ## Orleans Reminders table
