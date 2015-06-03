@@ -31,7 +31,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration.Serialization;
+using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.CodeGeneration
 {
@@ -281,12 +283,27 @@ namespace Orleans.CodeGeneration
             out bool hasStateClass)
         {
             var sourceType = grainInterfaceData.Type;
+
             stateClassName = FixupTypeName(stateClassName);
             CodeTypeParameterCollection genericTypeParams = grainInterfaceData.GenericTypeParams;
 
             Func<Type, bool> nonamespace = t => CurrentNamespace == t.Namespace || ReferencedNamespaces.Contains(t.Namespace);
 
             Type persistentInterface = GetPersistentInterface(sourceType);
+
+            if (persistentInterface!=null)
+            {
+                if (!sourceType.GetCustomAttributes(typeof (StorageProviderAttribute)).Any())
+                    throw new BadProviderConfigException(
+                        String.Format("No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
+
+                if (!persistentInterface.IsInterface)
+                {
+                    hasStateClass = false;
+                    return null;
+                }
+            }
+
             Dictionary<string, PropertyInfo> asyncProperties = GrainInterfaceData.GetPersistentProperties(persistentInterface)
                 .ToDictionary(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1), p => p);
 
