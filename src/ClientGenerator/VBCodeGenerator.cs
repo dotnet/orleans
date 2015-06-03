@@ -383,7 +383,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
 
             Action<string> add = codeFmt =>
                 factoryClass.Members.Add(new CodeSnippetTypeMember(
-                     String.Format(codeFmt, FixupTypeName(interfaceName), interfaceId)));
+                     String.Format(codeFmt, FixupTypeName(interfaceName))));
 
             bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
             bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
@@ -399,12 +399,12 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey as System.Int64, keyExt as System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), {1}, primaryKey, keyExt))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt))
                         End Function");
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey as System.Int64, keyExt as System.String, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), {1}, primaryKey, keyExt, grainClassNamePrefix))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt, grainClassNamePrefix))
                         End Function");
             }
             else if (isGuidCompoundKey)
@@ -412,12 +412,12 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey As System.Guid, keyExt as System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), {1}, primaryKey, keyExt))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt))
                         End Function");
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey As System.Guid, keyExt as System.String, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), {1}, primaryKey, keyExt,grainClassNamePrefix))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt,grainClassNamePrefix))
                         End Function");
             }
             else
@@ -428,12 +428,12 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey as System.Int64) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), {1}, primaryKey))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey))
                         End Function");
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey as System.Int64, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), {1}, primaryKey, grainClassNamePrefix))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey, grainClassNamePrefix))
                         End Function");
                 }
                 if (isGuidKey || isDefaultKey)
@@ -441,12 +441,12 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey As System.Guid) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), {1}, primaryKey))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey))
                         End Function");
                 add(
                     @"
                         Public Shared Function GetGrain(primaryKey As System.Guid, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), {1}, primaryKey, grainClassNamePrefix))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey, grainClassNamePrefix))
                         End Function");
                 }
                 if (isStringKey)
@@ -454,12 +454,12 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                     add(
                         @"
                         Public Shared Function GetGrain(primaryKey As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), {1}, primaryKey))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey))
                         End Function");
                     add(
                         @"
                         Public Shared Function GetGrain(primaryKey As System.String, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), {1}, primaryKey, grainClassNamePrefix))
+                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey, grainClassNamePrefix))
                         End Function");
                 }
             }
