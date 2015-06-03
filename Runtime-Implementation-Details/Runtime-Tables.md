@@ -30,8 +30,8 @@ All rows in this table consist of the following columns:
 8. *Status* - status of this silo, as set by cluster management protocol. Any of the type [`Orleans.Runtime.SiloStatus`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Runtime/SiloStatus.cs)
 9. *ProxyPort* - silo to clients TCP port
 10. *Primary* - whether this silo is primary or not. Deprecated.
-11. *RoleName* - The name of this role, if running is Azure.
-12. *InstanceName* - The name of this role instance, if running is Azure.
+11. *RoleName* - If running is Azure - the name of this role. If running on premises, the name of the executing assembly.
+12. *InstanceName* - If running is Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.
 13. *UpdateZone* - Azure update zone, if running is Azure.
 14. *FaultZone* - Azure fault zone, if running is Azure.
 15. *SuspectingSilos* - the list of silos that suspect this silo. Managed by cluster management protocol. 
@@ -45,6 +45,17 @@ There is also a special row in this table, called membership version row, with t
 2. *RowKey* - "VersionRow" costant string
 3. *DeploymentId* 
 4. *MembershipVersion* - the latest version of the current membership configuration. 
+
+### Naming:
+The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
+First, it is importanmt to note that [Orleans cluster protocol](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html) does not use any of these names for distoigushing between silos. Instead it uses IP:port:epoch as a unique identity of a silo instance. Therefore, setting of those 3 names has no impcat on runtime correctness. It is in the table merely for help diagnostics and opeartional troubleshooting.
+
+Hostname is always set to the name of this host, as returned by `Dns.GetHostName()`.
+Role name is a logical name of the whole service and instance name is the name of this specific silo instance within this service.
+Role name and Instance name depend on the hosting - where the silo runs. Each silo host can set those differently.
+Azure host (`azureSiloHost`) sets the role name to Azure role name (`myRoleInstance.Role.Name`) and instance name to Azure role Instance name (`myRoleInstance.Id`).
+On premises (`SiloHost`) the role name is the executing  assembly name (`Assembly.GetExecutingAssembly().GetName().Name`) and the instance name is the name thre host gave to that silo when it was started.
+
 
 ## Orleans Reminders table
 
