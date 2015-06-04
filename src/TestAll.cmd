@@ -17,4 +17,4 @@ cd "%CMDHOME%"
 
 set TEST_ARGS= /testcontainer:%OutDir%\Tester.dll /testcontainer:%OutDir%\TesterInternal.dll 
 
-"%MSTESTEXE%" %TEST_ARGS% /category:"BVT|Nightly"
+"%MSTESTEXE%" %TEST_ARGS% /category:"BVT|Functional"
