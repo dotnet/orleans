@@ -18,7 +18,7 @@ Runtime tables:
 
 Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the [Cluster Management Protocol](Cluster-Management) that maintains this table.
 
-All rows in this table consist of the following columns:
+All rows in this table consist of the following columns ([`SiloInstanceTableEntry`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/OrleansSiloInstanceManager.cs#L40)):
 
 1. *PartitionKey* - deployment id.
 2. *RowKey* - Silo IP Address + "-" + Silo Port + "-" + Silo Generation number (epoch)
@@ -60,7 +60,7 @@ On premises (`SiloHost`) the role name is the executing  assembly name (`Assembl
 
 ## Orleans Reminders table
 
-Orleans Reminders table durably stores all the reminders registered in the system. Each reminder has a separate row. All rows in this table consist of the following columns:
+Orleans Reminders table durably stores all the reminders registered in the system. Each reminder has a separate row. All rows in this table consist of the following columns ([`ReminderTableEntry`](https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/ReminderService/RemindersTableManager.cs#L38)):
 
 1. *PartitionKey* - ServiceId + "_" + GrainRefConsistentHash
 2. *RowKey* -  GrainReference + "-" ReminderName
@@ -75,7 +75,7 @@ Orleans Reminders table durably stores all the reminders registered in the syste
 
 ## Silo Metrics table
 
-Silo metrics table containes a small set of per-silo important key performance metrics. Each silo has one row, periodically updated in-place by its silo.
+Silo metrics table containes a small set of per-silo important key performance metrics (usually known as KPI - [Key Performance Indicators](http://en.wikipedia.org/wiki/Performance_indicator)). Each silo has one row, periodically updated in-place by its silo ([`SiloMetricsData`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36)).
 
 1. *PartitionKey* - DeploymentId
 2. *RowKey* -  silo name
@@ -117,6 +117,23 @@ Silo metrics table containes a small set of per-Orleans-client important key per
 
 
 ## Silo Statistics table
+
+Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in a troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper [PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept](http://research.microsoft.com/apps/pubs/?id=217109).
+Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table. 
+
+Each row is in the format ([`StatsTableData`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38)):
+
+1. *PartitionKey* - DeploymentId and last hour
+2. *RowKey* - ticks of the current time, silo name, monotonically grpowing sequance number
+3. *DeploymentId* -  the deployment id of this Orleans service
+4. *Time* -  the current time of the reporting on the reporting silo
+5. *Address* - the silo address (ip:port:epoch) of this silo
+6. *Name* - the name of this silo (in Azure it is its Instance name)
+7. *HostName* - the host name of this silo
+8. *Statistic* - the name of the statistic counter
+9. *StatValue* - the value of the statistic counter
+10. *IsDelta* - if this the statistic counter value is delta since last value reported or an absolute value
+
 
 ## Clients Statistics table
 
