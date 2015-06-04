@@ -305,21 +305,6 @@ namespace Orleans.Runtime
         public ActivationId ActivationId { get { return Address.Activation; } }
 
         public ActivationAddress Address { get; private set; }
-        
-        public string IdentityString
-        {
-            get { return Grain.ToDetailedString(); }
-        }
-
-        public string RuntimeIdentity
-        {
-            get { return Silo.ToLongString(); }
-        }
-
-        public void DeactivateOnIdle()
-        {
-            RuntimeClient.Current.DeactivateOnIdle(ActivationId);
-        }
 
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
