@@ -208,6 +208,7 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.UnhandledException +=
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
+            grainFactory = new GrainFactory();
             typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
 
             // Performance metrics
@@ -225,7 +226,7 @@ namespace Orleans.Runtime
             
             messageCenter = mc;
 
-            grainFactory = new GrainFactory();
+            // GrainRuntime can be created only here, after messageCenter was created.
             grainRuntime = new GrainRuntime(SiloAddress.ToLongString(), grainFactory,
                 new TimerRegistry(),
                 new ReminderRegistry(),
