@@ -39,6 +39,6 @@ namespace UnitTests.GrainInterfaces
 
         Task<T> Get();
 
-        Task CompareGrainReferences();
+        Task CompareGrainReferences(ISimpleGenericGrain<T> clientRef);
     }
 }

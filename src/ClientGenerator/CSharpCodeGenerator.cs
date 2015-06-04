@@ -379,7 +379,7 @@ namespace Orleans.CodeGeneration
             RecordReferencedNamespaceAndAssembly(iface.Type);
             var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.Type);
             Action<string> add = codeFmt => factoryClass.Members.Add(
-                new CodeSnippetTypeMember(String.Format(codeFmt, iface.InterfaceTypeName, interfaceId)));
+                new CodeSnippetTypeMember(String.Format(codeFmt, iface.InterfaceTypeName)));
 
             bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
             bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
@@ -394,13 +394,13 @@ namespace Orleans.CodeGeneration
                 add(@"
                         public static {0} GetGrain(long primaryKey, string keyExt)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt));
                         }}");
 
                 add(@"
                         public static {0} GetGrain(long primaryKey, string keyExt, string grainClassNamePrefix)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt, grainClassNamePrefix));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt, grainClassNamePrefix));
                         }}");
             }
             else if (isGuidCompoundKey)
@@ -408,13 +408,13 @@ namespace Orleans.CodeGeneration
                 add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt));
                         }}");
 
                 add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt, string grainClassNamePrefix)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), {1}, primaryKey, keyExt,grainClassNamePrefix));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt, grainClassNamePrefix));
                         }}");
             }
             else
@@ -425,13 +425,13 @@ namespace Orleans.CodeGeneration
                     add(@"
                         public static {0} GetGrain(long primaryKey)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey));
                         }}");
 
                     add(@"
                         public static {0} GetGrain(long primaryKey, string grainClassNamePrefix)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey, grainClassNamePrefix));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey, grainClassNamePrefix));
                         }}");
                 }
 
@@ -440,13 +440,13 @@ namespace Orleans.CodeGeneration
                     add(@"
                         public static {0} GetGrain(System.Guid primaryKey)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey));
                         }}");
 
                     add(@"
                         public static {0} GetGrain(System.Guid primaryKey, string grainClassNamePrefix)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey, grainClassNamePrefix));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey, grainClassNamePrefix));
                         }}");
                 }
 
@@ -455,13 +455,13 @@ namespace Orleans.CodeGeneration
                     add(@"
                         public static {0} GetGrain(System.String primaryKey)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey));
                         }}");
 
                     add(@"
                         public static {0} GetGrain(System.String primaryKey, string grainClassNamePrefix)
                         {{
-                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), {1}, primaryKey, grainClassNamePrefix));
+                            return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey, grainClassNamePrefix));
                         }}");
                 }
             }
