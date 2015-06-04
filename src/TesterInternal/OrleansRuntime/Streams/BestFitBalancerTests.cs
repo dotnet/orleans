@@ -32,7 +32,7 @@ namespace UnitTests.OrleansRuntime.Streams
     [TestClass]
     public class BestFitBalancerTests
     {
-        [TestMethod, TestCategory("Nightly")]
+        [TestMethod, TestCategory("Functional")]
         public void IdealCaseMoreResourcesThanBucketsTest()
         {
             const int resourceCount = 99;
@@ -45,7 +45,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Nightly")]
+        [TestMethod, TestCategory("Functional")]
         public void IdealCaseLessResourcesThanBucketsTest()
         {
             const int bucketCount = 99;
@@ -58,7 +58,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Nightly")]
+        [TestMethod, TestCategory("Functional")]
         public void HalfBucketsActiveTest()
         {
             const int resourceCount = 99;
@@ -73,7 +73,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(activeBuckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Nightly")]
+        [TestMethod, TestCategory("Functional")]
         public void OrderIrrelevantTest()
         {
             const int resourceCount = 99;

@@ -57,35 +57,35 @@ namespace Tester.StreamingTests
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSMultipleSubscriptionTest()
         {
             logger.Info("************************ SMSMultipleSubscriptionTest *********************************");
             await runner.MultipleSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSAddAndRemoveSubscriptionTest()
         {
             logger.Info("************************ SMSAddAndRemoveSubscriptionTest *********************************");
             await runner.AddAndRemoveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSResubscriptionTest()
         {
             logger.Info("************************ SMSResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSResubscriptionAfterDeactivationTest()
         {
             logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSActiveSubscriptionTest()
         {
             logger.Info("************************ SMSActiveSubscriptionTest *********************************");
