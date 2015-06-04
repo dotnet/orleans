@@ -71,7 +71,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_1()
         {
             logger.Info("************************ SampleStreamingTests_1 *********************************");
@@ -80,7 +80,7 @@ namespace Tester.StreamingTests
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_2()
         {
             logger.Info("************************ SampleStreamingTests_2 *********************************");
@@ -89,7 +89,7 @@ namespace Tester.StreamingTests
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory( "Nightly" ), TestCategory("Streaming" )]
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming" )]
         public async Task SampleStreamingTests_3()
         {
             logger.Info("************************ SampleStreamingTests_3 *********************************" );
@@ -98,7 +98,7 @@ namespace Tester.StreamingTests
             await StreamingTests_Producer_InlineConsumer(streamId, streamProvider );
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_4()
         {
             logger.Info("************************ SampleStreamingTests_4 *********************************");
@@ -107,7 +107,7 @@ namespace Tester.StreamingTests
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_5()
         {
             logger.Info("************************ SampleStreamingTests_5 *********************************");

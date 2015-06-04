@@ -43,13 +43,13 @@ namespace UnitTests.General
         {
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task StateClassTests_StateClass()
         {
             await StateClassTests_Test("UnitTests.Grains.SimplePersistentGrain");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task StateClassTests_StateInterface()
         {
             await StateClassTests_Test("UnitTests.Grains.SimpleInterfacePersistentGrain");

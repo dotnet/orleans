@@ -41,7 +41,7 @@ namespace UnitTests.General
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Serialization")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_JObject()
         {
             const string json = @"{ 

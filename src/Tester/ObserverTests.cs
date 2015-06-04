@@ -76,7 +76,7 @@ namespace UnitTests.General
             return random.Next();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_SimpleNotification()
         {
             var result = new AsyncResultHandle();
@@ -93,7 +93,7 @@ namespace UnitTests.General
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_SimpleNotification_GeneratedFactory()
         {
             var result = new AsyncResultHandle();
@@ -138,7 +138,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_DoubleSubscriptionSameReference()
         {
             var result = new AsyncResultHandle();
@@ -185,7 +185,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_SubscribeUnsubscribe()
         {
             var result = new AsyncResultHandle();
@@ -217,7 +217,7 @@ namespace UnitTests.General
         }
 
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_Unsubscribe()
         {
             ISimpleObserverableGrain grain = GetGrain();
@@ -241,7 +241,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_DoubleSubscriptionDifferentReferences()
         {
             var result = new AsyncResultHandle();
@@ -275,7 +275,7 @@ namespace UnitTests.General
         }
 
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_DeleteObject()
         {
             var result = new AsyncResultHandle();
@@ -304,7 +304,7 @@ namespace UnitTests.General
             result.Continue = true;
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         [ExpectedException(typeof(NotSupportedException))]
         public async Task ObserverTest_SubscriberMustBeGrainReference()
         {
