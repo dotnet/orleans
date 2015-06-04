@@ -6,7 +6,9 @@ title: Runtime Monitoring
 
 [[THIS IS IN NEED OF REVIEW]]
 
-There are five ways Orleans deployment can be monitored by an external operator by utilizing the data that Orleans writes automatically to Azure storage:
+There are five ways Orleans deployment can be monitored by an external operator by utilizing the data that Orleans writes automatically to Azure storage.
+
+The tables mentioned below are desribed in more details [here](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html).
 
 **OrleansSilosTable for cluster membership** - this table lists all silos in the deployment (partition key DeploymentID, row key silo id). The operator can use this table to check cluster health, watch the current set of live silos, or learn why and when a certain silo went down. Orleans' cluster membership protocol uses this table internally and updates it with significant membership events (silos goes up and down). 
 
