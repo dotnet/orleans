@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+
+	<PropertyGroup>
+		<NuGetExe Condition="'$(OS)' == 'Windows_NT'">.nuget\NuGet.exe</NuGetExe>
+		<NuGetExe Condition="'$(OS)' != 'Windows_NT'">nuget</NuGetExe>
+	</PropertyGroup>
+
+	<Target Name="RestorePackages" BeforeTargets="Build" DependsOnTargets="DownloadNuGet">
+		<Exec Command="&quot;$(NuGetExe)&quot; Restore &quot;$(SolutionPath)&quot;" />
+	</Target>
+
+	<PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+		<CodeTaskAssembly Condition="'$(MSBuildAssemblyVersion)' == ''">$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll</CodeTaskAssembly>
+		<!-- In VS2013, the assembly contains the VS version. -->
+		<CodeTaskAssembly Condition="'$(MSBuildAssemblyVersion)' == '12.0'">$(MSBuildToolsPath)\Microsoft.Build.Tasks.v12.0.dll</CodeTaskAssembly>
+		<!-- In VS2015+, the assembly was renamed, hopefully this will be the last condition! -->
+		<CodeTaskAssembly Condition="'$(MSBuildAssemblyVersion)' != '' and '$(MSBuildAssemblyVersion)' &gt;= '14.0'">$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll</CodeTaskAssembly>
+	</PropertyGroup>
+
+	<Target Name="DownloadNuGet" Condition="'$(OS)' == 'Windows_NT' And !Exists('$(NuGetExe)')">
+		<DownloadNuGet TargetPath="$(NuGetExe)" />
+	</Target>
+
+	<UsingTask TaskName="DownloadNuGet" TaskFactory="CodeTaskFactory" AssemblyFile="$(CodeTaskAssembly)">
+		<ParameterGroup>
+			<TargetPath ParameterType="System.String" Required="true" />
+		</ParameterGroup>
+		<Task>
+			<Reference Include="System.Core" />
+			<Using Namespace="System" />
+			<Using Namespace="System.IO" />
+			<Using Namespace="System.Net" />
+			<Using Namespace="Microsoft.Build.Framework" />
+			<Using Namespace="Microsoft.Build.Utilities" />
+			<Code Type="Fragment" Language="cs">
+				<![CDATA[
+                try {
+                    TargetPath = Path.GetFullPath(TargetPath);
+                    if (!Directory.Exists(Path.GetDirectoryName(TargetPath)))
+                        Directory.CreateDirectory(Path.GetDirectoryName(TargetPath));
+
+                    Log.LogMessage("Downloading latest version of NuGet.exe...");
+                    WebClient webClient = new WebClient();
+                    webClient.DownloadFile("https://www.nuget.org/nuget.exe", TargetPath);
+
+                    return true;
+                }
+                catch (Exception ex) {
+                    Log.LogErrorFromException(ex);
+                    return false;
+                }
+            ]]>
+			</Code>
+		</Task>
+	</UsingTask>
+
+</Project>
