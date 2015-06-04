@@ -36,9 +36,6 @@ namespace Orleans.Runtime
         Grain GrainInstance { get; }
         ActivationId ActivationId { get; }
         ActivationAddress Address { get; }
-        string IdentityString { get; }
-        string RuntimeIdentity { get;  }
-        void DeactivateOnIdle();
         void DelayDeactivation(TimeSpan timeSpan);
         IStorageProvider StorageProvider { get; }
         IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);

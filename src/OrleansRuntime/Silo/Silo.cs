@@ -170,12 +170,6 @@ namespace Orleans.Runtime
                 TraceLogger.Initialize(nodeConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
-
-            grainFactory = new GrainFactory();
-            grainRuntime = new GrainRuntime(name, grainFactory, 
-                new TimerRegistry(), 
-                new ReminderRegistry(), 
-                new StreamProviderManager());
             
             LimitManager.Initialize(nodeConfig);
             ActivationData.Init(config);
@@ -214,6 +208,7 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.UnhandledException +=
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
+            grainFactory = new GrainFactory();
             typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
 
             // Performance metrics
@@ -230,6 +225,13 @@ namespace Orleans.Runtime
                 mc.InstallGateway(nodeConfig.ProxyGatewayEndpoint);
             
             messageCenter = mc;
+
+            // GrainRuntime can be created only here, after messageCenter was created.
+            grainRuntime = new GrainRuntime(SiloAddress.ToLongString(), grainFactory,
+                new TimerRegistry(),
+                new ReminderRegistry(),
+                new StreamProviderManager());
+
 
             // Now the router/directory service
             // This has to come after the message center //; note that it then gets injected back into the message center.;
