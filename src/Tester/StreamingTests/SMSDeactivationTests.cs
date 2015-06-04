@@ -65,14 +65,14 @@ namespace Tester.StreamingTests
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSDeactivationTest()
         {
             logger.Info("************************ SMSDeactivationTest *********************************");
             await runner.DeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSDeactivationTest_ClientConsumer()
         {
             logger.Info("************************ SMSDeactivationTest *********************************");
