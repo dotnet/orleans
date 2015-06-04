@@ -101,7 +101,7 @@ namespace UnitTests.Grains
 
         public Task CompareGrainReferences(ISimpleGenericGrain<int> clientReference) 
         {
-            return TaskDone.Done;
+            throw new NotImplementedException();
         }
     }
 }
