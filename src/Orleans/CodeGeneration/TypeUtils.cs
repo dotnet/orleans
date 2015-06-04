@@ -49,9 +49,9 @@ namespace Orleans.Runtime
             if (t.IsNestedPublic || t.IsNestedPrivate)
             {
                 if (t.DeclaringType.IsGenericType)
-                    return GetTemplatedName(GetUntemplatedTypeName(t.DeclaringType.Name), t.DeclaringType, t.GetGenericArguments(), _ => true, language) + "." + GetUntemplatedTypeName(t.Name, language);
+                    return GetTemplatedName(GetUntemplatedTypeName(t.DeclaringType.Name), t.DeclaringType, t.GetGenericArguments(), _ => true, language) + "." + GetUntemplatedTypeName(t.Name);
                 
-                return GetTemplatedName(t.DeclaringType, language: language) + "." + GetUntemplatedTypeName(t.Name, language: language);
+                return GetTemplatedName(t.DeclaringType, language: language) + "." + GetUntemplatedTypeName(t.Name);
             }
 
             if (t.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language));
@@ -59,7 +59,7 @@ namespace Orleans.Runtime
             return fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language: language);
         }
 
-        public static string GetUntemplatedTypeName(string typeName, Language language = Language.CSharp)
+        public static string GetUntemplatedTypeName(string typeName)
         {
             int i = typeName.IndexOf('`');
             if (i > 0)
