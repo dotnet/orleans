@@ -253,7 +253,7 @@ namespace UnitTests.General
 
             var grainRef1 = GetGrain<ISimpleGenericGrain<string>>(grainId);
             await grainRef1.Set("JustString");
-            await grainRef1.CompareGrainReferences();
+            await grainRef1.CompareGrainReferences(grainRef1);
         }
     }
 }
