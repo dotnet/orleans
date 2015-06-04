@@ -123,8 +123,8 @@ Each statistic value is one row. This table is append only. Every silo periodica
 
 Each row is in the format ([`StatsTableData`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38)):
 
-1. *PartitionKey* - DeploymentId and last hour
-2. *RowKey* - ticks of the current time, silo name, monotonically growing sequence number
+1. *PartitionKey* - `DeploymentId$ReverseTimestampToTheNearestHour` - deploymentId and last hour
+2. *RowKey* - `ReverseTimestampToTheNearestSecond$Name$counter` - current second, silo name, monotonically growing sequence number
 3. *DeploymentId* -  the deployment id of this Orleans service
 4. *Time* -  the current time of the reporting on the reporting silo
 5. *Address* - the silo address (ip:port:epoch) of this silo
@@ -134,6 +134,7 @@ Each row is in the format ([`StatsTableData`](https://github.com/dotnet/orleans/
 9. *StatValue* - the value of the statistic counter
 10. *IsDelta* - if this the statistic counter value is delta since last value reported or an absolute value
 
+The rationale behind the choice of partition key and row key is described [here](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L149) and [here](https://github.com/dotnet/orleans/issues/34).
 
 ## Clients Statistics table
 
