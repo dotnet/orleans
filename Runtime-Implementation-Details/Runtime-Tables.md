@@ -99,7 +99,7 @@ Silo metrics table containes a small set of per-silo important key performance m
 
 ## Clients Metrics table
 
-Silo metrics table containes a small set of per-Orleans-client important key performance metrics. Each client has one row,  periodically updated in-place by its client. Client metrics are essentilay a subset of silo metrics.
+Silo metrics table containes a small set of per-Orleans-client important key performance metrics. Each client has one row,  periodically updated in-place by its client. Client metrics are essentilay a subset of silo metrics ([`ClientMetricsData `](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/ClientMetricsTableDataManager.cs#L38)).
 
 1. *PartitionKey* - DeploymentId
 2. *RowKey* - Address
@@ -118,13 +118,13 @@ Silo metrics table containes a small set of per-Orleans-client important key per
 
 ## Silo Statistics table
 
-Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in a troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper [PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept](http://research.microsoft.com/apps/pubs/?id=217109).
+Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper [PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept](http://research.microsoft.com/apps/pubs/?id=217109).
 Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table. 
 
 Each row is in the format ([`StatsTableData`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38)):
 
 1. *PartitionKey* - DeploymentId and last hour
-2. *RowKey* - ticks of the current time, silo name, monotonically grpowing sequance number
+2. *RowKey* - ticks of the current time, silo name, monotonically growing sequence number
 3. *DeploymentId* -  the deployment id of this Orleans service
 4. *Time* -  the current time of the reporting on the reporting silo
 5. *Address* - the silo address (ip:port:epoch) of this silo
@@ -137,3 +137,4 @@ Each row is in the format ([`StatsTableData`](https://github.com/dotnet/orleans/
 
 ## Clients Statistics table
 
+Same as Silo Statistics table but for client.
