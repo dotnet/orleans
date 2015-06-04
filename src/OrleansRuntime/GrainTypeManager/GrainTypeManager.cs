@@ -121,7 +121,6 @@ namespace Orleans.Runtime
                                 // Add to lookup tables for next time
                                 var grainClassName = concreteTypeData.GrainClass;
                                 grainTypes.Add(grainClassName, concreteTypeData);
-                                AddToGrainInterfaceToClassMap(concreteTypeData.Type, concreteTypeData.RemoteInterfaceTypes, genericGrainTypeData.IsStatelessWorker);
 
                                 return concreteTypeData;
                             }
