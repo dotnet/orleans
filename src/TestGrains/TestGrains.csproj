@@ -49,6 +49,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GenericGrains.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
@@ -90,13 +91,13 @@
   <Choose>
     <When Condition="'$(builduri)' != ''">
       <PropertyGroup>
-	    <!-- TFS build -->
+        <!-- TFS build -->
         <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
       </PropertyGroup>
     </When>
     <Otherwise>
       <PropertyGroup>
-	    <!-- Visual Studio or MsBuild .sln build -->
+        <!-- Visual Studio or MsBuild .sln build -->
         <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
       </PropertyGroup>
     </Otherwise>
