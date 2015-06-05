@@ -42,7 +42,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void AzureTableErrorCode_IsRetriableHttpError()
         {
             Assert.IsTrue(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 503, null));
@@ -57,7 +57,7 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 200, null));
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void AzureTableErrorCode_IsContentionError()
         {
             Assert.IsTrue(AzureStorageUtils.IsContentionError(HttpStatusCode.PreconditionFailed));
@@ -74,7 +74,7 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(AzureStorageUtils.IsContentionError((HttpStatusCode) 200));
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         [ExpectedException(typeof (ArgumentException))]
         public void AzureTableErrorCode_BadTableName()
         {

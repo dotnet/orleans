@@ -58,14 +58,14 @@ namespace UnitTests.General
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SimpleGrainGetGrain()
         {
             ISimpleGrain grain = GetSimpleGrain();
             int ignored = await grain.GetAxB();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SimpleGrainControlFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
@@ -80,7 +80,7 @@ namespace UnitTests.General
             Assert.AreEqual(6, await intPromise);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SimpleGrainDataFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();

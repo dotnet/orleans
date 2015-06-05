@@ -79,21 +79,21 @@ namespace UnitTests.LivenessTests
 
         // Test methods 
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Liveness"), TestCategory("Azure")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
         public async Task MT_Init_Azure()
         {
             var membership = await GetMemebershipTable_Azure();
             Assert.IsNotNull(membership, "Membership Table handler created");
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Liveness"), TestCategory("Azure")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
         public async Task MT_ReadAll_Azure()
         {
             var membership = await GetMemebershipTable_Azure();
             await MembershipTable_ReadAll(membership);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Liveness"), TestCategory("Azure")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
         public async Task MT_InsertRow_Azure()
         {
             var membership = await GetMemebershipTable_Azure();

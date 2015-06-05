@@ -97,7 +97,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadAll_0()
         {
             MembershipTableData data = await membership.ReadAll();
@@ -113,7 +113,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, ver, "Initial tabel version should be zero");
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadRow_0()
         {
             MembershipTableData data = await membership.ReadRow(siloAddress);
@@ -131,7 +131,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, ver, "Initial tabel version should be zero");
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadRow_1()
         {
             MembershipTableData data = await membership.ReadAll();
@@ -171,7 +171,7 @@ namespace UnitTests.StorageTests
             Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Azure"), TestCategory("Storage")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadAll_1()
         {
             MembershipTableData data = await membership.ReadAll();
