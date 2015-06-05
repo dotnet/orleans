@@ -16,7 +16,6 @@
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -138,3 +137,4 @@
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>
+
