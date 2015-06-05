@@ -45,7 +45,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IGenericGrain.cs" />
     <Compile Include="IGenericInterfaces.cs" />
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
@@ -100,4 +99,3 @@
   </Target> 
   -->
 </Project>
-

@@ -27,8 +27,9 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System.Runtime.CompilerServices;
+using UnitTests.GrainInterfaces;
 
-namespace UnitTests.SampleStreaming
+namespace UnitTests.Grains
 {
     internal class SampleConsumerObserver<T> : IAsyncObserver<T>
     {

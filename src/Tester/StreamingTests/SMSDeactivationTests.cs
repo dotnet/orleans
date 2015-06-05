@@ -29,7 +29,7 @@ using Orleans;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
-namespace Tester.StreamingTests
+namespace UnitTests.StreamingTests
 {
     [DeploymentItem("OrleansConfigurationForStreamingDeactivationUnitTests.xml")]
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]

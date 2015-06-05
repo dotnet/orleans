@@ -26,8 +26,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 
-namespace UnitTestGrainInterfaces.Generic
+namespace UnitTests.GrainInterfaces
 {
+    public interface IGenericGrain<T, U> : IGrainWithIntegerKey
+    {
+        Task SetT(T a);
+        Task<U> MapT2U();
+    }
+
     public interface ISimpleGenericGrain1<T> : IGrainWithIntegerKey
     {
         Task<T> GetA();
@@ -37,7 +43,7 @@ namespace UnitTestGrainInterfaces.Generic
         Task SetB(T b);
     }
 
-    public interface ISimpleGenericGrainU<U> : IGrain
+    public interface ISimpleGenericGrainU<U> : IGrainWithIntegerKey
     {
         Task<U> GetA();
         Task<string> GetAxB();
@@ -46,7 +52,7 @@ namespace UnitTestGrainInterfaces.Generic
         Task SetB(U b);
     }
 
-    public interface ISimpleGenericGrain2<T, in U> : IGrain
+    public interface ISimpleGenericGrain2<T, in U> : IGrainWithIntegerKey
     {
         Task<T> GetA();
         Task<string> GetAxB();
@@ -55,31 +61,31 @@ namespace UnitTestGrainInterfaces.Generic
         Task SetB(U b);
     }
 
-    public interface IGenericGrainWithNoProperties<in T> : IGrain
+    public interface IGenericGrainWithNoProperties<in T> : IGrainWithIntegerKey
     {
         Task<string> GetAxB(T a, T b);
     }
-    public interface IGrainWithNoProperties : IGrain
+    public interface IGrainWithNoProperties : IGrainWithIntegerKey
     {
         Task<string> GetAxB(int a, int b);
     }
 
-    public interface IGrainWithListFields : IGrain
+    public interface IGrainWithListFields : IGrainWithIntegerKey
     {
         Task AddItem(string item);
         Task<IList<string>> GetItems();
     }
-    public interface IGenericGrainWithListFields<T> : IGrain
+    public interface IGenericGrainWithListFields<T> : IGrainWithIntegerKey
     {
         Task AddItem(T item);
         Task<IList<T>> GetItems();
     }
 
-    public interface IGenericReader1<T> : IGrain
+    public interface IGenericReader1<T> : IGrainWithIntegerKey
     {
         Task<T> GetValue();
     }
-    public interface IGenericWriter1<in T> : IGrain
+    public interface IGenericWriter1<in T> : IGrainWithIntegerKey
     {
         Task SetValue(T value);
     }
@@ -87,12 +93,12 @@ namespace UnitTestGrainInterfaces.Generic
     {
     }
 
-    public interface IGenericReader2<TOne,TTwo> : IGrain
+    public interface IGenericReader2<TOne, TTwo> : IGrainWithIntegerKey
     {
         Task<TOne> GetValue1();
         Task<TTwo> GetValue2();
     }
-    public interface IGenericWriter2<in TOne, in TTwo> : IGrain
+    public interface IGenericWriter2<in TOne, in TTwo> : IGrainWithIntegerKey
     {
         Task SetValue1(TOne value);
         Task SetValue2(TTwo value);
@@ -113,7 +119,7 @@ namespace UnitTestGrainInterfaces.Generic
     {
     }
 
-    public interface IGenericSelfManagedGrain<T, U> : IGrain
+    public interface IGenericSelfManagedGrain<T, U> : IGrainWithIntegerKey
     {
         Task<T> GetA();
         Task<string> GetAxB();
@@ -122,7 +128,7 @@ namespace UnitTestGrainInterfaces.Generic
         Task SetB(U b);
     }
 
-    public interface IHubGrain<TKey, T1, T2> : IGrain
+    public interface IHubGrain<TKey, T1, T2> : IGrainWithIntegerKey
     {
         Task Bar(TKey key, T1 message1, T2 message2);
         
@@ -144,28 +150,28 @@ namespace UnitTestGrainInterfaces.Generic
         Task<T> Echo6(T item);
     }
 
-    public interface INonGenericBase : IGrain
+    public interface INonGenericBase : IGrainWithGuidKey
     {
         Task Ping();
     }
 
-    public interface IGeneric1Argument<T> : IGrain
+    public interface IGeneric1Argument<T> : IGrainWithGuidKey
     {
         Task<T> Ping(T t);
     }
 
-    public interface IGeneric2Arguments<T, U> : IGrain
+    public interface IGeneric2Arguments<T, U> : IGrainWithIntegerKey
     {
         Task<Tuple<T, U>> Ping(T t, U u);
     }
 
-    public interface IDbGrain<T> : Orleans.IGrain
+    public interface IDbGrain<T> : IGrainWithIntegerKey
     {
         Task SetValue(T value);
         Task<T> GetValue();
     }
 
-    public interface IGenericPingSelf<T> : IGrain
+    public interface IGenericPingSelf<T> : IGrainWithGuidKey
     {
         Task<T> Ping(T t);
         Task<T> PingSelf(T t);

@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using TestGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
-namespace TestGrains
+namespace UnitTests.Grains
 {
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {

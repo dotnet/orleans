@@ -30,7 +30,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
-namespace Tester.StreamingTests
+namespace UnitTests.StreamingTests
 {
     [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
