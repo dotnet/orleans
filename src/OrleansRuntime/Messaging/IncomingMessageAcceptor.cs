@@ -25,7 +25,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-
 using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
@@ -521,183 +520,25 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
-            private enum ReceivePhase
-            {
-                Lengths,
-                Header,
-                Body,
-                MetaHeader,
-                HeaderBodies
-            }
-
-            private ReceivePhase phase;
-            private byte[] lengthBuffer;
-            private readonly byte[] metaHeaderBuffer;
-            private List<ArraySegment<byte>> lengths;
-            private List<ArraySegment<byte>> header;
-            private List<ArraySegment<byte>> body;
-            private readonly List<ArraySegment<byte>> metaHeader;
-            private List<ArraySegment<byte>> headerBodies;
-            private int headerLength;
-            private int bodyLength;
-            private int[] headerLengths;
-            private int[] bodyLengths;
-            private int headerBodiesLength;
-            private int offset;
-            private readonly bool batchingMode;
-            private int numberOfMessages;
+            private readonly IncomingMessageBuffer _buffer;
 
             public Socket Sock { get; private set; }
             public EndPoint RemoteEndPoint { get; private set; }
             public IncomingMessageAcceptor IMA { get; private set; }
 
-            private List<ArraySegment<byte>> CurrentBuffer
-            {
-                get
-                {
-                    if (batchingMode)
-                    {
-                        switch (phase)
-                        {
-                            case ReceivePhase.MetaHeader:
-                                return metaHeader;
-                            case ReceivePhase.Lengths:
-                                return lengths;
-                            default:
-                                return headerBodies;
-                        }
-                    }
-
-                    switch (phase)
-                    {
-                        case ReceivePhase.Lengths:
-                            return lengths;
-                        case ReceivePhase.Header:
-                            return header;
-                        default:
-                            return body;
-                    }
-                }
-            }
-
-            private int CurrentLength
-            {
-                get
-                {
-                    if (batchingMode)
-                    {
-                        switch (phase)
-                        {
-                            case ReceivePhase.MetaHeader:
-                                return Message.LENGTH_META_HEADER;
-                            case ReceivePhase.Lengths:
-                                if (numberOfMessages == 0)
-                                {
-                                    IMA.Log.Info("Error: numberOfMessages must NOT be 0 here.");
-                                    return 0;
-                                }
-                                return Message.LENGTH_HEADER_SIZE * numberOfMessages;
-                            default:
-                                return headerBodiesLength;
-                        }
-                    }
-
-                    switch (phase)
-                    {
-                        case ReceivePhase.Lengths:
-                            return Message.LENGTH_HEADER_SIZE;
-                        case ReceivePhase.Header:
-                            return headerLength;
-                        default:
-                            return bodyLength;
-                    }
-                }
-            }
-
             public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima)
             {
-                batchingMode = ima.MessageCenter.MessagingConfiguration.UseMessageBatching;
-                if (batchingMode)
-                {
-                    phase = ReceivePhase.MetaHeader;
-                    Sock = sock;
-                    RemoteEndPoint = sock.RemoteEndPoint;
-                    IMA = ima;
-                    metaHeaderBuffer = new byte[Message.LENGTH_META_HEADER];
-                    metaHeader = new List<ArraySegment<byte>>() { new ArraySegment<byte>(metaHeaderBuffer) };
-                    // LengthBuffer and Lengths cannot be allocated here because the sizes varies in response to the number of received messages
-                    lengthBuffer = null;
-                    lengths = null;
-                    header = null;
-                    body = null;
-                    headerBodies = null;
-                    headerLengths = null;
-                    bodyLengths = null;
-                    headerBodiesLength = 0;
-                    numberOfMessages = 0;
-                    offset = 0;
-                }
-                else
-                {
-                    phase = ReceivePhase.Lengths;
-                    Sock = sock;
-                    RemoteEndPoint = sock.RemoteEndPoint;
-                    IMA = ima;
-                    lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
-                    lengths = new List<ArraySegment<byte>>() { new ArraySegment<byte>(lengthBuffer) };
-                    header = null;
-                    body = null;
-                    headerLength = 0;
-                    bodyLength = 0;
-                    offset = 0;
-                }
-            }
-
-            private void Reset()
-            {
-                if (batchingMode)
-                {
-                    phase = ReceivePhase.MetaHeader;
-                    // MetaHeader MUST NOT set to null because it will be re-used.
-                    lengthBuffer = null;
-                    lengths = null;
-                    header = null;
-                    body = null;
-                    headerLengths = null;
-                    bodyLengths = null;
-                    headerBodies = null;
-                    headerBodiesLength = 0;
-                    numberOfMessages = 0;
-                    offset = 0;
-                }
-                else
-                {
-                    phase = ReceivePhase.Lengths;
-                    headerLength = 0;
-                    bodyLength = 0;
-                    offset = 0;
-                    header = null;
-                    body = null;
-                }
-            }
-
-            /// <summary>
-            /// Builds the list of buffer segments to pass to Socket.BeginReceive, based on the total list (CurrentBuffer)
-            /// and how much we've already filled in (Offset). We have to do this because the scatter/gather variant of
-            /// the BeginReceive API doesn't allow you to specify an offset into the list of segments.
-            /// To build the list, we walk through the complete buffer, skipping segments that we've already filled up; 
-            /// add the partial segment for whatever's left in the first unfilled buffer, and then add any remaining buffers.
-            /// </summary>
-            private List<ArraySegment<byte>> BuildSegmentList()
-            {
-                return ByteArrayBuilder.BuildSegmentList(CurrentBuffer, offset);
+                Sock = sock;
+                RemoteEndPoint = sock.RemoteEndPoint;
+                IMA = ima;
+                _buffer = new IncomingMessageBuffer(ima.Log);
             }
 
             public void BeginReceive(AsyncCallback callback)
             {
                 try
                 {
-                    Sock.BeginReceive(BuildSegmentList(), SocketFlags.None, callback, this);
+                    Sock.BeginReceive(_buffer.ReceiveBuffer, SocketFlags.None, callback, this);
                 }
                 catch (Exception ex)
                 {
@@ -713,8 +554,8 @@ namespace Orleans.Runtime.Messaging
 
             public void ProcessReceivedBuffer(int bytes)
             {
-                offset += bytes;
-                if (offset < CurrentLength) return; // Nothing to do except start the next receive
+                if (bytes == 0)
+                    return;
 
 #if TRACK_DETAILED_STATS
                 ThreadTrackingStatistic tracker = null;
@@ -733,103 +574,14 @@ namespace Orleans.Runtime.Messaging
                     tracker.OnStartProcessing();
                 }
 #endif
-
                 try
                 {
-                    if (batchingMode)
+                    _buffer.UpdateReceivedData(bytes);
+
+                    Message msg;
+                    while (_buffer.TryDecodeMessage(out msg))
                     {
-                        switch (phase)
-                        {
-                            case ReceivePhase.MetaHeader:
-                                numberOfMessages = BitConverter.ToInt32(metaHeaderBuffer, 0);
-                                lengthBuffer = new byte[numberOfMessages * Message.LENGTH_HEADER_SIZE];
-                                lengths = new List<ArraySegment<byte>>() { new ArraySegment<byte>(lengthBuffer) };
-                                phase = ReceivePhase.Lengths;
-                                offset = 0;
-                                break;
-
-                            case ReceivePhase.Lengths:
-                                headerBodies = new List<ArraySegment<byte>>();
-                                headerLengths = new int[numberOfMessages];
-                                bodyLengths = new int[numberOfMessages];
-
-                                for (int i = 0; i < numberOfMessages; i++)
-                                {
-                                    headerLengths[i] = BitConverter.ToInt32(lengthBuffer, i * 8);
-                                    bodyLengths[i] = BitConverter.ToInt32(lengthBuffer, i * 8 + 4);
-                                    headerBodiesLength += (headerLengths[i] + bodyLengths[i]);
-
-                                    // We need to set the boundary of ArraySegment<byte>s to the same as the header/body boundary
-                                    headerBodies.AddRange(BufferPool.GlobalPool.GetMultiBuffer(headerLengths[i]));
-                                    headerBodies.AddRange(BufferPool.GlobalPool.GetMultiBuffer(bodyLengths[i]));
-                                }
-
-                                phase = ReceivePhase.HeaderBodies;
-                                offset = 0;
-                                break;
-
-                            case ReceivePhase.HeaderBodies:
-                                int lengtshSoFar = 0;
-
-                                for (int i = 0; i < numberOfMessages; i++)
-                                {
-                                    header = ByteArrayBuilder.BuildSegmentListWithLengthLimit(headerBodies, lengtshSoFar, headerLengths[i]);
-                                    body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(headerBodies, lengtshSoFar + headerLengths[i], bodyLengths[i]);
-                                    lengtshSoFar += (headerLengths[i] + bodyLengths[i]);
-
-                                    var msg = new Message(header, body);
-                                    MessagingStatisticsGroup.OnMessageReceive(msg, headerLengths[i], bodyLengths[i]);
-
-                                    if (IMA.Log.IsVerbose3) IMA.Log.Verbose3("Received a complete message of {0} bytes from {1}", headerLengths[i] + bodyLengths[i], msg.SendingAddress);
-                                    if (headerLengths[i] + bodyLengths[i] > Message.LargeMessageSizeThreshold)
-                                    {
-                                        IMA.Log.Info(ErrorCode.Messaging_LargeMsg_Incoming, "Receiving large message Size={0} HeaderLength={1} BodyLength={2}. Msg={3}",
-                                            headerLengths[i] + bodyLengths[i], headerLengths[i], bodyLengths[i], msg.ToString());
-                                        if (IMA.Log.IsVerbose3) IMA.Log.Verbose3("Received large message {0}", msg.ToLongString());
-                                    }
-                                    IMA.HandleMessage(msg, Sock);
-                                }
-                                MessagingStatisticsGroup.OnMessageBatchReceive(IMA.SocketDirection, numberOfMessages, lengtshSoFar);
-
-                                Reset();
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        // We've completed a buffer. What we do depends on which phase we were in
-                        switch (phase)
-                        {
-                            case ReceivePhase.Lengths:
-                                // Pull out the header and body lengths
-                                headerLength = BitConverter.ToInt32(lengthBuffer, 0);
-                                bodyLength = BitConverter.ToInt32(lengthBuffer, 4);
-                                header = BufferPool.GlobalPool.GetMultiBuffer(headerLength);
-                                body = BufferPool.GlobalPool.GetMultiBuffer(bodyLength);
-                                phase = ReceivePhase.Header;
-                                offset = 0;
-                                break;
-
-                            case ReceivePhase.Header:
-                                phase = ReceivePhase.Body;
-                                offset = 0;
-                                break;
-
-                            case ReceivePhase.Body:
-                                var msg = new Message(header, body);
-                                MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
-
-                                if (IMA.Log.IsVerbose3) IMA.Log.Verbose3("Received a complete message of {0} bytes from {1}", headerLength + bodyLength, msg.SendingAddress);
-                                if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)
-                                {
-                                    IMA.Log.Info(ErrorCode.Messaging_LargeMsg_Incoming, "Receiving large message Size={0} HeaderLength={1} BodyLength={2}. Msg={3}",
-                                        headerLength + bodyLength, headerLength, bodyLength, msg.ToString());
-                                    if (IMA.Log.IsVerbose3) IMA.Log.Verbose3("Received large message {0}", msg.ToLongString());
-                                }
-                                IMA.HandleMessage(msg, Sock);
-                                Reset();
-                                break;
-                        }
+                        IMA.HandleMessage(msg, Sock);
                     }
                 }
                 catch (Exception exc)
@@ -839,15 +591,12 @@ namespace Orleans.Runtime.Messaging
                         // Log details of receive state machine
                         IMA.Log.Error(ErrorCode.MessagingProcessReceiveBufferException,
                             string.Format(
-                            "Exception trying to process {0} bytes from endpoint {1} at offset {2} in phase {3}"
-                            + " CurrentLength={4} HeaderLength={5} BodyLength={6}",
-                                bytes, RemoteEndPoint, offset, phase,
-                                CurrentLength, headerLength, bodyLength
-                            ),
+                            "Exception trying to process {0} bytes from endpoint {1}",
+                                bytes, RemoteEndPoint),
                             exc);
                     }
                     catch (Exception) { }
-                    Reset(); // Reset back to a hopefully good base state
+                    _buffer.Reset(); // Reset back to a hopefully good base state
 
                     throw;
                 }

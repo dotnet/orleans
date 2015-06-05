@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -26,7 +26,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using Orleans.Runtime;
-
+ 
 namespace Orleans.Messaging
 {
     /// <summary>
@@ -35,11 +35,13 @@ namespace Orleans.Messaging
     internal class GatewayClientReceiver : AsynchAgent
     {
         private readonly GatewayConnection gatewayConnection;
+        private readonly IncomingMessageBuffer buffer;
 
         internal GatewayClientReceiver(GatewayConnection gateway)
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
+            buffer = new IncomingMessageBuffer(Log, true); 
         }
 
         protected override void Run()
@@ -58,34 +60,22 @@ namespace Orleans.Messaging
         {
             try
             {
-                var lengths = new byte[Message.LENGTH_HEADER_SIZE];
-                var lengthSegments = new List<ArraySegment<byte>> { new ArraySegment<byte>(lengths) };
-
                 while (!Cts.IsCancellationRequested)
                 {
-                    if (!FillBuffer(lengthSegments, Message.LENGTH_HEADER_SIZE))
+                    int bytesRead = FillBuffer(buffer.ReceiveBuffer);
+                    if (bytesRead == 0)
                     {
                         continue;
                     }
 
-                    var headerLength = BitConverter.ToInt32(lengths, 0);
-                    var header = BufferPool.GlobalPool.GetMultiBuffer(headerLength);
-                    var bodyLength = BitConverter.ToInt32(lengths, 4);
-                    var body = BufferPool.GlobalPool.GetMultiBuffer(bodyLength);
+                    buffer.UpdateReceivedData(bytesRead);
 
-                    if (!FillBuffer(header, headerLength))
+                    Message msg;
+                    while (buffer.TryDecodeMessage(out msg))
                     {
-                        continue;
+                        gatewayConnection.MsgCenter.QueueIncomingMessage(msg);
+                        if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
                     }
-                    if (!FillBuffer(body, bodyLength))
-                    {
-                        continue;
-                    }
-                    var msg = new Message(header, body);
-                    MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
-
-                    if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
-                    gatewayConnection.MsgCenter.QueueIncomingMessage(msg);
                 }
             }
             catch (Exception ex)
@@ -98,6 +88,7 @@ namespace Orleans.Messaging
 
         private void RunBatch()
         {
+            /* Disable batching.  TODO: Remove or fix
             try
             {
                 var metaHeader = new byte[Message.LENGTH_META_HEADER];
@@ -148,6 +139,7 @@ namespace Orleans.Messaging
                         lengthSoFar += (headerLengths[i] + bodyLengths[i]);
 
                         var msg = new Message(header, body);
+
                         MessagingStatisticsGroup.OnMessageReceive(msg, headerLengths[i], bodyLengths[i]);
 
                         if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
@@ -162,8 +154,10 @@ namespace Orleans.Messaging
                     ex, gatewayConnection.Address), ex);
                 throw;
             }
+             */
         }
 
+        /* Disable batching.  TODO: Remove or fix
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private bool FillBuffer(List<ArraySegment<byte>> buffer, int length)
         {
@@ -208,6 +202,42 @@ namespace Orleans.Messaging
                 }
             }
             return true;
+        }
+         */
+
+        private int FillBuffer(List<ArraySegment<byte>> buffer)
+        {
+            Socket socketCapture = null;
+            try
+            {
+                if (gatewayConnection.Socket == null || !gatewayConnection.Socket.Connected)
+                {
+                    gatewayConnection.Connect();
+                }
+                socketCapture = gatewayConnection.Socket;
+                if (socketCapture != null && socketCapture.Connected)
+                {
+                    var bytesRead = socketCapture.Receive(buffer);
+                    if (bytesRead == 0)
+                    {
+                        throw new EndOfStreamException("Socket closed");
+                    }
+                    return bytesRead;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Only try to reconnect if we're not shutting down
+                if (Cts.IsCancellationRequested) return 0;
+
+                if (ex is SocketException)
+                {
+                    Log.Warn(ErrorCode.Runtime_Error_100158, "Exception receiving from gateway " + gatewayConnection.Address);
+                }
+                gatewayConnection.MarkAsDisconnected(socketCapture);
+                return 0;
+            }
+            return 0;
         }
     }
 }

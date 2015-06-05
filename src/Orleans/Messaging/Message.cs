@@ -31,7 +31,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
     internal class Message : IOutgoingMessage
     {
         // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
@@ -425,24 +424,17 @@ namespace Orleans.Runtime
                 {
                     return bodyObject;
                 }
-                if (bodyBytes == null)
-                {
-                    return null;
-                }
                 try
                 {
-                    var stream = new BinaryTokenStreamReader(bodyBytes);
-                    bodyObject = SerializationManager.Deserialize(stream);
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
-                    throw;
+                    bodyObject = DeserializeBody(bodyBytes);
                 }
                 finally
                 {
-                    BufferPool.GlobalPool.Release(bodyBytes);
-                    bodyBytes = null;
+                    if (bodyBytes != null)
+                    {
+                        BufferPool.GlobalPool.Release(bodyBytes);
+                        bodyBytes = null;
+                    }
                 }
                 return bodyObject;
             }
@@ -453,6 +445,24 @@ namespace Orleans.Runtime
 
                 BufferPool.GlobalPool.Release(bodyBytes);
                 bodyBytes = null;
+            }
+        }
+
+        private static object DeserializeBody(List<ArraySegment<byte>> bytes)
+        {
+            if (bytes == null)
+            {
+                return null;
+            }
+            try
+            {
+                var stream = new BinaryTokenStreamReader(bytes);
+                return SerializationManager.Deserialize(stream);
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
+                throw;
             }
         }
 
@@ -472,23 +482,22 @@ namespace Orleans.Runtime
             Direction = subtype;
         }
 
-        internal Message(byte[] header, byte[] body)
-            : this(new List<ArraySegment<byte>> { new ArraySegment<byte>(header) },
-                new List<ArraySegment<byte>> { new ArraySegment<byte>(body) })
-        {
-        }
-
-        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body)
+        // Initializes body and header but does not take ownership of byte.
+        // Caller must clean up bytes
+        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
             metadata = new Dictionary<string, object>();
 
             var input = new BinaryTokenStreamReader(header);
             headers = SerializationManager.DeserializeMessageHeaders(input);
-            BufferPool.GlobalPool.Release(header);
-
-            bodyBytes = body;
-            bodyObject = null;
-            headerBytes = null;
+            if (deserializeBody)
+            {
+                bodyObject = DeserializeBody(body);
+            }
+            else
+            {
+                bodyBytes = body;
+            }
         }
 
         public Message CreateResponseMessage()
