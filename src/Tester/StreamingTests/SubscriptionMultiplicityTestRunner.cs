@@ -30,10 +30,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using TestGrainInterfaces;
-using UnitTests.SampleStreaming;
+using UnitTests.GrainInterfaces;
 
-namespace Tester.StreamingTests
+namespace UnitTests.StreamingTests
 {
     public class SubscriptionMultiplicityTestRunner
     {

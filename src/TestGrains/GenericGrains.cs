@@ -27,9 +27,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using UnitTestGrainInterfaces.Generic;
+using UnitTests.GrainInterfaces;
 
-namespace GenericTestGrains
+namespace UnitTests.Grains
 {
     public interface ISimpleGenericGrainState<T> : IGrainState
     {
@@ -389,7 +389,7 @@ namespace GenericTestGrains
         public async Task<T> Echo(T item)
         {
             long pk = this.GetPrimaryKeyLong();
-            var otherGrain = SimpleGenericGrain1Factory<T>.GetGrain(pk);
+            var otherGrain = GrainFactory.GetGrain<ISimpleGenericGrain1<T>>(pk);
             await otherGrain.SetA(item);
             return await otherGrain.GetA();
         }
@@ -397,14 +397,14 @@ namespace GenericTestGrains
         public async Task<T> Echo2(T item)
         {
             long pk = this.GetPrimaryKeyLong() + 1;
-            var otherGrain = EchoGenericChainGrainFactory<T>.GetGrain(pk);
+            var otherGrain = GrainFactory.GetGrain<IEchoGenericChainGrain<T>>(pk);
             return await otherGrain.Echo(item);
         }
 
         public async Task<T> Echo3(T item)
         {
             long pk = this.GetPrimaryKeyLong() + 1;
-            var otherGrain = EchoGenericChainGrainFactory<T>.GetGrain(pk);
+            var otherGrain = GrainFactory.GetGrain<IEchoGenericChainGrain<T>>(pk);
             return await otherGrain.Echo2(item);
         }
 

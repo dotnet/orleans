@@ -28,10 +28,9 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using TestGrainInterfaces;
-using UnitTests.SampleStreaming;
+using UnitTests.GrainInterfaces;
 
-namespace Tester.StreamingTests
+namespace UnitTests.StreamingTests
 {
     class DeactivationTestRunner
     {

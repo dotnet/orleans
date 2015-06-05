@@ -5,7 +5,7 @@
       <Defaults>
         <Deactivation AgeLimit="1m"/>
       </Defaults>
-      <GrainType Type="TestGrains.MultipleSubscriptionConsumerGrain">
+      <GrainType Type="UnitTests.Grains.MultipleSubscriptionConsumerGrain">
         <Deactivation AgeLimit="2hr"/>
       </GrainType>
     </Application>

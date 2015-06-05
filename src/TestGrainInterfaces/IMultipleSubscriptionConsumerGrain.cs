@@ -27,7 +27,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Streams;
 
-namespace TestGrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public interface IMultipleSubscriptionConsumerGrain : IGrainWithGuidKey
     {

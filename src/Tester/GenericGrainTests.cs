@@ -28,7 +28,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using UnitTestGrainInterfaces.Generic;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -264,7 +263,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_SimpleGrain_GetGrain()
         {
-            var grain = SimpleGenericGrain1Factory<int>.GetGrain(grainId++);
+            var grain = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
             await grain.GetA();
         }
 
@@ -275,7 +274,7 @@ namespace UnitTests.General
             var b = a + 1;
             var expected = a + "x" + b;
 
-            var grain = SimpleGenericGrain1Factory<int>.GetGrain(grainId++);
+            var grain = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
             await grain.SetA(a);
 
@@ -292,7 +291,7 @@ namespace UnitTests.General
             var b = a + 1;
             var expected = a + "x" + b;
 
-            var grain = SimpleGenericGrain1Factory<int>.GetGrain(grainId++);
+            var grain = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
             var setAPromise = grain.SetA(a);
             var setBPromise = grain.SetB(b);
@@ -305,39 +304,12 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_SimpleGrain2_GetGrain()
         {
-            var g1 = SimpleGenericGrain1Factory<int>.GetGrain(grainId++);
-            var g2 = SimpleGenericGrainUFactory<int>.GetGrain(grainId++);
-            var g3 = SimpleGenericGrain2Factory<int, int>.GetGrain(grainId++);
+            var g1 = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var g2 = GrainFactory.GetGrain<ISimpleGenericGrainU<int>>(grainId++);
+            var g3 = GrainFactory.GetGrain<ISimpleGenericGrain2<int, int>>(grainId++);
             await g1.GetA();
             await g2.GetA();
             await g3.GetA();
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Generics")]
-        public async Task Generic_SimpleGrainControlFlow2_SetAB()
-        {
-            var a = random.Next(100);
-            var b = a + 1;
-            var expected = a + "x" + b;
-
-            var g1 = SimpleGenericGrain1Factory<int>.GetGrain(grainId++);
-            var g2 = SimpleGenericGrainUFactory<int>.GetGrain(grainId++);
-            var g3 = SimpleGenericGrain2Factory<int, int>.GetGrain(grainId++);
-
-            await g1.SetA(a);
-            await g2.SetA(a);
-            await g3.SetA(a);
-
-            await g1.SetB(b);
-            await g2.SetB(b);
-            await g3.SetB(b);
-
-            string r1 = await g1.GetAxB();
-            string r2 = await g2.GetAxB();
-            string r3 = await g3.GetAxB();
-            Assert.AreEqual(expected, r1);
-            Assert.AreEqual(expected, r2);
-            Assert.AreEqual(expected, r3);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -347,9 +319,9 @@ namespace UnitTests.General
             var b = a + 1;
             var expected = a + "x" + b;
 
-            var g1 = SimpleGenericGrain1Factory<int>.GetGrain(grainId++);
-            var g2 = SimpleGenericGrainUFactory<int>.GetGrain(grainId++);
-            var g3 = SimpleGenericGrain2Factory<int, int>.GetGrain(grainId++);
+            var g1 = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var g2 = GrainFactory.GetGrain<ISimpleGenericGrainU<int>>(grainId++);
+            var g3 = GrainFactory.GetGrain<ISimpleGenericGrain2<int, int>>(grainId++);
 
             string r1 = await g1.GetAxB(a, b);
             string r2 = await g2.GetAxB(a, b);
@@ -359,19 +331,19 @@ namespace UnitTests.General
             Assert.AreEqual(expected, r3, "Grain 3");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainControlFlow3()
         {
-            ISimpleGenericGrain2<int, float> g = SimpleGenericGrain2Factory<int, float>.GetGrain(grainId++);
+            ISimpleGenericGrain2<int, float> g = GrainFactory.GetGrain<ISimpleGenericGrain2<int, float>>(grainId++);
             await g.SetA(3);
             await g.SetB(1.25f);
             Assert.AreEqual("3x1.25", await g.GetAxB());
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_SelfManagedGrainControlFlow()
         {
-            IGenericSelfManagedGrain<int, float> g = GenericSelfManagedGrainFactory<int, float>.GetGrain(0);
+            IGenericSelfManagedGrain<int, float> g = GrainFactory.GetGrain<IGenericSelfManagedGrain<int, float>>(0);
             await g.SetA(3);
             await g.SetB(1.25f);
             Assert.AreEqual("3x1.25", await g.GetAxB());
@@ -383,7 +355,7 @@ namespace UnitTests.General
             string a = random.Next(100).ToString(CultureInfo.InvariantCulture);
             string b = random.Next(100).ToString(CultureInfo.InvariantCulture);
 
-            var g1 = GrainWithListFieldsFactory.GetGrain(grainId++);
+            var g1 = GrainFactory.GetGrain<IGrainWithListFields>(grainId++);
 
             var p1 = g1.AddItem(a);
             var p2 = g1.AddItem(b);
@@ -402,7 +374,8 @@ namespace UnitTests.General
             int a = random.Next(100);
             int b = random.Next(100);
 
-            var g1 = GenericGrainWithListFieldsFactory<int>.GetGrain(grainId++);
+
+            var g1 = GrainFactory.GetGrain<IGenericGrainWithListFields<int>>(grainId++);
 
             var p1 = g1.AddItem(a);
             var p2 = g1.AddItem(b);
@@ -422,7 +395,7 @@ namespace UnitTests.General
             int b = random.Next(100);
             string expected = a + "x" + b;
 
-            var g1 = GenericGrainWithNoPropertiesFactory<int>.GetGrain(grainId++);
+            var g1 = GrainFactory.GetGrain<IGenericGrainWithNoProperties<int>>(grainId++);
 
             string r1 = await g1.GetAxB(a, b);
             Assert.AreEqual(expected, r1);
@@ -436,7 +409,7 @@ namespace UnitTests.General
             string expected = a + "x" + b;
 
             long grainId = GetRandomGrainId();
-            var g1 = GrainWithNoPropertiesFactory.GetGrain(grainId);
+            var g1 = GrainFactory.GetGrain<IGrainWithNoProperties>(grainId);
 
             string r1 = await g1.GetAxB(a, b);
             Assert.AreEqual(expected, r1);
@@ -446,8 +419,7 @@ namespace UnitTests.General
         public async Task Generic_ReaderWriterGrain1()
         {
             int a = random.Next(100);
-
-            var g = GenericReaderWriterGrain1Factory<int>.GetGrain(grainId++);
+            var g = GrainFactory.GetGrain<IGenericReaderWriterGrain1<int>>(grainId++);
             await g.SetValue(a);
             var res = await g.GetValue();
             Assert.AreEqual(a, res);
@@ -459,7 +431,7 @@ namespace UnitTests.General
             int a = random.Next(100);
             string b = "bbbbb";
 
-            var g = GenericReaderWriterGrain2Factory<int, string>.GetGrain(grainId++);
+            var g = GrainFactory.GetGrain<IGenericReaderWriterGrain2<int, string>>(grainId++);
             await g.SetValue1(a);
             await g.SetValue2(b);
             var r1 = await g.GetValue1();
@@ -475,7 +447,7 @@ namespace UnitTests.General
             string b = "bbbbb";
             double c = 3.145;
 
-            var g = GenericReaderWriterGrain3Factory<int, string, double>.GetGrain(grainId++);
+            var g = GrainFactory.GetGrain<IGenericReaderWriterGrain3<int, string, double>>(grainId++);
             await g.SetValue1(a);
             await g.SetValue2(b);
             await g.SetValue3(c);
@@ -490,9 +462,9 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_Non_Primitive_Type_Argument()
         {
-            IEchoHubGrain<Guid, string> g1 = EchoHubGrainFactory<Guid, string>.GetGrain(1);
-            IEchoHubGrain<Guid, int> g2 = EchoHubGrainFactory<Guid, int>.GetGrain(1);
-            IEchoHubGrain<Guid, byte[]> g3 = EchoHubGrainFactory<Guid, byte[]>.GetGrain(1);
+            IEchoHubGrain<Guid, string> g1 = GrainFactory.GetGrain<IEchoHubGrain<Guid, string>>(1);
+            IEchoHubGrain<Guid, int> g2 = GrainFactory.GetGrain<IEchoHubGrain<Guid, int>>(1);
+            IEchoHubGrain<Guid, byte[]> g3 = GrainFactory.GetGrain<IEchoHubGrain<Guid, byte[]>>(1);
 
             Assert.AreNotEqual((GrainReference) g1, (GrainReference) g2);
             Assert.AreNotEqual((GrainReference) g1, (GrainReference) g3);
@@ -512,7 +484,7 @@ namespace UnitTests.General
         {
             const string msg1 = "Hello from EchoGenericChainGrain-1";
 
-            IEchoGenericChainGrain<string> g1 = EchoGenericChainGrainFactory<string>.GetGrain(GetRandomGrainId());
+            IEchoGenericChainGrain<string> g1 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g1.Echo(msg1);
             Assert.AreEqual(msg1, received, "Echo");
@@ -523,7 +495,7 @@ namespace UnitTests.General
         {
             const string msg2 = "Hello from EchoGenericChainGrain-2";
 
-            IEchoGenericChainGrain<string> g2 = EchoGenericChainGrainFactory<string>.GetGrain(GetRandomGrainId());
+            IEchoGenericChainGrain<string> g2 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g2.Echo2(msg2);
             Assert.AreEqual(msg2, received, "Echo");
@@ -534,7 +506,7 @@ namespace UnitTests.General
         {
             const string msg3 = "Hello from EchoGenericChainGrain-3";
 
-            IEchoGenericChainGrain<string> g3 = EchoGenericChainGrainFactory<string>.GetGrain(GetRandomGrainId());
+            IEchoGenericChainGrain<string> g3 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g3.Echo3(msg3);
             Assert.AreEqual(msg3, received, "Echo");
@@ -577,7 +549,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_1Argument_GenericCallOnly()
         {
-            var grain = Generic1ArgumentFactory<string>.GetGrain(Guid.NewGuid(), "GenericTestGrains.Generic1ArgumentGrain");
+            var grain = GrainFactory.GetGrain<IGeneric1Argument<string>>(Guid.NewGuid(), "UnitTests.Grains.Generic1ArgumentGrain");
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.Ping(s1);
             Assert.AreEqual(s1, s2);
@@ -588,7 +560,7 @@ namespace UnitTests.General
         public async Task Generic_1Argument_NonGenericCallFirst()
         {
             var id = Guid.NewGuid();
-            var nonGenericFacet = NonGenericBaseFactory.GetGrain(id, "GenericTestGrains.Generic1ArgumentGrain");
+            var nonGenericFacet = GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             try
             {
                 await nonGenericFacet.Ping();
@@ -604,11 +576,11 @@ namespace UnitTests.General
         public async Task Generic_1Argument_GenericCallFirst()
         {
             var id = Guid.NewGuid();
-            var grain = Generic1ArgumentFactory<string>.GetGrain(id, "GenericTestGrains.Generic1ArgumentGrain");
+            var grain = GrainFactory.GetGrain<IGeneric1Argument<string>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.Ping(s1);
             Assert.AreEqual(s1, s2);
-            var nonGenericFacet = NonGenericBaseFactory.GetGrain(id, "GenericTestGrains.Generic1ArgumentGrain");
+            var nonGenericFacet = GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             try
             {
                 await nonGenericFacet.Ping();
@@ -622,10 +594,10 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("Generics")]
         public async Task DifferentTypeArgsProduceIndependentActivations()
         {
-            var grain1 = DbGrainFactory<int>.GetGrain(0);
+            var grain1 = GrainFactory.GetGrain<IDbGrain<int>>(0);
             await grain1.SetValue(123);
 
-            var grain2 = DbGrainFactory<string>.GetGrain(0);
+            var grain2 = GrainFactory.GetGrain<IDbGrain<string>>(0);
             var v = await grain2.GetValue();
             Assert.IsNull(v);
         }
@@ -634,7 +606,7 @@ namespace UnitTests.General
         public async Task Generic_CastToSelf()
         {
             var id = Guid.NewGuid();
-            var g = Generic1ArgumentFactory<string>.GetGrain(id, "GenericTestGrains.Generic1ArgumentGrain");
+            var g = GrainFactory.GetGrain<IGeneric1Argument<string>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             var grain = Generic1ArgumentFactory<string>.Cast(g);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.Ping(s1);
@@ -645,7 +617,7 @@ namespace UnitTests.General
         public async Task Generic_PingSelf()
         {
             var id = Guid.NewGuid();
-            var grain = GenericPingSelfFactory<string>.GetGrain(id);
+            var grain = GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.PingSelf(s1);
             Assert.AreEqual(s1, s2);
@@ -656,8 +628,8 @@ namespace UnitTests.General
         {
             var id = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-            var grain = GenericPingSelfFactory<string>.GetGrain(id);
-            var target = GenericPingSelfFactory<string>.GetGrain(targetId);
+            var grain = GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
+            var target = GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.PingOther(target, s1);
             Assert.AreEqual(s1, s2);
@@ -668,8 +640,8 @@ namespace UnitTests.General
         {
             var id = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-            var grain = GenericPingSelfFactory<string>.GetGrain(id);
-            var target = GenericPingSelfFactory<string>.GetGrain(targetId);
+            var grain = GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
+            var target = GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.PingSelfThroughOther(target, s1);
             Assert.AreEqual(s1, s2);
@@ -680,8 +652,8 @@ namespace UnitTests.General
         {
             var id = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-            var grain = GenericPingSelfFactory<string>.GetGrain(id);
-            var target = GenericPingSelfFactory<string>.GetGrain(targetId);
+            var grain = GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
+            var target = GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             await grain.ScheduleDelayedPingToSelfAndDeactivate(target, s1, TimeSpan.FromSeconds(5));
             await Task.Delay(TimeSpan.FromSeconds(6));
