@@ -10,7 +10,7 @@ The grain type we define will have one property that returns a reference to the 
 We will create three separate pieces of code: the grain interface definition, the grain implementation, and a standard C# class that uses the grain. 
 Each of these belongs in a different project, built into a different DLL: the interface needs to be available on both the "client" and "server" sides, while the implementation class should be hidden from the client, and the client class from the server.
 
-The interface project should be created using the Visual Studio "Orleans Grain Interface Project" template that is included in the Orleans SDK, and the grain implementation project should be created using the Visual Studio "Orleans Grain Implementation Class Project" template. 
+The interface project should be created using the Visual Studio "Orleans Grain Interface Collection" template that is included in the Orleans SDK, and the grain implementation project should be created using the Visual Studio "Orleans Grain Class Collection" template. 
 The grain client project can use any standard .NET code project template, such as the standard Console Application or Class Library templates.
 
 A grain cannot be explicitly created or deleted. 
