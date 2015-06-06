@@ -26,7 +26,7 @@ if "%PRODUCT_VERSION%" == "" (
 
   if EXIST "%VERSION%" (
       @Echo Using version number from file %VERSION%
-      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type %VERSION%`) do set VERSION=%%i.%%j.%%k
+      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION%"`) do set VERSION=%%i.%%j.%%k
   ) else (
       @Echo ERROR: Unable to read version number from file %VERSION%
       GOTO Usage
@@ -53,5 +53,6 @@ GOTO EOF
 :Usage
 @ECHO Usage:
 @ECHO    CreateOrleansPackages ^<Path to Orleans SDK folder^> ^<VersionFile^>
+EXIT /B -1
 
 :EOF
