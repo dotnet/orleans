@@ -1036,6 +1036,10 @@ namespace Orleans
 
         StreamProviderBase = Runtime + 3600,
         StreamProvider_FailedToUnsubscribeFromPubSub = StreamProviderBase + 1,
+
+        AzureServiceRuntimeWrapper = Runtime + 3700,
+        AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper +1,
+        AzureServiceRuntime_FailedToLoad    = AzureServiceRuntimeWrapper +2,
     }
 }
 // ReSharper restore InconsistentNaming

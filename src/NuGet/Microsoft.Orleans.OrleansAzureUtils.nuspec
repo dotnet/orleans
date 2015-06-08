@@ -23,8 +23,6 @@
 	  
       <dependency id="WindowsAzure.Storage" version="4.2.0.0" />
       <dependency id="Microsoft.WindowsAzure.ConfigurationManager" version="2.0.0.0" />
-            
-      <dependency id="Unofficial.Microsoft.WindowsAzure.ServiceRuntime" version="2.4.0.0" />
     </dependencies>
   </metadata>
   <files>
