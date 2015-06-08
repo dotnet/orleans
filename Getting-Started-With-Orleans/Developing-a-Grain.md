@@ -66,7 +66,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     // Game the player is currently in. May be null. 
     public Task<IGameGrain> GetCurrentGameAsync()
     { 
-       return TaskDone<IGameGrain>.Finished(currentGame);
+       return Task.FromResult(currentGame);
     } 
 
     // Game grain calls this method to notify that the player has joined the game. 
