@@ -5,7 +5,7 @@ title: Client Observers
 {% include JB/setup %}
 
 There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications. 
-For example, a user might want to be notified when a new message has been published by someone that she is following.
+For example, a user might want to be notified when a new instant message has been published by a friend.
 
 Client observers is a mechanism that allows notifying clients asynchronously. 
 An observer is a one-way asynchronous interface that inherits from `IGrainObserver`, and all its methods must be void. 

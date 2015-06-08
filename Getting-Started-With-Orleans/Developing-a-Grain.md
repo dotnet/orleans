@@ -44,7 +44,7 @@ public interface IPlayerGrain : IGrain
 
 ## Generating the Class Factory
 
-After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate client proxy and factory classes corresponding to the user-defined grain interfaces, and to merge this additional code back into the interface DLL. 
+After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate a client proxy and factory classes corresponding to the user-defined grain interfaces and to merge this additional code back into the interface DLL. 
 The code generation tool, _ClientGenerator.exe_, can also be invoked directly as a part of post-build processing. 
 However this should be used with caution and is generally not recommended.
 

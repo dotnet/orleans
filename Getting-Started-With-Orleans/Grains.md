@@ -11,7 +11,7 @@ Grains are the atomic units of isolation, distribution, and persistence.
 A grain encapsulates state and behavior, like any .NET object. 
 A grain is a logical entity that at any point in time may have zero or more (usually not more than one) in-memory replicas called activations. 
 A grain may exist only in the persistent store with no in-memory replicas if there are no requests pending for the grain. 
-When there is work for the grain, the run-time will create an activation of the grain by picking a server and instantiating there the .NET class that implements the behavior of the grain. 
+When there is work for the grain, the run-time will create an activation of the grain by picking a server and instantiating on that server the .NET class that implements the behavior of the grain. 
 
 Orleans controls the process of activating and deactivating grains. 
 This process is transparent to the developer: when coding a grain, a developer should assume that any other grains that the current grain will interact with are activated. 
