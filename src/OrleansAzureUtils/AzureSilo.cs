@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Threading;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
@@ -119,8 +120,8 @@ namespace Orleans.Runtime.Host
                 host = new SiloHost(instanceName, config); // Use supplied config data + Initializes logger configurations
             }
 
-            var myEndpoint = serviceRuntimeWrapper.GetEndpoint(SiloEndpointConfigurationKeyName);
-            var proxyEndpoint = serviceRuntimeWrapper.GetEndpoint(ProxyEndpointConfigurationKeyName);
+            IPEndPoint myEndpoint = serviceRuntimeWrapper.GetIPEndpoint(SiloEndpointConfigurationKeyName);
+            IPEndPoint proxyEndpoint = serviceRuntimeWrapper.GetIPEndpoint(ProxyEndpointConfigurationKeyName);
 
             host.SetSiloType(Silo.SiloType.Secondary);
 

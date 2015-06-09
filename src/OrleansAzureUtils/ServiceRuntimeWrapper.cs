@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="endpointName">Name of the IP endpoint</param>
         /// <returns></returns>
-        IPEndPoint GetEndpoint(string endpointName);
+        IPEndPoint GetIPEndpoint(string endpointName);
 
         /// <summary>
         /// Returns value of the given configuration setting
@@ -166,7 +166,7 @@ namespace Orleans.Runtime.Host
             return list;
         }
 
-        public IPEndPoint GetEndpoint(string endpointName)
+        public IPEndPoint GetIPEndpoint(string endpointName)
         {
             try
             {
