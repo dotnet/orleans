@@ -26,7 +26,7 @@ The **runtime behavior perspective** is that an object can only be created withi
 
 The **modeling perspective**: there are four kinds of "things" in your Orleans-based application: communication interfaces, message payloads, grains, and data held privately by grains. Objects should be used for payloads and data held by grains; communication interfaces are regular interfaces with some minor restrictions. The question that remains, then, is what entities in a given system should be modeled as grains?
 
-Generally, you should use a grain to model an independent entity which has a publicly exposed communication interface with other components of the system and that has a life of its own – that is, it can exist independently from other components. For example, user in social network is a grain, while its name is not. User’s news wall may be a grain, while the list of the messages it received is not (since the wall is accessible by other users, while the list of messages is a private data to that user only).” Hopefully, the samples on this site will help you identify some of the patterns and see parallels to your own scenarios.
+Generally, you should use a grain to model an independent entity which has a publicly exposed communication interface with other components of the system and that has a life of its own – that is, it can exist independently from other components. For example, a user in social network is a grain, while it's name is not. A user’s news wall may be a grain, while the list of the messages it received is not (since the wall is accessible by other users, while the list of messages is a private data to that user only). Hopefully, the samples on this site will help you identify some of the patterns and see parallels to your own scenarios.
 
 ## How should you avoid grain hot spots?
 
@@ -36,7 +36,7 @@ For example, if a grain is an aggregator of some counters or statistics that are
 
 ## How do I tear down a grain?
 
-In general there is no need for application logic to force deactivation of a grain, as the Orleans runtime automatically detects and deactivates idle activations of a grain to reclaim system resources. In rare cases when you think you do need to expedite deactivation of a grain, the grain can do that by calling base.DeactivateOnIdle() method. 
+In general there is no need for application logic to force deactivation of a grain, as the Orleans runtime automatically detects and deactivates idle activations of a grain to reclaim system resources. In rare cases when you think you do need to expedite deactivation of a grain, the grain can do that by calling the `base.DeactivateOnIdle()` method. 
 
 ## Can I tell Orleans where to activate a grain?
 
