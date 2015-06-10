@@ -27,43 +27,42 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Host;
 using Orleans.TestingHost;
 
 
 namespace UnitTests.StorageTests
 {
     /// <summary>
-    /// Tests for operation of Orleans SiloInstanceManager using AzureStore - Requires access to external Azure storage
+    /// Tests for operation of Orleans SiloInstanceManager using ZookeeperStore - Requires access to external Zookeeper storage
     /// </summary>
     [TestClass]
-    public class AzureMembershipTableTests
+    public class ZookeeperMembershipTableTests
     {
         public TestContext TestContext { get; set; }
 
         private string deploymentId;
         private int generation;
         private SiloAddress siloAddress;
-        private AzureBasedMembershipTable membership;
+        private IMembershipTable membership;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
         private readonly TraceLogger logger;
 
-        public AzureMembershipTableTests()
+        //this is because mstest doesn't copy the referenced dll if not used in the project
+#pragma warning disable 169
+        private static readonly ZooKeeperBasedMembershipTable hackToMakeCopy = null;
+#pragma warning restore 169
+
+        public ZookeeperMembershipTableTests()
         {
-            logger = TraceLogger.GetLogger("AzureMembershipTableTests", TraceLogger.LoggerType.Application);
+            logger = TraceLogger.GetLogger("ZookeeperMembershipTableTests", TraceLogger.LoggerType.Application);
         }
 
         // Use ClassInitialize to run code before running the first test in the class
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
         {
-            TraceLogger.Initialize(new NodeConfiguration());
-
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if(!StorageEmulator.TryStart())
-            {
-                Console.WriteLine("Azure Storage Emulator could not be started.");
-            }            
+            TraceLogger.Initialize(new NodeConfiguration());        
         }
 
         // Use TestInitialize to run code before running each test 
@@ -79,10 +78,9 @@ namespace UnitTests.StorageTests
             GlobalConfiguration config = new GlobalConfiguration
             {
                 DeploymentId = deploymentId,
-                DataConnectionString = StorageTestConstants.DataConnectionString
+                DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString()
             };
-
-            membership = new AzureBasedMembershipTable();
+            membership = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>("OrleansZooKeeperUtils.dll", logger);
             membership.InitializeMembershipTable(config, true, logger).WaitWithThrow(timeout);
         }
 
@@ -97,8 +95,8 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
-        public async Task AzureMembership_ReadAll_0()
+        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
+        public async Task ZookeeperMembership_ReadAll_0()
         {
             MembershipTableData data = await membership.ReadAll();
             TableVersion tableVersion = data.Version;
@@ -113,8 +111,8 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, ver, "Initial tabel version should be zero");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
-        public async Task AzureMembership_ReadRow_0()
+        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
+        public async Task ZookeeperMembership_ReadRow_0()
         {
             MembershipTableData data = await membership.ReadRow(siloAddress);
             TableVersion tableVersion = data.Version;
@@ -131,8 +129,8 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, ver, "Initial tabel version should be zero");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
-        public async Task AzureMembership_ReadRow_1()
+        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
+        public async Task ZookeeperMembership_ReadRow_1()
         {
             MembershipTableData data = await membership.ReadAll();
             TableVersion tableVersion = data.Version;
@@ -171,8 +169,8 @@ namespace UnitTests.StorageTests
             Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
-        public async Task AzureMembership_ReadAll_1()
+        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
+        public async Task ZookeeperMembership_ReadAll_1()
         {
             MembershipTableData data = await membership.ReadAll();
             TableVersion tableVersion = data.Version;

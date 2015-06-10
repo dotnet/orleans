@@ -168,6 +168,10 @@ namespace Orleans.Runtime.Configuration
                 {
                     Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
                 }
+                else if (Globals.UseZooKeeperSystemStore)
+                {
+                    Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
+                }
                 else
                 {
                     Globals.LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;

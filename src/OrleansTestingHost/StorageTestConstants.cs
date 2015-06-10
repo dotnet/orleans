@@ -141,5 +141,10 @@ namespace Orleans.TestingHost
                 Console.WriteLine("DB file is writeable {0}", dbFile.FullName);
             }
         }
+
+        public static string GetZooKeeperConnectionString()
+        {
+            return "127.0.0.1:2181";
+        }
     }
 }

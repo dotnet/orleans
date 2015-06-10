@@ -36,35 +36,30 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class SqlMembershipTable : IMembershipTable, IGatewayListProvider
     {
-        private readonly string deploymentId;
-        private readonly string connectionString;
-        private readonly TimeSpan maxStaleness;
+        private string deploymentId;
+        private string connectionString;
+        private TimeSpan maxStaleness;
 
-        private SqlMembershipTable(GlobalConfiguration config)
+        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
         {
             deploymentId = config.DeploymentId;
             connectionString = config.DataConnectionString;
-        }
-
-        public static async Task<SqlMembershipTable> GetMembershipTable(GlobalConfiguration config, bool tryInitTableVersion)
-        {
-            var table = new SqlMembershipTable(config);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
             // so we always have a first table version row, before this silo starts working.
             if (tryInitTableVersion)
             {
-                await table.InitTable();
+                await InitTable();
             }
-            return table;
         }
 
-        public SqlMembershipTable(ClientConfiguration config)
+        public Task InitializeGatewayListProvider(ClientConfiguration config, TraceLogger traceLogger)
         {
             deploymentId = config.DeploymentId;
             connectionString = config.DataConnectionString;
             maxStaleness = config.GatewayListRefreshPeriod;
+            return TaskDone.Done;
         }
 
         public TimeSpan MaxStaleness
@@ -201,7 +196,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        internal async Task DeleteMembershipTableEntries(string deployId)
+        public async Task DeleteMembershipTableEntries(string deployId)
         {
             using (var conn = new SqlConnection(connectionString))
             {

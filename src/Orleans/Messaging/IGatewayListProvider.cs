@@ -23,14 +23,23 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Messaging
 {
     /// <summary>
     /// Interface that provides Orleans gateways information.
     /// </summary>
-    internal interface IGatewayListProvider
+    public interface IGatewayListProvider
     {
+        /// <summary>
+        /// Initializes the provider, will be called before all other methods
+        /// </summary>
+        /// <param name="clientConfiguration">the given client configuration</param>
+        /// <param name="traceLogger">the logger to be used by the provider</param>
+        Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, TraceLogger traceLogger);
         /// <summary>
         /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
         /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.

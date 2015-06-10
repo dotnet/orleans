@@ -135,6 +135,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Chocolatey", "Chocolatey", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTestingHost", "OrleansTestingHost\OrleansTestingHost.csproj", "{40EE3B00-D381-485F-9C69-FF706837DEED}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansZooKeeperUtils", "OrleansZooKeeperUtils\OrleansZooKeeperUtils.csproj", "{45918DD2-53D9-4B27-BC6B-17C197DBC645}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -193,6 +195,10 @@ Global
 		{40EE3B00-D381-485F-9C69-FF706837DEED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{40EE3B00-D381-485F-9C69-FF706837DEED}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{40EE3B00-D381-485F-9C69-FF706837DEED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45918DD2-53D9-4B27-BC6B-17C197DBC645}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45918DD2-53D9-4B27-BC6B-17C197DBC645}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45918DD2-53D9-4B27-BC6B-17C197DBC645}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45918DD2-53D9-4B27-BC6B-17C197DBC645}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

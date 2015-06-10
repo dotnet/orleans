@@ -34,7 +34,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// The Utils class contains a variety of utility methods for use in application and grain code.
     /// </summary>
-    internal static class Utils
+    public static class Utils
     {
         /// <summary>
         /// Returns a human-readable text string that describes an IEnumerable collection of objects.

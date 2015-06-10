@@ -35,22 +35,14 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class AzureBasedMembershipTable : IMembershipTable
     {
-        private readonly TraceLogger logger;
+        private TraceLogger logger;
         private OrleansSiloInstanceManager tableManager;
 
-        private AzureBasedMembershipTable()
+        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
         {
-            logger = TraceLogger.GetLogger("AzureSiloMembershipTable", TraceLogger.LoggerType.Runtime);
-        }
-
-        public static async Task<AzureBasedMembershipTable> GetMembershipTable(
-            GlobalConfiguration config, bool tryInitTableVersion)
-        {
-            var table = new AzureBasedMembershipTable
-            {
-                tableManager = await OrleansSiloInstanceManager.GetManager(
-                    config.DeploymentId, config.DataConnectionString)
-            };
+            logger = traceLogger;
+            tableManager = await OrleansSiloInstanceManager.GetManager(
+                config.DeploymentId, config.DataConnectionString);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
@@ -58,10 +50,9 @@ namespace Orleans.Runtime.MembershipService
             if (tryInitTableVersion)
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
-                bool created = await table.tableManager.TryCreateTableVersionEntryAsync().WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
-                if(created) table.logger.Info("Created new table version row.");
+                bool created = await tableManager.TryCreateTableVersionEntryAsync().WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+                if(created) logger.Info("Created new table version row.");
             }
-            return table;
         }
 
         public Task DeleteMembershipTableEntries(string deploymentId)

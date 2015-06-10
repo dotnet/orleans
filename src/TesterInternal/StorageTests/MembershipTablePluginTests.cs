@@ -41,6 +41,7 @@ namespace UnitTests.LivenessTests
         public TestContext TestContext { get; set; }
         private static int counter;
         private static string hostName;
+        private static readonly TraceLogger logger = TraceLogger.GetLogger("MembershipTablePluginTests");
 
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
@@ -121,6 +122,27 @@ namespace UnitTests.LivenessTests
             await MembershipTable_InsertRow(membership);
         }
 
+        [TestMethod, TestCategory("Liveness"), TestCategory("ZooKeeper")]
+        public async Task MT_Init_ZooKeeper()
+        {
+            var membership = await GetMembershipTable_ZooKeeper();
+            Assert.IsNotNull(membership, "Membership Table handler created");
+        }
+
+        [TestMethod, TestCategory("Liveness"), TestCategory("ZooKeeper")]
+        public async Task MT_ReadAll_ZooKeeper()
+        {
+            var membership = await GetMembershipTable_ZooKeeper();
+            await MembershipTable_ReadAll(membership);
+        }
+
+        [TestMethod, TestCategory("Liveness"), TestCategory("ZooKeeper")]
+        public async Task MT_InsertRow_ZooKeeper()
+        {
+            var membership = await GetMembershipTable_ZooKeeper();
+            await MembershipTable_InsertRow(membership);
+        }
+
         // Test function methods
 
         private async Task<IMembershipTable> GetMemebershipTable_Azure()
@@ -131,6 +153,11 @@ namespace UnitTests.LivenessTests
         private async Task<IMembershipTable> GetMemebershipTable_SQL()
         {
             return await GetMembershipTable(GlobalConfiguration.LivenessProviderType.SqlServer);
+        }
+
+        private async Task<IMembershipTable> GetMembershipTable_ZooKeeper()
+        {
+            return await GetMembershipTable(GlobalConfiguration.LivenessProviderType.ZooKeeper);
         }
 
 
@@ -189,18 +216,24 @@ namespace UnitTests.LivenessTests
             {
                 case GlobalConfiguration.LivenessProviderType.AzureTable:
                     config.DataConnectionString = StorageTestConstants.DataConnectionString;
-                    membership = await AzureBasedMembershipTable.GetMembershipTable(config, true);
+                    membership = new AzureBasedMembershipTable();
                     break;
 
                 case GlobalConfiguration.LivenessProviderType.SqlServer:
                     config.DataConnectionString = StorageTestConstants.GetSqlConnectionString(TestContext.DeploymentDirectory);
-                    membership = await SqlMembershipTable.GetMembershipTable(config, true);
+                    membership = new SqlMembershipTable();
+                    break;
+
+                case GlobalConfiguration.LivenessProviderType.ZooKeeper:
+                    config.DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString();
+                    membership = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>("OrleansZooKeeperUtils.dll",logger);
                     break;
 
                 default:
                     throw new NotImplementedException(membershipType.ToString());
             }
 
+            await membership.InitializeMembershipTable(config, true, TraceLogger.GetLogger(membership.GetType().Name));
             return membership;
         }
     }
