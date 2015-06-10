@@ -79,6 +79,11 @@ namespace Orleans.Runtime.MembershipService
                 {
                     membershipTable = new AzureBasedMembershipTable();
                 }
+                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.ZooKeeper))
+                {
+                    membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
+                        "OrleansZooKeeperUtils.dll", logger);
+                }
                 else
                 {
                     throw new NotImplementedException("No membership table provider found for LivenessType=" +
