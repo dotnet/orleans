@@ -116,9 +116,9 @@ namespace Orleans.Runtime.Host
         private MethodInfo stoppingEventAdd;
         private MethodInfo stoppingEventRemove;
         private Type roleInstanceType;
-        private object currentRoleInstance;
-        private object instanceEndpoints;
-        private object role;
+        private dynamic currentRoleInstance;
+        private dynamic instanceEndpoints;
+        private dynamic role;
 
 
         public ServiceRuntimeWrapper()
@@ -147,22 +147,18 @@ namespace Orleans.Runtime.Host
         {
             get
             {
-                var instances = role.GetType().GetProperty("Instances").GetValue(role);
-                return (int) instances.GetType().GetProperty("Count").GetValue(instances);
+                dynamic instances = role.Instances;
+                return instances.Count;
             }
         }
 
         public IList<string> GetAllSiloInstanceNames()
         {
-            var instances = role.GetType().GetProperty("Instances").GetValue(role);
+            dynamic instances = role.Instances;
             var list = new List<string>();
-            var count = (int)instances.GetType().GetProperty("Count").GetValue(instances);
-            for (int i = 0; i < count; i++)
-            {
-                var instance = instances.GetType().GetProperty("Item")
-                    .GetMethod.Invoke(instances, new object[] { i });
-                list.Add((string) instance.GetType().GetProperty("Id").GetValue(instance));
-            }
+            foreach(dynamic instance in instances)
+                list.Add(instance.Id);
+            
             return list;
         }
 
@@ -170,10 +166,10 @@ namespace Orleans.Runtime.Host
         {
             try
             {
-                var ep = instanceEndpoints.GetType()
+                dynamic ep = instanceEndpoints.GetType()
                     .GetProperty("Item")
                     .GetMethod.Invoke(instanceEndpoints, new object[] {endpointName});
-                return (IPEndPoint)ep.GetType().GetProperty("IPEndpoint").GetValue(ep);
+                return ep.IPEndpoint;
             }
             catch (Exception exc)
             {
@@ -206,7 +202,7 @@ namespace Orleans.Runtime.Host
 
         private void Initialize()
         {
-            assembly  = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(
+            assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(
                 a => a.FullName.StartsWith("Microsoft.WindowsAzure.ServiceRuntime"));
 
             // If we are runing within a worker role Microsoft.WindowsAzure.ServiceRuntime should already be loaded
@@ -244,12 +240,12 @@ namespace Orleans.Runtime.Host
             if (currentRoleInstance == null)
                 throw new OrleansException("CurrentRoleInstance is null.");
 
-            InstanceId = (string) roleInstanceType.GetProperty("Id").GetValue(currentRoleInstance);
-            UpdateDomain = (int)roleInstanceType.GetProperty("UpdateDomain").GetValue(currentRoleInstance);
-            FaultDomain = (int)roleInstanceType.GetProperty("FaultDomain").GetValue(currentRoleInstance);
-            instanceEndpoints = roleInstanceType.GetProperty("InstanceEndpoints").GetValue(currentRoleInstance);
-            role = roleInstanceType.GetProperty("Role").GetValue(currentRoleInstance);
-            RoleName = (string) role.GetType().GetProperty("Name").GetValue(role);
+            InstanceId = currentRoleInstance.Id;
+            UpdateDomain = currentRoleInstance.UpdateDomain;
+            FaultDomain = currentRoleInstance.FaultDomain;
+            instanceEndpoints = currentRoleInstance.InstanceEndpoints;
+            role = currentRoleInstance.Role;
+            RoleName = role.Name;
         }
     }
 }
