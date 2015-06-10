@@ -122,6 +122,19 @@ namespace Orleans.CodeGeneration
 
         public static GrainInterfaceData FromGrainClass(Type grainType, Language language)
         {
+            IEnumerable<string> grainViolations;
+            IEnumerable<string> systemTargetViolations;
+            if (!TypeUtils.IsConcreteGrainClass(grainType, out grainViolations, true) &&
+                !TypeUtils.IsSystemTargetClass(grainType, out systemTargetViolations, true))
+            {
+                List<string> violations = new List<string>();
+                if (grainViolations != null)
+                    violations.AddRange(grainViolations);
+                else if (systemTargetViolations != null)
+                    violations.AddRange(systemTargetViolations);
+
+                throw new RulesViolationException(String.Format("{0} implements IGrain but is not a concrete Grain Class (Hint: Extend the base Grain or Grain<T> class).", grainType.FullName), violations);
+            }
             var gi = new GrainInterfaceData(language) { Type = grainType };
             gi.DefineClassNames(false);
             return gi;
@@ -141,7 +154,7 @@ namespace Orleans.CodeGeneration
             return typeof (IAddressable).IsAssignableFrom(t);
         }
 
-        public static bool IsGrainReference(Type t)
+        public static bool IsAddressable(Type t)
         {
             return typeof(IAddressable).IsAssignableFrom(t);
         }

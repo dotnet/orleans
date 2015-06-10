@@ -310,10 +310,20 @@ namespace Orleans.Runtime
             return !IsGeneratedType(type);
         }
 
-        public static bool IsSystemTargetClass(Type type)
+        internal static bool IsSystemTargetClass(Type type)
+        {
+            IEnumerable<string> violations;
+            return IsSystemTargetClass(type, out violations, false);
+        }
+
+        public static bool IsSystemTargetClass(Type type, out IEnumerable<string> violations, bool complain)
         {
             Type systemTargetType;
-            if (!TryResolveType("Orleans.Runtime.SystemTarget", out systemTargetType)) return false; 
+            violations = null;
+            if (!TryResolveType("Orleans.Runtime.SystemTarget", out systemTargetType)) {
+                //no need to add violation here, since it might be a Grain (or will be caught by the corresponding violation)
+                return false;
+            }
 
             var systemTargetInterfaceType = typeof(ISystemTarget);
             var systemTargetBaseInterfaceType = typeof(ISystemTargetBase);
@@ -324,22 +334,47 @@ namespace Orleans.Runtime
                 systemTargetBaseInterfaceType = ToReflectionOnlyType(systemTargetBaseInterfaceType);
             }
 
-            if (!systemTargetInterfaceType.IsAssignableFrom(type) || 
-                !systemTargetBaseInterfaceType.IsAssignableFrom(type) || 
-                !systemTargetType.IsAssignableFrom(type)) return false;
+            if (!systemTargetInterfaceType.IsAssignableFrom(type) ||
+                !systemTargetBaseInterfaceType.IsAssignableFrom(type) ||
+                !systemTargetType.IsAssignableFrom(type))
+            {
+                if (complain)
+                {
+                    violations = new string[] { String.Format("Class {0} extends IGrain but is not a concrete Grain class or a System Target. Hint: Extend from base Grain or Grain<T>.", type.FullName) };
+                }
+                return false;
+            }
 
             // exclude generated classes.
-            return !IsGeneratedType(type);
+            if (IsGeneratedType(type))
+            {
+                if (complain)
+                {
+                    violations = new string[] { String.Format("Ignoring {0}, as it is an auto-generated class.", type.FullName) };
+                }
+                return false;
+            }
+            return true;
         }
 
         public static bool IsConcreteGrainClass(Type type, out IEnumerable<string> complaints, bool complain)
         {
-            complaints = null;
-            if (!IsGrainClass(type)) return false;
-            if (!type.IsAbstract) return true;
+            var violations = new List<String>();
+            bool success = true;
+            if (!IsGrainClass(type))
+            {
+                violations.Add(string.Format("Class {0} extends IGrain but is not a concrete Grain class. Hint: Extend from base Grain or Grain<T>", type.FullName));
+                success = false;
+            }
 
-            complaints = complain ? new [] { string.Format("Grain type {0} is abstract and cannot be instantiated.", type.FullName) } : null;
-            return false;
+            if (type.IsAbstract)
+            {
+                violations.Add(string.Format("Grain type {0} is abstract and cannot be instantiated.", type.FullName));
+                success = false;
+            }
+
+            complaints = complain && !success ? violations.AsEnumerable() : null;
+            return success;
         }
 
         public static bool IsConcreteGrainClass(Type type, out IEnumerable<string> complaints)
