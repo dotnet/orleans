@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Messaging;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
 
@@ -34,26 +35,16 @@ namespace Orleans.AzureUtils
     internal class AzureGatewayListProvider : IGatewayListProvider
     {
         private OrleansSiloInstanceManager siloInstanceManager;
-        private readonly ClientConfiguration config;
-        private readonly object lockable;
-
-        private AzureGatewayListProvider(ClientConfiguration conf)
-        {
-            config = conf;
-            lockable = new object();
-        }
-
-        public static async Task<AzureGatewayListProvider> GetAzureGatewayListProvider(ClientConfiguration conf)
-        {
-            var provider = new AzureGatewayListProvider(conf)
-            {
-                siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString)
-            };
-            return provider;
-        }
+        private ClientConfiguration config;
+        private readonly object lockable = new object();
 
         #region Implementation of IGatewayListProvider
 
+        public async Task InitializeGatewayListProvider(ClientConfiguration conf, TraceLogger traceLogger)
+        {
+            config = conf;
+            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString);
+        }
         // no caching
         public IList<Uri> GetGateways()
         {

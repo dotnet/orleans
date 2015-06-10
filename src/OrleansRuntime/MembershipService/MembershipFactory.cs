@@ -66,20 +66,27 @@ namespace Orleans.Runtime.MembershipService
             GlobalConfiguration.LivenessProviderType livenessType = config.LivenessType;
             if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
             {
-                membershipTable = GrainFactory.Cast<IMembershipTable>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
-            }
-            else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
-            {
-                membershipTable = await SqlMembershipTable.GetMembershipTable(config, true);
-            }
-            else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
-            {
-                membershipTable = await AzureBasedMembershipTable.GetMembershipTable(config, true);
+                membershipTable =
+                    GrainFactory.Cast<IMembershipTable>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
             }
             else
             {
-                throw new NotImplementedException("No membership table provider found for LivenessType=" + livenessType);
+                if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
+                {
+                    membershipTable = new SqlMembershipTable();
+                }
+                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
+                {
+                    membershipTable = new AzureBasedMembershipTable();
+                }
+                else
+                {
+                    throw new NotImplementedException("No membership table provider found for LivenessType=" +
+                                                      livenessType);
+                }
+                await membershipTable.InitializeMembershipTable(config, true, TraceLogger.GetLogger(membershipTable.GetType().Name));
             }
+
             return membershipTable;
         }
     }

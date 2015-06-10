@@ -21,8 +21,10 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -31,6 +33,16 @@ namespace Orleans.Runtime.MembershipService
     {
         private InMemoryMembershipTable table;
         private TraceLogger logger;
+
+        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
+        {
+            throw new InvalidOperationException("This method should not be called directly");
+        }
+
+        public Task DeleteMembershipTableEntries(string deploymentId)
+        {
+            throw new InvalidOperationException("This method should not be called directly");
+        }
 
         public override Task OnActivateAsync()
         {

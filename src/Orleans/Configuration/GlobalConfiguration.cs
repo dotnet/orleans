@@ -573,7 +573,10 @@ namespace Orleans.Runtime.Configuration
                             if (!"None".Equals(sst, StringComparison.InvariantCultureIgnoreCase))
                             {
                                 LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
-                                SetReminderServiceType((ReminderServiceProviderType)Enum.Parse(typeof(ReminderServiceProviderType), sst));
+                                ReminderServiceProviderType reminderServiceProviderType;
+                                SetReminderServiceType(Enum.TryParse(sst, out reminderServiceProviderType)
+                                    ? reminderServiceProviderType
+                                    : ReminderServiceProviderType.ReminderTableGrain);
                             }
                         }
                         if (child.HasAttribute("ServiceId"))

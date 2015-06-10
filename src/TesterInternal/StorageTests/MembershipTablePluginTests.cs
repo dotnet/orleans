@@ -41,6 +41,7 @@ namespace UnitTests.LivenessTests
         public TestContext TestContext { get; set; }
         private static int counter;
         private static string hostName;
+        private static readonly TraceLogger logger = TraceLogger.GetLogger("MembershipTablePluginTests");
 
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
@@ -189,18 +190,19 @@ namespace UnitTests.LivenessTests
             {
                 case GlobalConfiguration.LivenessProviderType.AzureTable:
                     config.DataConnectionString = StorageTestConstants.DataConnectionString;
-                    membership = await AzureBasedMembershipTable.GetMembershipTable(config, true);
+                    membership = new AzureBasedMembershipTable();
                     break;
 
                 case GlobalConfiguration.LivenessProviderType.SqlServer:
                     config.DataConnectionString = StorageTestConstants.GetSqlConnectionString(TestContext.DeploymentDirectory);
-                    membership = await SqlMembershipTable.GetMembershipTable(config, true);
+                    membership = new SqlMembershipTable();
                     break;
 
                 default:
                     throw new NotImplementedException(membershipType.ToString());
             }
 
+            await membership.InitializeMembershipTable(config, true, TraceLogger.GetLogger(membership.GetType().Name));
             return membership;
         }
     }

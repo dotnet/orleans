@@ -102,6 +102,37 @@ namespace Orleans.Runtime
             return discoveredAssemblyLocations;
         }
 
+        public static T LoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        {
+            var exeRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var dirs = new Dictionary<string, SearchOption>
+            {
+                {exeRoot, SearchOption.TopDirectoryOnly}
+            };
+
+            AssemblyLoaderPathNameCriterion[] includeCriteria =
+            {
+                AssemblyLoaderCriteria.IncludeFileNames(new[] {assemblyName})
+            };
+            AssemblyLoaderReflectionCriterion[] loadCriteria =
+            {
+                AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof (T))
+            };
+
+            var discoveredAssemblyLocations = LoadAssemblies(dirs, includeCriteria, loadCriteria, logger);
+
+            if (discoveredAssemblyLocations.Count == 0)
+                throw new TypeLoadException("Type " + typeof(T).Name + " wasn't found");
+
+            if (discoveredAssemblyLocations.Count > 1)
+                throw new TypeLoadException("Type " + typeof(T).Name + " was found more than once");
+
+            var foundType =
+                TypeUtils.GetTypes(discoveredAssemblyLocations, type => typeof(T).IsAssignableFrom(type)).First();
+
+            return (T)Activator.CreateInstance(foundType, true);
+        }
+
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
         // process-- not the actual loading of assemblies.
         internal static AssemblyLoader NewAssemblyLoader(

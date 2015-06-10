@@ -27,6 +27,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
@@ -34,8 +35,21 @@ namespace Orleans
     /// Interface for Membership Table.
     /// </summary>
     [Unordered]
-    internal interface IMembershipTable : IGrain
+    public interface IMembershipTable : IGrain
     {
+        /// <summary>
+        /// Initializes the membership table, will be called before all other methods
+        /// </summary>
+        /// <param name="globalConfiguration">the give global configuration</param>
+        /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
+        /// <param name="traceLogger">the logger used by the membership table</param>
+        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion, TraceLogger traceLogger);
+
+        /// <summary>
+        /// Deletes all table entries of the given deploymentId
+        /// </summary>
+        Task DeleteMembershipTableEntries(string deploymentId);
+
         /// <summary>
         /// Atomically reads the Membership Table information about a given silo.
         /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
@@ -108,7 +122,7 @@ namespace Orleans
     
     [Serializable]
     [Immutable]
-    internal class TableVersion
+    public class TableVersion
     {
         /// <summary>
         /// The version part of this TableVersion. Monotonically increasing number.
@@ -138,7 +152,7 @@ namespace Orleans
     }
 
     [Serializable]
-    internal class MembershipTableData
+    public class MembershipTableData
     {
         public IReadOnlyList<Tuple<MembershipEntry, string>> Members { get; private set; }
 
@@ -231,7 +245,7 @@ namespace Orleans
     }
 
     [Serializable]
-    internal class MembershipEntry
+    public class MembershipEntry
     {
         public SiloAddress SiloAddress { get; set; }
 

@@ -82,8 +82,8 @@ namespace UnitTests.StorageTests
                 DataConnectionString = StorageTestConstants.DataConnectionString
             };
 
-            membership = AzureBasedMembershipTable.GetMembershipTable(config, true)
-                .WaitForResultWithThrow(timeout);
+            membership = new AzureBasedMembershipTable();
+            membership.InitializeMembershipTable(config, true, logger).WaitWithThrow(timeout);
         }
 
         // Use TestCleanup to run code after each test has run

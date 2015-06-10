@@ -45,6 +45,7 @@ namespace Orleans.Runtime.Configuration
             None,               // 
             AzureTable,         // use Azure, requires SystemStore element
             SqlServer,          // use SQL, requires SystemStore element
+            ZooKeeper,          // use ZooKeeper, requires SystemStore element
             Config              // use Config based static list, requires Config element(s)
         }
 
