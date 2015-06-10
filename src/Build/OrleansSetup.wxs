@@ -89,7 +89,6 @@
                 <File Id="File_SE_CounterControl.exe" Name="CounterControl.exe" Source="$(var.SDK_binaries_server_src)\CounterControl.exe" />
                 <File Id="File_SE_CounterControl.exe.config" Name="CounterControl.exe.config" Source="$(var.SDK_binaries_server_src)\CounterControl.exe.config" />
                 <File Id="File_SE_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
-                <File Id="File_SE_Microsoft.WindowsAzure.ServiceRuntime.dll" Name="Microsoft.WindowsAzure.ServiceRuntime.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.ServiceRuntime.dll" />
                 <File Id="File_SE_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Storage.dll" />
                 <File Id="File_SE_Microsoft.Data.Edm.dll" Name="Microsoft.Data.Edm.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Edm.dll" />
                 <File Id="File_SE_Microsoft.Data.OData.dll" Name="Microsoft.Data.OData.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.OData.dll" />
@@ -137,7 +136,6 @@
           <Directory Id="SDK_LocalSilo" Name="LocalSilo">
             <Component Id="Comp_LocalSilo" DiskId="1" Guid="3a1adaef-360a-4dfa-9924-3451201688c6">
               <File Id="File_LS_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
-              <File Id="File_LS_Microsoft.WindowsAzure.ServiceRuntime.dll" Name="Microsoft.WindowsAzure.ServiceRuntime.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.ServiceRuntime.dll" />
               <File Id="File_LS_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Storage.dll" />
               <File Id="File_LS_Microsoft.Data.Edm.dll" Name="Microsoft.Data.Edm.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Edm.dll" />
               <File Id="File_LS_Microsoft.Data.OData.dll" Name="Microsoft.Data.OData.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.OData.dll" />

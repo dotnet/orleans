@@ -25,8 +25,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
-using Microsoft.WindowsAzure.ServiceRuntime;
-
 using Orleans.Runtime.Configuration;
 
 
@@ -37,6 +35,8 @@ namespace Orleans.Runtime.Host
     /// </summary>
     public static class AzureClient
     {
+        private static readonly IServiceRuntimeWrapper serviceRuntimeWrapper = new ServiceRuntimeWrapper();
+
         /// <summary>Number of retry attempts to make when searching for gateway silos to connect to.</summary>
         public static readonly int MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
         /// <summary>Amount of time to pause before each retry attempt.</summary>
@@ -136,7 +136,7 @@ namespace Orleans.Runtime.Host
                 config.DataConnectionString = GetDataConnectionString();
                 config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
             }
-            catch (RoleEnvironmentException ex)
+            catch (Exception ex)
             {
                 var msg = string.Format("ERROR: No AzureClient role setting value '{0}' specified for this role -- unable to continue", AzureConstants.DataConnectionConfigurationSettingName);
                 Trace.TraceError(msg);
@@ -148,14 +148,14 @@ namespace Orleans.Runtime.Host
 
         private static string GetDeploymentId()
         {
-            return GrainClient.TestOnlyNoConnect ? "FakeDeploymentId" : RoleEnvironment.DeploymentId;
+            return GrainClient.TestOnlyNoConnect ? "FakeDeploymentId" : serviceRuntimeWrapper.DeploymentId;
         }
 
         private static string GetDataConnectionString()
         {
             return GrainClient.TestOnlyNoConnect
                 ? "FakeConnectionString"
-                : RoleEnvironment.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
+                : serviceRuntimeWrapper.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
         }
 
         private static void InitializeImpl_FromConfig(ClientConfiguration config)

@@ -75,10 +75,6 @@
     <Reference Include="Microsoft.WindowsAzure.Configuration">
       <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.WindowsAzure.ServiceRuntime">
-      <Private>True</Private>
-      <HintPath>..\packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.4.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
-    </Reference>
     <Reference Include="Microsoft.WindowsAzure.Storage">
       <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
     </Reference>
@@ -208,7 +204,6 @@
     <Compile Include="Core\InsideGrainClient.cs" />
     <Compile Include="GrainTypeManager\TypeManager.cs" />
     <Compile Include="Silo\Watchdog.cs" />
-    <Compile Include="Streams\QueueBalancer\AzureDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\BestFitBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\StaticClusterDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\ConsistentRingQueueBalancer.cs" />
@@ -238,13 +233,13 @@
   <Choose>
     <When Condition="'$(builduri)' != ''">
       <PropertyGroup>
-	    <!-- TFS build -->
+        <!-- TFS build -->
         <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
       </PropertyGroup>
     </When>
     <Otherwise>
       <PropertyGroup>
-	    <!-- Visual Studio or MsBuild .sln build -->
+        <!-- Visual Studio or MsBuild .sln build -->
         <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
       </PropertyGroup>
     </Otherwise>
@@ -252,4 +247,3 @@
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>
-

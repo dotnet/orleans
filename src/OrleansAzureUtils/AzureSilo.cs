@@ -24,9 +24,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Threading;
-using Microsoft.WindowsAzure.ServiceRuntime;
-
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 
@@ -68,6 +67,7 @@ namespace Orleans.Runtime.Host
         private OrleansSiloInstanceManager siloInstanceManager;
         private SiloInstanceTableEntry myEntry;
         private readonly TraceLogger logger;
+        private readonly IServiceRuntimeWrapper serviceRuntimeWrapper = new ServiceRuntimeWrapper();
 
         /// <summary>
         /// Constructor
@@ -92,40 +92,21 @@ namespace Orleans.Runtime.Host
         /// <returns><c>true</c> is the silo startup was successfull</returns>
         public bool Start()
         {
-            return Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance, null);
+            return Start(null);
         }
 
         /// <summary>
         /// Initialize this Orleans silo for execution with the specified Azure deploymentId and role instance
         /// </summary>
-        /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
-        /// <param name="myRoleInstance">Azure role instance info this silo is running under</param>
-        /// <returns><c>true</c> is the silo startup was successfull</returns>
-        public bool Start(string deploymentId, RoleInstance myRoleInstance)
-        {
-            return Start(deploymentId, myRoleInstance, null);
-        }
-
-        /// <summary>
-        /// Initialize this Orleans silo for execution with the specified Azure deploymentId and role instance
-        /// </summary>
-        /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
-        /// <param name="myRoleInstance">Azure role instance info this silo is running under</param>
         /// <param name="config">If null, Config data will be read from silo config file as normal, otherwise use the specified config data.</param>
         /// <returns><c>true</c> is the silo startup was successfull</returns>
-        public bool Start(string deploymentId, RoleInstance myRoleInstance, ClusterConfiguration config)
+        public bool Start(ClusterConfiguration config)
         {
-            if (string.IsNullOrWhiteSpace(deploymentId))
-                throw new ArgumentException("deploymentId is null or whitespace", "deploymentId");
-            
-            if (myRoleInstance == null)
-                throw new ArgumentException("myRoleInstance is null", "myRoleInstance");
-            
             // Program ident
             Trace.TraceInformation("Starting {0} v{1}", this.GetType().FullName, RuntimeVersion.Current);
 
             // Read endpoint info for this instance from Azure config
-            string instanceName = AzureConfigUtils.GetInstanceName(myRoleInstance);
+            string instanceName = serviceRuntimeWrapper.InstanceName;
 
             // Configure this Orleans silo instance
 
@@ -139,8 +120,8 @@ namespace Orleans.Runtime.Host
                 host = new SiloHost(instanceName, config); // Use supplied config data + Initializes logger configurations
             }
 
-            RoleInstanceEndpoint myEndpoint = GetEndpointInfo(myRoleInstance, SiloEndpointConfigurationKeyName);
-            RoleInstanceEndpoint proxyEndpoint = GetEndpointInfo(myRoleInstance, ProxyEndpointConfigurationKeyName);
+            IPEndPoint myEndpoint = serviceRuntimeWrapper.GetIPEndpoint(SiloEndpointConfigurationKeyName);
+            IPEndPoint proxyEndpoint = serviceRuntimeWrapper.GetIPEndpoint(ProxyEndpointConfigurationKeyName);
 
             host.SetSiloType(Silo.SiloType.Secondary);
 
@@ -150,29 +131,29 @@ namespace Orleans.Runtime.Host
 
             myEntry = new SiloInstanceTableEntry
             {
-                DeploymentId = deploymentId,
-                Address = myEndpoint.IPEndpoint.Address.ToString(),
-                Port = myEndpoint.IPEndpoint.Port.ToString(CultureInfo.InvariantCulture),
+                DeploymentId = serviceRuntimeWrapper.DeploymentId,
+                Address = myEndpoint.Address.ToString(),
+                Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
                 Generation = generation.ToString(CultureInfo.InvariantCulture),
 
                 HostName = host.Config.GetConfigurationForNode(host.Name).DNSHostName,
-                ProxyPort = (proxyEndpoint != null ? proxyEndpoint.IPEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
+                ProxyPort = (proxyEndpoint != null ? proxyEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
 
-                RoleName = myRoleInstance.Role.Name, 
+                RoleName = serviceRuntimeWrapper.RoleName, 
                 InstanceName = instanceName,
-                UpdateZone = myRoleInstance.UpdateDomain.ToString(CultureInfo.InvariantCulture),
-                FaultZone = myRoleInstance.FaultDomain.ToString(CultureInfo.InvariantCulture),
+                UpdateZone = serviceRuntimeWrapper.UpdateDomain.ToString(CultureInfo.InvariantCulture),
+                FaultZone = serviceRuntimeWrapper.FaultDomain.ToString(CultureInfo.InvariantCulture),
                 StartTime = TraceLogger.PrintDate(DateTime.UtcNow),
 
-                PartitionKey = deploymentId,
-                RowKey = myEndpoint.IPEndpoint.Address + "-" + myEndpoint.IPEndpoint.Port + "-" + generation
+                PartitionKey = serviceRuntimeWrapper.DeploymentId,
+                RowKey = myEndpoint.Address + "-" + myEndpoint.Port + "-" + generation
             };
 
-            var connectionString = RoleEnvironment.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+            var connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
             try
             {
                 siloInstanceManager = OrleansSiloInstanceManager.GetManager(
-                    deploymentId, connectionString).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
+                    serviceRuntimeWrapper.DeploymentId, connectionString).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
             }
             catch (Exception exc)
             {
@@ -186,33 +167,17 @@ namespace Orleans.Runtime.Host
             // Always use Azure table for membership when running silo in Azure
             host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
             host.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
-            host.SetExpectedClusterSize(RoleEnvironment.CurrentRoleInstance.Role.Instances.Count);
+            host.SetExpectedClusterSize(serviceRuntimeWrapper.RoleInstanceCount);
             siloInstanceManager.RegisterSiloInstance(myEntry);
 
             // Initialise this Orleans silo instance
-            host.SetDeploymentId(deploymentId, connectionString);
-            host.SetSiloEndpoint(myEndpoint.IPEndpoint, generation);
-            host.SetProxyEndpoint(proxyEndpoint.IPEndpoint);
+            host.SetDeploymentId(serviceRuntimeWrapper.DeploymentId, connectionString);
+            host.SetSiloEndpoint(myEndpoint, generation);
+            host.SetProxyEndpoint(proxyEndpoint);
 
             host.InitializeOrleansSilo();
             logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", host.Name, host.Type);
             return StartSilo();
-        }
-
-        private RoleInstanceEndpoint GetEndpointInfo(RoleInstance roleInstance, string endpointName)
-        {
-            try
-            {
-                return roleInstance.InstanceEndpoints[endpointName];
-            }
-            catch (Exception exc)
-            {
-                var errorMsg = string.Format("Unable to obtain endpoint info for role {0} from role config parameter {1} -- Endpoints defined = [{2}]",
-                    roleInstance.Role.Name, endpointName, string.Join(", ", roleInstance.InstanceEndpoints)); 
-
-                logger.Error(ErrorCode.SiloEndpointConfigError, errorMsg, exc);
-                throw new OrleansException(errorMsg, exc);
-            }
         }
 
         /// <summary>
@@ -241,7 +206,7 @@ namespace Orleans.Runtime.Host
         public void Stop()
         {
             logger.Info(ErrorCode.Runtime_Error_100290, "Stopping {0}", this.GetType().FullName);
-            RoleEnvironment.Stopping -= HandleAzureRoleStopping;
+            serviceRuntimeWrapper.UnsubscribeFromStoppingNotifcation(this, HandleAzureRoleStopping);
             host.ShutdownOrleansSilo();
             logger.Info(ErrorCode.Runtime_Error_100291, "Orleans silo '{0}' shutdown.", host.Name);
         }
@@ -262,7 +227,7 @@ namespace Orleans.Runtime.Host
             return ok;
         }
 
-        private void HandleAzureRoleStopping(object sender, RoleEnvironmentStoppingEventArgs e)
+        private void HandleAzureRoleStopping(object sender, object e)
         {
             // Try to perform gracefull shutdown of Silo when we detect Azure role instance is being stopped
             logger.Info(ErrorCode.SiloStopping, "HandleAzureRoleStopping - starting to shutdown silo");
@@ -283,7 +248,7 @@ namespace Orleans.Runtime.Host
 			logger.Info(ErrorCode.Runtime_Error_100289, "OrleansAzureHost entry point called");
 
 			// Hook up to receive notification of Azure role stopping events
-			RoleEnvironment.Stopping += HandleAzureRoleStopping;
+            serviceRuntimeWrapper.SubscribeForStoppingNotifcation(this, HandleAzureRoleStopping);
 
 			if (host.IsStarted)
 			{

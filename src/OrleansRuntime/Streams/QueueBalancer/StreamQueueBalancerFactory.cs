@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Reflection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -80,8 +81,10 @@ namespace Orleans.Streams
                 }
                 case StreamQueueBalancerType.AzureDeploymentBalancer:
                 {
-                    IDeploymentConfiguration deploymentConfiguration = new AzureDeploymentConfiguration();
-                    return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper);
+                    var azureUtils = Assembly.Load("OrleansAzureUtils, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133");
+                    var type = azureUtils.GetType("Orleans.Runtime.Host.ServiceRuntimeWrapper");
+                    var wrapper = (IDeploymentConfiguration)Activator.CreateInstance(type);
+                    return new DeploymentBasedQueueBalancer(siloStatusOracle, wrapper, queueMapper);
                 }
                 case StreamQueueBalancerType.StaticClusterDeploymentBalancer:
                 {
