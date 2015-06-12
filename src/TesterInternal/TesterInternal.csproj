@@ -84,6 +84,10 @@
     <Compile Include="StorageTests\ZookeeperMembershipTableTests.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.csproj">
+      <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
+      <Name>OrleansAzureUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
@@ -160,4 +164,3 @@ call "$(SolutionDir)Build\PostBuild.cmd"
   </Target>
   -->
 </Project>
-

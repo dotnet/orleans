@@ -27,6 +27,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 
@@ -41,6 +42,9 @@ namespace Orleans.Runtime.MembershipService
         public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
         {
             logger = traceLogger;
+            AzureTableDefaultPolicies.MaxBusyRetries = config.MaxStorageBusyRetries;
+            TraceLogger.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
+
             tableManager = await OrleansSiloInstanceManager.GetManager(
                 config.DeploymentId, config.DataConnectionString);
 

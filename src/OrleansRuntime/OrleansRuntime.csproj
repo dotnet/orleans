@@ -63,27 +63,9 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Data.Edm">
-      <HintPath>..\packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.OData">
-      <HintPath>..\packages\Microsoft.Data.OData.5.6.0\lib\net40\Microsoft.Data.OData.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.Services.Client">
-      <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Configuration">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Spatial">
-      <HintPath>..\packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
-    </Reference>
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
@@ -134,12 +116,10 @@
     <Compile Include="ReminderService\SqlReminderTable.cs" />
     <Compile Include="Scheduler\TaskSchedulerUtils.cs" />
     <Compile Include="Silo\SiloProviderRuntime.cs" />
-    <Compile Include="ReminderService\AzureBasedReminderTable.cs" />
     <Compile Include="ReminderService\GrainBasedReminderTable.cs" />
     <Compile Include="ReminderService\InMemoryRemindersTable.cs" />
     <Compile Include="ReminderService\LocalReminderService.cs" />
     <Compile Include="ReminderService\LocalReminderServiceFactory.cs" />
-    <Compile Include="ReminderService\RemindersTableManager.cs" />
     <Compile Include="ReminderService\ReminderTable.cs" />
     <Compile Include="Placement\DeploymentLoadPublisher.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
@@ -166,7 +146,6 @@
     <Compile Include="GrainTypeManager\AssemblyLoaderUtils.cs" />
     <Compile Include="GrainDirectory\ClientObserverRegistrar.cs" />
     <Compile Include="GrainTypeManager\GrainTypeManager.cs" />
-    <Compile Include="MembershipService\AzureBasedMembershipTable.cs" />
     <Compile Include="MembershipService\GrainBasedMembershipTable.cs" />
     <Compile Include="MembershipService\MembershipFactory.cs" />
     <Compile Include="MembershipService\MembershipOracle.cs" />
@@ -221,7 +200,6 @@
     <None Include="..\Orleans.snk">
       <Link>Orleans.snk</Link>
     </None>
-    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

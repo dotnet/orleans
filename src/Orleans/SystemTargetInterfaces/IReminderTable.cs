@@ -38,7 +38,7 @@ namespace Orleans
     [Unordered]
     internal interface IReminderTable : IGrainWithIntegerKey
     {
-        Task Init();
+        Task Init(Guid serviceId, string deploymentId, string connectionString);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 

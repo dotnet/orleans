@@ -23,7 +23,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using Orleans.Providers;
 
@@ -76,11 +75,11 @@ namespace Orleans.Runtime
             else if (config.UseAzureSystemStore)
             {
                 // Hook up to publish client metrics to Azure storage table
-                var publisher = await ClientMetricsTableDataManager.GetManager(config, transport.MyAddress.Endpoint.Address, clientId);
-                tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats)
-                {
-                    MetricsTableWriteInterval = config.StatisticsMetricsTableWriteInterval
-                };
+                //var publisher = await ClientMetricsTableDataManager.GetManager(config, transport.MyAddress.Endpoint.Address, clientId);
+                //tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats)
+                //{
+                //    MetricsTableWriteInterval = config.StatisticsMetricsTableWriteInterval
+                //};
             }
 
             // Configure Statistics
@@ -93,9 +92,9 @@ namespace Orleans.Runtime
                 }
                 else if (config.UseAzureSystemStore)
                 {
-                    var statsDataPublisher = await StatsTableDataManager.GetManager(false, config.DataConnectionString, config.DeploymentId,
-                        transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
-                    logStatistics.StatsTablePublisher = statsDataPublisher;
+                    //var statsDataPublisher = await StatsTableDataManager.GetManager(false, config.DataConnectionString, config.DeploymentId,
+                    //    transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
+                    //logStatistics.StatsTablePublisher = statsDataPublisher;
                 }
             }
             logStatistics.Start();

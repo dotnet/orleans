@@ -71,27 +71,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.Data.Edm">
-      <HintPath>..\packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.OData">
-      <HintPath>..\packages\Microsoft.Data.OData.5.6.0\lib\net40\Microsoft.Data.OData.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.Services.Client">
-      <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Configuration">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Management" />
-    <Reference Include="System.Spatial">
-      <HintPath>..\packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
-    </Reference>
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -103,15 +85,6 @@
     <Compile Include="Async\AsyncPipeline.cs" />
     <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
     <Compile Include="Async\TaskExtensions.cs" />
-    <Compile Include="AzureUtils\AzureQueueDataManager.cs" />
-    <Compile Include="AzureUtils\AzureGatewayListProvider.cs" />
-    <Compile Include="AzureUtils\AzureStorageUtils.cs" />
-    <Compile Include="AzureUtils\AzureTableDefaultPolicies.cs" />
-    <Compile Include="AzureUtils\ClientMetricsTableDataManager.cs" />
-    <Compile Include="AzureUtils\AzureTableDataManager.cs" />
-    <Compile Include="AzureUtils\StatsTableDataManager.cs" />
-    <Compile Include="AzureUtils\OrleansSiloInstanceManager.cs" />
-    <Compile Include="AzureUtils\SiloMetricsTableDataManager.cs" />
     <Compile Include="CodeGeneration\GrainState.cs" />
     <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
     <Compile Include="CodeGeneration\Language.cs" />
@@ -415,7 +388,7 @@
     <Message Text="CodeGenToolSources extracted: $(CodeGenToolSources)" Importance="high" />
     <!-- Compile orleans dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for boot strap" Importance="high" />
-    <csc Sources="@(Compile)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(CodeGenToolReferences);$(SolutionDir)packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll" DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN" KeyFile="$(AssemblyOriginatorKeyFile)" TargetType="$(OutputType)" />
+    <csc Sources="@(Compile)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(CodeGenToolReferences)" DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN" KeyFile="$(AssemblyOriginatorKeyFile)" TargetType="$(OutputType)" />
     <!-- Compile codegen tool exe -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans codegen tool for BootStrap" Importance="high" />
     <csc Sources="$(CodeGenToolSources)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(CodeGenToolReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" DefineConstants="$(DefineConstants);CLIENTGEN_PROJECT" KeyFile="$(AssemblyOriginatorKeyFile)" />
@@ -451,4 +424,3 @@
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')" />
   </Target>
 </Project>
-

@@ -222,7 +222,21 @@ namespace Orleans.AzureUtils
         public List<Uri> FindAllGatewayProxyEndpoints()
         {
             IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = FindAllGatewaySilos();
-            return gatewaySiloInstances.Select(gateway => gateway.ToGatewayUri()).ToList();
+            return gatewaySiloInstances.Select(ToGatewayUri).ToList();
+        }
+
+        /// <summary>
+        /// Represent a silo instance entry in the gateway URI format.
+        /// </summary>
+        /// <param name="address">The input silo instance</param>
+        /// <returns></returns>
+        private static Uri ToGatewayUri(SiloInstanceTableEntry gateway)
+        {
+            int proxyPort = 0;
+            if (!string.IsNullOrEmpty(gateway.ProxyPort))
+                int.TryParse(gateway.ProxyPort, out proxyPort);
+
+            return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", gateway.Address, proxyPort, gateway.Generation));
         }
 
         private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()
