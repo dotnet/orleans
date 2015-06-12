@@ -75,6 +75,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.OrleansManager.nuspec = NuGet\Microsoft.Orleans.OrleansManager.nuspec
 		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
 		NuGet\Microsoft.Orleans.OrleansRuntime.nuspec = NuGet\Microsoft.Orleans.OrleansRuntime.nuspec
+		NuGet\Microsoft.Orleans.OrleansZooKeeperUtils.nuspec = NuGet\Microsoft.Orleans.OrleansZooKeeperUtils.nuspec
 		NuGet\Microsoft.Orleans.Server.nuspec = NuGet\Microsoft.Orleans.Server.nuspec
 		NuGet\Microsoft.Orleans.Templates.Grains.nuspec = NuGet\Microsoft.Orleans.Templates.Grains.nuspec
 		NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec = NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec
@@ -207,4 +208,3 @@ Global
 		{0BB483EF-6401-424C-9C4F-5750B300C7FD} = {DD5D35C0-A5FE-41CC-A10D-CAAA37996479}
 	EndGlobalSection
 EndGlobal
-
