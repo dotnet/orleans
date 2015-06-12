@@ -36,7 +36,6 @@ using Orleans.Providers;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using Orleans.Storage;
-using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Collections.Concurrent;
 
@@ -66,7 +65,7 @@ namespace Orleans
         private GrainInterfaceMap grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
-        private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+        private static readonly TimeSpan initTimeout = TimeSpan.FromSeconds(10);
 
         private const string BARS = "----------";
 

@@ -28,7 +28,6 @@ using System.Linq;
 using System.Text;
 using System.Net;
 using System.Xml;
-using Orleans.AzureUtils;
 using Orleans.Providers;
 using Orleans.Streams;
 using Orleans.Storage;
@@ -218,6 +217,10 @@ namespace Orleans.Runtime.Configuration
         /// The TTLExtensionFactor attribute specifies the factor by which cache entry TTLs should be extended when they are found to be stable.
         /// </summary>
         public double CacheTTLExtensionFactor { get; set; }
+        /// <summary>
+        /// Retry count for Azure Table operations. 
+        /// </summary>
+        public int MaxStorageBusyRetries { get; private set; }
 
         /// <summary>
         /// The DirectoryCachingStrategy attribute specifies the caching strategy to use.
@@ -614,9 +617,8 @@ namespace Orleans.Runtime.Configuration
                         }
                         if (child.HasAttribute("MaxStorageBusyRetries"))
                         {
-                            int maxBusyRetries = ConfigUtilities.ParseInt(child.GetAttribute("MaxStorageBusyRetries"),
+                            MaxStorageBusyRetries = ConfigUtilities.ParseInt(child.GetAttribute("MaxStorageBusyRetries"),
                                 "Invalid integer value for the MaxStorageBusyRetries attribute on the SystemStore element");
-                            AzureTableDefaultPolicies.MaxBusyRetries = maxBusyRetries;
                         }
                         if (child.HasAttribute("UseMockReminderTable"))
                         {
