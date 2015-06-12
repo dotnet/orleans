@@ -26,7 +26,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -45,7 +44,7 @@ namespace Orleans.Messaging
             switch (gatewayProviderToUse)
             {
                 case ClientConfiguration.GatewayProviderType.AzureTable:
-                    listProvider = new AzureGatewayListProvider();
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>("OrleansAzureUtils.dll", logger);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.SqlServer:

@@ -27,7 +27,6 @@ using System;
 using System.Diagnostics;
 using System.Net;
 using System.Threading.Tasks;
-using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Storage;
 
@@ -176,9 +175,13 @@ namespace Orleans.Core
 
         private string MakeErrorMsg(string what, Exception exc)
         {
-            HttpStatusCode httpStatusCode;
-            string errorCode;
-            AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out errorCode, true);
+            var httpStatusCode = HttpStatusCode.Unused;
+            string errorCode = String.Empty;
+
+            var decoder = store as IExceptionDecoder;
+            if(decoder != null)
+                decoder.DecodeException(exc, out httpStatusCode, out errorCode, true);
+
             GrainReference grainReference = grain.GrainReference;
             return string.Format("Error from storage provider during {0} for grain Type={1} Pk={2} Id={3} Error={4}" + Environment.NewLine + " {5}",
                 what, grainTypeName, grainReference.GrainId.ToDetailedString(), grainReference, errorCode, TraceLogger.PrintException(exc));

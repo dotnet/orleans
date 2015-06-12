@@ -22,14 +22,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
-using System.Xml;
-using System.Data.Services.Client;
-using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
@@ -136,7 +130,7 @@ namespace Orleans.AzureUtils
                     e = e.InnerException;
                 }
             }
-            catch (Exception)
+            catch
             {
                 // if we failed to parse the exception, treat it as if we could not EvaluateException.
                 return false;
@@ -363,6 +357,34 @@ namespace Orleans.AzureUtils
                 }
             }
             return isLastErrorRetriable;
+        }
+
+        internal static string PrintStorageException(Exception exception)
+        {
+            var storeExc = exception as StorageException;
+            if(storeExc == null)
+                throw new ArgumentException(String.Format("Unexpected exception type {0}", exception.GetType().FullName));
+
+            var result = storeExc.RequestInformation;
+            if (result == null) return storeExc.Message;
+            var extendedError = storeExc.RequestInformation.ExtendedErrorInformation;
+            if (extendedError == null)
+            {
+                return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage);
+
+            }
+            return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}, " +
+                                   "ExtendedErrorInformation.ErrorCode = {3}, ExtendedErrorInformation.ErrorMessage = {4}{5}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage,
+                        extendedError.ErrorCode,
+                        extendedError.ErrorMessage,
+                        (extendedError.AdditionalDetails != null && extendedError.AdditionalDetails.Count > 0) ?
+                            String.Format(", ExtendedErrorInformation.AdditionalDetails = {0}", Utils.DictionaryToString(extendedError.AdditionalDetails)) : String.Empty);
         }
     }
 }

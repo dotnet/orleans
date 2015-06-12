@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Data.Services.Common;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -63,7 +64,7 @@ namespace Orleans.Storage
     ///   &lt;/StorageProviders>
     /// </code>
     /// </example>
-    public class AzureTableStorage : IStorageProvider
+    public class AzureTableStorage : IStorageProvider, IExceptionDecoder
     {
         private const string DATA_CONNECTION_STRING = "DataConnectionString";
         private const string TABLE_NAME_PROPERTY = "TableName";
@@ -429,6 +430,12 @@ namespace Orleans.Storage
                 await tableManager.DeleteTableEntryAsync(entity, record.ETag);
                 record.ETag = null;
             }
+        }
+
+        public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus,
+            bool getExtendedErrors = false)
+        {
+            return AzureStorageUtils.EvaluateException(e, out httpStatusCode, out restStatus, getExtendedErrors);
         }
     }
 }

@@ -26,7 +26,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
 
@@ -55,8 +55,15 @@ namespace Orleans.Runtime.ReminderService
         private readonly AverageTimeSpanStatistic tardinessStat;
         private readonly CounterStatistic ticksDeliveredStat;
         private readonly TraceLogger logger;
+        private readonly GlobalConfiguration config;
 
-        internal LocalReminderService(SiloAddress addr, GrainId id, IConsistentRingProvider ring, OrleansTaskScheduler localScheduler, IReminderTable reminderTable)
+        internal LocalReminderService(
+            SiloAddress addr, 
+            GrainId id, 
+            IConsistentRingProvider ring, 
+            OrleansTaskScheduler localScheduler, 
+            IReminderTable reminderTable,
+            GlobalConfiguration config)
             : base(id, addr)
         {
             logger = TraceLogger.GetLogger("ReminderService", TraceLogger.LoggerType.Runtime);
@@ -65,6 +72,7 @@ namespace Orleans.Runtime.ReminderService
             this.ring = ring;
             scheduler = localScheduler;
             this.reminderTable = reminderTable;
+            this.config = config;
             status = ReminderServiceStatus.Booting;
             myRange = null;
             localTableSequence = 0;
@@ -85,8 +93,7 @@ namespace Orleans.Runtime.ReminderService
             myRange = ring.GetMyRange();
             logger.Info(ErrorCode.RS_ServiceStarting, "Starting reminder system target on: {0} x{1,8:X8}, with range {2}", Silo, Silo.GetConsistentHashCode(), myRange);
 
-            // in case reminderTable is as grain, poke the grain to activate it, before slamming it with multipel parallel requests, which may create duplicate activations.
-            await reminderTable.Init();
+            await reminderTable.Init(config.ServiceId, config.DeploymentId, config.DataConnectionString);
             await ReadAndUpdateReminders();
             logger.Info(ErrorCode.RS_ServiceStarted, "Reminder system target started OK on: {0} x{1,8:X8}, with range {2}", Silo, Silo.GetConsistentHashCode(), myRange);
 
