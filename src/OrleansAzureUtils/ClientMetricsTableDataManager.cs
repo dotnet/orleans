@@ -79,31 +79,30 @@ namespace Orleans.AzureUtils
     {
         protected const string INSTANCE_TABLE_NAME = "OrleansClientMetrics";
 
-        private readonly string deploymentId;
-        private readonly string clientId;
-        private readonly IPAddress address;
-        private readonly string myHostName;
+        private string deploymentId;
+        private string clientId;
+        private IPAddress address;
+        private string myHostName;
 
-        private readonly AzureTableDataManager<ClientMetricsData> storage;
+        private AzureTableDataManager<ClientMetricsData> storage;
         private readonly TraceLogger logger;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        private ClientMetricsTableDataManager(ClientConfiguration config, IPAddress address, GrainId clientId)
+        public ClientMetricsTableDataManager()
         {
-            deploymentId = config.DeploymentId;
-            this.clientId = clientId.ToParsableString();
-            this.address = address;
-            myHostName = config.DNSHostName;
             logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
-            storage = new AzureTableDataManager<ClientMetricsData>(
-                INSTANCE_TABLE_NAME, config.DataConnectionString, logger);
         }
 
-        public static async Task<ClientMetricsTableDataManager> GetManager(ClientConfiguration config, IPAddress address, GrainId clientId)
+        async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
         {
-            var instance = new ClientMetricsTableDataManager(config, address, clientId);
-            await instance.storage.InitTableAsync().WithTimeout(initTimeout);
-            return instance;
+            deploymentId = config.DeploymentId;
+            this.clientId = clientId;
+            this.address = address;
+            myHostName = config.DNSHostName;
+            storage = new AzureTableDataManager<ClientMetricsData>(
+                INSTANCE_TABLE_NAME, config.DataConnectionString, logger);
+
+            await storage.InitTableAsync().WithTimeout(initTimeout);
         }
 
         #region IMetricsDataPublisher methods

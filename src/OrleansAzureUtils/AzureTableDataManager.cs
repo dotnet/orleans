@@ -62,6 +62,7 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
+        /// <param name="logger">Logger to use.</param>
         public AzureTableDataManager(string tableName, string storageConnectionString, TraceLogger logger = null)
         {
             var loggerName = "AzureTableDataManager-" + typeof(T).Name;
@@ -232,8 +233,9 @@ namespace Orleans.AzureUtils
         /// Merges a data entry in the Azure table.
         /// </summary>
         /// <param name="data">Data to be merged in the table.</param>
+        /// <param name="eTag">ETag to apply.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> MergeTableEntryAsync(T data, string eTag)
+        internal async Task<string> MergeTableEntryAsync(T data, string eTag)
         {
             const string operation = "MergeTableEntry";
             var startTime = DateTime.UtcNow;
@@ -276,6 +278,7 @@ namespace Orleans.AzureUtils
         /// Fails if the data does not already exist or of eTag does not match.
         /// </summary>
         /// <param name="data">Data to be updated into the table.</param>
+        /// /// <param name="dataEtag">ETag to use.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
         public async Task<string> UpdateTableEntryAsync(T data, string dataEtag)
         {
@@ -315,6 +318,7 @@ namespace Orleans.AzureUtils
         /// Fails if the data does not already exist or if eTag does not match.
         /// </summary>
         /// <param name="data">Data entry to be deleted from the table.</param>
+        /// <param name="eTag">ETag to use.</param>
         /// <returns>Completion promise for this storage operation.</returns>
         public async Task DeleteTableEntryAsync(T data, string eTag)
         {            
@@ -412,7 +416,7 @@ namespace Orleans.AzureUtils
         /// Deletes a set of already existing data entries in the table, by using eTag.
         /// Fails if the data does not already exist or if eTag does not match.
         /// </summary>
-        /// <param name="list">List of data entries and their corresponding etags to be deleted from the table.</param>
+        /// <param name="collection">Data entries and their corresponding etags to be deleted from the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
         public async Task DeleteTableEntriesAsync(IReadOnlyCollection<Tuple<T, string>> collection)
         {
@@ -530,7 +534,7 @@ namespace Orleans.AzureUtils
         /// Inserts a set of new data entries into the table.
         /// Fails if the data does already exists.
         /// </summary>
-        /// <param name="list">List of data entries to be inserted into the table.</param>
+        /// <param name="collection">Data entries to be inserted into the table.</param>
         /// <returns>Completion promise for this storage operation.</returns>
         public async Task BulkInsertTableEntries(IReadOnlyCollection<T> collection)
         {

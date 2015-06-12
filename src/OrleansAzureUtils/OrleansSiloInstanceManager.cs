@@ -222,7 +222,21 @@ namespace Orleans.AzureUtils
         public List<Uri> FindAllGatewayProxyEndpoints()
         {
             IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = FindAllGatewaySilos();
-            return gatewaySiloInstances.Select(gateway => gateway.ToGatewayUri()).ToList();
+            return gatewaySiloInstances.Select(ToGatewayUri).ToList();
+        }
+
+        /// <summary>
+        /// Represent a silo instance entry in the gateway URI format.
+        /// </summary>
+        /// <param name="gateway">The input silo instance</param>
+        /// <returns></returns>
+        private static Uri ToGatewayUri(SiloInstanceTableEntry gateway)
+        {
+            int proxyPort = 0;
+            if (!string.IsNullOrEmpty(gateway.ProxyPort))
+                int.TryParse(gateway.ProxyPort, out proxyPort);
+
+            return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", gateway.Address, proxyPort, gateway.Generation));
         }
 
         private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()
@@ -348,7 +362,6 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Insert (create new) row entry
         /// </summary>
-        /// <param name="siloEntry">Silo Entry to be written</param>
         internal async Task<bool> TryCreateTableVersionEntryAsync()
         {
             try
@@ -379,6 +392,8 @@ namespace Orleans.AzureUtils
         /// Insert (create new) row entry
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
+        /// <param name="tableVersionEntry">Version row to update</param>
+        /// <param name="tableVersionEtag">Version row eTag</param>
         internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag)
         {
             try
@@ -403,7 +418,9 @@ namespace Orleans.AzureUtils
         /// Conditionally update the row for this entry, but only if the eTag matches with the current record in data store
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
-        /// <param name="eTag">ETag value for the entry being updated</param>
+        /// <param name="entryEtag">ETag value for the entry being updated</param>
+        /// <param name="tableVersionEntry">Version row to update</param>
+        /// <param name="versionEtag">ETag value for the version row</param>
         /// <returns></returns>
         internal async Task<bool> UpdateSiloEntryConditionally(SiloInstanceTableEntry siloEntry, string entryEtag, SiloInstanceTableEntry tableVersionEntry, string versionEtag)
         {

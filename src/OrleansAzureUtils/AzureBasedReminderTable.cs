@@ -33,21 +33,14 @@ namespace Orleans.Runtime.ReminderService
         private readonly TraceLogger logger;
         private RemindersTableManager remTableManager;
 
-        private AzureBasedReminderTable()
+        public AzureBasedReminderTable()
         {
             logger = TraceLogger.GetLogger("AzureReminderTable", TraceLogger.LoggerType.Runtime);
         }
 
-        public static async Task<AzureBasedReminderTable> GetAzureBasedReminderTable(Guid serviceId, string deploymentId, string connectionString)
+        public async Task Init(Guid serviceId, string deploymentId, string connectionString)
         {
-            var table = new AzureBasedReminderTable();
-            table.remTableManager = await RemindersTableManager.GetManager(serviceId, deploymentId, connectionString);
-            return table;
-        }
-
-        public Task Init()
-        {
-            return TaskDone.Done;
+            remTableManager = await RemindersTableManager.GetManager(serviceId, deploymentId, connectionString);
         }
 
         #region Utility methods

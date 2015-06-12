@@ -192,20 +192,7 @@ namespace Orleans.Runtime
             return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", address.Endpoint.Address, address.Endpoint.Port, address.Generation));
         }
 
-        /// <summary>
-        /// Represent a silo instance entry in the gateway URI format.
-        /// </summary>
-        /// <param name="address">The input silo instance</param>
-        /// <returns></returns>
-        internal static Uri ToGatewayUri(this AzureUtils.SiloInstanceTableEntry gateway)
-        {
-            int proxyPort = 0;
-            if (!string.IsNullOrEmpty(gateway.ProxyPort))
-                int.TryParse(gateway.ProxyPort, out proxyPort);
-
-            return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", gateway.Address, proxyPort, gateway.Generation));
-        }
-
+        
         /// <summary>
         /// Calculates an integer hash value based on the consistent identity hash of a string.
         /// </summary>

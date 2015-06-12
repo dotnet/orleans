@@ -44,7 +44,6 @@ namespace Orleans.AzureUtils
     /// http://blogs.msdn.com/b/windowsazurestorage/archive/2010/11/06/how-to-get-most-out-of-windows-azure-tables.aspx
     /// 
     /// </summary>
-    /// <typeparam name="T"></typeparam>
     internal static class AzureQueueDefaultPolicies
     {
         public static int MaxQueueOperationRetries;
@@ -72,7 +71,7 @@ namespace Orleans.AzureUtils
         /// <summary> Name of the table queue instance is managing. </summary>
         public string QueueName { get; private set; }
 
-        protected string ConnectionString { get; set; }
+        private string connectionString { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly TraceLogger logger;
         private readonly CloudQueueClient queueOperationsClient;
@@ -89,10 +88,10 @@ namespace Orleans.AzureUtils
 
             logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
             QueueName = queueName;
-            ConnectionString = storageConnectionString;
+            connectionString = storageConnectionString;
 
             queueOperationsClient = AzureStorageUtils.GetCloudQueueClient(
-                ConnectionString,
+                connectionString,
                 AzureQueueDefaultPolicies.QueueOperationRetryPolicy,
                 AzureQueueDefaultPolicies.QueueOperationTimeout,
                 logger);
@@ -111,10 +110,10 @@ namespace Orleans.AzureUtils
             logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
             QueueName = deploymentId + "-" + queueName;
             AzureStorageUtils.ValidateQueueName(QueueName);
-            ConnectionString = storageConnectionString;
+            connectionString = storageConnectionString;
 
             queueOperationsClient = AzureStorageUtils.GetCloudQueueClient(
-                ConnectionString,
+                connectionString,
                 AzureQueueDefaultPolicies.QueueOperationRetryPolicy,
                 AzureQueueDefaultPolicies.QueueOperationTimeout,
                 logger);
