@@ -77,6 +77,10 @@
     <Reference Include="Microsoft.WindowsAzure.Storage">
       <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Spatial">
@@ -94,6 +98,17 @@
     <Compile Include="AzureConfigUtils.cs" />
     <Compile Include="AzureClient.cs" />
     <Compile Include="AzureConstants.cs" />
+    <Compile Include="Providers\AzureProviderErrorCode.cs" />
+    <Compile Include="Providers\Storage\AzureTableStorage.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueAdapter.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueAdapterFactory.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueAdapterReceiver.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueBatchContainer.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueStreamProvider.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueStreamProviderUtils.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\SimpleAzureQueueAdapter.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\SimpleAzureQueueAdapterFactory.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\SimpleAzureQueueStreamProvider.cs" />
     <Compile Include="AzureSilo.cs" />
     <Compile Include="AzureGatewayListProvider.cs" />
     <Compile Include="AzureQueueDataManager.cs" />
@@ -115,6 +130,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj">
+      <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
+      <Name>OrleansProviders</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
       <Name>OrleansRuntime</Name>

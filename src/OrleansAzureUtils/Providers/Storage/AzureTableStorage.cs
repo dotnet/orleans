@@ -30,6 +30,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
+using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Providers;
@@ -130,8 +131,8 @@ namespace Orleans.Storage
             }
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
-            Log.Info((int)ProviderErrorCode.AzureTableProvider_InitProvider, initMsg);
-            Log.Info((int)ProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableStorage Provider is using DataConnectionString: {0}", ConfigUtilities.PrintDataConnectionInfo(dataConnectionString));
+            Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);
+            Log.Info((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableStorage Provider is using DataConnectionString: {0}", ConfigUtilities.PrintDataConnectionInfo(dataConnectionString));
             tableDataManager = new GrainStateTableDataManager(tableName, dataConnectionString, Log);
             return tableDataManager.InitTableAsync();
         }
@@ -157,7 +158,7 @@ namespace Orleans.Storage
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
-            if (Log.IsVerbose3) Log.Verbose3((int)ProviderErrorCode.AzureTableProvider_ReadingData, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, pk, grainReference, tableName);
+            if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_ReadingData, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, pk, grainReference, tableName);
             string partitionKey = pk;
             string rowKey = grainType;
             GrainStateRecord record = await tableDataManager.Read(partitionKey, rowKey);
@@ -181,7 +182,7 @@ namespace Orleans.Storage
 
             string pk = GetKeyString(grainReference);
             if (Log.IsVerbose3)
-                Log.Verbose3((int)ProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.Etag, tableName);
+                Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.Etag, tableName);
 
             var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
             ConvertToStorageFormat(grainState, entity);
@@ -193,7 +194,7 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                Log.Error((int)ProviderErrorCode.AzureTableProvider_WriteError, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
+                Log.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
                     grainType, grainReference, grainState.Etag, tableName, exc.Message), exc);
                 throw;
             }
@@ -211,7 +212,7 @@ namespace Orleans.Storage
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
-            if (Log.IsVerbose3) Log.Verbose3((int) ProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.Etag, isDeleteStateOnClear, tableName);
+            if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.Etag, isDeleteStateOnClear, tableName);
             var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.Etag };
             string operation = "Clearing";
@@ -230,7 +231,7 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                Log.Error((int)ProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
+                Log.Error((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
                     operation, grainType, grainReference, grainState.Etag, tableName, exc.Message), exc);
                 throw;
             }
@@ -388,25 +389,25 @@ namespace Orleans.Storage
 
             public async Task<GrainStateRecord> Read(string partitionKey, string rowKey)
             {
-                if (logger.IsVerbose3) logger.Verbose3((int)ProviderErrorCode.AzureTableProvider_Storage_Reading, "Reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
+                if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_Reading, "Reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
                 try
                 {
                     Tuple<GrainStateEntity, string> data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey);
                     if (data == null || data.Item1 == null)
                     {
-                        if (logger.IsVerbose2) logger.Verbose2((int)ProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
+                        if (logger.IsVerbose2) logger.Verbose2((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
                         return null;
                     }
                     GrainStateEntity stateEntity = data.Item1;
                     var record = new GrainStateRecord { Entity = stateEntity, ETag = data.Item2 };
-                    if (logger.IsVerbose3) logger.Verbose3((int)ProviderErrorCode.AzureTableProvider_Storage_DataRead, "Read: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", stateEntity.PartitionKey, stateEntity.RowKey, TableName, record.ETag);
+                    if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_DataRead, "Read: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", stateEntity.PartitionKey, stateEntity.RowKey, TableName, record.ETag);
                     return record;
                 }
                 catch (Exception exc)
                 {
                     if (AzureStorageUtils.TableStorageDataNotFound(exc))
                     {
-                        if (logger.IsVerbose2) logger.Verbose2((int)ProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, TraceLogger.PrintException(exc));
+                        if (logger.IsVerbose2) logger.Verbose2((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, TraceLogger.PrintException(exc));
                         return null;  // No data
                     }
                     throw;
@@ -416,7 +417,7 @@ namespace Orleans.Storage
             public async Task Write(GrainStateRecord record)
             {
                 GrainStateEntity entity = record.Entity;
-                if (logger.IsVerbose3) logger.Verbose3((int)ProviderErrorCode.AzureTableProvider_Storage_Writing, "Writing: PartitionKey={0} RowKey={1} to Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
+                if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Writing: PartitionKey={0} RowKey={1} to Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 string eTag = String.IsNullOrEmpty(record.ETag) ?
                     await tableManager.CreateTableEntryAsync(record.Entity) :
                     await tableManager.UpdateTableEntryAsync(entity, record.ETag);
@@ -426,7 +427,7 @@ namespace Orleans.Storage
             public async Task Delete(GrainStateRecord record)
             {
                 GrainStateEntity entity = record.Entity;
-                if (logger.IsVerbose3) logger.Verbose3((int)ProviderErrorCode.AzureTableProvider_Storage_Writing, "Deleting: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
+                if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Deleting: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 await tableManager.DeleteTableEntryAsync(entity, record.ETag);
                 record.ETag = null;
             }
