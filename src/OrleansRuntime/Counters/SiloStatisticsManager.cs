@@ -25,7 +25,6 @@ using System;
 using System.Threading.Tasks;
 
 using Orleans.Runtime.Configuration;
-using Orleans.AzureUtils;
 
 namespace Orleans.Runtime.Counters
 {
@@ -35,6 +34,7 @@ namespace Orleans.Runtime.Counters
         private RuntimeStatisticsGroup runtimeStats;
         private PerfCountersStatistics perfCountersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
+        private readonly TraceLogger logger = TraceLogger.GetLogger("SiloStatisticsManager");
 
         internal SiloStatisticsManager(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig)
         {
@@ -80,7 +80,8 @@ namespace Orleans.Runtime.Counters
             {
                 // Hook up to publish silo metrics to Azure storage table
                 var gateway = nodeConfig.IsGatewayNode ? nodeConfig.ProxyGatewayEndpoint : null;
-                var metricsDataPublisher = await SiloMetricsTableDataManager.GetManager(silo.GlobalConfig.DeploymentId, silo.GlobalConfig.DataConnectionString, silo.SiloAddress, silo.Name, gateway, nodeConfig.DNSHostName);
+                var metricsDataPublisher = AssemblyLoader.LoadAndCreateInstance<ISiloMetricsDataPublisher>("OrleansAzureUtils.dll", logger);
+                await metricsDataPublisher.Init(silo.GlobalConfig.DeploymentId, silo.GlobalConfig.DataConnectionString, silo.SiloAddress, silo.Name, gateway, nodeConfig.DNSHostName);
                 MetricsTable.MetricsDataPublisher = metricsDataPublisher;
             }
             // else no metrics
@@ -116,7 +117,8 @@ namespace Orleans.Runtime.Counters
             }
             else if (useAzureTable)
             {
-                var statsDataPublisher = await StatsTableDataManager.GetManager(true, silo.GlobalConfig.DataConnectionString, silo.GlobalConfig.DeploymentId, silo.SiloAddress.ToLongString(), silo.Name, nodeConfig.DNSHostName);
+                var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>("OrleansAzureUtils.dll", logger);
+                await statsDataPublisher.Init(true, silo.GlobalConfig.DataConnectionString, silo.GlobalConfig.DeploymentId, silo.SiloAddress.ToLongString(), silo.Name, nodeConfig.DNSHostName);
                 logStatistics.StatsTablePublisher = statsDataPublisher;
             }
             // else no stats

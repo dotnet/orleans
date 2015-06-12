@@ -33,10 +33,12 @@ namespace Orleans.Runtime.ReminderService
     {
         internal static IReminderTable Singleton { get; private set; }
 
-        public static async Task Initialize(Silo silo, IGrainFactory grainFactory)
+        public static void Initialize(Silo silo, IGrainFactory grainFactory)
         {
             var config = silo.GlobalConfig;
             var serviceType = config.ReminderServiceType;
+            var logger = TraceLogger.GetLogger("ReminderTable");
+
             switch (serviceType)
             {
                 default:
@@ -50,10 +52,7 @@ namespace Orleans.Runtime.ReminderService
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
-                    Singleton = await AzureBasedReminderTable.GetAzureBasedReminderTable(
-                            config.ServiceId,
-                            config.DeploymentId,
-                            config.DataConnectionString);
+                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>("OrleansAzureUtils.dll", logger);
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:

@@ -30,6 +30,7 @@ using System.Data;
 using System.Data.SqlClient;
 
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Providers.SqlServer
 {
@@ -78,6 +79,11 @@ namespace Orleans.Providers.SqlServer
                 generation = SiloAddress.AllocateNewGeneration();
         }
 
+        Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
+        {
+            return TaskDone.Done;
+        }
+
         public async Task ReportMetrics(IClientPerformanceMetrics metricsData)
         {
             using (var conn = new SqlConnection(connectionString))
@@ -102,6 +108,12 @@ namespace Orleans.Providers.SqlServer
                     tx.Commit();
                 }
             }
+        }
+
+        Task ISiloMetricsDataPublisher.Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName,
+            IPEndPoint gateway, string hostName)
+        {
+            return TaskDone.Done;
         }
 
         public async Task ReportMetrics(ISiloPerformanceMetrics metricsData)
@@ -157,6 +169,11 @@ namespace Orleans.Providers.SqlServer
 
                 await Task.WhenAll(tasks);
             }
+        }
+
+        Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
+        {
+            return TaskDone.Done;
         }
 
         private SqlCommand ConvertToStatisticsRow(ICounter counter, SqlCommand command)
