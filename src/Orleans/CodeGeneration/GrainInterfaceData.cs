@@ -251,6 +251,7 @@ namespace Orleans.CodeGeneration
                 {
                     //no need for recursion as .GetInterfaces() actually returns all parent interfaces at all levels.
                     //GetInterfaceProperties(parent, ref propertyInfos, bIncludeAllParentsMethods);
+                    infos = parent.GetProperties();
                     foreach (var propInfo in infos)
                         if (!propertyInfos.Contains(propInfo, propertyComparator))
                             propertyInfos.Add(propInfo);

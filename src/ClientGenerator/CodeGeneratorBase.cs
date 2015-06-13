@@ -125,9 +125,9 @@ namespace Orleans.CodeGeneration
         /// </summary>
         internal protected static bool IsGrainMethod(MethodInfo methodInfo, Type declaringType = null)
         {
-            var methodDeclaringGrainType = declaringType ?? methodInfo.DeclaringType;
-
             if (methodInfo == null) throw new ArgumentNullException("methodInfo", "Cannot inspect null method info");
+            
+            var methodDeclaringGrainType = declaringType ?? methodInfo.DeclaringType;
 
             // ignore static, event, or non-remote methods
             if (methodInfo.IsStatic || methodInfo.IsSpecialName || IsSpecialEventMethod(methodInfo))
