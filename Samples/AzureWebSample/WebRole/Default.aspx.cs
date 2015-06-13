@@ -16,8 +16,8 @@
 
 using System;
 using System.IO;
+using HelloEnvironmentInterfaces;
 using Orleans.Runtime.Host;
-using HelloWorldInterfaces;
 
 namespace Orleans.Azure.Samples.Web
 {
@@ -43,17 +43,17 @@ namespace Orleans.Azure.Samples.Web
         {
             this.ReplyText.Text = "Talking to Orleans";
 
-            IHello grainRef = GrainFactory.GetGrain<IHello>(0);
+            IHelloEnvironment grainRef = GrainFactory.GetGrain<IHelloEnvironment>(0);
 
             try
             {
-                string msg = await grainRef.SayHello(this.NameTextBox.Text);
-                this.ReplyText.Text = "Orleans said: " + msg + " at " + DateTime.UtcNow + " UTC";
+                string reply = await grainRef.RequestDetails();
+                this.ReplyText.Text = "Orleans said: " + reply + " at " + DateTime.UtcNow + " UTC";
             }
             catch (Exception exc)
             {
                 while (exc is AggregateException) exc = exc.InnerException;
-
+                
                 this.ReplyText.Text = "Error connecting to Orleans: " + exc + " at " + DateTime.Now;
             }
         }

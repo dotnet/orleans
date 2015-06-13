@@ -129,13 +129,13 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\HelloWorld\HelloWorldGrains\HelloWorldGrains.csproj">
+    <ProjectReference Include="..\HelloEnvironmentGrains\HelloEnvironmentGrains.csproj">
       <Project>{98d4db83-175e-44d5-a14b-9c66ee89f037}</Project>
-      <Name>HelloWorldGrains</Name>
+      <Name>HelloEnvironmentGrains</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\HelloWorld\HelloWorldInterfaces\HelloWorldInterfaces.csproj">
+    <ProjectReference Include="..\HelloEnvironmentInterfaces\HelloEnvironmentInterfaces.csproj">
       <Project>{163cce80-c506-468c-9b28-e2ff198097e3}</Project>
-      <Name>HelloWorldInterfaces</Name>
+      <Name>HelloEnvironmentInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
