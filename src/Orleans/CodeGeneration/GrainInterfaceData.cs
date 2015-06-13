@@ -180,6 +180,12 @@ namespace Orleans.CodeGeneration
         /// <param name="bIncludeAllParentsMethods"></param>
         private static void GetInterfaceMethods(System.Type interfaceType, ref List<MethodInfo> methodInfos, bool bIncludeAllParentsMethods)
         {
+            if (!interfaceType.IsInterface)
+            {
+                throw new ArgumentException("Illegal argument: interfaceType. Must be an interface.");
+            }
+
+            //Default flags (BindingFlags.Public) for GetMethod works fine here given that interfaceType is an interface and not a class (Hence .Invoke and .Instance flags are not required).
             MethodInfo[] infos = interfaceType.GetMethods();
 
             IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
@@ -192,7 +198,12 @@ namespace Orleans.CodeGeneration
                 var parentInterfaces = interfaceType.GetInterfaces();
                 foreach (var parent in parentInterfaces)
                 {
-                    GetInterfaceMethods(parent, ref methodInfos, bIncludeAllParentsMethods);
+                    //no need for recursion as .GetInterfaces() actually returns all parent interfaces at all levels.
+                    //GetInterfaceMethods(parent, ref methodInfos, bIncludeAllParentsMethods);
+                    infos = parent.GetMethods();
+                    foreach (var methodInfo in infos)
+                        if (!methodInfos.Contains(methodInfo, methodComparer))
+                            methodInfos.Add(methodInfo);        
                 }
             }
         }
@@ -238,7 +249,11 @@ namespace Orleans.CodeGeneration
                 var parentInterfaces = interfaceType.GetInterfaces();
                 foreach (var parent in parentInterfaces)
                 {
-                    GetInterfaceProperties(parent, ref propertyInfos, bIncludeAllParentsMethods);
+                    //no need for recursion as .GetInterfaces() actually returns all parent interfaces at all levels.
+                    //GetInterfaceProperties(parent, ref propertyInfos, bIncludeAllParentsMethods);
+                    foreach (var propInfo in infos)
+                        if (!propertyInfos.Contains(propInfo, propertyComparator))
+                            propertyInfos.Add(propInfo);
                 }
             }
         }

@@ -50,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GenericGrains.cs" />
+    <Compile Include="SimpleGrainWithMultiInheritance.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
@@ -105,4 +106,3 @@
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>
-
