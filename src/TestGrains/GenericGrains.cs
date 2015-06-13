@@ -28,6 +28,7 @@ using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using UnitTests.GrainInterfaces;
+using System.Globalization;
 
 namespace UnitTests.Grains
 {
@@ -137,13 +138,13 @@ namespace UnitTests.Grains
 
         public Task<string> GetAxB()
         {
-            string retValue = string.Format("{0}x{1}", State.A, State.B);
+            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", State.A, State.B);
             return Task.FromResult(retValue);
         }
 
         public Task<string> GetAxB(T a, U b)
         {
-            string retValue = string.Format("{0}x{1}", a, b);
+            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
     }
@@ -332,13 +333,13 @@ namespace UnitTests.Grains
 
         public Task<string> GetAxB()
         {
-            string retValue = string.Format("{0}x{1}", _a, _b);
+            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", _a, _b);
             return Task.FromResult(retValue);
         }
 
         public Task<string> GetAxB(T a, U b)
         {
-            string retValue = string.Format("{0}x{1}", a, b);
+            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
 
