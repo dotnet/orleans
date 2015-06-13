@@ -304,7 +304,7 @@ namespace Orleans.CodeGeneration
             private Dictionary<int, MethodInfo> GetGrainMethods()
             {
                 var grainMethods = new Dictionary<int, MethodInfo>();
-                foreach (var interfaceMethodInfo in GrainInterfaceData.GetMethods(InterfaceType))
+                foreach (var interfaceMethodInfo in GrainInterfaceData.GetGrainInterfaceMethods(InterfaceType, true))
                 {
                     ParameterInfo[] parameters = interfaceMethodInfo.GetParameters();
                     var args = new Type[parameters.Length];

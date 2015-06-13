@@ -145,22 +145,102 @@ namespace Orleans.CodeGeneration
         {
             return typeof(IAddressable).IsAssignableFrom(t);
         }
-        
-        public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = false)
-        {
-            var methodInfos = new List<MethodInfo>();
-            GetMethodsImpl(grainType, grainType, methodInfos);
-            var flags = BindingFlags.Public | BindingFlags.InvokeMethod | BindingFlags.Instance;
-            if (!bAllMethods)
-                flags |= BindingFlags.DeclaredOnly;
 
-            MethodInfo[] infos = grainType.GetMethods(flags);
+        //This is to fix issue #504 (which is in turn required to fix issue #492). 
+        //The reason that the previous implementation did not work is the way .Net handles interface "inheritance". 
+        //See: http://stackoverflow.com/questions/10550970/how-to-do-proper-reflection-of-base-interface-methods (last visited: 6/12/15)
+        //See: http://www.roxolan.com/2009/04/interface-inheritance-in-c.html (last visited: 6/12/15)
+        //The type.GetMethods(flags) (where type is an interface, not a class) only returns methods declared by the immediate interface and not by it's parents. 
+        //Hence a recursive solution is used in the following method. 
+        /// <summary>
+        /// Returns all the methods declared by the grain interface and it's parents in the inheritance tree.
+        /// </summary>
+        /// <param name="grainInterfaceType">"grainInterfaceType" must be an interface (not a class) and must be inherited from IGrain at some level.</param>
+        /// <param name="bIncludeAllParentsMethods"></param>
+        /// <returns></returns>
+        public static MethodInfo[] GetGrainInterfaceMethods(Type grainInterfaceType, bool bIncludeAllParentsMethods = false)
+        {
+            if (!IsGrainInterface(grainInterfaceType))
+            {
+                //should never happen since this method should be called only for grain interfaces.
+                throw new ArgumentException("Illegal argument: grainInterfaceType. Must be an interface and extend IGrain");
+            }
+
+            List<MethodInfo> methodInfos = new List<MethodInfo>();
+            GetInterfaceMethods(grainInterfaceType, ref methodInfos, bIncludeAllParentsMethods);
+
+            return methodInfos.ToArray();
+        }
+
+        /// <summary>
+        /// Recurses through entire interface graph accumulating methods.
+        /// </summary>
+        /// <param name="interfaceType"></param>
+        /// <param name="methodInfos"></param>
+        /// <param name="bIncludeAllParentsMethods"></param>
+        private static void GetInterfaceMethods(System.Type interfaceType, ref List<MethodInfo> methodInfos, bool bIncludeAllParentsMethods)
+        {
+            MethodInfo[] infos = interfaceType.GetMethods();
+
             IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
             foreach (var methodInfo in infos)
                 if (!methodInfos.Contains(methodInfo, methodComparer))
                     methodInfos.Add(methodInfo);
+            
+            if (bIncludeAllParentsMethods)
+            {
+                var parentInterfaces = interfaceType.GetInterfaces();
+                foreach (var parent in parentInterfaces)
+                {
+                    GetInterfaceMethods(parent, ref methodInfos, bIncludeAllParentsMethods);
+                }
+            }
+        }
 
-            return methodInfos.ToArray();
+        //See explanation for GetGrainInterfaceMethods above.
+        /// <summary>
+        /// Returns all the properties declared by the grain type and it's parents in the inheritance tree.
+        /// </summary>
+        /// <param name="grainInterfaceType">"grainInterfaceType" must be an interface (not a class) and must be inherited from IGrain at some level.</param>
+        /// <param name="bIncludeAllParentsMethods"></param>
+        /// <returns></returns>
+        public static PropertyInfo[] GetGrainInterfaceProperties(Type grainInterfaceType, bool bIncludeAllParentsMethods = false)
+        {
+            if (!IsGrainInterface(grainInterfaceType))
+            {
+                //should never happen since this method should be called only for grain interfaces.
+                throw new ArgumentException("Illegal argument: grainInterfaceType. Must be an interface and extend IGrain");
+            }
+
+            List<PropertyInfo> propertyInfos = new List<PropertyInfo>();
+            GetInterfaceProperties(grainInterfaceType, ref propertyInfos, bIncludeAllParentsMethods);
+
+            return propertyInfos.ToArray();
+        }
+
+        /// <summary>
+        /// Recurses through entire interface graph accumulating Properties.
+        /// </summary>
+        /// <param name="interfaceType"></param>
+        /// <param name="methodInfos"></param>
+        /// <param name="bIncludeAllParentsMethods"></param>
+        private static void GetInterfaceProperties(System.Type interfaceType, ref List<PropertyInfo> propertyInfos, bool bIncludeAllParentsMethods)
+        {
+            PropertyInfo[] infos = interfaceType.GetProperties();
+
+            IEqualityComparer<PropertyInfo> propertyComparator = new PropertyInfoComparer();
+            foreach (var propInfo in infos)
+                if (!propertyInfos.Contains(propInfo, propertyComparator))
+                    propertyInfos.Add(propInfo);
+
+            if (bIncludeAllParentsMethods)
+            {
+                var parentInterfaces = interfaceType.GetInterfaces();
+                foreach (var parent in parentInterfaces)
+                {
+                    GetInterfaceProperties(parent, ref propertyInfos, bIncludeAllParentsMethods);
+                }
+            }
         }
 
         public static string GetFactoryClassForInterface(Type referenceInterface, Language language)
@@ -376,7 +456,7 @@ namespace Orleans.CodeGeneration
         {
             bool success = true;
 
-            MethodInfo[] methods = type.GetMethods();
+            MethodInfo[] methods = GetGrainInterfaceMethods(type, true);
             foreach (MethodInfo method in methods)
             {
                 if (method.IsSpecialName)
@@ -424,7 +504,7 @@ namespace Orleans.CodeGeneration
         {
             bool success = true;
 
-            PropertyInfo[] properties = type.GetProperties();
+            PropertyInfo[] properties = GetGrainInterfaceProperties(type, true);
             foreach (PropertyInfo property in properties)
             {
                 success = false;
@@ -510,44 +590,27 @@ namespace Orleans.CodeGeneration
             #endregion
         }
 
-        /// <summary>
-        /// Recurses through interface graph accumulating methods
-        /// </summary>
-        /// <param name="grainType">Grain type</param>
-        /// <param name="serviceType">Service interface type</param>
-        /// <param name="methodInfos">Accumulated </param>
-        private static void GetMethodsImpl(Type grainType, Type serviceType, List<MethodInfo> methodInfos)
+        private class PropertyInfoComparer : IEqualityComparer<PropertyInfo>
         {
-            Type[] iTypes = GetRemoteInterfaces(serviceType).Values.ToArray();
-            IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
+            #region IEqualityComparer<InterfaceInfo> Members
 
-            foreach (Type iType in iTypes)
+            public bool Equals(PropertyInfo x, PropertyInfo y)
             {
-                var mapping = new InterfaceMapping();
-                if (grainType.IsClass)
-                    mapping = grainType.GetInterfaceMap(iType);
+                var xString = new StringBuilder(x.Name);
+                var yString = new StringBuilder(y.Name);
 
-                if (grainType.IsInterface || mapping.TargetType == grainType)
-                {
-                    foreach (var methodInfo in iType.GetMethods())
-                    {
-                        if (grainType.IsClass)
-                        {
-                            var mi = methodInfo;
-                            var match = mapping.TargetMethods.Any(info => methodComparer.Equals(mi, info) &&
-                                info.DeclaringType == grainType);
-
-                            if (match)
-                                if (!methodInfos.Contains(mi, methodComparer))
-                                    methodInfos.Add(mi);
-                        }
-                        else if (!methodInfos.Contains(methodInfo, methodComparer))
-                        {
-                            methodInfos.Add(methodInfo);
-                        }
-                    }
-                }
+                xString.Append(x.PropertyType.Name);
+                yString.Append(y.PropertyType.Name);
+                
+                return String.CompareOrdinal(xString.ToString(), yString.ToString()) == 0;
             }
+
+            public int GetHashCode(PropertyInfo obj)
+            {
+                throw new NotImplementedException();
+            }
+
+            #endregion
         }
 
         private static int GetTypeCode(Type grainInterfaceOrClass)

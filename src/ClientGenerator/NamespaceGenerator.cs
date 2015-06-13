@@ -252,7 +252,7 @@ namespace Orleans.CodeGeneration
             ReferencedNamespace.Imports.Add(new CodeNamespaceImport("System.IO"));
             ReferencedNamespace.Imports.Add(new CodeNamespaceImport("System.Collections.Generic"));
 
-            MethodInfo[] methods = GrainInterfaceData.GetMethods(interfaceData.Type);
+            MethodInfo[] methods = GrainInterfaceData.GetGrainInterfaceMethods(interfaceData.Type, true);
             AddMethods(methods, referenceClass, genericTypeParam, isObserver);
         }
 
