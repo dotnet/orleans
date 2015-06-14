@@ -146,7 +146,7 @@ namespace Orleans.CodeGeneration
             return typeof(IAddressable).IsAssignableFrom(t);
         }
         
-        public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = false)
+        public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = true)
         {
             var methodInfos = new List<MethodInfo>();
             GetMethodsImpl(grainType, grainType, methodInfos);
@@ -267,7 +267,7 @@ namespace Orleans.CodeGeneration
                     methodInfo.DeclaringType.GetInterfaceMap(i).TargetMethods.Contains(methodInfo)));
         }
 
-        public static Dictionary<int, Type> GetRemoteInterfaces(Type type)
+        public static Dictionary<int, Type> GetRemoteInterfaces(Type type, bool checkIsGrainInterface = true)
         {
             var dict = new Dictionary<int, Type>();
 
@@ -275,7 +275,7 @@ namespace Orleans.CodeGeneration
                 dict.Add(ComputeInterfaceId(type), type);
 
             Type[] interfaces = type.GetInterfaces();
-            foreach (Type interfaceType in interfaces.Where(IsGrainInterface))
+            foreach (Type interfaceType in interfaces.Where(i => !checkIsGrainInterface || IsGrainInterface(i)))
                 dict.Add(ComputeInterfaceId(interfaceType), interfaceType);
 
             return dict;
@@ -518,7 +518,7 @@ namespace Orleans.CodeGeneration
         /// <param name="methodInfos">Accumulated </param>
         private static void GetMethodsImpl(Type grainType, Type serviceType, List<MethodInfo> methodInfos)
         {
-            Type[] iTypes = GetRemoteInterfaces(serviceType).Values.ToArray();
+            Type[] iTypes = GetRemoteInterfaces(serviceType, false).Values.ToArray();
             IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
 
             foreach (Type iType in iTypes)

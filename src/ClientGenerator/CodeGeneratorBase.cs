@@ -131,7 +131,7 @@ namespace Orleans.CodeGeneration
             if (methodInfo.IsStatic || methodInfo.IsSpecialName || IsSpecialEventMethod(methodInfo))
                 return false; // Methods which are derived from base class or object class, or property getter/setter methods
 
-            return methodInfo.DeclaringType.IsInterface && typeof(IAddressable).IsAssignableFrom(methodInfo.DeclaringType);
+            return methodInfo.DeclaringType.IsInterface;
         }
         
         internal static CodeDomProvider GetCodeProvider(Language language, bool debug = false)
