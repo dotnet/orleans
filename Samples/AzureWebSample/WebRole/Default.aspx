@@ -12,14 +12,12 @@
     <asp:UpdatePanel ID="UpdatePanel1" runat="server">
         <ContentTemplate>
             <p id="InputSpace">
-                <asp:Label ID="NameLabel" runat="server" Text="Your Name:" />
-                <asp:TextBox ID="NameTextBox" runat="server">Orleans User</asp:TextBox>
-                <asp:Button ID="ButtonSayHello" runat="server" Text="Say Hello to Orleans" 
+                <asp:Button ID="ButtonSayHello" runat="server" Text="Ask Orleans it's details" 
                     onclick="ButtonSayHello_Click" />
             </p>
             <p id="ReplySpace">
                 <asp:TextBox ID="ReplyText" runat="server" ReadOnly="true" Width="100%" 
-                    Height="200px" TextMode="MultiLine" >Hoping I will get Hello message from Orleans...</asp:TextBox>
+                    Height="200px" TextMode="MultiLine" >Hoping I will get a reply message from Orleans...</asp:TextBox>
             </p>
         </ContentTemplate>
     </asp:UpdatePanel>

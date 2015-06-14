@@ -40,7 +40,6 @@ namespace Orleans.Azure.Silos
         public override bool OnStart()
         {
             Trace.WriteLine("OrleansAzureSilos-OnStart called", "Information");
-
             Trace.WriteLine("OrleansAzureSilos-OnStart Initializing config", "Information");
 
             // Set the maximum number of concurrent connections 

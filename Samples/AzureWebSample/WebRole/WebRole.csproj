@@ -148,13 +148,13 @@
     <Content Include="Site.Master" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\HelloWorld\HelloWorldInterfaces\HelloWorldInterfaces.csproj">
-      <Project>{163CCE80-C506-468C-9B28-E2FF198097E3}</Project>
-      <Name>HelloWorldInterfaces</Name>
-    </ProjectReference>
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="packages.config" />
+    <ProjectReference Include="..\HelloEnvironmentInterfaces\HelloEnvironmentInterfaces.csproj">
+      <Project>{163cce80-c506-468c-9b28-e2ff198097e3}</Project>
+      <Name>HelloEnvironmentInterfaces</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
