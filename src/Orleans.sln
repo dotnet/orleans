@@ -32,11 +32,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansManager", "OrleansMa
 		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CounterControl", "CounterControl\CounterControl.csproj", "{F88449A1-8964-4EB9-9EFC-B913AFEBD7D1}"
-	ProjectSection(ProjectDependencies) = postProject
-		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
-	EndProjectSection
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansProviders", "OrleansProviders\OrleansProviders.csproj", "{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}"
 	ProjectSection(ProjectDependencies) = postProject
 		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
@@ -137,6 +132,7 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTestingHost", "OrleansTestingHost\OrleansTestingHost.csproj", "{40EE3B00-D381-485F-9C69-FF706837DEED}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansZooKeeperUtils", "OrleansZooKeeperUtils\OrleansZooKeeperUtils.csproj", "{45918DD2-53D9-4B27-BC6B-17C197DBC645}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCounterControl", "OrleansCounterControl\OrleansCounterControl.csproj", "{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -164,10 +160,6 @@ Global
 		{60498B15-9700-4623-BDA0-365238F2C1AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{60498B15-9700-4623-BDA0-365238F2C1AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{60498B15-9700-4623-BDA0-365238F2C1AD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F88449A1-8964-4EB9-9EFC-B913AFEBD7D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F88449A1-8964-4EB9-9EFC-B913AFEBD7D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F88449A1-8964-4EB9-9EFC-B913AFEBD7D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F88449A1-8964-4EB9-9EFC-B913AFEBD7D1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -200,6 +192,10 @@ Global
 		{45918DD2-53D9-4B27-BC6B-17C197DBC645}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{45918DD2-53D9-4B27-BC6B-17C197DBC645}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{45918DD2-53D9-4B27-BC6B-17C197DBC645}.Release|Any CPU.Build.0 = Release|Any CPU
+		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
