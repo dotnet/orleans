@@ -67,26 +67,34 @@ namespace Orleans.AzureUtils
         }
     }
 
-    internal class StatsTableDataManager : IStatisticsPublisher
+    /// <summary>
+    /// Publishes silo or client statistics to Azure Table
+    /// </summary>
+    public class StatsTableDataManager : IStatisticsPublisher
     {
-        private readonly string deploymentId;
-        private readonly string address;
-        private readonly string name;
-        private readonly bool isSilo;
-        private readonly long clientEpoch;
+        private string deploymentId;
+        private string address;
+        private string name;
+        private bool isSilo;
+        private long clientEpoch;
         private int counter;
-        private readonly string myHostName;
+        private string myHostName;
         private const string DATE_TIME_FORMAT = "yyyy-MM-dd-" + "HH:mm:ss.fff 'GMT'"; // Example: 2010-09-02 09:50:43.341 GMT - Variant of UniversalSorta­bleDateTimePat­tern
 
 
-        private readonly AzureTableDataManager<StatsTableData> tableManager;
+        private AzureTableDataManager<StatsTableData> tableManager;
         private readonly TraceLogger logger;
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        private StatsTableDataManager(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
+        private StatsTableDataManager()
         {
             logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            
+        }
+
+        async Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
+        {
             this.deploymentId = deploymentId;
             this.address = address;
             name = siloName;
@@ -99,15 +107,14 @@ namespace Orleans.AzureUtils
             counter = 0;
             var tableName = isSilo ? "OrleansSiloStatistics" : "OrleansClientStatistics";
             tableManager = new AzureTableDataManager<StatsTableData>(tableName, storageConnectionString, logger);
+            await tableManager.InitTableAsync().WithTimeout(initTimeout);
         }
 
-        internal static async Task<IStatisticsPublisher> GetManager(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
-        {
-            var instance = new StatsTableDataManager(isSilo, storageConnectionString, deploymentId, address, siloName, hostName);
-            await instance.tableManager.InitTableAsync().WithTimeout(initTimeout);
-            return instance;
-        }
-
+        /// <summary>
+        /// Writes a set of statistics to storage.
+        /// </summary>
+        /// <param name="statsCounters">Statistics to write</param>
+        /// <returns></returns>
         public Task ReportStats(List<ICounter> statsCounters)
         {
             var bulkPromises = new List<Task>();

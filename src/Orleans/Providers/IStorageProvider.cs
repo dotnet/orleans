@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Net;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 
@@ -64,6 +65,22 @@ namespace Orleans.Storage
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
         Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+    }
+
+    /// <summary>
+    /// Interface to be optionally implemented by storage providers to return richer exception details.
+    /// </summary>
+    public interface IExceptionDecoder
+    {
+        /// <summary>
+        /// Decode details of the exceprion
+        /// </summary>
+        /// <param name="e">Excption to decode</param>
+        /// <param name="httpStatusCode">HTTP status code for the error</param>
+        /// <param name="restStatus">REST status for the error</param>
+        /// <param name="getExtendedErrors">Whether or not to extract REST error code</param>
+        /// <returns></returns>
+        bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false);
     }
 
     /// <summary>

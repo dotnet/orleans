@@ -23,7 +23,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
@@ -63,6 +65,7 @@ namespace Orleans.Runtime
 
     public interface ISiloMetricsDataPublisher
     {
+        Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName);
         Task ReportMetrics(ISiloPerformanceMetrics metricsData);
     }
 
@@ -73,6 +76,7 @@ namespace Orleans.Runtime
 
     public interface IClientMetricsDataPublisher
     {
+        Task Init(ClientConfiguration config, IPAddress address, string clientId);
         Task ReportMetrics(IClientPerformanceMetrics metricsData);
     }
 
@@ -84,6 +88,7 @@ namespace Orleans.Runtime
     public interface IStatisticsPublisher
     {
         Task ReportStats(List<ICounter> statsCounters);
+        Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName);
     }
 
     public interface IConfigurableStatisticsPublisher : IStatisticsPublisher

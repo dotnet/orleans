@@ -44,7 +44,7 @@ namespace Orleans.Runtime.ReminderService
             return TaskDone.Done;
         }
 
-        public Task Init()
+        public Task Init(Guid serviceId, string deploymentId, string connectionString)
         {
             return TaskDone.Done;
         }

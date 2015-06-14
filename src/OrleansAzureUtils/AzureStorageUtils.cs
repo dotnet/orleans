@@ -22,14 +22,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
-using System.Xml;
-using System.Data.Services.Client;
-using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
@@ -73,7 +67,7 @@ namespace Orleans.AzureUtils
             return false;
         }
 
-        public static bool IsServerBusy(Exception exc)
+        internal static bool IsServerBusy(Exception exc)
         {
             HttpStatusCode httpStatusCode;
             string restStatus;
@@ -104,19 +98,19 @@ namespace Orleans.AzureUtils
         }
 
         /// <summary>
-        /// Examine a storage exception, and if applicable extracts the HTTP status code, and REST error code if <c>getExtendedErrors=true</c>.
+        /// Examine a storage exception, and if applicable extracts the HTTP status code, and REST error code if <c>getRESTErrors=true</c>.
         /// </summary>
         /// <param name="e">Exeption to be examined.</param>
         /// <param name="httpStatusCode">Output HTTP status code if applicable, otherwise HttpStatusCode.Unused (306)</param>
-        /// <param name="restStatus">When <c>getExtendedErrors=true</c>, will output REST error code if applicable, otherwise <c>null</c></param>
-        /// <param name="getExtendedErrors">Whether REST error code should also be examined / extracted.</param>
+        /// <param name="restStatus">When <c>getRESTErrors=true</c>, will output REST error code if applicable, otherwise <c>null</c></param>
+        /// <param name="getRESTErrors">Whether REST error code should also be examined / extracted.</param>
         /// <returns>Returns <c>true</c> if HTTP status code and REST error were extracted.</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static bool EvaluateException(
             Exception e,
             out HttpStatusCode httpStatusCode,
             out string restStatus,
-            bool getExtendedErrors = false)
+            bool getRESTErrors = false)
         {
             httpStatusCode = HttpStatusCode.Unused;
             restStatus = null;
@@ -129,14 +123,14 @@ namespace Orleans.AzureUtils
                     {
                         var ste = e as StorageException;
                         httpStatusCode = (HttpStatusCode)ste.RequestInformation.HttpStatusCode;
-                        if (getExtendedErrors)
+                        if (getRESTErrors)
                             restStatus = ExtractRestErrorCode(ste);
                         return true;
                     }
                     e = e.InnerException;
                 }
             }
-            catch (Exception)
+            catch
             {
                 // if we failed to parse the exception, treat it as if we could not EvaluateException.
                 return false;
@@ -271,7 +265,7 @@ namespace Orleans.AzureUtils
             }
         }
 
-        public static void ValidateTableName(string tableName)
+        internal static void ValidateTableName(string tableName)
         {
             // Table Name Rules: http://msdn.microsoft.com/en-us/library/dd179338.aspx
 
@@ -363,6 +357,34 @@ namespace Orleans.AzureUtils
                 }
             }
             return isLastErrorRetriable;
+        }
+
+        internal static string PrintStorageException(Exception exception)
+        {
+            var storeExc = exception as StorageException;
+            if(storeExc == null)
+                throw new ArgumentException(String.Format("Unexpected exception type {0}", exception.GetType().FullName));
+
+            var result = storeExc.RequestInformation;
+            if (result == null) return storeExc.Message;
+            var extendedError = storeExc.RequestInformation.ExtendedErrorInformation;
+            if (extendedError == null)
+            {
+                return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage);
+
+            }
+            return String.Format("Message = {0}, HttpStatusCode = {1}, HttpStatusMessage = {2}, " +
+                                   "ExtendedErrorInformation.ErrorCode = {3}, ExtendedErrorInformation.ErrorMessage = {4}{5}.",
+                        storeExc.Message,
+                        result.HttpStatusCode,
+                        result.HttpStatusMessage,
+                        extendedError.ErrorCode,
+                        extendedError.ErrorMessage,
+                        (extendedError.AdditionalDetails != null && extendedError.AdditionalDetails.Count > 0) ?
+                            String.Format(", ExtendedErrorInformation.AdditionalDetails = {0}", Utils.DictionaryToString(extendedError.AdditionalDetails)) : String.Empty);
         }
     }
 }

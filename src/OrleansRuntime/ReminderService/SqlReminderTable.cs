@@ -42,7 +42,7 @@ namespace Orleans.Runtime.ReminderService
             connectionString = config.DataConnectionString;
         }
 
-        public Task Init()
+        public Task Init(Guid serviceId, string deploymentId, string connectionString)
         {
             return TaskDone.Done;
         }

@@ -87,34 +87,32 @@ namespace Orleans.AzureUtils
     internal class SiloMetricsTableDataManager : ISiloMetricsDataPublisher
     {
         private const string INSTANCE_TABLE_NAME = "OrleansSiloMetrics";
-        private readonly string deploymentId;
-        private readonly SiloAddress siloAddress;
-        private readonly string siloName;
-        private readonly IPEndPoint gateway;
-        private readonly string myHostName;
+        private string deploymentId;
+        private SiloAddress siloAddress;
+        private string siloName;
+        private IPEndPoint gateway;
+        private string myHostName;
         private readonly SiloMetricsData metricsDataObject = new SiloMetricsData();
-        private readonly AzureTableDataManager<SiloMetricsData> storage;
+        private AzureTableDataManager<SiloMetricsData> storage;
         private readonly TraceLogger logger;
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        private SiloMetricsTableDataManager(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
+        public SiloMetricsTableDataManager()
+        {
+            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            
+        }
+
+        public async Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
         {
             this.deploymentId = deploymentId;
             this.siloAddress = siloAddress;
             this.siloName = siloName;
             this.gateway = gateway;
             myHostName = hostName;
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
-            storage = new AzureTableDataManager<SiloMetricsData>(
-                INSTANCE_TABLE_NAME, storageConnectionString, logger);
-        }
-
-        public static async Task<SiloMetricsTableDataManager> GetManager(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
-        {
-            var instance = new SiloMetricsTableDataManager(deploymentId, storageConnectionString, siloAddress, siloName, gateway, hostName);
-            await instance.storage.InitTableAsync().WithTimeout(initTimeout);
-            return instance;
+            storage = new AzureTableDataManager<SiloMetricsData>( INSTANCE_TABLE_NAME, storageConnectionString, logger);
+            await storage.InitTableAsync().WithTimeout(initTimeout);
         }
 
         #region IMetricsDataPublisher methods
