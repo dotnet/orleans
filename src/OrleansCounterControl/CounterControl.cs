@@ -146,7 +146,7 @@ namespace Orleans.Counter.Control
             }
             catch (Exception exc) 
             {
-                ConsoleText.WriteError("Error running CounterControl.exe", exc);
+                ConsoleText.WriteError("Error running " + Assembly.GetExecutingAssembly().GetName().Name + ".exe", exc);
 
                 if (!BruteForce) return 2;
 

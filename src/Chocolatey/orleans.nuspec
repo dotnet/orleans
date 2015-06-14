@@ -37,8 +37,8 @@
     <file src="..\..\Binaries\Release\OrleansProviders.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansRuntime.dll" target="Binaries" />
 
-    <file src="..\..\Binaries\Release\CounterControl.exe" target="Binaries" />
-    <file src="..\..\Binaries\Release\CounterControl.exe.config" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansCounterControl.exe" target="Binaries" />
+    <file src="..\..\Binaries\Release\OrleansCounterControl.exe.config" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansHost.exe" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansHost.exe.config" target="Binaries" />
     <file src="..\..\Binaries\Release\OrleansManager.exe" target="Binaries" />
@@ -47,7 +47,6 @@
     
     <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Configuration.dll" target="Binaries"/>
     <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Storage.dll" target="Binaries" />
-    <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.ServiceRuntime.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.Edm.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.OData.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.Services.Client.dll" target="Binaries" />

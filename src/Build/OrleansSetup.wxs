@@ -86,8 +86,8 @@
               <Component Id="Comp_ServerBinaries" DiskId="1" Guid="9d84d4e7-6ac7-4757-8f39-c18ac473336a">
                 <File Id="File_SE_ClientGenerator.exe" Name="ClientGenerator.exe" Source="$(var.SDK_binaries_server_src)\ClientGenerator.exe" />
                 <File Id="File_SE_ClientGenerator.exe.config" Name="ClientGenerator.exe.config" Source="$(var.SDK_binaries_server_src)\ClientGenerator.exe.config" />
-                <File Id="File_SE_CounterControl.exe" Name="CounterControl.exe" Source="$(var.SDK_binaries_server_src)\CounterControl.exe" />
-                <File Id="File_SE_CounterControl.exe.config" Name="CounterControl.exe.config" Source="$(var.SDK_binaries_server_src)\CounterControl.exe.config" />
+                <File Id="File_SE_CounterControl.exe" Name="OrleansCounterControl.exe" Source="$(var.SDK_binaries_server_src)\OrleansCounterControl.exe" />
+                <File Id="File_SE_CounterControl.exe.config" Name="OrleansCounterControl.exe.config" Source="$(var.SDK_binaries_server_src)\OrleansCounterControl.exe.config" />
                 <File Id="File_SE_Microsoft.WindowsAzure.Configuration.dll" Name="Microsoft.WindowsAzure.Configuration.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Configuration.dll" />
                 <File Id="File_SE_Microsoft.WindowsAzure.Storage.dll" Name="Microsoft.WindowsAzure.Storage.dll" Source="$(var.SDK_binaries_server_src)\Microsoft.WindowsAzure.Storage.dll" />
                 <File Id="File_SE_Microsoft.Data.Edm.dll" Name="Microsoft.Data.Edm.dll" Source="$(var.SDK_binaries_clnt_src)\Microsoft.Data.Edm.dll" />
@@ -149,8 +149,8 @@
               <File Id="File_LS_OrleansManager.exe" Name="OrleansManager.exe" Source="$(var.SDK_binaries_server_src)\OrleansManager.exe" />
               <File Id="File_LS_OrleansManager.exe.config" Name="OrleansManager.exe.config" Source="$(var.SDK_binaries_server_src)\OrleansManager.exe.config" />
               <File Id="File_LS_OrleansProviders.dll" Name="OrleansProviders.dll" Source="$(var.SDK_binaries_server_src)\OrleansProviders.dll" />
-              <File Id="File_LS_CounterControl.exe" Name="CounterControl.exe" Source="$(var.SDK_binaries_server_src)\CounterControl.exe" />
-              <File Id="File_LS_CounterControl.exe.config" Name="CounterControl.exe.config" Source="$(var.SDK_binaries_server_src)\CounterControl.exe.config" />
+              <File Id="File_LS_CounterControl.exe" Name="OrleansCounterControl.exe" Source="$(var.SDK_binaries_server_src)\OrleansCounterControl.exe" />
+              <File Id="File_LS_CounterControl.exe.config" Name="OrleansCounterControl.exe.config" Source="$(var.SDK_binaries_server_src)\OrleansCounterControl.exe.config" />
               <File Id="File_LS_OrleansConfiguration.xml" Name="OrleansConfiguration.xml" Source="$(var.SDK_binaries_server_src)\OrleansConfiguration.xml" />
               <File Id="File_LS_OrleansConfiguration.xsd" Name="OrleansConfiguration.xsd" Source="$(var.OrleansDir)\Orleans\Configuration\OrleansConfiguration.xsd" />
               <File Id="File_LS_OrleansHost.exe" Name="OrleansHost.exe" Source="$(var.SDK_binaries_server_src)\OrleansHost.exe" />
