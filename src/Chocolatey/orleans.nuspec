@@ -47,7 +47,6 @@
     
     <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Configuration.dll" target="Binaries"/>
     <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Storage.dll" target="Binaries" />
-    <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.ServiceRuntime.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.Edm.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.OData.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.Services.Client.dll" target="Binaries" />
