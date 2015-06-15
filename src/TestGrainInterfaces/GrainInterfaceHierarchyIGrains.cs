@@ -3,17 +3,29 @@ using Orleans;
 
 namespace TestGrainInterfaces
 {
-    public interface GrainInterfaceHierarchyIGrains
+    public interface IDoSomething
     {
         Task<string> DoIt();
+
+        Task SetA(int a);
+
+        Task IncrementA();
+
+        Task<int> GetA();
     }
 
-    public interface IDoSomethingWithMoreGrain : GrainInterfaceHierarchyIGrains, IGrainWithIntegerKey
+    public interface IDoSomethingWithMoreGrain : IDoSomething, IGrainWithIntegerKey
     {
         Task<string> DoThat();
+
+        Task SetB(int a);
+
+        Task IncrementB();
+
+        Task<int> GetB();
     }
 
-    public interface IDoSomethingEmptyGrain : GrainInterfaceHierarchyIGrains, IGrainWithIntegerKey
+    public interface IDoSomethingEmptyGrain : IDoSomething, IGrainWithIntegerKey
     {
     }
 
@@ -28,6 +40,11 @@ namespace TestGrainInterfaces
 
     public interface IDoSomethingCombinedGrain : IDoSomethingWithMoreGrain, IDoSomethingWithMoreEmptyGrain
     {
+        Task SetC(int a);
+
+        Task IncrementC();
+
+        Task<int> GetC();
     }
 
 }
