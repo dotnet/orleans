@@ -63,6 +63,7 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="SimplePersistentGrain.cs" />
+    <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
   </ItemGroup>
   <ItemGroup>
