@@ -123,15 +123,17 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// Decide whether this method is a remote grain call method
         /// </summary>
-        internal protected static bool IsGrainMethod(MethodInfo methodInfo)
+        internal protected static bool IsGrainMethod(MethodInfo methodInfo, Type declaringType = null)
         {
             if (methodInfo == null) throw new ArgumentNullException("methodInfo", "Cannot inspect null method info");
+            
+            var methodDeclaringGrainType = declaringType ?? methodInfo.DeclaringType;
 
             // ignore static, event, or non-remote methods
             if (methodInfo.IsStatic || methodInfo.IsSpecialName || IsSpecialEventMethod(methodInfo))
                 return false; // Methods which are derived from base class or object class, or property getter/setter methods
 
-            return methodInfo.DeclaringType.IsInterface && typeof(IAddressable).IsAssignableFrom(methodInfo.DeclaringType);
+            return methodDeclaringGrainType.IsInterface && typeof(IAddressable).IsAssignableFrom(methodDeclaringGrainType);
         }
         
         internal static CodeDomProvider GetCodeProvider(Language language, bool debug = false)
@@ -304,7 +306,7 @@ namespace Orleans.CodeGeneration
             private Dictionary<int, MethodInfo> GetGrainMethods()
             {
                 var grainMethods = new Dictionary<int, MethodInfo>();
-                foreach (var interfaceMethodInfo in GrainInterfaceData.GetMethods(InterfaceType))
+                foreach (var interfaceMethodInfo in GrainInterfaceData.GetGrainInterfaceMethods(InterfaceType, true))
                 {
                     ParameterInfo[] parameters = interfaceMethodInfo.GetParameters();
                     var args = new Type[parameters.Length];
@@ -314,7 +316,7 @@ namespace Orleans.CodeGeneration
 
                     MethodInfo methodInfo = InterfaceType.GetMethod(interfaceMethodInfo.Name, args) ?? interfaceMethodInfo;
 
-                    if (IsGrainMethod(methodInfo))
+                    if (IsGrainMethod(methodInfo, InterfaceType))
                         grainMethods.Add(GrainInterfaceData.ComputeMethodId(methodInfo), methodInfo);
                 }
                 return grainMethods;

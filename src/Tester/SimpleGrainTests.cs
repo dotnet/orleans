@@ -92,5 +92,24 @@ namespace UnitTests.General
 
             Assert.AreEqual(12, x);
         }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task SimpleGrainWithMultiInheritance()
+        {
+            ISimpleGrainWithMultiInheritance grain = GrainFactory.GetGrain<ISimpleGrainWithMultiInheritance>(GetRandomGrainId());
+            int A = 10;
+            int B = 20;
+            int C = 30;
+            await grain.SetA(A);
+            await grain.SetB(B);
+            await grain.SetC(C);
+            await grain.IncrementA();
+            await grain.IncrementB();
+            await grain.IncrementC();
+
+            Assert.AreEqual(A + 1, await grain.GetA());
+            Assert.AreEqual(B + 1, await grain.GetB());
+            Assert.AreEqual(C + 1, await grain.GetC());
+        }
     }
 }

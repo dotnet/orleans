@@ -49,6 +49,7 @@
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
+    <Compile Include="ISimpleGrainWithMultiInheritance.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />
     <Compile Include="ISimpleGrain.cs" />
