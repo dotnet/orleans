@@ -126,6 +126,10 @@
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansCounterControl\OrleansCounterControl.csproj">
+      <Project>{606b9647-cc0c-4058-bfbc-b5b7ed4f3c56}</Project>
+      <Name>OrleansCounterControl</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansHost\OrleansHost.csproj">
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>
       <Name>OrleansHost</Name>
@@ -145,6 +149,10 @@
     <ProjectReference Include="..\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
       <Name>OrleansTestingHost</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansZooKeeperUtils\OrleansZooKeeperUtils.csproj">
+      <Project>{45918dd2-53d9-4b27-bc6b-17c197dbc645}</Project>
+      <Name>OrleansZooKeeperUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
