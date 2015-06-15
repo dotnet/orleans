@@ -4,8 +4,8 @@ title: Runtime Implemention Details
 ---
 {% include JB/setup %}
 
-### [Cluster Management](Cluster-Management.html)
+### [Cluster Management](Cluster-Management)
 
-### [Messaging Delivery Guarantees](Messaging-Delivery-Guarantees.html)
+### [Messaging Delivery Guarantees](Messaging-Delivery-Guarantees)
 
-### [Runtime Tables](Runtime-Tables.html)
+### [Runtime Tables](Runtime-Tables)
