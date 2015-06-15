@@ -13,6 +13,9 @@ namespace UnitTests.GrainInterfaces
 
     public interface ISimpleServiceInterfaceA
     {
+        //Test: Uncommenting this property should throw compile error during code generation since Properties are not supported on grain interfaces.
+        //int A { get; set; }
+
         Task SetA(int a);
 
         Task IncrementA();

@@ -198,8 +198,6 @@ namespace Orleans.CodeGeneration
                 var parentInterfaces = interfaceType.GetInterfaces();
                 foreach (var parent in parentInterfaces)
                 {
-                    //no need for recursion as .GetInterfaces() actually returns all parent interfaces at all levels.
-                    //GetInterfaceMethods(parent, ref methodInfos, bIncludeAllParentsMethods);
                     infos = parent.GetMethods();
                     foreach (var methodInfo in infos)
                         if (!methodInfos.Contains(methodInfo, methodComparer))
@@ -249,8 +247,6 @@ namespace Orleans.CodeGeneration
                 var parentInterfaces = interfaceType.GetInterfaces();
                 foreach (var parent in parentInterfaces)
                 {
-                    //no need for recursion as .GetInterfaces() actually returns all parent interfaces at all levels.
-                    //GetInterfaceProperties(parent, ref propertyInfos, bIncludeAllParentsMethods);
                     infos = parent.GetProperties();
                     foreach (var propInfo in infos)
                         if (!propertyInfos.Contains(propInfo, propertyComparator))
