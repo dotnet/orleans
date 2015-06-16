@@ -26,7 +26,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
     /// <summary>
     /// Marker interface for grain extensions, used by internal runtime extension endpoints
     /// </summary>
-    public interface IGrainExtension
+    public interface IGrainExtension : IAddressable
     {
     }
 }

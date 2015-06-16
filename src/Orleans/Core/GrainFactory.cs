@@ -154,6 +154,17 @@ namespace Orleans
         public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
         {
+            return CreateObjectReferenceImpl<TGrainObserverInterface>(obj);
+        }
+
+        internal Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
+                where TGrainObserverInterface : IAddressable
+        {
+            return CreateObjectReferenceImpl<TGrainObserverInterface>(obj);
+        }
+
+        private Task<TGrainObserverInterface> CreateObjectReferenceImpl<TGrainObserverInterface>(object obj)
+        {
             var interfaceType = typeof(TGrainObserverInterface);
             if (!interfaceType.IsInterface)
             {

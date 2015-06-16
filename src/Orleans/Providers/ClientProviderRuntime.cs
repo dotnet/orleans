@@ -130,11 +130,6 @@ namespace Orleans.Providers
             IAddressable addressable;
             TExtension extension;
 
-            // until we have a means to get the factory related to a grain interface, we have to search linearly for the factory. 
-            var factoryName = String.Format("{0}.{1}Factory", typeof(TExtensionInterface).Namespace, typeof(TExtensionInterface).Name.Substring(1)); // skip the I
-            var factoryType = TypeUtils.ResolveType(factoryName);
-
-
             using (await lockable.LockAsync())
             {
                 Tuple<IGrainExtension, IAddressable> entry;
@@ -144,11 +139,10 @@ namespace Orleans.Providers
                     addressable = entry.Item2;
                 }
                 else
-                {
+                { 
                     extension = newExtensionFunc();
-                    var obj = factoryType.InvokeMember("CreateObjectReference", 
-                        BindingFlags.Default | BindingFlags.InvokeMethod, 
-                        null, null, new object[]{ extension }, CultureInfo.InvariantCulture);
+                    var obj = ((Orleans.GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
+
                     addressable = (IAddressable) await (Task<TExtensionInterface>) obj;
 
                     if (null == addressable)
@@ -160,12 +154,7 @@ namespace Orleans.Providers
                 }
             }
 
-            var typedAddressable = (TExtensionInterface) GrainClient.InvokeStaticMethodThroughReflection(
-                 typeof(TExtensionInterface).Assembly.FullName,
-                 factoryName,
-                 "Cast",
-                 new Type[] { typeof(IAddressable) },
-                 new object[] { addressable });
+            var typedAddressable = Orleans.GrainFactory.Cast<TExtensionInterface>(addressable);
             // we have to return the extension as well as the IAddressable because the caller needs to root the extension
             // to prevent it from being collected (the IAddressable uses a weak reference).
             return Tuple.Create(extension, typedAddressable);
