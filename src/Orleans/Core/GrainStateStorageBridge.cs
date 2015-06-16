@@ -178,7 +178,7 @@ namespace Orleans.Core
             var httpStatusCode = HttpStatusCode.Unused;
             string errorCode = String.Empty;
 
-            var decoder = store as IExceptionDecoder;
+            var decoder = store as IStorageExceptionDecoder;
             if(decoder != null)
                 decoder.DecodeException(exc, out httpStatusCode, out errorCode, true);
 

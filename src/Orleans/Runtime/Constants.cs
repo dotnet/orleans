@@ -39,6 +39,9 @@ namespace Orleans.Runtime
         public const string MEMORY_STORAGE_PROVIDER_NAME = "MemoryStore";
         public const string DATA_CONNECTION_STRING_NAME = "DataConnectionString";
 
+        public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils.dll";
+        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils.dll";
+
         public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);
         public static readonly GrainId DirectoryCacheValidatorId = GrainId.GetSystemTargetGrainId(11);
         public static readonly GrainId SiloControlId = GrainId.GetSystemTargetGrainId(12);

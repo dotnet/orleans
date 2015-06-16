@@ -226,7 +226,7 @@ namespace UnitTests.LivenessTests
 
                 case GlobalConfiguration.LivenessProviderType.ZooKeeper:
                     config.DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString();
-                    membership = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>("OrleansZooKeeperUtils.dll",logger);
+                    membership = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
                     break;
 
                 default:

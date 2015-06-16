@@ -220,7 +220,10 @@ namespace Orleans.Runtime.Management
             if (membershipTable == null)
             {
                 var factory = new MembershipFactory();
-                membershipTable = await factory.GetMembershipTable(Silo.CurrentSilo);
+                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType);
+
+                await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
+                    TraceLogger.GetLogger(membershipTable.GetType().Name));
             }
             return membershipTable;
         }
