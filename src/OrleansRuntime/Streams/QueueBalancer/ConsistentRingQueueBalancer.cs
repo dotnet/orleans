@@ -29,7 +29,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal class ConsistentRingQueueBalancer : IGrainRingRangeListener, IStreamQueueBalancer
+    internal class ConsistentRingQueueBalancer : IAsyncRingRangeListener, IStreamQueueBalancer
     {
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners = new List<IStreamQueueBalanceListener>();
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;

@@ -29,7 +29,7 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Runtime.MembershipService
 {
     [Reentrant]
-    internal class GrainBasedMembershipTable : Grain, IMembershipTable
+    internal class GrainBasedMembershipTable : Grain, IMembershipTableGrain
     {
         private InMemoryMembershipTable table;
         private TraceLogger logger;

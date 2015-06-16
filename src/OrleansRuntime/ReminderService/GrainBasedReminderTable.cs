@@ -30,7 +30,7 @@ using Orleans.Concurrency;
 namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
-    internal class GrainBasedReminderTable : Grain, IReminderTable
+    internal class GrainBasedReminderTable : Grain, IReminderTableGrain
     {
         private InMemoryRemindersTable remTable;
         private TraceLogger logger;

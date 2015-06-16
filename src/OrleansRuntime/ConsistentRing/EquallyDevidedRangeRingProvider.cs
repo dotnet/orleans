@@ -32,7 +32,7 @@ namespace Orleans.Runtime.ConsistentRing
     internal class EquallyDevidedRangeRingProvider : IConsistentRingProviderForGrains, IRingRangeListener
     {
         private readonly IConsistentRingProvider ringProvider;
-        private readonly List<IGrainRingRangeListener> grainStatusListeners;
+        private readonly List<IAsyncRingRangeListener> grainStatusListeners;
         private readonly TraceLogger logger;
         private readonly int numSubRanges;
         private readonly int mySubRangeIndex;
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.ConsistentRing
             ringProvider = provider;
             this.numSubRanges = numSubRanges;
             this.mySubRangeIndex = mySubRangeIndex;
-            grainStatusListeners = new List<IGrainRingRangeListener>();
+            grainStatusListeners = new List<IAsyncRingRangeListener>();
             ringProvider.SubscribeToRangeChangeEvents(this);
             logger = TraceLogger.GetLogger(typeof(EquallyDevidedRangeRingProvider).Name);
         }
@@ -62,7 +62,7 @@ namespace Orleans.Runtime.ConsistentRing
             return equallyDevidedMultiRange.GetSubRange(mySubRangeIndex);
         }
 
-        public bool SubscribeToRangeChangeEvents(IGrainRingRangeListener observer)
+        public bool SubscribeToRangeChangeEvents(IAsyncRingRangeListener observer)
         {
             lock (grainStatusListeners)
             {
@@ -73,7 +73,7 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        public bool UnSubscribeFromRangeChangeEvents(IGrainRingRangeListener observer)
+        public bool UnSubscribeFromRangeChangeEvents(IAsyncRingRangeListener observer)
         {
             lock (grainStatusListeners)
             {
@@ -98,12 +98,12 @@ namespace Orleans.Runtime.ConsistentRing
 
             logger.Info("-NotifyLocal GrainRangeSubscribers about old {0} and new {1} increased? {2}.", oldSubRange.ToString(), newSubRange.ToString(), increased);
 
-            List<IGrainRingRangeListener> copy;
+            List<IAsyncRingRangeListener> copy;
             lock (grainStatusListeners)
             {
                 copy = grainStatusListeners.ToList();
             }
-            foreach (IGrainRingRangeListener listener in copy)
+            foreach (IAsyncRingRangeListener listener in copy)
             {
                 try
                 {
