@@ -16,9 +16,10 @@ Installation
 =======
 The stable production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-The latest development branch build from CI is [orleans_setup.msi](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/ws/Binaries/Release/orleans_setup.msi) located: [here](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/ws/Binaries/Release/)
+The latest clean development branch build from CI is located: [here](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/lastStableBuild/Azure/)
 
-Alternatively, you can clone the sources, run build.cmd to build and install orleans_setup.msi. 
+Alternatively, you can clone the sources from GitHub, and run the Build.cmd script to build Binaries locally. 
+Then just xcopy Binaries\Release\* or reference Binaries\NuGet.Packages\* or install Binaries\Release\orleans_setup.msi.
 
 Documentation 
 =======
