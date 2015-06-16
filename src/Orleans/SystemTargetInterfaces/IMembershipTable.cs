@@ -34,8 +34,9 @@ namespace Orleans
     /// <summary>
     /// Interface for Membership Table.
     /// </summary>
-    [Unordered]
-    public interface IMembershipTable : IGrain
+    //Removing the inheritance from IGrain since it is not applicable to all implementations of IMembershipTable. 
+    //Instead, creating a new interface IMembershipTableGrain which extends this one and will be used by the grain based implementation.    
+    public interface IMembershipTable
     {
         /// <summary>
         /// Initializes the membership table, will be called before all other methods
@@ -119,7 +120,16 @@ namespace Orleans
         /// <returns>Task representing the successful execution of this operation. </returns>
         Task UpdateIAmAlive(MembershipEntry entry);
     }
-    
+
+    /// <summary>
+    /// Membership table interface for grain based implementation.
+    /// </summary>
+    [Unordered]
+    public interface IMembershipTableGrain : IGrain, IMembershipTable
+    {
+        
+    }
+
     [Serializable]
     [Immutable]
     public class TableVersion
