@@ -29,6 +29,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
+using Orleans.AzureUtils;
 
 
 namespace UnitTests.StorageTests
@@ -58,6 +59,12 @@ namespace UnitTests.StorageTests
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
+            TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("Storage", Logger.Severity.Verbose3);
+
+            // Set shorter init timeout for these tests
+            OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
 
             //Starts the storage emulator if not started already and it exists (i.e. is installed).
             if(!StorageEmulator.TryStart())
@@ -95,120 +102,63 @@ namespace UnitTests.StorageTests
                 membership.DeleteMembershipTableEntries(deploymentId).Wait();
                 membership = null;
             }
+            Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+        }
+
+        [ClassCleanup]
+        public static void ClassCleanup()
+        {
+            // Reset init timeout after tests
+            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
+        public async Task MT_Init_Azure()
+        {
+            var membership = await MembershipTablePluginTests.GetMemebershipTable_Azure();
+            Assert.IsNotNull(membership, "Membership Table handler created");
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
+        public async Task MT_ReadAll_Azure()
+        {
+            var membership = await MembershipTablePluginTests.GetMemebershipTable_Azure();
+            await MembershipTablePluginTests.MembershipTable_ReadAll(membership);
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
+        public async Task MT_InsertRow_Azure()
+        {
+            var membership = await MembershipTablePluginTests.GetMemebershipTable_Azure();
+            await MembershipTablePluginTests.MembershipTable_InsertRow(membership);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadAll_0()
         {
-            MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            string eTag = tableVersion.VersionEtag;
-            int ver = tableVersion.Version;
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.AreEqual(0, ver, "Initial tabel version should be zero");
+            var membership = await MembershipTablePluginTests.GetMemebershipTable_Azure();
+            await MembershipTablePluginTests.MembershipTable_ReadAll_0(membership);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadRow_0()
         {
-            MembershipTableData data = await membership.ReadRow(siloAddress);
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            string eTag = tableVersion.VersionEtag;
-            int ver = tableVersion.Version;
-
-            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} TableVersion={1}", eTag, tableVersion);
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.AreEqual(0, ver, "Initial tabel version should be zero");
+            var membership = await MembershipTablePluginTests.GetMemebershipTable_Azure();
+            await MembershipTablePluginTests.MembershipTable_ReadRow_0(membership, siloAddress);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadRow_1()
         {
-            MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            DateTime now = DateTime.UtcNow;
-            MembershipEntry entry = new MembershipEntry
-            {
-                SiloAddress = siloAddress,
-                StartTime = now,
-                Status = SiloStatus.Active,
-            };
-
-            TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(entry, newTableVersion);
-
-            Assert.IsTrue(ok, "InsertRow completed successfully");
-
-            data = await membership.ReadRow(siloAddress);
-            tableVersion = data.Version;
-            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
-
-            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
-            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
-            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
-
-            MembershipEntry MembershipEntry = data.Members[0].Item1;
-            string eTag = data.Members[0].Item2;
-            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} Entry={1}", eTag, MembershipEntry);
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
+            var membership = await MembershipTablePluginTests.GetMemebershipTable_Azure();
+            await MembershipTablePluginTests.MembershipTable_ReadRow_1(membership, siloAddress);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureMembership_ReadAll_1()
         {
-            MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            DateTime now = DateTime.UtcNow;
-            MembershipEntry entry = new MembershipEntry
-            {
-                SiloAddress = siloAddress,
-                StartTime = now,
-                Status = SiloStatus.Active,
-            };
-
-            TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(entry, newTableVersion);
-
-            Assert.IsTrue(ok, "InsertRow completed successfully");
-
-            data = await membership.ReadAll();
-            tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
-
-            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
-            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
-            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
-
-            MembershipEntry MembershipEntry = data.Members[0].Item1;
-            string eTag = data.Members[0].Item2;
-            logger.Info("Membership.ReadAll returned MembershipEntry ETag={0} Entry={1}", eTag, MembershipEntry);
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
+            var membership = await MembershipTablePluginTests.GetMemebershipTable_Azure();
+            await MembershipTablePluginTests.MembershipTable_ReadAll_1(membership, siloAddress);
         }
     }
 }

@@ -32,7 +32,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
 
-namespace UnitTests.LivenessTests
+namespace UnitTests.StorageTests
 {
     [TestClass]
     [DeploymentItem(@"Data\TestDb.mdf")]
@@ -40,85 +40,29 @@ namespace UnitTests.LivenessTests
     {
         public TestContext TestContext { get; set; }
         private static int counter;
-        private static string hostName;
+        private static string hostName = Dns.GetHostName();
         private static readonly TraceLogger logger = TraceLogger.GetLogger("MembershipTablePluginTests");
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            hostName = Dns.GetHostName();
-
-            var cfg = new NodeConfiguration();
-            TraceLogger.Initialize(cfg);
-
-            TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Logger.Severity.Verbose3);
-            TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Logger.Severity.Verbose3);
-            TraceLogger.AddTraceLevelOverride("Storage", Logger.Severity.Verbose3);
-
-            // Set shorter init timeout for these tests
-            OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
-
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if(!StorageEmulator.TryStart())
-            {
-                Console.WriteLine("Azure Storage Emulator could not be started.");
-            }
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            // Reset init timeout after tests
-            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-        }
-
         // Test methods 
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
-        public async Task MT_Init_Azure()
-        {
-            var membership = await GetMemebershipTable_Azure();
-            Assert.IsNotNull(membership, "Membership Table handler created");
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
-        public async Task MT_ReadAll_Azure()
-        {
-            var membership = await GetMemebershipTable_Azure();
-            await MembershipTable_ReadAll(membership);
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
-        public async Task MT_InsertRow_Azure()
-        {
-            var membership = await GetMemebershipTable_Azure();
-            await MembershipTable_InsertRow(membership);
-        }
 
         [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_Init_SqlServer()
         {
-            var membership = await GetMemebershipTable_SQL();
+            var membership = await GetMemebershipTable_SQL(TestContext.DeploymentDirectory);
             Assert.IsNotNull(membership, "Membership Table handler created");
         }
 
         [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_ReadAll_SqlServer()
         {
-            var membership = await GetMemebershipTable_SQL();
+            var membership = await GetMemebershipTable_SQL(TestContext.DeploymentDirectory);
             await MembershipTable_ReadAll(membership);
         }
 
         [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_InsertRow_SqlServer()
         {
-            var membership = await GetMemebershipTable_SQL();
+            var membership = await GetMemebershipTable_SQL(TestContext.DeploymentDirectory);
             await MembershipTable_InsertRow(membership);
         }
 
@@ -145,29 +89,28 @@ namespace UnitTests.LivenessTests
 
         // Test function methods
 
-        private async Task<IMembershipTable> GetMemebershipTable_Azure()
+        internal static async Task<IMembershipTable> GetMemebershipTable_Azure()
         {
             return await GetMembershipTable(GlobalConfiguration.LivenessProviderType.AzureTable);
         }
 
-        private async Task<IMembershipTable> GetMemebershipTable_SQL()
+        internal static async Task<IMembershipTable> GetMemebershipTable_SQL(string deploymentDirectory)
         {
-            return await GetMembershipTable(GlobalConfiguration.LivenessProviderType.SqlServer);
+            return await GetMembershipTable(GlobalConfiguration.LivenessProviderType.SqlServer, deploymentDirectory);
         }
 
-        private async Task<IMembershipTable> GetMembershipTable_ZooKeeper()
+        internal static async Task<IMembershipTable> GetMembershipTable_ZooKeeper()
         {
             return await GetMembershipTable(GlobalConfiguration.LivenessProviderType.ZooKeeper);
         }
 
-
-        private async Task MembershipTable_ReadAll(IMembershipTable membership)
+        internal static async Task MembershipTable_ReadAll(IMembershipTable membership)
         {
             var membershipData = await membership.ReadAll();
             Assert.IsNotNull(membershipData, "Membership Data not null");
         }
 
-        private async Task MembershipTable_InsertRow(IMembershipTable membership)
+        internal static async Task MembershipTable_InsertRow(IMembershipTable membership)
         {
             var membershipEntry = CreateMembershipEntryForTest();
 
@@ -182,6 +125,115 @@ namespace UnitTests.LivenessTests
             Assert.AreEqual(1, membershipData.Members.Count, "Should be one row after insert: {0}", membershipData);
         }
 
+        internal static async Task MembershipTable_ReadAll_0(IMembershipTable membership)
+        {
+            MembershipTableData data = await membership.ReadAll();
+            TableVersion tableVersion = data.Version;
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+
+            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
+
+            string eTag = tableVersion.VersionEtag;
+            int ver = tableVersion.Version;
+
+            Assert.IsNotNull(eTag, "ETag should not be null");
+            Assert.AreEqual(0, ver, "Initial tabel version should be zero");
+        }
+
+        internal static async Task MembershipTable_ReadRow_0(IMembershipTable membership, SiloAddress siloAddress)
+        {
+            MembershipTableData data = await membership.ReadRow(siloAddress);
+            TableVersion tableVersion = data.Version;
+            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
+
+            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
+
+            string eTag = tableVersion.VersionEtag;
+            int ver = tableVersion.Version;
+
+            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} TableVersion={1}", eTag, tableVersion);
+
+            Assert.IsNotNull(eTag, "ETag should not be null");
+            Assert.AreEqual(0, ver, "Initial tabel version should be zero");
+        }
+
+        internal static async Task MembershipTable_ReadRow_1(IMembershipTable membership, SiloAddress siloAddress)
+        {
+            MembershipTableData data = await membership.ReadAll();
+            TableVersion tableVersion = data.Version;
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+
+            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
+
+            DateTime now = DateTime.UtcNow;
+            MembershipEntry entry = new MembershipEntry
+            {
+                SiloAddress = siloAddress,
+                StartTime = now,
+                Status = SiloStatus.Active,
+            };
+
+            TableVersion newTableVersion = tableVersion.Next();
+            bool ok = await membership.InsertRow(entry, newTableVersion);
+
+            Assert.IsTrue(ok, "InsertRow completed successfully");
+
+            data = await membership.ReadRow(siloAddress);
+            tableVersion = data.Version;
+            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
+
+            Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
+
+            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
+            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
+            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
+
+            MembershipEntry MembershipEntry = data.Members[0].Item1;
+            string eTag = data.Members[0].Item2;
+            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} Entry={1}", eTag, MembershipEntry);
+
+            Assert.IsNotNull(eTag, "ETag should not be null");
+            Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
+        }
+
+        internal static async Task MembershipTable_ReadAll_1(IMembershipTable membership, SiloAddress siloAddress)
+        {
+            MembershipTableData data = await membership.ReadAll();
+            TableVersion tableVersion = data.Version;
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+
+            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
+
+            DateTime now = DateTime.UtcNow;
+            MembershipEntry entry = new MembershipEntry
+            {
+                SiloAddress = siloAddress,
+                StartTime = now,
+                Status = SiloStatus.Active,
+            };
+
+            TableVersion newTableVersion = tableVersion.Next();
+            bool ok = await membership.InsertRow(entry, newTableVersion);
+
+            Assert.IsTrue(ok, "InsertRow completed successfully");
+
+            data = await membership.ReadAll();
+            tableVersion = data.Version;
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+
+            Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
+
+            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
+            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
+            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
+
+            MembershipEntry MembershipEntry = data.Members[0].Item1;
+            string eTag = data.Members[0].Item2;
+            logger.Info("Membership.ReadAll returned MembershipEntry ETag={0} Entry={1}", eTag, MembershipEntry);
+
+            Assert.IsNotNull(eTag, "ETag should not be null");
+            Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
+        }
         // Utility methods
 
         private static MembershipEntry CreateMembershipEntryForTest()
@@ -204,7 +256,8 @@ namespace UnitTests.LivenessTests
             return membershipEntry;
         }
 
-        private async Task<IMembershipTable> GetMembershipTable(GlobalConfiguration.LivenessProviderType membershipType)
+        private static async Task<IMembershipTable> GetMembershipTable(GlobalConfiguration.LivenessProviderType membershipType, 
+            string deploymentDirectory = null)
         {
             string runId = Guid.NewGuid().ToString("N");
 
@@ -220,7 +273,7 @@ namespace UnitTests.LivenessTests
                     break;
 
                 case GlobalConfiguration.LivenessProviderType.SqlServer:
-                    config.DataConnectionString = StorageTestConstants.GetSqlConnectionString(TestContext.DeploymentDirectory);
+                    config.DataConnectionString = StorageTestConstants.GetSqlConnectionString(deploymentDirectory);
                     membership = new SqlMembershipTable();
                     break;
 
