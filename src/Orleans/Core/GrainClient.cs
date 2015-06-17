@@ -364,43 +364,5 @@ namespace Orleans
                 return outsideRuntimeClient.Gateways;
             }
         }
-
-        internal static MethodInfo GetStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes)
-        {
-            var asm = Assembly.Load(assemblyName);
-            if (asm == null) 
-                throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null) 
-                throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            MethodInfo method;
-            method = argumentTypes == null 
-                ? cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) 
-                : cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, argumentTypes, null);
-            
-            if (method == null) 
-                throw new InvalidOperationException(string.Format("Cannot find static method {0} of class {1} in assembly {2}", methodName, className, assemblyName));
-
-            return method;
-        }
-
-        internal static object InvokeStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes, object[] arguments)
-        {
-            var method = GetStaticMethodThroughReflection(assemblyName, className, methodName, argumentTypes);
-            return method.Invoke(null, arguments);
-        }
-
-        internal static Type LoadTypeThroughReflection(string assemblyName, string className)
-        {
-            var asm = Assembly.Load(assemblyName);
-            if (asm == null) throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null) throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            return cl;
-        }
     }
 }

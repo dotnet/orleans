@@ -466,7 +466,7 @@ namespace Orleans.Runtime.ReminderService
                 Identity = new ReminderIdentity(entry.GrainRef, entry.ReminderName);
                 firstTickTime = entry.StartAt;
                 period = entry.Period;
-                remindable = RemindableFactory.Cast(entry.GrainRef);
+                remindable = GrainFactory.Cast<IRemindable>(entry.GrainRef);
                 ETag = entry.ETag;
                 LocalSequenceNumber = -1;
             }

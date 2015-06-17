@@ -133,7 +133,6 @@ namespace Orleans.Runtime.Providers
             where TExtensionInterface : IGrainExtension
         {
             // Hookup Extension.
-            IAddressable currentGrain = RuntimeClient.Current.CurrentActivationData.GrainInstance;
             TExtension extension;
             if (!TryGetExtensionHandler(out extension))
             {
@@ -142,13 +141,8 @@ namespace Orleans.Runtime.Providers
                     throw new OrleansException("Failed to register " + typeof(TExtension).Name);
             }
 
-            var factoryName = String.Format("{0}.{1}Factory", typeof(TExtensionInterface).Namespace, typeof(TExtensionInterface).Name.Substring(1)); // skip the I
-            var currentTypedGrain = (TExtensionInterface) GrainClient.InvokeStaticMethodThroughReflection(
-                typeof(TExtensionInterface).Assembly.FullName,
-                factoryName,
-                "Cast",
-                new Type[] { typeof(IAddressable) },
-                new object[] { currentGrain });
+            IAddressable currentGrain = RuntimeClient.Current.CurrentActivationData.GrainInstance;
+            var currentTypedGrain = currentGrain.AsReference<TExtensionInterface>();
 
             return Task.FromResult(Tuple.Create(extension, currentTypedGrain));
         }

@@ -31,7 +31,7 @@ namespace Orleans.Streams
 {
     // This is the extension interface for stream consumers
     [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
-    internal interface IStreamConsumerExtension : IGrain, IGrainExtension
+    internal interface IStreamConsumerExtension : IGrainExtension
     {
         Task DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token);
         Task DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> item);
@@ -41,7 +41,7 @@ namespace Orleans.Streams
 
     // This is the extension interface for stream producers
     [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
-    internal interface IStreamProducerExtension : IGrain, IGrainExtension
+    internal interface IStreamProducerExtension : IGrainExtension
     {
         [AlwaysInterleave]
         Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
