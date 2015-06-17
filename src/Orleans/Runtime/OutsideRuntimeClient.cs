@@ -65,8 +65,8 @@ namespace Orleans
         private GrainInterfaceMap grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
-        // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, whcih was 3 min
-        private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(3);
+        // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
+        private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
 
         private const string BARS = "----------";
 
