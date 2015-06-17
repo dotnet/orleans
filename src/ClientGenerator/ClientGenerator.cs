@@ -347,11 +347,22 @@ namespace Orleans.CodeGeneration
                     }
                 }
 
-                if (options.ServerGen && !type.IsAbstract && (TypeUtils.IsGrainClass(type) || TypeUtils.IsSystemTargetClass(type)))
+                if (options.ServerGen && !type.IsAbstract && (GrainInterfaceData.IsAddressable(type)))
                 {
                     var grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage.Value);
-                    var grainInterfaceData = GrainInterfaceData.FromGrainClass(type, options.TargetLanguage.Value);
-                    grainNamespace.AddStateClass(grainInterfaceData);
+                    try
+                    {
+                        var grainInterfaceData = GrainInterfaceData.FromGrainClass(type, options.TargetLanguage.Value);
+                        grainNamespace.AddStateClass(grainInterfaceData);
+                    }
+                    catch (GrainInterfaceData.RulesViolationException rve)
+                    {
+                        //Note: I have a separate try/catch here since we are issuing warnings instead of compile error unlike the Grain Interface validations above.
+                        //Question: Should we instead throw compile errors?
+                        //Question: What warning number should we use? Standard C# warning/error numbers are listed here: https://msdn.microsoft.com/en-us/library/ms228296(v=vs.90).aspx                        
+                        foreach (var v in rve.Violations)
+                            ConsoleText.WriteUsage(string.Format("Warning CS0184 : {0}", v));
+                    }
                 }
             }
 
