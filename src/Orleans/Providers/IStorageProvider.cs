@@ -70,7 +70,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Interface to be optionally implemented by storage providers to return richer exception details.
     /// </summary>
-    public interface IExceptionDecoder
+    public interface IRestExceptionDecoder
     {
         /// <summary>
         /// Decode details of the exceprion

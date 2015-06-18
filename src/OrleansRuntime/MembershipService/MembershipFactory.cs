@@ -49,47 +49,35 @@ namespace Orleans.Runtime.MembershipService
             return TaskDone.Done;
         }
 
-        internal async Task<IMembershipOracle> CreateMembershipOracle(Silo silo)
+        internal IMembershipOracle CreateMembershipOracle(Silo silo, IMembershipTable membershipTable)
         {
             var livenessType = silo.GlobalConfig.LivenessType;
             logger.Info("Creating membership oracle for type={0}", Enum.GetName(typeof(GlobalConfiguration.LivenessProviderType), livenessType));
-
-            IMembershipTable membershipTable = await GetMembershipTable(silo);
-            return membershipTable == null ? null : new MembershipOracle(silo, membershipTable);
+            return new MembershipOracle(silo, membershipTable);
         }
 
-        internal async Task<IMembershipTable> GetMembershipTable(Silo silo)
+        internal IMembershipTable GetMembershipTable(GlobalConfiguration.LivenessProviderType livenessType)
         {
-            var config = silo.GlobalConfig;
-
             IMembershipTable membershipTable;
-            GlobalConfiguration.LivenessProviderType livenessType = config.LivenessType;
             if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
             {
-                membershipTable =
-                    GrainFactory.Cast<IMembershipTableGrain>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+                membershipTable = GrainFactory.Cast<IMembershipTableGrain>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+            }
+            else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
+            {
+                membershipTable = new SqlMembershipTable();
+            }
+            else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
+            {
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+            }
+            else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.ZooKeeper))
+            {
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
             }
             else
             {
-                if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
-                {
-                    membershipTable = new SqlMembershipTable();
-                }
-                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
-                {
-                    membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>("OrleansAzureUtils.dll", logger);
-                }
-                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.ZooKeeper))
-                {
-                    membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
-                        "OrleansZooKeeperUtils.dll", logger);
-                }
-                else
-                {
-                    throw new NotImplementedException("No membership table provider found for LivenessType=" +
-                                                      livenessType);
-                }
-                await membershipTable.InitializeMembershipTable(config, true, TraceLogger.GetLogger(membershipTable.GetType().Name));
+                throw new NotImplementedException("No membership table provider found for LivenessType=" + livenessType);
             }
 
             return membershipTable;

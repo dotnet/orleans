@@ -76,7 +76,7 @@ namespace UnitTests.StorageTests
                 DeploymentId = deploymentId,
                 DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString()
             };
-            membership = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>("OrleansZooKeeperUtils.dll", logger);
+            membership = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
             membership.InitializeMembershipTable(config, true, logger).WaitWithThrow(timeout);
         }
 

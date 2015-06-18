@@ -896,7 +896,7 @@ namespace Orleans.Runtime
 
         public static void SetExceptionDecoder(Type exceptionType, Func<Exception, string> decoder)
         {
-            exceptionDecoders[exceptionType] = decoder;
+            exceptionDecoders.TryAdd(exceptionType, decoder);
         }
 
         private static string PrintException_Helper(Exception exception, int level, bool includeStackTrace)
@@ -949,8 +949,10 @@ namespace Orleans.Runtime
             
             string message = exception.Message;
             var excType = exception.GetType();
-            if ( exceptionDecoders.ContainsKey(excType))
-                message = exceptionDecoders[excType](exception);
+
+            Func<Exception, string> decoder;
+            if (exceptionDecoders.TryGetValue(excType, out decoder))
+                message = decoder(exception);
             
             return String.Format(Environment.NewLine + "Exc level {0}: {1}: {2}{3}",
                 level,

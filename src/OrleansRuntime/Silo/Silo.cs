@@ -405,7 +405,8 @@ namespace Orleans.Runtime
             siloStatistics.SetSiloStatsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
             siloStatistics.SetSiloMetricsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
 
-            membershipOracle = membershipFactory.CreateMembershipOracle(this).WaitForResultWithThrow(initTimeout);
+            IMembershipTable membershipTable = membershipFactory.GetMembershipTable(this.GlobalConfig.LivenessType);
+            membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
             
             // This has to follow the above steps that start the runtime components
             CreateSystemTargets();
@@ -439,6 +440,10 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
+
+            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(this.GlobalConfig, true, TraceLogger.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
+                .WaitWithThrow(initTimeout);
+
             bool waitForPrimaryToStart = globalConfig.PrimaryNodeIsRequired && siloType != SiloType.Primary;
             scheduler.QueueTask(() => LocalSiloStatusOracle.Start(waitForPrimaryToStart), statusOracleContext)
                 .WaitWithThrow(initTimeout);

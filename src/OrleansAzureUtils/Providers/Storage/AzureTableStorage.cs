@@ -65,7 +65,7 @@ namespace Orleans.Storage
     ///   &lt;/StorageProviders>
     /// </code>
     /// </example>
-    public class AzureTableStorage : IStorageProvider, IExceptionDecoder
+    public class AzureTableStorage : IStorageProvider, IRestExceptionDecoder
     {
         private const string DATA_CONNECTION_STRING = "DataConnectionString";
         private const string TABLE_NAME_PROPERTY = "TableName";

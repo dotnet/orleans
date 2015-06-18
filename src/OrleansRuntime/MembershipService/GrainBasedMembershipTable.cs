@@ -34,27 +34,28 @@ namespace Orleans.Runtime.MembershipService
         private InMemoryMembershipTable table;
         private TraceLogger logger;
 
-        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
-        {
-            throw new InvalidOperationException("This method should not be called directly");
-        }
-
-        public Task DeleteMembershipTableEntries(string deploymentId)
-        {
-            throw new InvalidOperationException("This method should not be called directly");
-        }
-
         public override Task OnActivateAsync()
         {
             logger = TraceLogger.GetLogger("GrainBasedMembershipTable", TraceLogger.LoggerType.Runtime);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
-            table = new InMemoryMembershipTable();
             return TaskDone.Done;
         }
 
         public override Task OnDeactivateAsync()
         {
             logger.Info("GrainBasedMembershipTable Deactivated.");
+            return TaskDone.Done;
+        }
+
+        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
+        {
+            table = new InMemoryMembershipTable();
+            return TaskDone.Done;
+        }
+
+        public Task DeleteMembershipTableEntries(string deploymentId)
+        {
+            table = null;
             return TaskDone.Done;
         }
 

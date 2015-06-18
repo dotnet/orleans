@@ -34,7 +34,7 @@ namespace Orleans.Messaging
 {
     internal class GatewayProviderFactory
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("GatewayProviderFactory", TraceLogger.LoggerType.Runtime);
+        private static readonly TraceLogger logger = TraceLogger.GetLogger(typeof(GatewayProviderFactory).Name, TraceLogger.LoggerType.Runtime);
 
         internal static async Task<IGatewayListProvider> CreateGatewayListProvider(ClientConfiguration cfg)
         {
@@ -44,7 +44,7 @@ namespace Orleans.Messaging
             switch (gatewayProviderToUse)
             {
                 case ClientConfiguration.GatewayProviderType.AzureTable:
-                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>("OrleansAzureUtils.dll", logger);
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.SqlServer:
@@ -52,7 +52,7 @@ namespace Orleans.Messaging
                     break;
 
                 case ClientConfiguration.GatewayProviderType.ZooKeeper:
-                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>("OrleansZooKeeperUtils.dll", logger);
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Config:
