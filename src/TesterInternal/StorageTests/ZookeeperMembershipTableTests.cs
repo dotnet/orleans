@@ -37,6 +37,7 @@ namespace UnitTests.StorageTests
     /// Tests for operation of Orleans SiloInstanceManager using ZookeeperStore - Requires access to external Zookeeper storage
     /// </summary>
     [TestClass]
+    [DeploymentItem("OrleansZooKeeperUtils.dll")]
     public class ZookeeperMembershipTableTests
     {
         public TestContext TestContext { get; set; }
@@ -47,11 +48,6 @@ namespace UnitTests.StorageTests
         private IMembershipTable membership;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
         private readonly TraceLogger logger;
-
-        //this is because mstest doesn't copy the referenced dll if not used in the project
-#pragma warning disable 169
-        private static readonly ZooKeeperBasedMembershipTable hackToMakeCopy = null;
-#pragma warning restore 169
 
         public ZookeeperMembershipTableTests()
         {

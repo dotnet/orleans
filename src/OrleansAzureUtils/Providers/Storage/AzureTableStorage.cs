@@ -84,11 +84,11 @@ namespace Orleans.Storage
         private Newtonsoft.Json.JsonSerializerSettings jsonSettings;
 
         /// <summary> Name of this storage provider instance. </summary>
-        /// <see cref="IProvider#Name"/>
+        /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
 
         /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider#Log"/>
+        /// <see cref="IStorageProvider.Log"/>
         public Logger Log { get; private set; }
 
         /// <summary> Default constructor </summary>
@@ -99,7 +99,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider#Init"/>
+        /// <see cref="IProvider.Init"/>
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
@@ -144,7 +144,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Shutdown this storage provider. </summary>
-        /// <see cref="IStorageProvider#Close"/>
+        /// <see cref="IStorageProvider.Close"/>
         public Task Close()
         {
             tableDataManager = null;
@@ -152,7 +152,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider#ReadStateAsync"/>
+        /// <see cref="IStorageProvider.ReadStateAsync"/>
         public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -175,7 +175,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider#WriteStateAsync"/>
+        /// <see cref="IStorageProvider.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -206,7 +206,7 @@ namespace Orleans.Storage
         /// for this grain will be deleted / removed, otherwise the table row will be 
         /// cleared by overwriting with default / null values.
         /// </remarks>
-        /// <see cref="IStorageProvider#ClearStateAsync"/>
+        /// <see cref="IStorageProvider.ClearStateAsync"/>
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -433,6 +433,7 @@ namespace Orleans.Storage
             }
         }
 
+        /// <summary> Decodes Storage exceptions.</summary>
         public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false)
         {
             return AzureStorageUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);

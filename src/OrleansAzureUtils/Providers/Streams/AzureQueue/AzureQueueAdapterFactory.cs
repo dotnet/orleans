@@ -30,11 +30,14 @@ using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
+    /// <summary> Factory class for Azure Queue based stream provider.</summary>
     public class AzureQueueAdapterFactory : IQueueAdapterFactory
     {
         private const string CACHE_SIZE_PARAM = "CacheSize";
         private const int DEFAULT_CACHE_SIZE = 4096;
         private const string NUM_QUEUES_PARAM = "NumQueues";
+
+        /// <summary> Default number oi\f Azure Queue used in this stream provider.</summary>
         public const int DEFAULT_NUM_QUEUES = 8; // keep as power of 2.
         
         private string deploymentId;
@@ -45,9 +48,12 @@ namespace Orleans.Providers.Streams.AzureQueue
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
 
+        /// <summary>"DataConnectionString".</summary>
         public const string DATA_CONNECTION_STRING = "DataConnectionString";
+        /// <summary>"DeploymentId".</summary>
         public const string DEPLOYMENT_ID = "DeploymentId";
-        
+
+        /// <summary> Init the factory.</summary>
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger)
         {
             if (config == null) throw new ArgumentNullException("config");
@@ -76,17 +82,20 @@ namespace Orleans.Providers.Streams.AzureQueue
             adapterCache = new SimpleQueueAdapterCache(this, cacheSize, logger);
         }
 
+        /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
             var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 
+        /// <summary>Creates the adapter cache.</summary>
         public virtual IQueueAdapterCache GetQueueAdapterCache()
         {
             return adapterCache;
         }
 
+        /// <summary>Creates the factory stream queue mapper.</summary>
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             return streamQueueMapper;
