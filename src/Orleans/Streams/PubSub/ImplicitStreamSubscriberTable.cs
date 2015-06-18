@@ -245,8 +245,7 @@ namespace Orleans.Streams
         /// Create a reference to a grain that we expect to support the stream consumer extension.
         /// </summary>
         /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassName">The name of the grain class to instantiate.</param>
-        /// <param name="grainIfaceName">The name of the an IGrain-derived interface that `className` implements (required by MakeGrainReferenceInternal)</param>
+        /// <param name="implTypeCode">The type code of the grain interface.</param>
         /// <returns></returns>
         private IStreamConsumerExtension MakeConsumerReference(Guid primaryKey, int implTypeCode)
         {

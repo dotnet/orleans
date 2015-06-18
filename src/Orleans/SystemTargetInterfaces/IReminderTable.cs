@@ -34,9 +34,7 @@ namespace Orleans
     /// Interface for multiple implementations of the underlying storage for reminder data:
     /// Azure Table, SQL, development emulator grain, and a mock implementation.
     /// Defined as a grain interface for the development emulator grain case.
-    /// </summary>
-    //Removing the inheritance from IGrain since it is not applicable to all implementations of IReminderTable. 
-    //Instead, creating a new interface IReminderTableGrain which extends this one and will be used by the grain based implementation.    
+    /// </summary>  
     internal interface IReminderTable
     {
         Task Init(Guid serviceId, string deploymentId, string connectionString);
