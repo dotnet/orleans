@@ -38,6 +38,7 @@ namespace Orleans.Runtime.MembershipService
         {
             logger = TraceLogger.GetLogger("GrainBasedMembershipTable", TraceLogger.LoggerType.Runtime);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
+            table = new InMemoryMembershipTable();
             return TaskDone.Done;
         }
 
@@ -49,7 +50,6 @@ namespace Orleans.Runtime.MembershipService
 
         public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
         {
-            table = new InMemoryMembershipTable();
             return TaskDone.Done;
         }
 
