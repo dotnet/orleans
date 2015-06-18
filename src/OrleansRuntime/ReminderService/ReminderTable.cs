@@ -62,6 +62,9 @@ namespace Orleans.Runtime.ReminderService
                 case GlobalConfiguration.ReminderServiceProviderType.MockTable:
                     Singleton = new MockReminderTable(config.MockReminderTableTimeout);
                     return;
+                case GlobalConfiguration.ReminderServiceProviderType.NotImplemented:
+                    Singleton = new NotImplementedReminderTable();
+                    return;
             }
         }
 

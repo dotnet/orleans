@@ -93,6 +93,8 @@ namespace Orleans.Runtime.Configuration
             SqlServer,
             /// <summary>Used for benchmarking; it simply delays for a specified delay during each operation.</summary>
             MockTable,
+            /// <summary>Used to disable reminders. Throws a NotImplementedException when a grain upserts or removes reminders.</summary>
+            NotImplemented
         }
 
         /// <summary>
@@ -595,7 +597,7 @@ namespace Orleans.Runtime.Configuration
                                 ReminderServiceProviderType reminderServiceProviderType;
                                 SetReminderServiceType(Enum.TryParse(sst, out reminderServiceProviderType)
                                     ? reminderServiceProviderType
-                                    : ReminderServiceProviderType.ReminderTableGrain);
+                                    : ReminderServiceProviderType.NotImplemented);
                             }
                         }
                         if (child.HasAttribute("ServiceId"))
