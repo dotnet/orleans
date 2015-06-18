@@ -93,6 +93,8 @@ namespace Orleans.Runtime.Configuration
             SqlServer,
             /// <summary>Used for benchmarking; it simply delays for a specified delay during each operation.</summary>
             MockTable,
+            /// <summary>Reminder Service is disabled.</summary>
+            Disabled,
         }
 
         /// <summary>
@@ -595,7 +597,7 @@ namespace Orleans.Runtime.Configuration
                                 ReminderServiceProviderType reminderServiceProviderType;
                                 SetReminderServiceType(Enum.TryParse(sst, out reminderServiceProviderType)
                                     ? reminderServiceProviderType
-                                    : ReminderServiceProviderType.ReminderTableGrain);
+                                    : ReminderServiceProviderType.Disabled);
                             }
                         }
                         if (child.HasAttribute("ServiceId"))

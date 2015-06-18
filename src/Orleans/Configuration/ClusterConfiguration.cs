@@ -192,6 +192,10 @@ namespace Orleans.Runtime.Configuration
                 {
                     Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
                 }
+                else if (Globals.UseZooKeeperSystemStore)
+                {
+                    Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.Disabled);
+                }
                 else
                 {
                     Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
