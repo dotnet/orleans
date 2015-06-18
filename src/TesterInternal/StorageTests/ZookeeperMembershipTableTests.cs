@@ -43,16 +43,11 @@ namespace UnitTests.StorageTests
         public TestContext TestContext { get; set; }
 
         private string deploymentId;
-        private int generation;
         private SiloAddress siloAddress;
         private IMembershipTable membership;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
-        private readonly TraceLogger logger;
+        private readonly TraceLogger logger = TraceLogger.GetLogger("ZookeeperMembershipTableTests", TraceLogger.LoggerType.Application);
 
-        public ZookeeperMembershipTableTests()
-        {
-            logger = TraceLogger.GetLogger("ZookeeperMembershipTableTests", TraceLogger.LoggerType.Application);
-        }
 
         // Use ClassInitialize to run code before running the first test in the class
         [ClassInitialize]
@@ -63,10 +58,10 @@ namespace UnitTests.StorageTests
 
         // Use TestInitialize to run code before running each test 
         [TestInitialize]
-        public void TestInitialize()
+        private async Task Initialize()
         {
             deploymentId = "test-" + Guid.NewGuid();
-            generation = SiloAddress.AllocateNewGeneration();
+            int generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddress.NewLocalAddress(generation);
 
             logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
@@ -76,8 +71,10 @@ namespace UnitTests.StorageTests
                 DeploymentId = deploymentId,
                 DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString()
             };
-            membership = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
-            membership.InitializeMembershipTable(config, true, logger).WaitWithThrow(timeout);
+
+            var mbr = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>("OrleansZooKeeperUtils.dll", logger);
+            await mbr.InitializeMembershipTable(config, true, logger).WithTimeout(timeout);
+            membership = mbr;
         }
 
         // Use TestCleanup to run code after each test has run
@@ -91,118 +88,47 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
-        public async Task ZookeeperMembership_ReadAll_0()
+        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task Membership_ZooKeeper_Init()
         {
-            MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            string eTag = tableVersion.VersionEtag;
-            int ver = tableVersion.Version;
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.AreEqual(0, ver, "Initial tabel version should be zero");
+            await Initialize();
+            Assert.IsNotNull(membership, "Membership Table handler created");
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
-        public async Task ZookeeperMembership_ReadRow_0()
+        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task Membership_ZooKeeper_ReadAll()
         {
-            MembershipTableData data = await membership.ReadRow(siloAddress);
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            string eTag = tableVersion.VersionEtag;
-            int ver = tableVersion.Version;
-
-            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} TableVersion={1}", eTag, tableVersion);
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.AreEqual(0, ver, "Initial tabel version should be zero");
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_ReadAll(membership);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
-        public async Task ZookeeperMembership_ReadRow_1()
+        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task Membership_ZooKeeper_InsertRow()
         {
-            MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            DateTime now = DateTime.UtcNow;
-            MembershipEntry entry = new MembershipEntry
-            {
-                SiloAddress = siloAddress,
-                StartTime = now,
-                Status = SiloStatus.Active,
-            };
-
-            TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(entry, newTableVersion);
-
-            Assert.IsTrue(ok, "InsertRow completed successfully");
-
-            data = await membership.ReadRow(siloAddress);
-            tableVersion = data.Version;
-            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
-
-            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
-            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
-            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
-
-            MembershipEntry MembershipEntry = data.Members[0].Item1;
-            string eTag = data.Members[0].Item2;
-            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} Entry={1}", eTag, MembershipEntry);
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_InsertRow(membership);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("ZooKeeper"), TestCategory("Storage")]
-        public async Task ZookeeperMembership_ReadAll_1()
+
+        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task Membership_ZooKeeper_ReadRow_EmptyTable()
         {
-            MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_ReadRow_EmptyTable(membership, siloAddress);
+        }
 
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
+        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task Membership_ZooKeeper_ReadRow_Insert_Read()
+        {
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_ReadRow_Insert_Read(membership, siloAddress);
+        }
 
-            DateTime now = DateTime.UtcNow;
-            MembershipEntry entry = new MembershipEntry
-            {
-                SiloAddress = siloAddress,
-                StartTime = now,
-                Status = SiloStatus.Active,
-            };
-
-            TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(entry, newTableVersion);
-
-            Assert.IsTrue(ok, "InsertRow completed successfully");
-
-            data = await membership.ReadAll();
-            tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
-
-            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
-            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
-            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
-
-            MembershipEntry MembershipEntry = data.Members[0].Item1;
-            string eTag = data.Members[0].Item2;
-            logger.Info("Membership.ReadAll returned MembershipEntry ETag={0} Entry={1}", eTag, MembershipEntry);
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
+        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task Membership_ZooKeeper_ReadAll_Insert_ReadAll()
+        {
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership, siloAddress);
         }
     }
 }
