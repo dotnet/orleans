@@ -1,3 +1,4 @@
+using Orleans.Runtime;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -36,7 +37,7 @@ namespace Orleans.Streams
     /// It should be implemented by components interested in stream queue load balancing.
     /// When change notification is received, listener should request updated list of queues from the queue balancer.
     /// </summary>
-    internal interface IStreamQueueBalanceListener : IGrain
+    internal interface IStreamQueueBalanceListener : IAddressable
     {
         /// <summary>
         /// Receive notifications about adapter queue responsibility changes. 

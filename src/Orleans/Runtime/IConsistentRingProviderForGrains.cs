@@ -55,7 +55,6 @@ namespace Orleans.Runtime
     // This has to be a separate interface, not polymorphic with IRingRangeListener,
     // since IRingRangeListener is implemented by SystemTarget and thus if it becomes grain interface 
     // it would need to be system target interface (with SiloAddress as first argument).
-    // Renamed from IGrainRingRangeListener to IAsyncRingRangeListener and removed inheritance from IGrain.
     internal interface IAsyncRingRangeListener
     {
         Task RangeChangeNotification(IRingRange old, IRingRange now);
