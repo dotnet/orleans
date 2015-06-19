@@ -694,11 +694,13 @@ namespace Orleans.Runtime
 
         private void CheckValidReminderServiceType(string doingWhat)
         {
-            if (Config.Globals.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.NotSpecified))
+            var remType = Config.Globals.ReminderServiceType;
+            if (remType.Equals(GlobalConfiguration.ReminderServiceProviderType.NotSpecified) ||
+                remType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
             {
                 throw new InvalidOperationException(
                     string.Format("Cannot {0} when ReminderServiceProviderType is {1}",
-                    doingWhat, GlobalConfiguration.ReminderServiceProviderType.NotSpecified));
+                    doingWhat, remType));
             }
         }
 

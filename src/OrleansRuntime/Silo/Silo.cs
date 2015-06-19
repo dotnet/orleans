@@ -327,10 +327,13 @@ namespace Orleans.Runtime
 
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents(DeploymentLoadPublisher.Instance);
 
-            // start the reminder service system target
-            reminderService = reminderFactory.CreateReminderService(this, grainFactory, initTimeout);
-            RegisterSystemTarget((SystemTarget)reminderService);
-            
+            if (!globalConfig.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
+            {
+                // start the reminder service system target
+                reminderService = reminderFactory.CreateReminderService(this, grainFactory, initTimeout);
+                RegisterSystemTarget((SystemTarget) reminderService);
+            }
+
             RegisterSystemTarget(catalog);
             scheduler.QueueAction(catalog.Start, catalog.SchedulingContext)
                 .WaitWithThrow(initTimeout);
@@ -467,10 +470,16 @@ namespace Orleans.Runtime
                 platformWatchdog.Start();
                 if (logger.IsVerbose) { logger.Verbose("Silo platform watchdog started successfully."); }
 
-                // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                scheduler.QueueTask(reminderService.Start, ((SystemTarget)reminderService).SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Reminder service started successfully."); }
+                if (reminderService != null)
+                {
+                    // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
+                    scheduler.QueueTask(reminderService.Start, ((SystemTarget) reminderService).SchedulingContext)
+                        .WaitWithThrow(initTimeout);
+                    if (logger.IsVerbose)
+                    {
+                        logger.Verbose("Reminder service started successfully.");
+                    }
+                }
 
                 // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
                 scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
@@ -634,9 +643,12 @@ namespace Orleans.Runtime
                     return; // will go to finally
                 }
 
-                // 2: Stop reminder service
-                scheduler.QueueTask(reminderService.Stop, ((SystemTarget)reminderService).SchedulingContext)
-                    .WaitWithThrow(stopTimeout);
+                if (reminderService != null)
+                {
+                    // 2: Stop reminder service
+                    scheduler.QueueTask(reminderService.Stop, ((SystemTarget) reminderService).SchedulingContext)
+                        .WaitWithThrow(stopTimeout);
+                }
 
                 if (gracefully)
                 {
