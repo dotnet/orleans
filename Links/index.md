@@ -18,6 +18,8 @@ title: Links
 
 
 ## **By others**
+[Microsoft Orleans & IoT : Software Actors living on Cloud as avatars for physical devices living in real world](http://www.tinyclr.it/microsoft-orleans-iot--software-actors-living-on-cloud-as-avatars-for-physical-devices-living-in-real-world.aspx)
+
 [Project Orleans: Different Than Erlang, Designed for a Broad Group of Developers](http://thenewstack.io/project-orleans-different-than-erlang-designed-for-a-broad-group-of-developers/)
 
 [Two Reasons You May Want to Use Microsoft’s Project Orleans](http://www.bloggedbychris.com/2015/03/18/reasons-project-orleans/)
