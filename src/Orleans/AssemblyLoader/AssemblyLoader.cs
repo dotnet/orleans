@@ -104,7 +104,6 @@ namespace Orleans.Runtime
 
         public static T LoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
         {
-            bool alreadyLoggedError = false;
             try
             {
                 var exeRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -126,33 +125,25 @@ namespace Orleans.Runtime
 
                 if (discoveredAssemblyLocations.Count == 0)
                 {
-                    var error = String.Format("Failed LoadAndCreateInstance for type {0} from assembly {1}. " +
-                                              "Make sure this assembly is in your current executing directory and the type is defined there.", 
-                        typeof(T).FullName, assemblyName);
-                    logger.Error(ErrorCode.Loader_LoadAndCreateInstance_Failure_1, error);
-                    alreadyLoggedError = true;
-                    throw new TypeLoadException(error);
+                    var error = String.Format(  "Failed to LoadAndCreateInstance for type {0} from assembly {1}. " +
+                                                "Make sure this assembly is in your current executing directory and the type is defined there.", 
+                                                typeof(T).FullName, assemblyName);
+                    throw new OrleansException(error);
                 }
 
                 if (discoveredAssemblyLocations.Count > 1)
                 {
                     var error = String.Format("Type {0} was found more than once in assembly {1}.", typeof(T).FullName, assemblyName);
-                    logger.Error(ErrorCode.Loader_LoadAndCreateInstance_Failure_2, error);
-                    alreadyLoggedError = true;
-                    throw new TypeLoadException(error);
+                    throw new OrleansException(error);
                 }
 
-                var foundType =
-                    TypeUtils.GetTypes(discoveredAssemblyLocations, type => typeof (T).IsAssignableFrom(type)).First();
+                var foundType = TypeUtils.GetTypes(discoveredAssemblyLocations, type => typeof (T).IsAssignableFrom(type)).First();
 
                 return (T) Activator.CreateInstance(foundType, true);
             }
             catch (Exception exc)
             {
-                if (!alreadyLoggedError)
-                {
-                    logger.Error(ErrorCode.Loader_LoadAndCreateInstance_Failure_3, "", exc);
-                }
+                logger.Error(ErrorCode.Loader_LoadAndCreateInstance_Failure, exc.Message, exc);
                 throw;
             }
         }
