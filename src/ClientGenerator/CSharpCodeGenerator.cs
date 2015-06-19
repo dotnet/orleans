@@ -392,12 +392,14 @@ namespace Orleans.CodeGeneration
             {
                 // the programmer has specified [ExtendedPrimaryKey] on the interface.
                 add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(long primaryKey, string keyExt)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt));
                         }}");
 
                 add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(long primaryKey, string keyExt, string grainClassNamePrefix)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt, grainClassNamePrefix));
@@ -406,12 +408,14 @@ namespace Orleans.CodeGeneration
             else if (isGuidCompoundKey)
             {
                 add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt));
                         }}");
 
                 add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(System.Guid primaryKey, string keyExt, string grainClassNamePrefix)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(typeof({0}), primaryKey, keyExt, grainClassNamePrefix));
@@ -423,12 +427,14 @@ namespace Orleans.CodeGeneration
                 if (isLongKey || isDefaultKey)
                 {
                     add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(long primaryKey)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey));
                         }}");
 
                     add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(long primaryKey, string grainClassNamePrefix)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey, grainClassNamePrefix));
@@ -438,12 +444,14 @@ namespace Orleans.CodeGeneration
                 if (isGuidKey || isDefaultKey)
                 {
                     add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(System.Guid primaryKey)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey));
                         }}");
 
                     add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(System.Guid primaryKey, string grainClassNamePrefix)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey, grainClassNamePrefix));
@@ -453,12 +461,14 @@ namespace Orleans.CodeGeneration
                 if (isStringKey)
                 {
                     add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(System.String primaryKey)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey));
                         }}");
 
                     add(@"
+                        [System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")]
                         public static {0} GetGrain(System.String primaryKey, string grainClassNamePrefix)
                         {{
                             return Cast(global::Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(typeof({0}), primaryKey, grainClassNamePrefix));
