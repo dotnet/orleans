@@ -377,7 +377,6 @@ namespace Orleans.Runtime.MembershipService
                     await Task.Delay(timespan);
                 }
             }
-            throw new OrleansException("Secondary silo waited for MBR table on primary silo to init, but gave up after 100 attempts.");
         }
 
         #region Table update/insert processing
