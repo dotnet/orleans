@@ -12,7 +12,7 @@ Make sure to read this entire page, as there are some important caveats that may
 
 Starting the installer, you should see the following welcome page:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=816159)
+![Install 1.PNG](https://github.com/dotnet/orleans/tree/gh-pages/Images/Install 1.PNG)
 
 You get a chance to select the destination folder for the installation, but otherwise there are not a lot of installation options. Unless you start the installer with Administrator privileges, you will see a UAC dialog pop up, asking your permission to install.
 
