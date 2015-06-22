@@ -39,6 +39,7 @@ namespace Orleans.Runtime.Configuration
     {
         private IDictionary<string, string> properties;
         private readonly IList<ProviderConfiguration> childConfigurations = new List<ProviderConfiguration>();
+        [NonSerialized]
         private IList<IProvider> childProviders;
         [NonSerialized]
         private IProviderManager providerManager;
