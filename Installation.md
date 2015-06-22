@@ -57,19 +57,19 @@ Close all sessions of Visual Studio that you have open.
 
 Open the Control Panel and go to the 'System' section.
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=816161)
+![](Images/Install 2.PNG)
 
 Choose the 'Advanced system settings' link
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=816162)
+![](Images/Install 3.PNG)
 
 then, click the 'Environment Variables' button and find the 'OrleansSDK' variable among the system variables:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=816163)
+![](Images/Install 4.PNG)
 
 Click the 'Edit' button, but don't actually edit anything.
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=816164)
+![](Images/Install 5.PNG)
 
  Click 'OK' all the way out and close the Control Panel.
 
