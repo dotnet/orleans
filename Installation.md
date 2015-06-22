@@ -35,15 +35,7 @@ For the current release, an Orleans silo must be stopped and restarted in order 
 Visual Studio does not always seem to immediately pick up environment variables after an installation, and the Orleans SDK depends on one when building Orleans-based projects in VS. (By the way, it's probably something I didn't know how to do in the installer, I'm not saying it's Visual Studio's fault.)
 
 If you have problems loading or building samples after installing the SDK and restarting Visual Studio, you may be running into this issue. For the author, it has manifested itself as failures to load a solution in VS, as well as issues with finding references to the Orleans assemblies within projects that did load.
-For example, you might see this:
-
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=819322)
-
-or this:
-
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=817451)
-
-and get the following error message in the Output window:
+For example, you might be getting the following error message in the Output window:
 
     C:\dd\Orleans\git\orleans\src\samples\HelloWorld\HelloWorldInterfaces\HelloWorldInterfaces.csproj : error  : The imported project "C:\Binaries\OrleansClient\Orleans.SDK.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.  C:\dd\Orleans\git\orleans\src\samples\HelloWorld\HelloWorldInterfaces\HelloWorldInterfaces.csproj
     
