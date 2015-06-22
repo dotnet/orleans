@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -36,31 +37,50 @@ namespace Orleans.Runtime.Host
 {
     public class ZooKeeperBasedMembershipTable : IMembershipTable, IGatewayListProvider
     {
-        private TraceLogger logger;
-
         private const int ZOOKEEPER_CONNECTION_TIMEOUT = 2000;
 
         private ZooKeeperWatcher watcher;
-
         private string deploymentConnectionString;
         private string deploymentPath;
         private string rootConnectionString;
         private TimeSpan maxStaleness;
+        private TraceLogger logger;
 
         public Task InitializeGatewayListProvider(ClientConfiguration config,TraceLogger traceLogger)
         {
-            InitConfig(traceLogger,config.DataConnectionString, config.DeploymentId, config.GatewayListRefreshPeriod);
+            InitConfig(traceLogger,config.DataConnectionString, config.DeploymentId);
+            maxStaleness = config.GatewayListRefreshPeriod;
             return TaskDone.Done;
         }
 
-        private void InitConfig(TraceLogger traceLogger, string dataConnectionString, string deploymentId, TimeSpan maxStale)
+        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitPath, TraceLogger traceLogger)
+        {
+            InitConfig(traceLogger, config.DataConnectionString, config.DeploymentId);
+            // even if I am not the one who created the path, 
+            // try to insert an initial path if it is not already there,
+            // so we always have the path, before this silo starts working.
+            await UsingZookeeper(rootConnectionString, async zk =>
+            {
+                try
+                {
+                    await zk.createAsync(deploymentPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    await zk.sync(deploymentPath);
+                    logger.Info("Created new deployment path.");
+                }
+                catch (KeeperException.NodeExistsException)
+                {
+                    logger.Verbose("Deployment path already exists.");
+                }
+            });
+        }
+
+        private void InitConfig(TraceLogger traceLogger, string dataConnectionString, string deploymentId)
         {
             watcher = new ZooKeeperWatcher(traceLogger);
             logger = traceLogger;
             deploymentPath = "/" + deploymentId;
             deploymentConnectionString = dataConnectionString + deploymentPath;
             rootConnectionString = dataConnectionString;
-            maxStaleness = maxStale;
         }
 
         public Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
@@ -126,7 +146,7 @@ namespace Orleans.Runtime.Host
             var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
 
             int expectedTableVersion = tableVersion.Version - 1;
-            int expectedRowVersion = int.Parse(etag);
+            int expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
 
             return TryTransaction(t => t
                 .setData("/", null, expectedTableVersion)
@@ -139,27 +159,6 @@ namespace Orleans.Runtime.Host
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
             return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData, -1));
-        }
-
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitPath, TraceLogger traceLogger)
-        {
-            InitConfig(traceLogger, config.DataConnectionString, config.DeploymentId, config.TableRefreshTimeout);
-            // even if I am not the one who created the path, 
-            // try to insert an initial path if it is not already there,
-            // so we always have the path, before this silo starts working.
-            await UsingZookeeper(rootConnectionString, async zk =>
-            {
-                try
-                {
-                    await zk.createAsync(deploymentPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    await zk.sync(deploymentPath);
-                    logger.Info("Created new deployment path.");
-                }
-                catch (KeeperException.NodeExistsException)
-                {
-                    logger.Verbose("Deployment path already exists.");
-                }
-            });
         }
 
         public IList<Uri> GetGateways()
@@ -221,7 +220,7 @@ namespace Orleans.Runtime.Host
 
             int rowVersion = (await rowDataTask).Stat.getVersion();
 
-            return new Tuple<MembershipEntry, string>(me, rowVersion.ToString());
+            return new Tuple<MembershipEntry, string>(me, rowVersion.ToString(CultureInfo.InvariantCulture));
         }
 
         private Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod)
@@ -247,7 +246,7 @@ namespace Orleans.Runtime.Host
         private static TableVersion ConvertToTableVersion(Stat stat)
         {
             int version = stat.getVersion();
-            return new TableVersion(version, version.ToString());
+            return new TableVersion(version, version.ToString(CultureInfo.InvariantCulture));
         }
 
         private static byte[] Serialize(object obj)
