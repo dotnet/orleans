@@ -78,8 +78,8 @@ namespace Orleans.Runtime.Configuration
         /// Specifies a unique identifier of this deployment.
         /// If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime, 
         /// accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config. 
-        /// So if the silos are run as Azure roles this variable should not be specified in the OrleansConmfiguration.xml (it will be overwritten if specified).
-        /// If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConmfiguration.xml file.
+        /// So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
+        /// If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConfiguration.xml file.
         /// </summary>
         public string DeploymentId { get; set; }
         /// <summary>
@@ -87,8 +87,8 @@ namespace Orleans.Runtime.Configuration
         /// If the silos are deployed on Azure (run as workers roles), DataConnectionString may be specified via RoleEnvironment.GetConfigurationSettingValue("DataConnectionString");
         /// In such a case it is taken from there and passed to the silo automatically by the role via config.
         /// So if the silos are run as Azure roles and this config is specified via RoleEnvironment, 
-        /// this variable should not be specified in the OrleansConmfiguration.xml (it will be overwritten if specified).
-        /// If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConmfiguration.xml file.
+        /// this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
+        /// If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConfiguration.xml file.
         /// If not set at all, DevelopmentStorageAccount will be used.
         /// </summary>
         public string DataConnectionString { get; set; }
