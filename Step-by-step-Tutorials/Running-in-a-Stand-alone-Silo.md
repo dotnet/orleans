@@ -38,7 +38,7 @@ If you set the grain collection project as a startup project and hit F5, you wil
 This is a ready-made host executable intended for running Orleans code on Windows Server (Azure has a different host). 
 It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
 
-![](../Images/Standalone 1.png)
+![](../Images/Standalone 1.PNG)
 
 
 This allows us to debug the grains in their own process, while keeping the client code in its own process. 
@@ -77,13 +77,13 @@ Console.WriteLine(hello.SayHello("Fourth").Result);
 What we would expect to see here is four greetings, the first of which is "Hello World!". 
 Let's check it out:
 
-![](../Images/Standalone 2.png)
+![](../Images/Standalone 2.PNG)
 
 Terminate the client (make sure it's just the client, we need the grain host to stay up) and restart it using the context menu. 
 There's no reason to wait for the silo now, since it's already running. 
 Here's what we get:
 
-![](../Images/Standalone 3.png)
+![](../Images/Standalone 3.PNG)
 
 Still four greetings, but instead of "Hello World!" the first greeting is the last one from our previous client session. 
 In other words, the grain in the silo kept some state around for us.
