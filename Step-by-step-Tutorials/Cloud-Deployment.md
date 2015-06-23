@@ -27,12 +27,12 @@ Right click on your solution, and select 'Add | New Project...'.
 
 Choose the 'Windows Azure Cloud Service' project template:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815101)
+![](../Images/AzureTutorial1.PNG)
 
 When prompted, select a new 'Worker Role' to add to the project. 
 This will be used to host the Orleans Silos:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815102)
+![](../Images/AzureTutorial2.PNG)
 
 ## Add project references for Orleans Silo binaries 
 Add references to the `OrleansAzureSilo` project for the required Orleans server library files. 
@@ -45,7 +45,7 @@ Copies of these files can be found in the _.\Binaries\OrleansServer_ folder unde
 
 Note: All of these references MUST have _Copy Local = 'True'_ settings to ensure the necessary library DLLs get copied into the `OrleansAzureSilo` project output directory. 
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815103)
+![](../Images/AzureTutorial3.PNG)
 
 ## Configure Azure Worker Role for Orleans Silos 
 The Worker Role initialization class is a normal Azure worker role - it needs to inherit from the usual `Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint` base class. 
@@ -150,14 +150,14 @@ The networking configuration information in _OrleansConfiguration.xml_ will be o
 
 
 Note: You MUST ensure this config file get copied into the `OrleansAzureSilo` project output directory, to ensure they get picked up by the Azure packaging tools. 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815104)
+![](../Images/AzureTutorial4.PNG)
 
 ## Add your grain binaries to Azure Worker Role for Orleans Silos 
 Add the grain interfaces DLL and implementation classes DLL for the grains to he hosted in the Azure silo into the `OrleansAzureSilo` project, along with any supporting libraries those grains need.
 
 
 Note: You MUST ensure that all the referenced binaries are copied into the `OrleansAzureSilo` project output directory, to ensure they get picked up by the Azure packaging tools.
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815105)
+![](../Images/AzureTutorial5.PNG)
 
 ## Running Orleans Client as Azure Web Role
 The user interface / presentation layer for your application will usually run as a Web Role in Azure.
@@ -173,7 +173,7 @@ Any type of web role can be used as an Orleans client, and there are no specific
 
 Add a web role to the solution:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815106)
+![](../Images/AzureTutorial6.PNG)
 
 Add project references for Orleans Client binaries. 
 Add references to the web role project for the required Orleans client library files. 
