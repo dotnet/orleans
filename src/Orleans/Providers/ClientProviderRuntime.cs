@@ -154,7 +154,7 @@ namespace Orleans.Providers
                 }
             }
 
-            var typedAddressable = Orleans.GrainFactory.Cast<TExtensionInterface>(addressable);
+            var typedAddressable = addressable.Cast<TExtensionInterface>();
             // we have to return the extension as well as the IAddressable because the caller needs to root the extension
             // to prevent it from being collected (the IAddressable uses a weak reference).
             return Tuple.Create(extension, typedAddressable);

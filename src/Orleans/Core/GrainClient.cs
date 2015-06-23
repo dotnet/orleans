@@ -58,7 +58,7 @@ namespace Orleans
 
         private static readonly object initLock = new Object();
 
-        private static IGrainFactory grainFactory;
+        private static GrainFactory grainFactory;
 
         //TODO: prevent client code from using this from inside a Grain
         public static IGrainFactory GrainFactory
@@ -68,6 +68,19 @@ namespace Orleans
                 if (!IsInitialized)
                 {
                     throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
+                }
+
+                return grainFactory;
+            }
+        }
+
+        internal static GrainFactory InternalGrainFactory
+        {
+            get
+            {
+                if (!IsInitialized)
+                {
+                    throw new OrleansException("You must initialize the Grain Client before accessing the InternalGrainFactory");
                 }
 
                 return grainFactory;

@@ -292,16 +292,16 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<GrainInterfaceMap> GetTypeCodeMap()
+        public Task<GrainInterfaceMap> GetTypeCodeMap(GrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo).GetTypeCodeMap(silo);
+            return GetTypeManager(silo, grainFactory).GetTypeCodeMap(silo);
         }
 
-        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable()
+        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(GrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo).GetImplicitStreamSubscriberTable(silo);
+            return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -396,9 +396,9 @@ namespace Orleans.Messaging
 
         #endregion
 
-        private ITypeManager GetTypeManager(SiloAddress destination)
+        private ITypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
         {
-            return GrainFactory.GetSystemTarget<ITypeManager>(Constants.TypeManagerId, destination);
+            return grainFactory.GetSystemTarget<ITypeManager>(Constants.TypeManagerId, destination);
         }
 
         private SiloAddress GetLiveGatewaySiloAddress()

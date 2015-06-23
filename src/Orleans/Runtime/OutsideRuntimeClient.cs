@@ -70,7 +70,12 @@ namespace Orleans
 
         private const string BARS = "----------";
 
-        private readonly IGrainFactory grainFactory;
+        private readonly GrainFactory grainFactory;
+
+        public GrainFactory InternalGrainFactory
+        {
+            get { return grainFactory; }
+        }
 
         /// <summary>
         /// Response timeout.
@@ -127,7 +132,7 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ClientConfiguration cfg, IGrainFactory grainFactory, bool secondary = false)
+        public OutsideRuntimeClient(ClientConfiguration cfg, GrainFactory grainFactory, bool secondary = false)
         {
             this.grainFactory = grainFactory;
             this.clientId = GrainId.NewClientId();
@@ -221,7 +226,7 @@ namespace Orleans
 
         private void StreamingInitialize()
         {
-            var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable().Result;
+            var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable(grainFactory).Result;
             ClientProviderRuntime.StreamingInitialize(grainFactory, implicitSubscriberTable);
             var streamProviderManager = new Streams.StreamProviderManager();
             streamProviderManager
@@ -316,7 +321,7 @@ namespace Orleans
                     }
                 }
             );
-            grainInterfaceMap = transport.GetTypeCodeMap().Result;
+            grainInterfaceMap = transport.GetTypeCodeMap(grainFactory).Result;
             StreamingInitialize();
         }
 

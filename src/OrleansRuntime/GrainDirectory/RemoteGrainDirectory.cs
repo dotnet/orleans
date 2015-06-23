@@ -407,7 +407,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private IRemoteGrainDirectory GetDirectoryReference(SiloAddress target)
         {
-            return GrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, target);
+            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, target);
         }
     }
 }

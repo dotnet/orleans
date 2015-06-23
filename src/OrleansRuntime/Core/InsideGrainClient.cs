@@ -31,6 +31,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
@@ -68,7 +69,8 @@ namespace Orleans.Runtime
             SiloAddress silo,
             ClusterConfiguration config,
             IConsistentRingProvider ring,
-            GrainTypeManager typeManager)
+            GrainTypeManager typeManager,
+            GrainFactory grainFactory)
         {
             this.dispatcher = dispatcher;
             MySilo = silo;
@@ -82,6 +84,7 @@ namespace Orleans.Runtime
             CallbackData.Config = Config.Globals;
             RuntimeClient.Current = this;
             this.typeManager = typeManager;
+            this.InternalGrainFactory = grainFactory;
         }
 
         public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
@@ -97,6 +100,11 @@ namespace Orleans.Runtime
         public ClusterConfiguration Config { get; private set; }
 
         public OrleansTaskScheduler Scheduler { get { return Dispatcher.Scheduler; } }
+
+        public IGrainFactory GrainFactory { get { return InternalGrainFactory; } }
+
+        public GrainFactory InternalGrainFactory { get; private set; }
+
 
         #region Implementation of IRuntimeClient
 
@@ -619,7 +627,7 @@ namespace Orleans.Runtime
                     destination.GetConsistentHashCode(),
                     ConsistentRingProvider.ToString());
             }
-            return GrainFactory.GetSystemTarget<IReminderService>(Constants.ReminderServiceId, destination);
+            return InternalGrainFactory.GetSystemTarget<IReminderService>(Constants.ReminderServiceId, destination);
         }
 
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context)
