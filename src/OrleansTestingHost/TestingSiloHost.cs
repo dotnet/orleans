@@ -135,9 +135,17 @@ namespace Orleans.TestingHost
                 {
                     throw new TimeoutException("Timeout during test initialization", ex);
                 }
-                throw new AggregateException(
+                // IMPORTANT:
+                // Do NOT re-throw the original exception here, also not as an internal exception inside AggregateException
+                // Due to the way MS tests works, if the original exception is an Orleans exception,
+                // it's assembly might not be loaded yet in this phase of the test.
+                // As a result, we will get "MSTest: Unit Test Adapter threw exception: Type is not resolved for member XXX"
+                // and will loose the oroginal exception. This makes debugging tests super hard!
+                // The root cause has to do with us initializing our tests from Test constructor and not from TestInitialize method.
+                // More details: http://dobrzanski.net/2010/09/20/mstest-unit-test-adapter-threw-exception-type-is-not-resolved-for-member/
+                throw new Exception(
                     string.Format("Exception during test initialization: {0}",
-                        TraceLogger.PrintException(ex)), ex);
+                        TraceLogger.PrintException(baseExc)));
             }
         }
 
