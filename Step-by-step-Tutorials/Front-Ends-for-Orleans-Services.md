@@ -11,13 +11,8 @@ Creating an HTTP API, or web application is a common scenario.
 Let's extend the Employee/Manager scenario from the  [Declarative-Persistence](Declarative-Persistence) walk-through to see what steps are required to publish grain data over HTTP.
 
 ##Creating the ASP.NET application
-First, you should add a new ASP.NET Web Application to your solution:
+First, you should add a new ASP.NET Web Application to your solution. Then, select the Web API template, although you could use MVC or Web Forms.
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815096)
-
-Select the Web API template, although you could use MVC or Web Forms.
-
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815097)
 
 ## Initializing Orleans
 
@@ -46,13 +41,9 @@ Now when the ASP.NET application starts, it will initialize the Orleans Client.
 
 Now lets add a controller to the project, to receive HTTP requests, and call the grain code.
 
-Right click on the "Controllers" folder, and add a new "Web API 2 Controller - Empty":
+Right click on the "Controllers" folder, and add a new "Web API 2 Controller - Empty".
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815098)
-
-Next, call the controller `EmployeeController`:
-
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815099)
+Next, call the controller `EmployeeController`.
 
 This will create a new empty controller called `EmployeeController`.
 
