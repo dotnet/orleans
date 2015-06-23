@@ -196,7 +196,7 @@ public class Manager : Employee, IManager
 
 Executing it, you should see something like this:
 
-![Multiple Actors1.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810446)
+![](../Images/Multiple Actors1.PNG)
 
 The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise.
 
