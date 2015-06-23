@@ -195,12 +195,12 @@ Set a breakpoint in `Employee.Promote()`.
 
 When we run the client code the first time and hit the breakpoint, the level field should be `0` and the newLevel parameter either `10` or `11`:
 
-![Persistence 2.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810750)
+![](../Images/Persistence 2.PNG)
 
 Let the application finish (reach the 'Hit Enter...' prompt) and exit. 
 Run it again, and compare what happens when you look at state this second time around:
 
-![Persistence 3.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810753)
+![](../Images/Persistence 3.PNG)
 
 
 ## Just Making Sure...
@@ -209,7 +209,7 @@ It's worth checking what Azure thinks about the data.
 Using a storage explorer such as Azure Storage Explorer (ASE) or the one built in to Server Explorer in Visual Studio 2013, open the storage account (or developer storage of the emulator) and find the 'OrleansGrainState' table. 
 It should look something like this (you have to hit 'Query' in ASE):
 
-![Persistence 4.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810756)
+![](../Images/Persistence 4.PNG)
 
 If everything is working correctly, the GUIDs should appear in the `PartitionKey` column, and the qualified class name of the grains should appear in the `RowKey` column.
 
