@@ -254,7 +254,7 @@ which corresponds to a server configuration that looks like this (relevant excer
 
 Running the client in VS, I see this:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=813859)
+![](../Images/onpremise 1.PNG)
 
 ## Monitoring Orleans
 Once Orleans is deployed, you can start an optional script that will monitor the Orleans deployment using standard performance counters.
