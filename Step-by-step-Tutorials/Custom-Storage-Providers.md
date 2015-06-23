@@ -218,4 +218,4 @@ The easiest method to write is the one that deletes grain state, which we didn't
 In fact, we don't need it for our Hello World application, so we'll just leave its implementation as an exercise. 
 It should do the obvious, i.e. delete the file.
 
-[Back to Orleans Documenation homepage](../../)
+[Back to Orleans Documenation homepage](http://dotnet.github.io/orleans/)
