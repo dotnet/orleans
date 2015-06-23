@@ -208,7 +208,7 @@ There's really just one thing left to do, and that is to test the thing.
 Run the application and let it get to the end, where the greetings are shown, and then terminate it. 
 Under the _LocalSilo\Storage_ directory, you should find a file called _0.Grain1State_, and it should contain something very recognizable:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810449)
+![](../Images/Storage Provider 1.PNG)
 
 Run the application again, and you should see the same behavior as before, that is, the last greeting of the first session is remembered.
 
