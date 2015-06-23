@@ -28,11 +28,11 @@ Typically, you will run one silo per machine, but it sometimes make sense to run
 After starting either Visual Studio 2012 or 2013, go to create a new project. 
 Under "Visual C#," you should see the following:
 
-![](Images/New New DevTest 1.PNG)
+![](https://github.com/dotnet/orleans/tree/gh-pages/Images/New New DevTest 1.PNG)
 
 Choose the "Orleans Dev/Test Host" project type, create a directory for the solution, and create the project:
 
-![New DevTest 2.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810086)
+![](../Images/New New DevTest 2.PNG)
 
 The project is just a console application populated with code that helps you host a silo in an environment that is "developer friendly," i.e. where everything runs in a single process.
 
