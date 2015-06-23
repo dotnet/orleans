@@ -21,13 +21,14 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans;
-using Orleans.Runtime;
-using Orleans.TestingHost;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using NUnit.Framework;
+using Orleans;
+using Orleans.Core;
+using Orleans.Runtime;
+using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -36,7 +37,7 @@ namespace UnitTests.General
     /// <summary>
     /// Summary description for ObserverTests
     /// </summary>
-    [TestClass]
+    [TestFixture]
     public class ObserverTests : UnitTestSiloHost
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
@@ -48,14 +49,13 @@ namespace UnitTests.General
         private SimpleGrainObserver observer1;
         private SimpleGrainObserver observer2;
 
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestFixtureTearDown]
+        public void MyClassCleanup()
         {
             StopAllSilos();
         }
 
-        [TestInitialize]
+        [SetUp]
         public void TestInitialize()
         {
             callbackCounter = 0;
@@ -76,7 +76,7 @@ namespace UnitTests.General
             return random.Next();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task ObserverTest_SimpleNotification()
         {
             var result = new AsyncResultHandle();
@@ -93,7 +93,7 @@ namespace UnitTests.General
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task ObserverTest_SimpleNotification_GeneratedFactory()
         {
             var result = new AsyncResultHandle();
@@ -138,7 +138,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task ObserverTest_DoubleSubscriptionSameReference()
         {
             var result = new AsyncResultHandle();
@@ -160,7 +160,7 @@ namespace UnitTests.General
             {
                 Exception baseException = exc.GetBaseException();
                 Console.WriteLine("Received exception: {0}", baseException);
-                Assert.IsInstanceOfType(baseException, typeof(OrleansException));
+                Assert.IsInstanceOf<OrleansException>(baseException);
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
                     Assert.Fail("Unexpected exception message: " + baseException);
@@ -185,7 +185,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task ObserverTest_SubscribeUnsubscribe()
         {
             var result = new AsyncResultHandle();
@@ -217,17 +217,18 @@ namespace UnitTests.General
         }
 
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task ObserverTest_Unsubscribe()
         {
+            IGrainFactory grainFactory = GrainClient.GrainFactory;
             ISimpleObserverableGrain grain = GetGrain();
             observer1 = new SimpleGrainObserver(null, null);
-            ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
+            ISimpleGrainObserver reference = await grainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             try
             {
                 await grain.Unsubscribe(reference);
 
-                await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
+                await grainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             }
             catch (TimeoutException)
             {
@@ -241,7 +242,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task ObserverTest_DoubleSubscriptionDifferentReferences()
         {
             var result = new AsyncResultHandle();
@@ -275,7 +276,7 @@ namespace UnitTests.General
         }
 
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task ObserverTest_DeleteObject()
         {
             var result = new AsyncResultHandle();
@@ -304,7 +305,7 @@ namespace UnitTests.General
             result.Continue = true;
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         [ExpectedException(typeof(NotSupportedException))]
         public async Task ObserverTest_SubscriberMustBeGrainReference()
         {

@@ -22,9 +22,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
+using NUnit.Framework;
+﻿using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
 namespace UnitTests.General
@@ -32,7 +32,7 @@ namespace UnitTests.General
     /// <summary>
     /// Summary description for SimpleGrain
     /// </summary>
-    [TestClass]
+    [TestFixture]
     public class SimpleGrainTests : UnitTestSiloHost
     {
         private const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
@@ -40,6 +40,12 @@ namespace UnitTests.General
         public SimpleGrainTests()
             : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
         {
+        }
+
+        [TestFixtureTearDown]
+        public void MyClassCleanup()
+        {
+            StopAllSilos();
         }
 
         public ISimpleGrain GetSimpleGrain()
@@ -52,20 +58,14 @@ namespace UnitTests.General
             return random.Next();
         }
 
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task SimpleGrainGetGrain()
         {
             ISimpleGrain grain = GetSimpleGrain();
             int ignored = await grain.GetAxB();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task SimpleGrainControlFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
@@ -80,7 +80,7 @@ namespace UnitTests.General
             Assert.AreEqual(6, await intPromise);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task SimpleGrainDataFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();

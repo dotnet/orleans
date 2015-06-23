@@ -24,17 +24,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForStreamingDeactivationUnitTests.xml")]
-    [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
+    [TestFixture]
     public class SMSDeactivationTests : UnitTestSiloHost
     {
         private const string SMSStreamProviderName = "SMSProvider";
@@ -58,21 +55,20 @@ namespace UnitTests.StreamingTests
             runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
         }
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
+        [TestFixtureTearDown]
         public static void MyClassCleanup()
         {
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task SMSDeactivationTest()
         {
             logger.Info("************************ SMSDeactivationTest *********************************");
             await runner.DeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task SMSDeactivationTest_ClientConsumer()
         {
             logger.Info("************************ SMSDeactivationTest *********************************");

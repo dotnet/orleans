@@ -24,7 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
@@ -33,10 +33,7 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
-    [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
+    [TestFixture]
     public class SampleStreamingTests : UnitTestSiloHost
     {
         private const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
@@ -60,14 +57,13 @@ namespace UnitTests.StreamingTests
         {
         }
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestFixtureTearDown]
+        public void MyClassCleanup()
         {
             StopAllSilos();
         }
 
-        [TestCleanup]
+        [TearDown]
         public void TestCleanup()
         {
             if (streamProvider != null && streamProvider.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
@@ -76,7 +72,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Test, Category("BVT"), Category("Functional"), Category("Streaming")]
         public async Task SampleStreamingTests_1()
         {
             logger.Info("************************ SampleStreamingTests_1 *********************************");
@@ -85,7 +81,7 @@ namespace UnitTests.StreamingTests
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task SampleStreamingTests_2()
         {
             logger.Info("************************ SampleStreamingTests_2 *********************************");
@@ -94,7 +90,7 @@ namespace UnitTests.StreamingTests
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming" )]
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task SampleStreamingTests_3()
         {
             logger.Info("************************ SampleStreamingTests_3 *********************************" );
@@ -103,7 +99,7 @@ namespace UnitTests.StreamingTests
             await StreamingTests_Producer_InlineConsumer(streamId, streamProvider );
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task SampleStreamingTests_4()
         {
             logger.Info("************************ SampleStreamingTests_4 *********************************");
@@ -112,7 +108,7 @@ namespace UnitTests.StreamingTests
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task SampleStreamingTests_5()
         {
             logger.Info("************************ SampleStreamingTests_5 *********************************");
@@ -121,7 +117,7 @@ namespace UnitTests.StreamingTests
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task MultipleImplicitSubscriptionTest()
         {
             logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");

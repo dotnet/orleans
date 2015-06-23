@@ -24,7 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
@@ -32,9 +32,7 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
+    [TestFixture]
     public class AQSubscriptionMultiplicityTests : UnitTestSiloHost
     {
         private const string AQStreamProviderName = "AzureQueueProvider";                 // must match what is in OrleansConfigurationForStreamingUnitTests.xml
@@ -52,48 +50,47 @@ namespace UnitTests.StreamingTests
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
         }
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
+        [TestFixtureTearDown]
         public static void MyClassCleanup()
         {
             StopAllSilos();
         }
 
-        [TestCleanup]
+        [TearDown]
         public void TestCleanup()
         {
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage"), Category("Streaming")]
         public async Task AQMultipleSubscriptionTest()
         {
             logger.Info("************************ AQMultipleSubscriptionTest *********************************");
             await runner.MultipleSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage"), Category("Streaming")]
         public async Task AQAddAndRemoveSubscriptionTest()
         {
             logger.Info("************************ AQAddAndRemoveSubscriptionTest *********************************");
             await runner.AddAndRemoveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage"), Category("Streaming")]
         public async Task AQResubscriptionTest()
         {
             logger.Info("************************ AQResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage"), Category("Streaming")]
         public async Task AQResubscriptionAfterDeactivationTest()
         {
             logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage"), Category("Streaming")]
         public async Task AQActiveSubscriptionTest()
         {
             logger.Info("************************ AQActiveSubscriptionTest *********************************");

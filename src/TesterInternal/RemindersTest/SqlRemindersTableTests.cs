@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -38,12 +38,9 @@ namespace UnitTests.RemindersTest
     /// <summary>
     /// Tests for operation of Orleans Reminders Table using SQL
     /// </summary>
-    [TestClass]
-    [DeploymentItem("CreateOrleansTables_SqlServer.sql")]
+    [TestFixture]
     public class SQLRemindersTableTests
     {
-        public TestContext TestContext { get; set; }
-
         private string deploymentId;
         private SiloAddress siloAddress;
         private static IRelationalStorage relationalStorage;
@@ -57,8 +54,8 @@ namespace UnitTests.RemindersTest
         private SqlReminderTable reminder;
 
         // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        [TestFixtureSetUp]
+        public static void ClassInitialize()
         {
             TraceLogger.Initialize(new NodeConfiguration());
             TraceLogger.AddTraceLevelOverride("SQLReminderTableTests", Logger.Severity.Verbose3);
@@ -91,7 +88,7 @@ namespace UnitTests.RemindersTest
 
 
         // Use TestCleanup to run code after each test has run
-        [TestCleanup]
+        [TearDown]
         public void TestCleanup()
         {
             if (reminder != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
@@ -99,11 +96,13 @@ namespace UnitTests.RemindersTest
                 reminder.TestOnlyClearTable().Wait();
                 reminder = null;
             }
-            logger.Info("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+            var testContext = TestContext.CurrentContext;
+
+            logger.Info("Test {0} completed - Outcome = {1}", testContext.Test.Name, testContext.Result.Status);
         }
 
 
-        [ClassCleanup]
+        [TestFixtureTearDown]
         public static void ClassCleanup()
         {
             // Reset init timeout after tests
@@ -111,7 +110,7 @@ namespace UnitTests.RemindersTest
         }
 
 
-        [TestMethod, TestCategory("Reminders"), TestCategory("SqlServer")]
+        [Test, Category("Reminders"), Category("SqlServer")]
         public async Task RemindersTable_SqlServer_Init()
         {
             await Initialize();
@@ -119,7 +118,7 @@ namespace UnitTests.RemindersTest
         }
 
 
-        [TestMethod, TestCategory("Reminders"), TestCategory("SqlServer")]
+        [Test, Category("Reminders"), Category("SqlServer")]
         public async Task RemindersTable_SqlServer_UpsertReminderTwice()
         {
             await Initialize();

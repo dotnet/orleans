@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.Runtime;
 
@@ -31,7 +31,6 @@ namespace UnitTests.RemindersTest
 {
     internal class ReminderTablePluginTests
     {
-        public TestContext TestContext { get; set; }
         private static readonly TraceLogger logger = TraceLogger.GetLogger("ReminderTablePluginTests");
 
         internal static async Task ReminderTableUpsertTwice(IReminderTable reminder)

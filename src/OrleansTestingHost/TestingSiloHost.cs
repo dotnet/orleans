@@ -30,7 +30,6 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.Remoting;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
@@ -358,8 +357,11 @@ namespace Orleans.TestingHost
 
         #region Private methods
 
-        private async Task InitializeAsync(TestingSiloOptions options, TestingClientOptions clientOptions)
+        protected async Task InitializeAsync(TestingSiloOptions options, TestingClientOptions clientOptions)
         {
+            if (clientOptions == null) throw new ArgumentNullException("options", "TestSiloOptions must be supplied");
+            if (options == null) throw new ArgumentNullException("clientOptions", "TestingClientOptions must be supplied");
+
             bool doStartPrimary = false;
             bool doStartSecondary = false;
 
@@ -421,7 +423,8 @@ namespace Orleans.TestingHost
                 {
                     Secondary = await handles[1];
                 }
-            }else
+            }
+            else
             {
                 if (doStartPrimary)
                 {

@@ -24,7 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Globalization;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.CodeGeneration;
@@ -36,16 +36,16 @@ namespace UnitTests.General
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>
-    [TestClass]
+    [TestFixture]
     public class SerializationTests
     {
-        [TestInitialize]
+        [SetUp]
         public void InitializeForTesting()
         {
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Test, Category("BVT"), Category("Functional"), Category("Serialization")]
         public void SerializationTests_DateTime()
         {
             // Local Kind
@@ -70,7 +70,7 @@ namespace UnitTests.General
             Assert.AreEqual(inputUnspecified.Kind, outputUnspecified.Kind);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Test, Category("BVT"), Category("Functional"), Category("Serialization")]
         public void SerializationTests_DateTimeOffset()
         {
             // Local Kind
@@ -107,7 +107,7 @@ namespace UnitTests.General
             Assert.AreEqual(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Test, Category("BVT"), Category("Functional"), Category("Serialization")]
         public void SerializationTests_JObject_Example1()
         {
             const string json = @"{ 
@@ -156,8 +156,8 @@ namespace UnitTests.General
                 SerializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
             }
         }
-        
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+
+        [Test, Category("BVT"), Category("Functional"), Category("Serialization")]
         public void SerializationTests_Json_InnerTypes_TypeNameHandling()
         {
             var original = new RootType();
@@ -176,7 +176,7 @@ namespace UnitTests.General
             Console.WriteLine("Done OK.");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Test, Category("BVT"), Category("Functional"), Category("Serialization")]
         public void SerializationTests_Json_InnerTypes_NoTypeNameHandling()
         {
             var original = new RootType();

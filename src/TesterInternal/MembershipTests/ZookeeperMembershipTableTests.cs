@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -36,12 +36,9 @@ namespace UnitTests.MembershipTests
     /// <summary>
     /// Tests for operation of Orleans SiloInstanceManager using ZookeeperStore - Requires access to external Zookeeper storage
     /// </summary>
-    [TestClass]
-    [DeploymentItem("OrleansZooKeeperUtils.dll")]
+    [TestFixture]
     public class ZookeeperMembershipTableTests
     {
-        public TestContext TestContext { get; set; }
-
         private string deploymentId;
         private SiloAddress siloAddress;
         private IMembershipTable membership;
@@ -49,11 +46,26 @@ namespace UnitTests.MembershipTests
         private readonly TraceLogger logger = TraceLogger.GetLogger("ZookeeperMembershipTableTests", TraceLogger.LoggerType.Application);
 
 
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        [TestFixtureSetUp]
+        public void ClassInitialize()
         {
-            TraceLogger.Initialize(new NodeConfiguration());        
+            TraceLogger.Initialize(new NodeConfiguration());
+        }
+
+        [SetUp]
+        public void TestInitialize()
+        {
+            Initialize().Wait();
+        }
+
+        [TearDown]
+        public void TestCleanup()
+        {
+            if (membership != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
+            {
+                membership.DeleteMembershipTableEntries(deploymentId).Wait();
+                membership = null;
+            }
         }
 
         private async Task Initialize()
@@ -75,56 +87,40 @@ namespace UnitTests.MembershipTests
             membership = mbr;
         }
 
-        // Use TestCleanup to run code after each test has run
-        [TestCleanup]
-        public void TestCleanup()
+        [Test, Category("Membership"), Category("ZooKeeper")]
+        public void MembershipTable_ZooKeeper_Init()
         {
-            if (membership != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
-            {
-                membership.DeleteMembershipTableEntries(deploymentId).Wait();
-                membership = null;
-            }
-        }
-
-        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
-        public async Task MembershipTable_ZooKeeper_Init()
-        {
-            await Initialize();
             Assert.IsNotNull(membership, "Membership Table handler created");
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Test, Category("Membership"), Category("ZooKeeper")]
         public async Task MembershipTable_ZooKeeper_ReadAll_EmptyTable()
         {
-            await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadAll_EmptyTable(membership);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Test, Category("Membership"), Category("ZooKeeper")]
         public async Task MembershipTable_ZooKeeper_InsertRow()
         {
-            await Initialize();
             await MembershipTablePluginTests.MembershipTable_InsertRow(membership);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Test, Category("Membership"), Category("ZooKeeper")]
         public async Task MembershipTable_ZooKeeper_ReadRow_Insert_Read()
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadRow_Insert_Read(membership);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Test, Category("Membership"), Category("ZooKeeper")]
         public async Task MembershipTable_ZooKeeper_ReadAll_Insert_ReadAll()
         {
-            await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Test, Category("Membership"), Category("ZooKeeper")]
         public async Task MembershipTable_ZooKeeper_UpdateRow()
         {
-            await Initialize();
             await MembershipTablePluginTests.MembershipTable_UpdateRow(membership);
         }
     }

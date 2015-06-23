@@ -21,19 +21,19 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.AzureUtils;
-using Orleans.TestingHost;
 using System;
 using System.Net;
+using NUnit.Framework;
+using Orleans.AzureUtils;
+using Orleans.TestingHost;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
+    [TestFixture]
     public class AzureTableErrorCodeTests
     {
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        [TestFixtureSetUp]
+        public void ClassInitialize()
         {
             //Starts the storage emulator if not started already and it exists (i.e. is installed).
             if(!StorageEmulator.TryStart())
@@ -42,7 +42,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage")]
         public void AzureTableErrorCode_IsRetriableHttpError()
         {
             Assert.IsTrue(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 503, null));
@@ -57,7 +57,7 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 200, null));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage")]
         public void AzureTableErrorCode_IsContentionError()
         {
             Assert.IsTrue(AzureStorageUtils.IsContentionError(HttpStatusCode.PreconditionFailed));
@@ -74,7 +74,7 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(AzureStorageUtils.IsContentionError((HttpStatusCode) 200));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Test, Category("Functional"), Category("Azure"), Category("Storage")]
         [ExpectedException(typeof (ArgumentException))]
         public void AzureTableErrorCode_BadTableName()
         {

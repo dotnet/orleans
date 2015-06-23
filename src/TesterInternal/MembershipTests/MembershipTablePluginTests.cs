@@ -24,7 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.Runtime;
 
@@ -32,7 +32,6 @@ namespace UnitTests.MembershipTests
 {
     public class MembershipTablePluginTests
     {
-        public TestContext TestContext { get; set; }
         private static string hostName = Dns.GetHostName();
         private static readonly TraceLogger logger = TraceLogger.GetLogger("MembershipTablePluginTests");
 
