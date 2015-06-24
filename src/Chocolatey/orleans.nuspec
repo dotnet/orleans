@@ -28,7 +28,7 @@
     <file src="..\..\Binaries\Release\ClientConfiguration.xml" target="Binaries\ClientConfiguration.xml" />
     <file src="..\..\Binaries\Release\OrleansConfiguration.xml" target="Binaries\OrleansConfiguration.xml" />
     <file src="..\..\Binaries\Release\Configuration\OrleansConfiguration.xsd" target="Binaries\OrleansConfiguration.xsd" />
-    <file src="..\..\Binaries\Release\SQLServer\CreateTables.sql" target="Binaries\CreateTables.sql" />
+    <file src="..\..\Binaries\Release\SQLServer\CreateOrleansTables_SqlServer.sql" target="Binaries\CreateOrleansTables_SqlServer.sql" />
 
     <file src="..\..\Binaries\Release\Orleans.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Orleans.xml" target="Binaries" />

@@ -108,7 +108,7 @@
                 <File Id="File_SE_OrleansProviders.dll" Name="OrleansProviders.dll" Source="$(var.SDK_binaries_server_src)\OrleansProviders.dll" />
                 <File Id="File_SE_OrleansRuntime.dll" Name="OrleansRuntime.dll" Source="$(var.SDK_binaries_server_src)\OrleansRuntime.dll" />
                 <File Id="File_SE_StartOrleans.cmd" Name="StartOrleans.cmd" Source="$(var.SDK_binaries_server_src)\StartOrleans.cmd" />
-                <File Id="File_SE_CreateTables.sql" Name="CreateTables.sql" Source="$(var.Orleans_src)\OrleansProviders\SQLServer\CreateTables.sql" />
+                <File Id="File_SE_CreateOrleansTables_SqlServer.sql" Name="CreateOrleansTables_SqlServer.sql" Source="$(var.Orleans_src)\OrleansProviders\SQLServer\CreateOrleansTables_SqlServer.sql" />
                 <File Id="File_SE_Newtonsoft.Json.dll" Name="Newtonsoft.Json.dll" Source="$(var.SDK_binaries_server_src)\Newtonsoft.Json.dll" />
                 <RemoveFolder Id='SDK_Binaries_OrleansServer' On='uninstall'/>
                 <RegistryValue Root='HKLM' Key='Software\Microsoft\OrleansSDK\Preview\v$(var.ProductVersion)\SDK' Type='string' Value='' KeyPath='yes' />

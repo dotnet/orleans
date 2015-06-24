@@ -27,6 +27,6 @@
   </metadata>
   <files>
     <file src="OrleansProviders.dll" target="lib\net45" />
-    <file src="SQLServer\CreateTables.sql" target="lib\net45\SQLServer" />
+    <file src="SQLServer\CreateOrleansTables_SqlServer.sql" target="lib\net45\SQLServer" />
   </files>
 </package>
