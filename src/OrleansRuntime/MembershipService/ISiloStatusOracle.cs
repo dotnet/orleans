@@ -44,7 +44,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Start this oracle. Will register this silo in the SiloDirectory with SiloStatus.Starting status.
         /// </summary>
-        Task Start(bool waitForTableToInit);
+        Task Start();
 
         /// <summary>
         /// Turns this oracle into an Active state. Will update this silo in the SiloDirectory with SiloStatus.Active status.

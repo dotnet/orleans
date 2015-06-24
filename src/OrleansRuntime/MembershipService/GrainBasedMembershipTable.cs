@@ -50,11 +50,13 @@ namespace Orleans.Runtime.MembershipService
 
         public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
         {
+            logger.Info("InitializeMembershipTable {0}.", tryInitTableVersion);
             return TaskDone.Done;
         }
 
         public Task DeleteMembershipTableEntries(string deploymentId)
         {
+            logger.Info("DeleteMembershipTableEntries {0}", deploymentId);
             table = null;
             return TaskDone.Done;
         }
