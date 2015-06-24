@@ -444,11 +444,16 @@ namespace Orleans.Runtime
 
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
 
+            bool waitForPrimaryToStart = globalConfig.PrimaryNodeIsRequired && siloType != SiloType.Primary;
+            if (waitForPrimaryToStart) // only in MembershipTableGrain case.
+            {
+                scheduler.QueueTask(() => membershipFactory.WaitForTableToInit(membershipTable), statusOracleContext)
+                        .WaitWithThrow(initTimeout);
+            }
             scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(this.GlobalConfig, true, TraceLogger.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
                 .WaitWithThrow(initTimeout);
-
-            bool waitForPrimaryToStart = globalConfig.PrimaryNodeIsRequired && siloType != SiloType.Primary;
-            scheduler.QueueTask(() => LocalSiloStatusOracle.Start(waitForPrimaryToStart), statusOracleContext)
+          
+            scheduler.QueueTask(() => LocalSiloStatusOracle.Start(), statusOracleContext)
                 .WaitWithThrow(initTimeout);
             if (logger.IsVerbose) { logger.Verbose("Local silo status oracle created successfully."); }
             scheduler.QueueTask(LocalSiloStatusOracle.BecomeActive, statusOracleContext)
