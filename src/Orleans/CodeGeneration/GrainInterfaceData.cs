@@ -140,7 +140,8 @@ namespace Orleans.CodeGeneration
                 return false;
             if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
                 return false;
-            if (t == typeof (IGrain))
+            if (t == typeof(IGrain) || t == typeof(IGrainWithGuidKey) || t == typeof(IGrainWithIntegerKey)
+                || t == typeof(IGrainWithGuidCompoundKey) || t == typeof(IGrainWithIntegerCompoundKey))
                 return false;
             if (t == typeof (ISystemTarget))
                 return false;
