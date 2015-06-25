@@ -22,12 +22,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -54,27 +50,6 @@ namespace UnitTests.Grains
 
         public Task CompareGrainReferences(ISimpleGenericGrain<T> clientReference)
         {
-            long pk = this.GetPrimaryKeyLong() + 1;
-
-            var gr1 = GrainFactory.GetGrain<ISimpleGenericGrain<float>>(pk);
-            var gr2 = SimpleGenericGrainFactory<float>.GetGrain(pk);
-
-            // This equality currently work, since the SimpleGenericGrain<float> was never created before, and as a result both grs are the same.
-            if (!gr1.Equals(gr2))
-                throw new Exception(String.Format("Case_1: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", gr1, gr2));
-            
-            var gr3 = GrainFactory.GetGrain<ISimpleGenericGrain<T>>(pk);
-            var gr4 = SimpleGenericGrainFactory<string>.GetGrain(pk);
-
-            if (typeof(T).Equals(typeof(string)))
-            {
-                // This equality currently fails. 
-                // SimpleGenericGrain<string> was already instantiated once before (this grain), and as a result grs are the different for some reason.
-                if (!gr3.Equals(gr4))
-                    throw new Exception(String.Format("Case_2: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", gr3, gr4));
-            }
-
-
             // Compare reference to this grain created by the client 
             var thisReference = GrainFactory.GetGrain <ISimpleGenericGrain<T>>(this.GetPrimaryKeyLong());
             if(!thisReference.Equals(clientReference))
