@@ -24,8 +24,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
-
 using Orleans.Storage;
 using Orleans.CodeGeneration;
 
@@ -36,6 +34,11 @@ namespace Orleans.Runtime
     /// </summary>
     internal interface IRuntimeClient
     {
+        /// <summary>
+        /// Grain Factory to get and cast grain references.
+        /// </summary>
+        GrainFactory InternalGrainFactory { get; }
+
         /// <summary>
         /// Provides client application code with access to an Orleans logger.
         /// </summary>

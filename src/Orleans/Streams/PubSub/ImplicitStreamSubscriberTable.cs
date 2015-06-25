@@ -251,7 +251,7 @@ namespace Orleans.Streams
         {
             GrainId grainId = GrainId.GetGrainId(implTypeCode, primaryKey);
             IAddressable addressable = GrainReference.FromGrainId(grainId);
-            return GrainFactory.Cast<IStreamConsumerExtension>(addressable);
+            return addressable.Cast<IStreamConsumerExtension>();
         }
 
         /// <summary>

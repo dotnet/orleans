@@ -166,7 +166,7 @@ namespace OrleansManager
                 WriteStatus(string.Format("**Calling GetDetailedGrainReport({0}, {1})", silo, grainId));
                 try
                 {
-                    var siloControl = GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+                    var siloControl = GrainClient.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
                     DetailedGrainReport grainReport = siloControl.GetDetailedGrainReport(grainId).Result;
                     reports.Add(grainReport);
                 }
@@ -188,7 +188,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = GrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
 
             WriteStatus(string.Format("**Calling DeleteGrain({0}, {1}, {2})", silo, grainId, RETRIES));
             directory.DeleteGrain(grainId, RETRIES).Wait();
@@ -202,7 +202,7 @@ namespace OrleansManager
             var silo = GetSiloAddress();
             if (silo == null) return;
 
-            var directory = GrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
   
             WriteStatus(string.Format("**Calling LookupGrain({0}, {1}, {2})", silo, grainId, RETRIES));
             Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.LookUp(grainId, RETRIES);

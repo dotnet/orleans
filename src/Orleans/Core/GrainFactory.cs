@@ -244,10 +244,10 @@ namespace Orleans
         #endregion
 
         #region Interface Casting
-        private static readonly ConcurrentDictionary<Type, Func<IAddressable, object>> casters
+        private readonly ConcurrentDictionary<Type, Func<IAddressable, object>> casters
             = new ConcurrentDictionary<Type, Func<IAddressable, object>>();
 
-        internal static TGrainInterface Cast<TGrainInterface>(IAddressable grain)
+        internal TGrainInterface Cast<TGrainInterface>(IAddressable grain)
         {
             var interfaceType = typeof(TGrainInterface);
             Func<IAddressable, object> caster;
@@ -269,10 +269,10 @@ namespace Orleans
 
         #region SystemTargets
 
-        private static readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
+        private readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
                     new Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>>();
 
-        internal static TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
+        internal TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
             where TGrainInterface : ISystemTarget
         {
             Dictionary<SiloAddress, ISystemTarget> cache;

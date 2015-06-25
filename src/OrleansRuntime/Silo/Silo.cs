@@ -97,7 +97,7 @@ namespace Orleans.Runtime
         private readonly Catalog catalog;
         private readonly List<IHealthCheckParticipant> healthCheckParticipants;
         private readonly object lockable = new object();
-        private readonly IGrainFactory grainFactory;
+        private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         
         
@@ -258,7 +258,8 @@ namespace Orleans.Runtime
                 SiloAddress, 
                 config, 
                 RingProvider, 
-                typeManager);
+                typeManager,
+                grainFactory);
             messageCenter.RerouteHandler = InsideRuntimeClient.Current.RerouteMessage;
             messageCenter.SniffIncomingMessage = InsideRuntimeClient.Current.SniffIncomingMessage;
 
