@@ -93,8 +93,8 @@ namespace Orleans.Runtime.Scheduler
 
         internal readonly int WorkerThreadStatisticsNumber;
 
-        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, bool system = false)
-            : base(system ? "System" : null)
+        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, int threadNumber, bool system = false)
+            : base((system ? "System." : "") + threadNumber)
         {
             pool = gtp;
             scheduler = sched;
