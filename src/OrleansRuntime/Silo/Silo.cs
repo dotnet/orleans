@@ -170,9 +170,8 @@ namespace Orleans.Runtime
                 TraceLogger.Initialize(nodeConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
-            
-            LimitManager.Initialize(nodeConfig);
-            ActivationData.Init(config);
+
+            ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
             SerializationManager.Initialize(globalConfig.UseStandardSerializer);
             initTimeout = globalConfig.MaxJoinAttemptTime;

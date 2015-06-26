@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Configuration
     /// Individual node-specific silo configuration parameters.
     /// </summary>
     [Serializable]
-    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration, ILimitsConfiguration
+    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration
     {
         private readonly DateTime creationTimestamp;
         private string siloName;
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The values for various silo limits.
         /// </summary>
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        public LimitManager LimitManager { get; private set; }
 
         private string traceFilePattern;
         /// <summary>
@@ -289,7 +289,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = true;
             StatisticsCollectionLevel = DEFAULT_STATS_COLLECTION_LEVEL;
 
-            LimitValues = new Dictionary<string, LimitValue>();
+            LimitManager = new LimitManager();
 
             MinDotNetThreadPoolSize = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
 
@@ -337,7 +337,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = other.StatisticsWriteLogStatisticsToTable;
             StatisticsCollectionLevel = other.StatisticsCollectionLevel;
 
-            LimitValues = new Dictionary<string, LimitValue>(other.LimitValues); // Shallow copy
+            LimitManager = new LimitManager(other.LimitManager); // Shallow copy
 
             Subnet = other.Subnet;
 
@@ -388,26 +388,15 @@ namespace Orleans.Runtime.Configuration
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
 
-            if (LimitValues.Count > 0)
+            if (LimitManager.LimitValues.Count > 0)
             {
                 sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitValues.Values)
+                foreach (var limit in LimitManager.LimitValues.Values)
+                {
                     sb.AppendFormat("       {0}", limit).AppendLine();
+                }
             }
-
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// Returns the value of silo limit.
-        /// </summary>
-        /// <param name="limitName">The name of the limit return.</param>
-        /// <returns>Limit value</returns>
-        public LimitValue GetLimit(string limitName)
-        {
-            LimitValue limit;
-            LimitValues.TryGetValue(limitName, out limit);
-            return limit;
         }
 
         internal void Load(XmlElement root)
@@ -514,7 +503,7 @@ namespace Orleans.Runtime.Configuration
                         ConfigUtilities.ParseStatistics(this, child, SiloName);
                         break;
                     case "Limits":
-                        ConfigUtilities.ParseLimitValues(this, child, SiloName);
+                        ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
                         break;
                 }
             }

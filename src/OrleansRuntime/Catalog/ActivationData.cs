@@ -150,6 +150,7 @@ namespace Orleans.Runtime
 
         // This is the maximum amount of time we expect a request to continue processing
         private static TimeSpan maxRequestProcessingTime;
+        private static NodeConfiguration nodeConfiguration;
         public readonly TimeSpan CollectionAgeLimit;
         private IGrainMethodInvoker lastInvoker;
 
@@ -158,10 +159,11 @@ namespace Orleans.Runtime
         private HashSet<GrainTimer> timers;
         private readonly TraceLogger logger;
 
-        public static void Init(ClusterConfiguration config)
+        public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
             // Consider adding a config parameter for this
             maxRequestProcessingTime = config.Globals.ResponseTimeout.Multiply(5);
+            nodeConfiguration = nodeConfig;
         }
 
         public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, IActivationCollector collector, TimeSpan ageLimit)
@@ -565,11 +567,11 @@ namespace Orleans.Runtime
                 string limitName = CodeGeneration.GrainInterfaceData.IsStatelessWorker(GrainInstanceType)
                     ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER
                     : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
-                maxEnqueuedRequestsLimit = LimitManager.GetLimit(limitName); // Cache for next time
+                maxEnqueuedRequestsLimit = nodeConfiguration.LimitManager.GetLimit(limitName); // Cache for next time
                 return maxEnqueuedRequestsLimit;
             }
-            
-            return LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
+
+            return nodeConfiguration.LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
         }
 
         public Message PeekNextWaitingMessage()

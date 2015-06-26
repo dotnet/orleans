@@ -129,7 +129,6 @@
     <Compile Include="AssemblyLoader\AssemblyLoaderCriterion.cs" />
     <Compile Include="Providers\StatisticsProviderManager.cs" />
     <Compile Include="AssemblyLoader\CachedTypeResolver.cs" />
-    <Compile Include="Configuration\ILimitsConfiguration.cs" />
     <Compile Include="Configuration\MessagingConfiguration.cs" />
     <Compile Include="Configuration\ProviderConfiguration.cs" />
     <Compile Include="Configuration\IStatisticsConfiguration.cs" />

@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
-    public class ClientConfiguration : MessagingConfiguration, ITraceConfiguration, IStatisticsConfiguration, ILimitsConfiguration
+    public class ClientConfiguration : MessagingConfiguration, ITraceConfiguration, IStatisticsConfiguration
     {
         /// <summary>
         /// Specifies the type of the gateway provider.
@@ -127,7 +127,7 @@ namespace Orleans.Runtime.Configuration
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        public LimitManager LimitManager { get; private set; }
 
         private static readonly TimeSpan DEFAULT_GATEWAY_LIST_REFRESH_PERIOD = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
@@ -206,17 +206,8 @@ namespace Orleans.Runtime.Configuration
             StatisticsLogWriteInterval = DEFAULT_STATS_LOG_WRITE_PERIOD;
             StatisticsWriteLogStatisticsToTable = true;
             StatisticsCollectionLevel = NodeConfiguration.DEFAULT_STATS_COLLECTION_LEVEL;
-            LimitValues = new Dictionary<string, LimitValue>();
+            LimitManager = new LimitManager();
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
-        }
-
-        /// <summary>
-        /// </summary>
-        public LimitValue GetLimit(string name)
-        {
-            LimitValue limit;
-            LimitValues.TryGetValue(name, out limit);
-            return limit;
         }
 
         public void Load(TextReader input)
@@ -280,7 +271,7 @@ namespace Orleans.Runtime.Configuration
                             ConfigUtilities.ParseStatistics(this, child, ClientName);
                             break;
                         case "Limits":
-                            ConfigUtilities.ParseLimitValues(this, child, ClientName);
+                            ConfigUtilities.ParseLimitValues(LimitManager, child, ClientName);
                             break;
                         case "Debug":
                             break;
@@ -463,10 +454,10 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Client Name: ").AppendLine(ClientName);
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-            if (LimitValues.Count > 0)
+            if (LimitManager.LimitValues.Count > 0)
             {
                 sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitValues.Values)
+                foreach (var limit in LimitManager.LimitValues.Values)
                 {
                     sb.AppendFormat("       {0}", limit).AppendLine();
                 }

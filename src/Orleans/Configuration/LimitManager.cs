@@ -22,46 +22,54 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.Configuration
 {
     /// <summary>
     /// Limits Manager
     /// </summary>
-    internal static class LimitManager
+    public class LimitManager
     {
-        private static ILimitsConfiguration limitsConfig;
+        public IDictionary<string, LimitValue> LimitValues { get; private set; }
 
-        public static void Initialize(ILimitsConfiguration limitValues)
+        public LimitManager()
         {
-            limitsConfig = limitValues;
+            LimitValues = new Dictionary<string, LimitValue>();
         }
 
-        public static void UnInitialize()
+        public LimitManager(LimitManager other)
         {
-            limitsConfig = null;
+            LimitValues = new Dictionary<string, LimitValue>(other.LimitValues);
         }
 
-        public static LimitValue GetLimit(string name)
+        public void AddLimitValue(string name, LimitValue @value)
         {
-            if (limitsConfig == null) throw new InvalidOperationException("LimitsManager not yet initialized");
+            LimitValues.Add(name, @value);
+        }
 
+        public LimitValue GetLimit(string name)
+        {
             return GetLimit(name, 0, 0);
         }
 
-        public static LimitValue GetLimit(string name, int defaultSoftLimit)
+        public LimitValue GetLimit(string name, int defaultSoftLimit)
         {
-            if (limitsConfig == null) throw new InvalidOperationException("LimitsManager not yet initialized");
-
             return GetLimit(name, defaultSoftLimit, 0);
         }
 
-        public static LimitValue GetLimit(string name, int defaultSoftLimit, int defaultHardLimit)
+        public LimitValue GetLimit(string name, int defaultSoftLimit, int defaultHardLimit)
         {
-            if (limitsConfig == null) throw new InvalidOperationException("LimitsManager not yet initialized");
+            LimitValue limit;
+            if(LimitValues.TryGetValue(name, out limit))
+                return limit;
 
-            return limitsConfig.GetLimit(name) ?? 
-                new LimitValue { Name = name, SoftLimitThreshold = defaultSoftLimit, HardLimitThreshold = defaultHardLimit};
+            return new LimitValue { Name = name, SoftLimitThreshold = defaultSoftLimit, HardLimitThreshold = defaultHardLimit };
+        }
+
+        public static LimitValue GetDefaultLimit(string name)
+        {
+            return new LimitValue { Name = name, SoftLimitThreshold = 0, HardLimitThreshold = 0 };
         }
     }
 }

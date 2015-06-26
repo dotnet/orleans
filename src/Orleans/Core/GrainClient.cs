@@ -236,10 +236,7 @@ namespace Orleans
                         }
                         outsideRuntimeClient = runtimeClient;  // Keep reference, to avoid GC problems
                         outsideRuntimeClient.Start();
-
-                        LimitManager.Initialize(config);
-
-                        
+         
                         // this needs to be the last successful step inside the lock so 
                         // IsInitialized doesn't return true until we're fully initialized
                         isFullyInitialized = true;
@@ -279,8 +276,6 @@ namespace Orleans
             // before the next init attempt.
             isFullyInitialized = false;
 
-            LimitManager.UnInitialize();
-            
             if (RuntimeClient.Current != null)
             {
                 try
