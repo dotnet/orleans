@@ -57,6 +57,31 @@ namespace UnitTests.General
             Assert.AreEqual(input.ToString(), output.ToString());
         }
 
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void SerializationTests_DateTime()
+        {
+            // Local Kind
+            DateTime inputLocal = DateTime.Now;
+
+            DateTime outputLocal = SerializationManager.RoundTripSerializationForTesting(inputLocal);
+            Assert.AreEqual(inputLocal.ToString(), outputLocal.ToString());
+            Assert.AreEqual(inputLocal.Kind, outputLocal.Kind);
+
+            // UTC Kind
+            DateTime inputUtc = DateTime.UtcNow;
+
+            DateTime outputUtc = SerializationManager.RoundTripSerializationForTesting(inputUtc);
+            Assert.AreEqual(inputUtc.ToString(), outputUtc.ToString());
+            Assert.AreEqual(inputUtc.Kind, outputUtc.Kind);
+
+            // Unspecified Kind
+            DateTime inputUnspecified = new DateTime(0x08d27e2c0cc7dfb9);
+
+            DateTime outputUnspecified = SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
+            Assert.AreEqual(inputUnspecified.ToString(), outputUnspecified.ToString());
+            Assert.AreEqual(inputUnspecified.Kind, outputUnspecified.Kind);
+        }
+
         [Orleans.CodeGeneration.RegisterSerializerAttribute()]
         internal class JObjectSerialization
         {
