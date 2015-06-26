@@ -4,6 +4,7 @@
     <StorageProviders>
       <!-- To test the sample storage providers, uncomment one of the following two lines:
       <Provider Type="Samples.StorageProviders.MongoDBStorage" Name="TestStore" Database="orleanssamples" ConnectionString="mongodb://localhost:27017/" />
+      <Provider Type="Samples.StorageProviders.OrleansFileStorage" Name="TestStore" RootDirectory=".\Samples.FileStorage"/>
       -->
       <Provider Type="Samples.StorageProviders.OrleansFileStorage" Name="TestStore" RootDirectory=".\Samples.FileStorage"/>
     </StorageProviders>
