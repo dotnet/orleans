@@ -42,22 +42,6 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
-        public void SerializationTests_JObject()
-        {
-            const string json = @"{ 
-                    CPU: 'Intel', 
-                    Drives: [ 
-                            'DVD read/writer', 
-                            '500 gigabyte hard drive' 
-                           ] 
-                   }"; 
- 
-            JObject input = JObject.Parse(json);
-            JObject output = SerializationManager.RoundTripSerializationForTesting(input);
-            Assert.AreEqual(input.ToString(), output.ToString());
-        }
-
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_DateTime()
         {
             // Local Kind
@@ -80,6 +64,22 @@ namespace UnitTests.General
             DateTime outputUnspecified = SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
             Assert.AreEqual(inputUnspecified.ToString(), outputUnspecified.ToString());
             Assert.AreEqual(inputUnspecified.Kind, outputUnspecified.Kind);
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void SerializationTests_JObject()
+        {
+            const string json = @"{ 
+                    CPU: 'Intel', 
+                    Drives: [ 
+                            'DVD read/writer', 
+                            '500 gigabyte hard drive' 
+                           ] 
+                   }"; 
+ 
+            JObject input = JObject.Parse(json);
+            JObject output = SerializationManager.RoundTripSerializationForTesting(input);
+            Assert.AreEqual(input.ToString(), output.ToString());
         }
 
         [Orleans.CodeGeneration.RegisterSerializerAttribute()]
