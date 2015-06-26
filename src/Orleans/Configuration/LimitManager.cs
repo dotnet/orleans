@@ -29,6 +29,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Limits Manager
     /// </summary>
+    [Serializable]
     public class LimitManager
     {
         public IDictionary<string, LimitValue> LimitValues { get; private set; }
