@@ -39,6 +39,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly object lockable;
         private bool running;
         private int runningThreadCount;
+        private int createThreadCount;
         private SafeTimer longTurnTimer;
 
         internal readonly int MaxActiveThreads;
@@ -55,13 +56,15 @@ namespace Orleans.Runtime.Scheduler
             MaxWorkQueueWait = TimeSpan.FromMilliseconds(50);
             threadLimitingSemaphore = new Semaphore(maxActiveThreads, maxActiveThreads);
             pool = new HashSet<WorkerPoolThread>();
+            createThreadCount = 0;
             lockable = new object();
-            for (int i = 0; i < MaxActiveThreads; i++)
+            for (createThreadCount = 0; createThreadCount < MaxActiveThreads; createThreadCount++)
             {
-                var t = new WorkerPoolThread(this, scheduler);
+                var t = new WorkerPoolThread(this, scheduler, createThreadCount);
                 pool.Add(t);
             }
-            systemThread = new WorkerPoolThread(this, scheduler, true);
+            createThreadCount++;
+            systemThread = new WorkerPoolThread(this, scheduler, createThreadCount, true);
             running = false;
             runningThreadCount = 0;
             longTurnTimer = null;
@@ -140,18 +143,21 @@ namespace Orleans.Runtime.Scheduler
                 pool.Remove(t);
                 if (running && (pool.Count < MaxActiveThreads + 2))
                     restart = true;
-            }
-            if (!restart) return;
 
-            var tnew = new WorkerPoolThread(this, scheduler);
-            tnew.Start();
+                if (!restart) return;
+
+                createThreadCount++;
+                var tnew = new WorkerPoolThread(this, scheduler, createThreadCount);
+                tnew.Start();
+            }
         }
 
         internal void CreateNewThread()
         {
             lock (lockable)
             {
-                var t = new WorkerPoolThread(this, scheduler);
+                createThreadCount++;
+                var t = new WorkerPoolThread(this, scheduler, createThreadCount);
                 pool.Add(t);
                 t.Start();
             }

@@ -38,6 +38,7 @@ namespace Orleans.Messaging
         private readonly IncomingMessageBuffer buffer;
 
         internal GatewayClientReceiver(GatewayConnection gateway)
+            : base(gateway.Address.ToString())
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
