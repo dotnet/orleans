@@ -454,14 +454,7 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Client Name: ").AppendLine(ClientName);
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-            if (LimitManager.LimitValues.Count > 0)
-            {
-                sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitManager.LimitValues.Values)
-                {
-                    sb.AppendFormat("       {0}", limit).AppendLine();
-                }
-            }
+            sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());
             sb.AppendFormat("   Providers:").AppendLine();
             sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));

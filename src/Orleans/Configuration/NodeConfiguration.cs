@@ -387,15 +387,7 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Debug: ").AppendLine();
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-
-            if (LimitManager.LimitValues.Count > 0)
-            {
-                sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitManager.LimitValues.Values)
-                {
-                    sb.AppendFormat("       {0}", limit).AppendLine();
-                }
-            }
+            sb.Append(LimitManager);
             return sb.ToString();
         }
 

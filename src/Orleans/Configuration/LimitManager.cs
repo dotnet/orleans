@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -32,21 +33,21 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class LimitManager
     {
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        private readonly Dictionary<string, LimitValue> limitValues;
 
         public LimitManager()
         {
-            LimitValues = new Dictionary<string, LimitValue>();
+            limitValues = new Dictionary<string, LimitValue>();
         }
 
         public LimitManager(LimitManager other)
         {
-            LimitValues = new Dictionary<string, LimitValue>(other.LimitValues);
+            limitValues = new Dictionary<string, LimitValue>(other.limitValues);
         }
 
         public void AddLimitValue(string name, LimitValue @value)
         {
-            LimitValues.Add(name, @value);
+            limitValues.Add(name, @value);
         }
 
         public LimitValue GetLimit(string name)
@@ -62,7 +63,7 @@ namespace Orleans.Runtime.Configuration
         public LimitValue GetLimit(string name, int defaultSoftLimit, int defaultHardLimit)
         {
             LimitValue limit;
-            if(LimitValues.TryGetValue(name, out limit))
+            if (limitValues.TryGetValue(name, out limit))
                 return limit;
 
             return new LimitValue { Name = name, SoftLimitThreshold = defaultSoftLimit, HardLimitThreshold = defaultHardLimit };
@@ -71,6 +72,21 @@ namespace Orleans.Runtime.Configuration
         public static LimitValue GetDefaultLimit(string name)
         {
             return new LimitValue { Name = name, SoftLimitThreshold = 0, HardLimitThreshold = 0 };
+        }
+
+        public override string ToString()
+        {
+            if (limitValues.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.Append("   Limits Values: ").AppendLine();
+                foreach (var limit in limitValues.Values)
+                {
+                    sb.AppendFormat("       {0}", limit).AppendLine();
+                }
+                return sb.ToString();
+            }
+            return String.Empty;
         }
     }
 }
