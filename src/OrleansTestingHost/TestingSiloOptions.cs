@@ -21,6 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.IO;
 using Orleans.Runtime.Configuration;
 
@@ -44,6 +45,9 @@ namespace Orleans.TestingHost
         public int LargeMessageWarningThreshold { get; set; }
         public GlobalConfiguration.LivenessProviderType LivenessType { get; set; }
         public bool ParallelStart { get; set; }
+        public GlobalConfiguration.ReminderServiceProviderType ReminderServiceType { get; set; }
+        public string DataConnectionString { get; set; }
+        public Guid ServiceId { get; private set; }
 
         public TestingSiloOptions()
         {
@@ -56,8 +60,10 @@ namespace Orleans.TestingHost
             BasePort = -1; // use default from configuration file
             MachineName = ".";
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
+            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
             SiloConfigFile = new FileInfo(DEFAULT_SILO_CONFIG_FILE);
             ParallelStart = false;
+            ServiceId = Guid.NewGuid();
         }
 
         public TestingSiloOptions Copy()
@@ -75,7 +81,10 @@ namespace Orleans.TestingHost
                 LargeMessageWarningThreshold = LargeMessageWarningThreshold,
                 PropagateActivityId = PropagateActivityId,
                 LivenessType = LivenessType,
-                ParallelStart = ParallelStart
+                ReminderServiceType = ReminderServiceType,
+                DataConnectionString = DataConnectionString,
+                ParallelStart = ParallelStart,
+                ServiceId = ServiceId
             };
         }
     }

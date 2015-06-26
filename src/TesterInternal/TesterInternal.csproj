@@ -68,6 +68,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="General\Identifiertests.cs" />
+    <Compile Include="LivenessTests\Liveness_OracleTests.cs" />
+    <Compile Include="LivenessTests\Liveness_Set_2_Tests.cs" />
+    <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
@@ -89,6 +92,10 @@
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansManager\OrleansManager.csproj">
+      <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
+      <Name>OrleansManager</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
@@ -108,6 +115,10 @@
     <ProjectReference Include="..\Tester\Tester.csproj">
       <Project>{591ef75b-d3b0-403d-830c-39d032a73404}</Project>
       <Name>Tester</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
+      <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
+      <Name>TestGrainInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

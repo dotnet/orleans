@@ -182,7 +182,7 @@ namespace Orleans.TestingHost
         /// Wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
         /// </summary>
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
-        public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
+        public static async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
             TimeSpan stabilizationTime = _livenessStabilizationTime;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
@@ -282,7 +282,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Restart the default Primary and Secondary silos.
         /// </summary>
-        public void RestartDefaultSilos()
+        public static void RestartDefaultSilos()
         {
             TestingSiloOptions primarySiloOptions = Primary.Options;
             TestingSiloOptions secondarySiloOptions = Secondary.Options;
@@ -343,6 +343,8 @@ namespace Orleans.TestingHost
             }
             return null;
         }
+
+        public Guid ServiceId { get { return siloInitOptions.ServiceId; } }
 
         #region Private methods
 
@@ -467,7 +469,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        private static SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
@@ -505,6 +507,11 @@ namespace Orleans.TestingHost
             }
 
             config.Globals.LivenessType = options.LivenessType;
+            config.Globals.ReminderServiceType = options.ReminderServiceType;
+            if (!String.IsNullOrEmpty(options.DataConnectionString))
+            {
+                config.Globals.DataConnectionString = options.DataConnectionString;
+            }
 
             config.AdjustForTestEnvironment();
 
