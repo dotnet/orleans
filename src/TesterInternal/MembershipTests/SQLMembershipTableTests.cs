@@ -30,9 +30,10 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
 using Orleans.AzureUtils;
+using UnitTests.StorageTests;
 
 
-namespace UnitTests.StorageTests
+namespace UnitTests.MembershipTests
 {
     /// <summary>
     /// Tests for operation of Orleans Membership Table using AzureStore - Requires access to external Azure storage
@@ -144,6 +145,13 @@ namespace UnitTests.StorageTests
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership, siloAddress);
+        }
+
+        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
+        public async Task Membership_SqlServer_UpdateRow()
+        {
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_UpdateRow(membership);
         }
     }
 }

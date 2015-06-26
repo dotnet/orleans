@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
-namespace UnitTestGrains
+namespace UnitTests.Grains
 {
     internal class LivenessTestGrain : Grain, ILivenessTestGrain
     {
@@ -37,20 +34,9 @@ namespace UnitTestGrains
 
         #region Implementation of ILivenessTestGrain
 
-        public Task<long> GetKey()
-        {
-            return Task.FromResult(this.GetPrimaryKeyLong());
-        }
-
         public Task<string> GetLabel()
         {
             return Task.FromResult(label);
-        }
-
-        public async Task DoLongAction(TimeSpan timespan, string str)
-        {
-            logger.Info("DoLongAction {0} received", str);
-            await Task.Delay(timespan);
         }
 
         public Task SetLabel(string label)
@@ -74,28 +60,6 @@ namespace UnitTestGrains
             return TaskDone.Done;
         }
 
-        public async Task<Tuple<string, string>> TestRequestContext()
-        {
-            string bar1 = null;
-            RequestContext.Set("jarjar", "binks");
-
-            Task task = Task.Factory.StartNew(() =>
-            {
-                bar1 = (string)RequestContext.Get("jarjar");
-                logger.Info("bar = {0}.", bar1);
-            });
-
-            string bar2 = null;
-            Task ac = Task.Factory.StartNew(() =>
-            {
-                bar2 = (string)RequestContext.Get("jarjar");
-                logger.Info("bar = {0}.", bar2);
-            });
-
-            await Task.WhenAll(task, ac);
-            return new Tuple<string, string>(bar1, bar2);
-        }
-
         public Task<string> GetRuntimeInstanceId()
         {
             return Task.FromResult(this.RuntimeIdentity);
@@ -109,26 +73,6 @@ namespace UnitTestGrains
         public Task<ILivenessTestGrain> GetGrainReference()
         {
             return Task.FromResult(this.AsReference<ILivenessTestGrain>());
-        }
-
-        public Task<IGrain[]> GetMultipleGrainInterfaces_Array()
-        {
-            IGrain[] grains = new IGrain[5];
-            for (int i = 0; i < grains.Length; i++)
-            {
-                grains[i] = GrainFactory.GetGrain<ILivenessTestGrain>(i);
-            }
-            return Task.FromResult(grains);
-        }
-
-        public Task<List<IGrain>> GetMultipleGrainInterfaces_List()
-        {
-            IGrain[] grains = new IGrain[5];
-            for (int i = 0; i < grains.Length; i++)
-            {
-                grains[i] = GrainFactory.GetGrain<ILivenessTestGrain>(i);
-            }
-            return Task.FromResult(grains.ToList());
         }
 
         #endregion

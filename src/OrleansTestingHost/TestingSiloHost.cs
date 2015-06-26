@@ -182,7 +182,7 @@ namespace Orleans.TestingHost
         /// Wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
         /// </summary>
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
-        public static async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
+        public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
             TimeSpan stabilizationTime = _livenessStabilizationTime;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
@@ -282,7 +282,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Restart the default Primary and Secondary silos.
         /// </summary>
-        public static void RestartDefaultSilos()
+        public void RestartDefaultSilos()
         {
             TestingSiloOptions primarySiloOptions = Primary.Options;
             TestingSiloOptions secondarySiloOptions = Secondary.Options;
@@ -330,21 +330,18 @@ namespace Orleans.TestingHost
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
-        /// <param name="stopGracefully">Whether the silo should be immediately Killed, or graceful Stop.</param>
-        public SiloHandle RestartSilo(SiloHandle instance, bool stopGracefully = true)
+        public SiloHandle RestartSilo(SiloHandle instance)
         {
             if (instance != null)
             {
                 var options = instance.Options;
                 var type = instance.Silo.Type;
-                StopOrleansSilo(instance, stopGracefully);
+                StopOrleansSilo(instance, true);
                 instance = StartOrleansSilo(type, options, InstanceCounter++);
                 return instance;
             }
             return null;
         }
-
-        public Guid ServiceId { get { return siloInitOptions.ServiceId; } }
 
         #region Private methods
 

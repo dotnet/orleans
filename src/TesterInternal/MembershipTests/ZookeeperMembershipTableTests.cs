@@ -27,11 +27,11 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Host;
 using Orleans.TestingHost;
+using UnitTests.StorageTests;
 
 
-namespace UnitTests.StorageTests
+namespace UnitTests.MembershipTests
 {
     /// <summary>
     /// Tests for operation of Orleans SiloInstanceManager using ZookeeperStore - Requires access to external Zookeeper storage
@@ -129,6 +129,13 @@ namespace UnitTests.StorageTests
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership, siloAddress);
+        }
+
+        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task Membership_ZooKeeper_UpdateRow()
+        {
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_UpdateRow(membership);
         }
     }
 }

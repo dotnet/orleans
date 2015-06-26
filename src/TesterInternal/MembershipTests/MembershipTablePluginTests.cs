@@ -26,13 +26,9 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.AzureUtils;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
-using Orleans.TestingHost;
 
-namespace UnitTests.StorageTests
+namespace UnitTests.MembershipTests
 {
     public class MembershipTablePluginTests
     {
@@ -166,6 +162,43 @@ namespace UnitTests.StorageTests
             Assert.IsNotNull(eTag, "ETag should not be null");
             Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
         }
+
+        internal static async Task MembershipTable_UpdateRow(IMembershipTable membership)
+        {
+            MembershipEntry data = CreateMembershipEntryForTest();
+
+            MembershipTableData tableData = await membership.ReadAll();
+            TableVersion tableVer = tableData.Version;
+            Assert.AreEqual(0, tableData.Members.Count, "Should be no data initially: {0}", tableData);
+
+            logger.Info("Calling InsertRow with Entry = {0} TableVersion = {1}", data, tableVer);
+            bool ok = await membership.InsertRow(data, tableVer);
+
+            Assert.IsTrue(ok, "InsertRow OK");
+
+            tableData = await membership.ReadAll();
+            Assert.AreEqual(1, tableData.Members.Count, "Should be one row after insert: {0}", tableData);
+
+            Tuple<MembershipEntry, string> newEntryData = tableData.Get(data.SiloAddress);
+            string eTag = newEntryData.Item2;
+            Assert.IsNotNull(eTag, "ETag should not be null");
+
+            tableVer = tableData.Version;
+            Assert.IsNotNull(tableVer, "TableVersion should not be null");
+            tableVer = tableVer.Next();
+
+            data = CreateMembershipEntryForTest();
+            data.Status = SiloStatus.Active;
+
+            logger.Info("Calling UpdateRow with Entry = {0} eTag = {1} New TableVersion={2}", data, eTag, tableVer);
+            ok = await membership.UpdateRow(data, eTag, tableVer);
+
+            tableData = await membership.ReadAll();
+            Assert.AreEqual(1, tableData.Members.Count, "Should be one row after update: {0}", tableData);
+
+            Assert.IsTrue(ok, "UpdateRow OK - Table Data = {0}", tableData);
+        }
+
         // Utility methods
 
         private static MembershipEntry CreateMembershipEntryForTest()
