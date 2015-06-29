@@ -330,14 +330,13 @@ namespace Orleans.TestingHost
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
-        /// <param name="stopGracefully">Whether the silo should be immediately Killed, or graceful Stop.</param>
-        public SiloHandle RestartSilo(SiloHandle instance, bool stopGracefully = true)
+        public SiloHandle RestartSilo(SiloHandle instance)
         {
             if (instance != null)
             {
                 var options = instance.Options;
                 var type = instance.Silo.Type;
-                StopOrleansSilo(instance, stopGracefully);
+                StopOrleansSilo(instance, true);
                 instance = StartOrleansSilo(type, options, InstanceCounter++);
                 return instance;
             }
@@ -467,7 +466,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        private static SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
@@ -505,6 +504,11 @@ namespace Orleans.TestingHost
             }
 
             config.Globals.LivenessType = options.LivenessType;
+            config.Globals.ReminderServiceType = options.ReminderServiceType;
+            if (!String.IsNullOrEmpty(options.DataConnectionString))
+            {
+                config.Globals.DataConnectionString = options.DataConnectionString;
+            }
 
             config.AdjustForTestEnvironment();
 

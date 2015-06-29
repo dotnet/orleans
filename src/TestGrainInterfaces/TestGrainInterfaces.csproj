@@ -54,6 +54,7 @@
     <Compile Include="IObserverGrain.cs" />
     <Compile Include="ISimpleGrain.cs" />
     <Compile Include="ISimplePersistentGrain.cs" />
+    <Compile Include="ILivenessTestGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

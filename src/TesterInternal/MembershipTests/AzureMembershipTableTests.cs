@@ -30,31 +30,33 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
 using Orleans.AzureUtils;
+using UnitTests.StorageTests;
 
 
-namespace UnitTests.StorageTests
+namespace UnitTests.MembershipTests
 {
     /// <summary>
     /// Tests for operation of Orleans Membership Table using AzureStore - Requires access to external Azure storage
     /// </summary>
     [TestClass]
-    [DeploymentItem(@"Data\TestDb.mdf")]
-    public class SQLMembershipTableTests
+    public class AzureMembershipTableTests
     {
         public TestContext TestContext { get; set; }
 
         private string deploymentId;
         private SiloAddress siloAddress;
-        private SqlMembershipTable membership;
+        private AzureBasedMembershipTable membership;
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
-        private readonly TraceLogger logger = TraceLogger.GetLogger("SQLMembershipTableTests", TraceLogger.LoggerType.Application);
+        private readonly TraceLogger logger = TraceLogger.GetLogger("AzureMembershipTableTests", TraceLogger.LoggerType.Application);
 
         // Use ClassInitialize to run code before running the first test in the class
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("SQLMembershipTableTests", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("Storage", Logger.Severity.Verbose3);
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
@@ -77,10 +79,10 @@ namespace UnitTests.StorageTests
             GlobalConfiguration config = new GlobalConfiguration
             {
                 DeploymentId = deploymentId,
-                DataConnectionString = StorageTestConstants.GetSqlConnectionString(TestContext.DeploymentDirectory)
+                DataConnectionString = StorageTestConstants.DataConnectionString
             };
 
-            var mbr = new SqlMembershipTable();
+            var mbr = new AzureBasedMembershipTable();
             await mbr.InitializeMembershipTable(config, true, logger).WithTimeout(timeout);
             membership = mbr;
         }
@@ -104,46 +106,53 @@ namespace UnitTests.StorageTests
             OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Membership_SqlServer_Init()
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_Init()
         {
             await Initialize();
             Assert.IsNotNull(membership, "Membership Table handler created");
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Membership_SqlServer_ReadAll()
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_ReadAll()
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadAll(membership);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Membership_SqlServer_InsertRow()
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_InsertRow()
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_InsertRow(membership);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Membership_SqlServer_ReadRow_EmptyTable()
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_ReadRow_EmptyTable()
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadRow_EmptyTable(membership, siloAddress);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Membership_SqlServer_ReadRow_Insert_Read()
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_ReadRow_Insert_Read()
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadRow_Insert_Read(membership, siloAddress);
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Membership_SqlServer_ReadAll_Insert_ReadAll()
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_ReadAll_Insert_ReadAll()
         {
             await Initialize();
             await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership, siloAddress);
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_UpdateRow()
+        {
+            await Initialize();
+            await MembershipTablePluginTests.MembershipTable_UpdateRow(membership);
         }
     }
 }
