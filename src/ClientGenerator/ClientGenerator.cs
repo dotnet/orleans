@@ -124,11 +124,6 @@ namespace Orleans.CodeGeneration
                 // Call a method 
                 return generator.CreateGrainClient(options);
             }
-            catch (Exception ex)
-            {
-                ConsoleText.WriteError("ERROR -- Client code-gen FAILED -- Exception caught -- ", ex);
-                throw;
-            }
             finally
             {
                 if (appDomain != null)

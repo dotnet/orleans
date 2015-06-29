@@ -294,9 +294,8 @@ namespace Orleans.CodeGeneration
             if (persistentInterface!=null)
             {
                 if (!sourceType.GetCustomAttributes(typeof (StorageProviderAttribute)).Any())
-                    throw new BadProviderConfigException(
-                        String.Format("No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
-
+                    ConsoleText.WriteError(String.Format("Error: No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
+                    
                 if (!persistentInterface.IsInterface)
                 {
                     hasStateClass = false;
@@ -725,7 +724,7 @@ namespace Orleans.CodeGeneration
             int methodId = GrainInterfaceData.ComputeMethodId(methodInfo);
             if (methodIdCollisionDetection.Contains(methodId))
             {
-                ReportErrorAndThrow(string.Format("Collision detected for method {0}, declaring type {1}, consider renaming method name",
+                ReportError(string.Format("Collision detected for method {0}, declaring type {1}, consider renaming method name",
                     methodInfo.Name, methodInfo.DeclaringType.FullName));
             }
             else
@@ -741,10 +740,9 @@ namespace Orleans.CodeGeneration
 
         #region utility methods
 
-        private static void ReportErrorAndThrow(string errorMsg)
+        private static void ReportError(string errorMsg)
         {
-            ConsoleText.WriteError("Orleans code generator found error: " + errorMsg);
-            throw new OrleansException(errorMsg);
+            ConsoleText.WriteError("Error: Orleans code generator found error " + errorMsg);
         }
 
         private void AddFactoryMethods(GrainInterfaceData si, CodeTypeDeclaration factoryClass)
