@@ -515,7 +515,7 @@ namespace Orleans.Serialization
         /// <summary> Write a <c>DataTime</c> value to the stream. </summary>
         public void Write(DateTime dt)
         {
-            Write(dt.Ticks);
+            Write(dt.ToBinary());
         }
 
         /// <summary> Write a <c>Guid</c> value to the stream. </summary>

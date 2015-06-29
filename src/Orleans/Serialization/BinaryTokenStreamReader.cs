@@ -539,7 +539,7 @@ namespace Orleans.Serialization
                     result = new Guid(bytes);
                     break;
                 case SerializationTokenType.Date:
-                    result = new DateTime(ReadLong());
+                    result = DateTime.FromBinary(ReadLong());
                     break;
                 case SerializationTokenType.TimeSpan:
                     result = new TimeSpan(ReadLong());
