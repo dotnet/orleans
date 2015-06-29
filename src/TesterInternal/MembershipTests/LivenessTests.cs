@@ -32,7 +32,19 @@ namespace UnitTests.MembershipTests
         protected void DoTestCleanup()
         {
             Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-            StopAdditionalSilos();
+            StopAllSilos();
+        }
+
+        protected static void DoClassCleanup()
+        {
+            Console.WriteLine("ClassCleanup.");
+            StopAllSilos();
+        }
+
+        protected static void DoClassInitialize()
+        {
+            Console.WriteLine("ClassCleanup.");
+            StopAllSilos();
         }
 
         protected async Task Do_Liveness_OracleTest_1()
@@ -176,13 +188,31 @@ namespace UnitTests.MembershipTests
             : base(siloOptions, clientOptions)
         { }
 
+        [TestInitialize]
+        public void TestInitialize()
+        {
+            DoTestCleanup();
+        }
+
         [TestCleanup]
         public void TestCleanup()
         {
             DoTestCleanup();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Membership")]
+        [ClassCleanup]
+        public static void MyClassCleanup()
+        {
+            DoClassCleanup();
+        }
+
+        [ClassInitialize]
+        public static void MyClassInitialize(TestContext testContext)
+        {
+            DoClassInitialize();
+        }
+
+        //[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("Gabi")]
         public async Task Liveness_Grain_1()
         {
             GlobalConfiguration config = Primary.Silo.GlobalConfig;
@@ -232,7 +262,19 @@ namespace UnitTests.MembershipTests
             DoTestCleanup();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [ClassCleanup]
+        public static void MyClassCleanup()
+        {
+            DoClassCleanup();
+        }
+
+        [ClassInitialize]
+        public static void MyClassInitialize(TestContext testContext)
+        {
+            DoClassInitialize();
+        }
+
+        //[TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_1()
         {
             GlobalConfiguration config = Primary.Silo.GlobalConfig;
@@ -288,7 +330,19 @@ namespace UnitTests.MembershipTests
             DoTestCleanup();
         }
 
-        [TestMethod,  TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [ClassCleanup]
+        public static void MyClassCleanup()
+        {
+            DoClassCleanup();
+        }
+
+        [ClassInitialize]
+        public static void MyClassInitialize(TestContext testContext)
+        {
+            DoClassInitialize();
+        }
+
+        //[TestMethod,  TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_1()
         {
             GlobalConfiguration config = Primary.Silo.GlobalConfig;
@@ -354,7 +408,19 @@ namespace UnitTests.MembershipTests
             DoTestCleanup();
         }
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
+        [ClassCleanup]
+        public static void MyClassCleanup()
+        {
+            DoClassCleanup();
+        }
+
+        [ClassInitialize]
+        public static void MyClassInitialize(TestContext testContext)
+        {
+            DoClassInitialize();
+        }
+
+        //[TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
         public async Task Liveness_Sql_1()
         {
             GlobalConfiguration config = Primary.Silo.GlobalConfig;
