@@ -146,8 +146,7 @@ namespace Orleans.Runtime.Scheduler
         // per ActivationWorker. An attempt to wait when there are already too many threads waiting
         // will result in a TooManyWaitersException being thrown.
         //private static readonly int MaxWaitingThreads = 500;
-        // This is the maximum number of pending work items for a single activation before we write a warning log.
-        private static LimitValue MaxPendingItemsLimit;
+
 
         internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext)
         {
@@ -161,7 +160,6 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskRunner = new ActivationTaskScheduler(this);
-            MaxPendingItemsLimit = LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS);
             log = IsSystem ? TraceLogger.GetLogger("Scheduler." + Name + ".WorkItemGroup", TraceLogger.LoggerType.Runtime) : appLogger;
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
@@ -221,7 +219,7 @@ namespace Orleans.Runtime.Scheduler
                     SchedulerStatisticsGroup.OnWorkItemEnqueue();
 #endif
                 workItems.Enqueue(task);
-                int maxPendingItemsLimit = MaxPendingItemsLimit.SoftLimitThreshold;
+                int maxPendingItemsLimit = masterScheduler.MaxPendingItemsLimit.SoftLimitThreshold;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
                     log.Warn(ErrorCode.SchedulerTooManyPendingItems, String.Format("{0} pending work items for group {1}, exceeding the warning threshold of {2}",

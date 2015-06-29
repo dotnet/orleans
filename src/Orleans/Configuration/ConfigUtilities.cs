@@ -161,7 +161,7 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal static void ParseLimitValues(ILimitsConfiguration config, XmlElement root, string nodeName)
+        internal static void ParseLimitValues(LimitManager limitManager, XmlElement root, string nodeName)
         {
             foreach (XmlNode node in root.ChildNodes)
             {
@@ -172,7 +172,7 @@ namespace Orleans.Runtime.Configuration
                     && (grandchild.HasAttribute("SoftLimit") || grandchild.HasAttribute("HardLimit")))
                 {
                     var limitName = grandchild.GetAttribute("Name");
-                    config.LimitValues.Add(limitName, new LimitValue
+                    limitManager.AddLimitValue(limitName, new LimitValue
                     {
                         Name = limitName,
                         SoftLimitThreshold = ParseInt(grandchild.GetAttribute("SoftLimit"),
