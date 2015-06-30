@@ -336,7 +336,7 @@ namespace Orleans.CodeGeneration
                     catch (GrainInterfaceData.RulesViolationException rve)
                     {
                         foreach (var v in rve.Violations)
-                            ConsoleText.WriteError(string.Format("Error: {0}", v));
+                            NamespaceGenerator.ReportError(v);
 
                         success = false;
                     }
@@ -356,7 +356,7 @@ namespace Orleans.CodeGeneration
                         //Question: Should we instead throw compile errors?
                         //Question: What warning number should we use? Standard C# warning/error numbers are listed here: https://msdn.microsoft.com/en-us/library/ms228296(v=vs.90).aspx                        
                         foreach (var v in rve.Violations)
-                            ConsoleText.WriteUsage(string.Format("Warning CS0184 : {0}", v));
+                            NamespaceGenerator.ReportWarning(string.Format("CS0184 : {0}", v));
                     }
                 }
             }
@@ -813,7 +813,7 @@ namespace Orleans.CodeGeneration
 
                 if (!options.TargetLanguage.HasValue)
                 {
-                    ConsoleText.WriteError("Error: unable to determine source code language to use for code generation.");
+                    NamespaceGenerator.ReportError("Unable to determine source code language to use for code generation.");
                     return 2;
                 }
 
@@ -826,7 +826,7 @@ namespace Orleans.CodeGeneration
 
                 if (string.IsNullOrEmpty(options.CodeGenFile))
                 {
-                    ConsoleText.WriteError(string.Format("Error: no codegen file. Add a file '{0}' to your project",
+                    NamespaceGenerator.ReportError(string.Format("No codegen file. Add a file '{0}' to your project",
                         (options.TargetLanguage == Language.CSharp) ? Path.Combine("Properties", "orleans.codegen.cs") :
                         (options.TargetLanguage == Language.FSharp) ? Path.Combine("GeneratedFiles", "orleans.codegen.fs") 
                                                                     : Path.Combine("GeneratedFiles", "orleans.codegen.vb")));
@@ -873,7 +873,7 @@ namespace Orleans.CodeGeneration
             }
             catch (Exception ex)
             {
-                ConsoleText.WriteError("ERROR -- Code-gen FAILED -- ", ex);
+                NamespaceGenerator.ReportError("-- Code-gen FAILED -- ", ex);
                 return 3;
             }
         }

@@ -294,7 +294,7 @@ namespace Orleans.CodeGeneration
             if (persistentInterface!=null)
             {
                 if (!sourceType.GetCustomAttributes(typeof (StorageProviderAttribute)).Any())
-                    ConsoleText.WriteError(String.Format("Error: No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
+                    ReportError(String.Format("No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
                     
                 if (!persistentInterface.IsInterface)
                 {
@@ -560,7 +560,7 @@ namespace Orleans.CodeGeneration
                     return GetGenericTypeName(genericArguments[0], flag);
 
                 var errorMsg = String.Format("Unexpected number of arguments {0} for generic type {1} used as a return type. Only Type<T> are supported as generic return types of grain methods.", genericArguments.Length, type);
-                ConsoleText.WriteError(errorMsg);
+                ReportError(errorMsg);
                 throw new ApplicationException(errorMsg);
             }
 
@@ -740,10 +740,34 @@ namespace Orleans.CodeGeneration
 
         #region utility methods
 
-        private static void ReportError(string errorMsg)
+        /// <summary>
+        /// Makes errors visible in VS and MSBuild by prefixing error message with "Error"
+        /// </summary>
+        /// <param name="errorMsg">Error message</param>
+        internal static void ReportError(string errorMsg)
         {
-            ConsoleText.WriteError("Error: Orleans code generator found error " + errorMsg);
+            ConsoleText.WriteError("Error: Orleans code generator found error: " + errorMsg);
         }
+
+        /// <summary>
+        /// Makes errors visible in VS and MSBuild by prefixing error message with "Error"
+        /// </summary>
+        /// <param name="errorMsg">Error message</param>
+        /// <param name="exc">Exception associated with the error</param>
+        internal static void ReportError(string errorMsg, Exception exc)
+        {
+            ConsoleText.WriteError("Error: Orleans code generator found error: " + errorMsg, exc);
+        }
+
+        /// <summary>
+        /// Makes warnings visible in VS and MSBuild by prefixing error message with "Warning"
+        /// </summary>
+        /// <param name="warning">Warning message</param>
+        internal static void ReportWarning(string warning)
+        {
+            ConsoleText.WriteWarning("Warning: " + warning);
+        }
+        
 
         private void AddFactoryMethods(GrainInterfaceData si, CodeTypeDeclaration factoryClass)
         {
