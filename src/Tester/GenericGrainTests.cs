@@ -523,7 +523,7 @@ namespace UnitTests.General
             Assert.AreEqual(msg4, received, "Echo");
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Generics")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_Echo_Chain_5()
         {
             const string msg5 = "Hello from EchoGenericChainGrain-5";
@@ -534,7 +534,7 @@ namespace UnitTests.General
             Assert.AreEqual(msg5, received, "Echo");
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Generics")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_Echo_Chain_6()
         {
             const string msg6 = "Hello from EchoGenericChainGrain-6";

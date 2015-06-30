@@ -46,7 +46,7 @@ namespace Orleans.Runtime
         {
             // Need to make a non-generic instance of the class to access the static data field. The field itself is independent of the instantiated type.
             var concreteActivationType = activationType.MakeGenericType(typeArgs);
-            var concreteStateObjectType = (stateObjectType != null && stateObjectType.IsGenericType) ? stateObjectType.MakeGenericType(typeArgs) : stateObjectType;
+            var concreteStateObjectType = (stateObjectType != null && stateObjectType.IsGenericType) ? stateObjectType.GetGenericTypeDefinition().MakeGenericType(typeArgs) : stateObjectType;
 
             return new GrainTypeData(concreteActivationType, concreteStateObjectType);
         }
