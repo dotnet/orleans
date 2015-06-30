@@ -92,17 +92,9 @@ namespace UnitTests.MembershipTests
             logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
 
             Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            DateTime now = DateTime.UtcNow;
-            MembershipEntry entry = new MembershipEntry
-            {
-                SiloAddress = siloAddress,
-                StartTime = now,
-                Status = SiloStatus.Active,
-            };
-
+                        
             TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(entry, newTableVersion);
+            bool ok = await membership.InsertRow(CreateActiveMembershipEntryForTest(siloAddress), newTableVersion);
 
             Assert.IsTrue(ok, "InsertRow completed successfully");
 
@@ -131,17 +123,9 @@ namespace UnitTests.MembershipTests
             logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
 
             Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            DateTime now = DateTime.UtcNow;
-            MembershipEntry entry = new MembershipEntry
-            {
-                SiloAddress = siloAddress,
-                StartTime = now,
-                Status = SiloStatus.Active,
-            };
-
+                        
             TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(entry, newTableVersion);
+            bool ok = await membership.InsertRow(CreateActiveMembershipEntryForTest(siloAddress), newTableVersion);
 
             Assert.IsTrue(ok, "InsertRow completed successfully");
 
@@ -200,7 +184,6 @@ namespace UnitTests.MembershipTests
         }
 
         // Utility methods
-
         private static MembershipEntry CreateMembershipEntryForTest()
         {
             var siloAddress = SiloAddress.NewLocalAddress(SiloAddress.AllocateNewGeneration());
@@ -219,6 +202,20 @@ namespace UnitTests.MembershipTests
             };
 
             return membershipEntry;
+        }
+
+        private static MembershipEntry CreateActiveMembershipEntryForTest(SiloAddress siloAddress)
+        {
+            DateTime now = DateTime.UtcNow;
+            return new MembershipEntry
+            {
+                SiloAddress = siloAddress,
+                StartTime = now,
+                Status = SiloStatus.Active,
+                HostName = "TestHost",
+                RoleName = "TestRole",
+                InstanceName = "TestInstance"
+            };
         }
     }
 }
