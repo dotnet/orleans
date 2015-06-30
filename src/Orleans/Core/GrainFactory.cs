@@ -287,14 +287,29 @@ namespace Orleans
                     typedSystemTargetReferenceCache[grainId] = cache;
                 }
             }
+
+            ISystemTarget reference;
             lock (cache)
             {
                 if (cache.ContainsKey(destination))
-                    return (TGrainInterface)cache[destination];
+                {
+                    reference = cache[destination];
+                }
+                else
+                {
+                    reference = Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
+                    cache[destination] = reference; // Store for next time
+                }
+            }
 
-                var reference = Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
-                cache[destination] = reference;
-                return reference;
+            if (reference is TGrainInterface)
+            {
+                return (TGrainInterface) reference;
+            }
+            else
+            {
+                // This system target may implement multiple interfaces, so Cast to the one we need
+                return Cast<TGrainInterface>(reference);
             }
         }
 
