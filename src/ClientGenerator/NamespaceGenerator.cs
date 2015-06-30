@@ -294,9 +294,8 @@ namespace Orleans.CodeGeneration
             if (persistentInterface!=null)
             {
                 if (!sourceType.GetCustomAttributes(typeof (StorageProviderAttribute)).Any())
-                    throw new BadProviderConfigException(
-                        String.Format("No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
-
+                    ReportError(String.Format("No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
+                    
                 if (!persistentInterface.IsInterface)
                 {
                     hasStateClass = false;
@@ -561,7 +560,7 @@ namespace Orleans.CodeGeneration
                     return GetGenericTypeName(genericArguments[0], flag);
 
                 var errorMsg = String.Format("Unexpected number of arguments {0} for generic type {1} used as a return type. Only Type<T> are supported as generic return types of grain methods.", genericArguments.Length, type);
-                ConsoleText.WriteError(errorMsg);
+                ReportError(errorMsg);
                 throw new ApplicationException(errorMsg);
             }
 
@@ -725,7 +724,7 @@ namespace Orleans.CodeGeneration
             int methodId = GrainInterfaceData.ComputeMethodId(methodInfo);
             if (methodIdCollisionDetection.Contains(methodId))
             {
-                ReportErrorAndThrow(string.Format("Collision detected for method {0}, declaring type {1}, consider renaming method name",
+                ReportError(string.Format("Collision detected for method {0}, declaring type {1}, consider renaming method name",
                     methodInfo.Name, methodInfo.DeclaringType.FullName));
             }
             else
@@ -741,11 +740,34 @@ namespace Orleans.CodeGeneration
 
         #region utility methods
 
-        private static void ReportErrorAndThrow(string errorMsg)
+        /// <summary>
+        /// Makes errors visible in VS and MSBuild by prefixing error message with "Error"
+        /// </summary>
+        /// <param name="errorMsg">Error message</param>
+        internal static void ReportError(string errorMsg)
         {
-            ConsoleText.WriteError("Orleans code generator found error: " + errorMsg);
-            throw new OrleansException(errorMsg);
+            ConsoleText.WriteError("Error: Orleans code generator found error: " + errorMsg);
         }
+
+        /// <summary>
+        /// Makes errors visible in VS and MSBuild by prefixing error message with "Error"
+        /// </summary>
+        /// <param name="errorMsg">Error message</param>
+        /// <param name="exc">Exception associated with the error</param>
+        internal static void ReportError(string errorMsg, Exception exc)
+        {
+            ConsoleText.WriteError("Error: Orleans code generator found error: " + errorMsg, exc);
+        }
+
+        /// <summary>
+        /// Makes warnings visible in VS and MSBuild by prefixing error message with "Warning"
+        /// </summary>
+        /// <param name="warning">Warning message</param>
+        internal static void ReportWarning(string warning)
+        {
+            ConsoleText.WriteWarning("Warning: " + warning);
+        }
+        
 
         private void AddFactoryMethods(GrainInterfaceData si, CodeTypeDeclaration factoryClass)
         {

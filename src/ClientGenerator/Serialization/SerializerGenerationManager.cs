@@ -75,7 +75,7 @@ namespace Orleans.CodeGeneration.Serialization
                     processedTypes.Contains(def) || typeof (IAddressable).IsAssignableFrom(def)) return;
 
                 if (def.Namespace.Equals("System") || def.Namespace.StartsWith("System."))
-                    ConsoleText.WriteError("System type " + def.Name + " requires a serializer.");
+                    ConsoleText.WriteWarning("System type " + def.Name + " requires a serializer.");
                 else
                     typesToProcess.Add(def);
 
@@ -87,8 +87,8 @@ namespace Orleans.CodeGeneration.Serialization
 
             if (t.Namespace.Equals("System") || t.Namespace.StartsWith("System."))
             {
-                ConsoleText.WriteError("System type " + t.Name + " may require a custom serializer for optimal performance.");
-                ConsoleText.WriteError("If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.");
+                ConsoleText.WriteWarning("System type " + t.Name + " may require a custom serializer for optimal performance. " +
+                    "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.");
                 return;
             }
 

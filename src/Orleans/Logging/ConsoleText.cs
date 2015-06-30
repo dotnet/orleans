@@ -45,6 +45,13 @@ namespace Orleans.Runtime
             WriteLine(ConsoleColor.Red, logMsg);
         }
 
+        public static void WriteWarning(string msg)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine(msg);
+            Console.ResetColor();
+        }
+
         public static void WriteStatus(string msg)
         {
             WriteLine(ConsoleColor.Green, msg);
