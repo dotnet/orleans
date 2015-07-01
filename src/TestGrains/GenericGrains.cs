@@ -29,17 +29,18 @@ using Orleans.Concurrency;
 using Orleans.Providers;
 using UnitTests.GrainInterfaces;
 using System.Globalization;
+using Orleans.CodeGeneration;
 
 namespace UnitTests.Grains
 {
-    public interface ISimpleGenericGrainState<T> : IGrainState
+    public class SimpleGenericGrainState<T> : GrainState
     {
-        T A { get; set; }
-        T B { get; set; }
+        public T A { get; set; }
+        public T B { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class SimpleGenericGrain1<T> : Grain<ISimpleGenericGrainState<T>>, ISimpleGenericGrain1<T>
+    public class SimpleGenericGrain1<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrain1<T>
     {
         public Task<T> GetA()
         {
@@ -71,14 +72,14 @@ namespace UnitTests.Grains
         }
     }
 
-    public interface ISimpleGenericGrainUState<U> : IGrainState
+    public class SimpleGenericGrainUState<U> : GrainState
     {
-        U A { get; set; }
-        U B { get; set; }
+        public U A { get; set; }
+        public U B { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class SimpleGenericGrainU<U> : Grain<ISimpleGenericGrainUState<U>>, ISimpleGenericGrainU<U>
+    public class SimpleGenericGrainU<U> : Grain<SimpleGenericGrainUState<U>>, ISimpleGenericGrainU<U>
     {
         public Task<U> GetA()
         {
@@ -110,14 +111,14 @@ namespace UnitTests.Grains
         }
     }
 
-    public interface ISimpleGenericGrain2State<T, U> : IGrainState
+    public class SimpleGenericGrain2State<T, U> : GrainState
     {
-        T A { get; set; }
-        U B { get; set; }
+        public T A { get; set; }
+        public U B { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class SimpleGenericGrain2<T, U> : Grain<ISimpleGenericGrain2State<T, U>>, ISimpleGenericGrain2<T, U>
+    public class SimpleGenericGrain2<T, U> : Grain<SimpleGenericGrain2State<T, U>>, ISimpleGenericGrain2<T, U>
     {
         public Task<T> GetA()
         {
@@ -149,7 +150,6 @@ namespace UnitTests.Grains
         }
     }
 
-    //public class GenericGrainWithNoProperties<T> : GenericGrainWithNoPropertiesBase<T>
     public class GenericGrainWithNoProperties<T> : Grain, IGenericGrainWithNoProperties<T>
     {
         public Task<string> GetAxB(T a, T b)
@@ -166,9 +166,9 @@ namespace UnitTests.Grains
             return Task.FromResult(retValue);
         }
     }
-    public interface IGrainWithListFieldsState : IGrainState
+    public class IGrainWithListFieldsState : GrainState
     {
-        IList<string> Items { get; set; }
+        public IList<string> Items { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
@@ -193,13 +193,13 @@ namespace UnitTests.Grains
         }
     }
 
-    public interface IGenericGrainWithListFieldsState<T> : IGrainState
+    public class GenericGrainWithListFieldsState<T> : GrainState
     {
-        IList<T> Items { get; set; }
+        public IList<T> Items { get; set; }
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class GenericGrainWithListFields<T> : Grain<IGenericGrainWithListFieldsState<T>>, IGenericGrainWithListFields<T>
+    public class GenericGrainWithListFields<T> : Grain<GenericGrainWithListFieldsState<T>>, IGenericGrainWithListFields<T>
     {
         public override Task OnActivateAsync()
         {
@@ -221,33 +221,33 @@ namespace UnitTests.Grains
         }
     }
 
-    public interface IGenericReaderWriterState<T> : IGrainState
+    public class GenericReaderWriterState<T> : GrainState
     {
-        T Value { get; set; }
+        public T Value { get; set; }
     }
     
 
-    public interface IGenericReader2State<TOne, TTwo> : IGrainState
+    public class GenericReader2State<TOne, TTwo> : GrainState
     {
-        TOne Value1 { get; set; }
-        TTwo Value2 { get; set; }
+        public TOne Value1 { get; set; }
+        public TTwo Value2 { get; set; }
     }
-    public interface IGenericReaderWriterGrain2State<TOne, TTwo> : IGrainState
+    public class GenericReaderWriterGrain2State<TOne, TTwo> : GrainState
     {
-        TOne Value1 { get; set; }
-        TTwo Value2 { get; set; }
+        public TOne Value1 { get; set; }
+        public TTwo Value2 { get; set; }
     }
 
-    public interface IGenericReader3State<TOne, TTwo, TThree> : IGrainState
+    public class GenericReader3State<TOne, TTwo, TThree> : GrainState
     {
-        TOne Value1 { get; set; }
-        TTwo Value2 { get; set; }
-        TThree Value3 { get; set; }
+        public TOne Value1 { get; set; }
+        public TTwo Value2 { get; set; }
+        public TThree Value3 { get; set; }
     }
 
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class GenericReaderWriterGrain1<T> : Grain<IGenericReaderWriterState<T>>, IGenericReaderWriterGrain1<T>
+    public class GenericReaderWriterGrain1<T> : Grain<GenericReaderWriterState<T>>, IGenericReaderWriterGrain1<T>
     {
         public Task SetValue(T value)
         {
@@ -262,7 +262,7 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class GenericReaderWriterGrain2<TOne, TTwo> : Grain<IGenericReaderWriterGrain2State<TOne, TTwo>>, IGenericReaderWriterGrain2<TOne, TTwo>
+    public class GenericReaderWriterGrain2<TOne, TTwo> : Grain<GenericReaderWriterGrain2State<TOne, TTwo>>, IGenericReaderWriterGrain2<TOne, TTwo>
     {
         public Task SetValue1(TOne value)
         {
@@ -287,7 +287,7 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class GenericReaderWriterGrain3<TOne, TTwo, TThree> : Grain<IGenericReader3State<TOne, TTwo, TThree>>, IGenericReaderWriterGrain3<TOne, TTwo, TThree>
+    public class GenericReaderWriterGrain3<TOne, TTwo, TThree> : Grain<GenericReader3State<TOne, TTwo, TThree>>, IGenericReaderWriterGrain3<TOne, TTwo, TThree>
     {
         public Task SetValue1(TOne value)
         {

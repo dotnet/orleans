@@ -25,19 +25,19 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal interface IPubSubGrainState : IGrainState
+    internal class PubSubGrainState : GrainState
     {
-        HashSet<PubSubPublisherState> Producers { get; set; }
-        HashSet<PubSubSubscriptionState> Consumers { get; set; }
+        public HashSet<PubSubPublisherState> Producers { get; set; }
+        public HashSet<PubSubSubscriptionState> Consumers { get; set; }
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "PubSubStore")]
-    internal class PubSubRendezvousGrain : Grain<IPubSubGrainState>, IPubSubRendezvousGrain
+    internal class PubSubRendezvousGrain : Grain<PubSubGrainState>, IPubSubRendezvousGrain
     {
         private Logger logger;
         private const bool DEBUG_PUB_SUB = false;

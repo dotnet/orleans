@@ -301,6 +301,11 @@ namespace Orleans.CodeGeneration
                     hasStateClass = false;
                     return null;
                 }
+                else
+                {
+                    ConsoleText.WriteError(String.Format("Warning: Usage of grain state interfaces as type arguments for Grain<T> has been deprecated. " +
+                        "Define an equivalent class with automatic properties instead of the state interface for {0}.", sourceType.FullName));
+                }
             }
 
             Dictionary<string, PropertyInfo> asyncProperties = GrainInterfaceData.GetPersistentProperties(persistentInterface)

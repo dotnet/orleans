@@ -49,12 +49,6 @@ namespace UnitTests.General
             await StateClassTests_Test("UnitTests.Grains.SimplePersistentGrain");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        public async Task StateClassTests_StateInterface()
-        {
-            await StateClassTests_Test("UnitTests.Grains.SimpleInterfacePersistentGrain");
-        }
-
         private async Task StateClassTests_Test(string grainClass)
         {
             var x = rand.Next();
