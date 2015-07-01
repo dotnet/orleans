@@ -33,9 +33,8 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 
-namespace Orleans.CodeGeneration
+namespace Orleans
 {
-
     /// <summary>
     /// Base class for generated grain state classes.
     /// </summary>
