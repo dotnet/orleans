@@ -70,7 +70,7 @@ namespace Orleans.CodeGeneration
                 noNamespace = t => true;
 
             referred(type);
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.FSharp);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type.GetTypeInfo(), Language.FSharp);
 
             if (!type.IsGenericType)
             {
@@ -114,7 +114,7 @@ namespace Orleans.CodeGeneration
                 .ToDictionary(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1), p => p);
 
             Dictionary<string, string> properties = asyncProperties.ToDictionary(p => p.Key,
-                    p => GetGenericTypeName(GrainInterfaceData.GetPromptType(p.Value.PropertyType), referred, nonamespace));
+                    p => GetGenericTypeName(GrainInterfaceData.GetPromptType(p.Value.PropertyType.GetTypeInfo()), referred, nonamespace));
 
             hasStateClass = properties.Count > 0;
 

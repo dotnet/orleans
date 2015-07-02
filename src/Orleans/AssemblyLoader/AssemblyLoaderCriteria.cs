@@ -61,7 +61,7 @@ namespace Orleans.Runtime
 
             return
                 AssemblyLoaderReflectionCriterion.NewCriterion(
-                    (Type type, out IEnumerable<string> ignored) =>
+                    (TypeInfo type, out IEnumerable<string> ignored) =>
                     {
                         ignored = null;
                         foreach (var requiredTypeInfo in requiredTypeInfos)

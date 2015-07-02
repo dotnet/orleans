@@ -67,8 +67,8 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo()),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -83,8 +83,8 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo()),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -99,8 +99,8 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo()),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -119,8 +119,8 @@ namespace Orleans
 
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo(), keyExtension),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -140,7 +140,7 @@ namespace Orleans
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
-                    typeof(TGrainInterface),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 

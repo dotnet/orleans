@@ -46,7 +46,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
-
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -859,7 +859,7 @@ namespace Orleans.Runtime
                     return obj;
                 }
                 throw new InvalidOperationException(string.Format("Cannot return reference to {0} {1} if it is not MarshalByRefObject or Serializable",
-                    what, TypeUtils.GetFullName(obj.GetType())));
+                    what, TypeUtils.GetFullName(obj.GetType().GetTypeInfo())));
             }
         }
 

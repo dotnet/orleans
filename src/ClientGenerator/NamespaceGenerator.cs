@@ -312,7 +312,7 @@ namespace Orleans.CodeGeneration
                 .ToDictionary(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1), p => p);
 
             Dictionary<string, string> properties = asyncProperties.ToDictionary(p => p.Key,
-                    p => GetGenericTypeName(GrainInterfaceData.GetPromptType(p.Value.PropertyType), referred, nonamespace));
+                    p => GetGenericTypeName(GrainInterfaceData.GetPromptType(p.Value.PropertyType.GetTypeInfo()), referred, nonamespace));
 
             var stateClass = new CodeTypeDeclaration(stateClassBaseName);
             if (genericTypeParams != null) 
@@ -478,12 +478,12 @@ namespace Orleans.CodeGeneration
             if (!isObserver)
             {
                 // Method is expected to return either a Task or a grin reference
-                if (!GrainInterfaceData.IsTaskType(methodInfo.ReturnType) &&
+                if (!GrainInterfaceData.IsTaskType(methodInfo.ReturnType.GetTypeInfo()) &&
                     !typeof (IAddressable).IsAssignableFrom(methodInfo.ReturnType))
                     throw new InvalidOperationException(
                         string.Format("Unsupported return type {0}. Method Name={1} Declaring Type={2}",
                             methodInfo.ReturnType.FullName, methodInfo.Name,
-                            TypeUtils.GetFullName(methodInfo.DeclaringType, language)));
+                            TypeUtils.GetFullName(methodInfo.DeclaringType.GetTypeInfo(), language)));
 
                 returnType = CreateCodeTypeReference(methodInfo.ReturnType, language);
             }
@@ -501,7 +501,7 @@ namespace Orleans.CodeGeneration
                 var paramName = GetParameterName(param);
                 CodeParameterDeclarationExpression p = param.ParameterType.IsGenericType
                     ? new CodeParameterDeclarationExpression(
-                        TypeUtils.GetParameterizedTemplateName(param.ParameterType, true,
+                        TypeUtils.GetParameterizedTemplateName(param.ParameterType.GetTypeInfo(), true,
                             tt => CurrentNamespace != tt.Namespace && !ReferencedNamespaces.Contains(tt.Namespace), language),
                         paramName)
                     : new CodeParameterDeclarationExpression(param.ParameterType, paramName);
@@ -558,7 +558,7 @@ namespace Orleans.CodeGeneration
             if (!type.IsGenericType)
                 return GetGenericTypeName(type, flag);
 
-            if (GrainInterfaceData.IsTaskType(type))
+            if (GrainInterfaceData.IsTaskType(type.GetTypeInfo()))
             {
                 Type[] genericArguments = type.GetGenericArguments();
                 if (genericArguments.Length == 1) 
@@ -581,7 +581,7 @@ namespace Orleans.CodeGeneration
 
         private static CodeTypeReference CreateCodeTypeReference(Type type, Language language)
         {
-            var baseName = TypeUtils.GetSimpleTypeName(type, language: language);
+            var baseName = TypeUtils.GetSimpleTypeName(type.GetTypeInfo(), language: language);
             if (!type.IsGenericParameter) 
                 baseName = type.Namespace + "." + baseName;
 
@@ -628,7 +628,7 @@ namespace Orleans.CodeGeneration
             GrainInterfaceInfo grainInterfaceInfo = GetInterfaceInfo(grainType);
             var interfaceId = grainInterfaceInfo.Interfaces.Keys.First();
             invokerClass.CustomAttributes.Add(new CodeAttributeDeclaration( new CodeTypeReference(typeof(MethodInvokerAttribute), CodeTypeReferenceOptions.GlobalReference),
-                new CodeAttributeArgument(new CodePrimitiveExpression(grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType, language: language))),
+                new CodeAttributeArgument(new CodePrimitiveExpression(grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType.GetTypeInfo(), language: language))),
                 new CodeAttributeArgument(new CodePrimitiveExpression(interfaceId))));
 
             var interfaceIdProperty = new CodeMemberProperty

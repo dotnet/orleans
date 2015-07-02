@@ -50,7 +50,7 @@ namespace Orleans.CodeGeneration
 
             referred(type);
 
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.CSharp);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type.GetTypeInfo(), Language.CSharp);
 
             if (!type.IsGenericType)
             {
@@ -193,7 +193,7 @@ namespace Orleans.CodeGeneration
                 var t = new System.Threading.Tasks.TaskCompletionSource<object>();
                 t.SetException(new NotImplementedException(""No grain interfaces for type {0}""));
                 return t.Task;
-                ", TypeUtils.GetFullName(grainType, Language.CSharp));
+                ", TypeUtils.GetFullName(grainType.GetTypeInfo(), Language.CSharp));
             }
 
             var builder = new StringBuilder();
@@ -281,7 +281,7 @@ namespace Orleans.CodeGeneration
 ",
                         invokeGrainMethod);
                 }
-                else if (GrainInterfaceData.IsTaskType(returnType))
+                else if (GrainInterfaceData.IsTaskType(returnType.GetTypeInfo()))
                 {
                     if (returnType != typeof(Task))
                         GetGenericTypeName(returnType.GetGenericArguments()[0]);
@@ -525,7 +525,7 @@ namespace Orleans.CodeGeneration
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("{0} is global::Orleans.Grain ? {0}.AsReference<{1}>() : {0}",
                         GetParameterName(paramInfo),
-                        TypeUtils.GetTemplatedName(paramInfo.ParameterType, _ => true, Language.CSharp));
+                        TypeUtils.GetTemplatedName(paramInfo.ParameterType.GetTypeInfo(), _ => true, Language.CSharp));
                 else
                     invokeArguments += GetParameterName(paramInfo);
 

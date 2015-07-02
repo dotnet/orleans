@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -193,7 +194,7 @@ namespace Orleans.Runtime
                     if (data == null || data.GrainInstance == null) continue;
 
                     // TODO: generic type expansion
-                    var grainTypeName = TypeUtils.GetFullName(data.GrainInstanceType);
+                    var grainTypeName = TypeUtils.GetFullName(data.GrainInstanceType.GetTypeInfo());
                     
                     Dictionary<GrainId, int> grains;
                     int n;
@@ -277,7 +278,7 @@ namespace Orleans.Runtime
 
             if (activation.GrainInstance == null) return;
 
-            var grainTypeName = TypeUtils.GetFullName(activation.GrainInstanceType);
+            var grainTypeName = TypeUtils.GetFullName(activation.GrainInstanceType.GetTypeInfo());
             activations.DecrementGrainCounter(grainTypeName);
             activation.SetGrainInstance(null);
         }
@@ -308,7 +309,7 @@ namespace Orleans.Runtime
             GrainTypeData data;
             return TryGetActivationData(running, out target) &&
                 target.GrainInstance != null &&
-                GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out data) &&
+                GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType.GetTypeInfo()), out data) &&
                 data.IsReentrant;
         }
 

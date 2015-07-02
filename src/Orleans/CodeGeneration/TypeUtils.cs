@@ -411,15 +411,15 @@ namespace Orleans.Runtime
             return typeInfo.Assembly.ReflectionOnly ? typeInfo : ResolveReflectionOnlyType(typeInfo.AssemblyQualifiedName);
         }
 
-        public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc)
+        public static IEnumerable<TypeInfo> GetTypes(Assembly assembly, Func<TypeInfo, bool> whereFunc)
         {
-            return assembly.IsDynamic ? Enumerable.Empty<Type>() : assembly.GetTypes().Where(type => !type.IsNestedPrivate && whereFunc(type));
+            return assembly.IsDynamic ? Enumerable.Empty<TypeInfo>() : assembly.GetTypes().Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type.GetTypeInfo())).Select(t => t.GetTypeInfo());
         }
 
-        public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc)
+        public static IEnumerable<TypeInfo> GetTypes(Func<TypeInfo, bool> whereFunc)
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            var result = new List<Type>();
+            var result = new List<TypeInfo>();
             foreach (var assembly in assemblies)
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
@@ -429,10 +429,10 @@ namespace Orleans.Runtime
             return result;
         }
 
-        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc)
+        public static IEnumerable<TypeInfo> GetTypes(List<string> assemblies, Func<TypeInfo, bool> whereFunc)
         {
             var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-            var result = new List<Type>();
+            var result = new List<TypeInfo>();
             foreach (var assembly in currentAssemblies.Where(loaded => !loaded.IsDynamic && assemblies.Contains(loaded.Location)))
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
