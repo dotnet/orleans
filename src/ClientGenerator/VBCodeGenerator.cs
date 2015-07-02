@@ -377,20 +377,20 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
         protected override void AddGetGrainMethods(GrainInterfaceData iface, CodeTypeDeclaration factoryClass)
         {
             RecordReferencedNamespaceAndAssembly(typeof(GrainId));
-            RecordReferencedNamespaceAndAssembly(iface.Type);
-            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.Type);
+            RecordReferencedNamespaceAndAssembly(iface.TypeInfo);
+            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.TypeInfo);
             var interfaceName = iface.InterfaceTypeName;
 
             Action<string> add = codeFmt =>
                 factoryClass.Members.Add(new CodeSnippetTypeMember(
                      String.Format(codeFmt, FixupTypeName(interfaceName))));
 
-            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
-            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
+            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.TypeInfo);
+            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.TypeInfo);
 
-            bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
-            bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
-            bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
+            bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.TypeInfo);
+            bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.TypeInfo);
+            bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.TypeInfo);
             bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
 
             if (isLongCompoundKey)
@@ -503,7 +503,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                     @"CType(Global.Orleans.Runtime.GrainReference.CastInternal(GetType({0}), Function(gr As GrainReference) New {1}(gr), grainRef, {2}),{0})",
                     FixupTypeName(si.InterfaceTypeName), // Interface type for references for this grain
                     FixupTypeName(si.ReferenceClassName), // Concrete class for references for this grain
-                    GrainInterfaceData.GetGrainInterfaceId(si.Type));
+                    GrainInterfaceData.GetGrainInterfaceId(si.TypeInfo));
             }
 
             var methodImpl = string.Format(@"

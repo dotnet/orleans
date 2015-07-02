@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -46,16 +47,16 @@ namespace Orleans.Runtime
                     }
                 });
 
-        internal static AssemblyLoaderReflectionCriterion LoadTypesAssignableFrom(Type[] requiredTypes)
+        internal static AssemblyLoaderReflectionCriterion LoadTypesAssignableFrom(TypeInfo[] requiredTypeInfos)
         {
             // any types provided must be converted to reflection-only
             // types, or they aren't comparable with other reflection-only 
             // types.
-            requiredTypes = requiredTypes.Select(TypeUtils.ToReflectionOnlyType).ToArray();
-            string[] complaints = new string[requiredTypes.Length];
-            for (var i = 0; i < requiredTypes.Length; ++i)
+            requiredTypeInfos = requiredTypeInfos.Select(TypeUtils.ToReflectionOnlyType).ToArray();
+            string[] complaints = new string[requiredTypeInfos.Length];
+            for (var i = 0; i < requiredTypeInfos.Length; ++i)
             {
-                complaints[i] = String.Format("Assembly contains no types assignable from {0}.", requiredTypes[i].FullName);
+                complaints[i] = String.Format("Assembly contains no types assignable from {0}.", requiredTypeInfos[i].FullName);
             }  
 
             return
@@ -63,9 +64,9 @@ namespace Orleans.Runtime
                     (Type type, out IEnumerable<string> ignored) =>
                     {
                         ignored = null;
-                        foreach (var requiredType in requiredTypes)
+                        foreach (var requiredTypeInfo in requiredTypeInfos)
                         {
-                            if (requiredType.IsAssignableFrom(type))
+                            if (requiredTypeInfo.IsAssignableFrom(type))
                             {
                                 //  we found a match! load the assembly.
                                 return true;
@@ -76,9 +77,9 @@ namespace Orleans.Runtime
                     complaints);
         }
 
-        internal static AssemblyLoaderReflectionCriterion LoadTypesAssignableFrom(Type requiredType)
+        internal static AssemblyLoaderReflectionCriterion LoadTypesAssignableFrom(TypeInfo requiredTypeInfo)
         {
-            return LoadTypesAssignableFrom(new [] {requiredType});
+            return LoadTypesAssignableFrom(new [] {requiredTypeInfo});
         }
 
         internal static readonly string[] 

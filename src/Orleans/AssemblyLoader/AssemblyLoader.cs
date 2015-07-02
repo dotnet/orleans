@@ -118,7 +118,7 @@ namespace Orleans.Runtime
                 };
                 AssemblyLoaderReflectionCriterion[] loadCriteria =
                 {
-                    AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof (T))
+                    AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof (T).GetTypeInfo())
                 };
 
                 var discoveredAssemblyLocations = LoadAssemblies(dirs, includeCriteria, loadCriteria, logger);

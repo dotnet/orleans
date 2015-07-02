@@ -103,7 +103,7 @@ namespace Orleans.Serialization
                 if (typeNameCache.TryGetValue(t.TypeHandle, out name))
                     return name;
             }
-            name = TypeUtils.GetTemplatedName(t, _ => !_.IsGenericParameter);
+            name = TypeUtils.GetTemplatedName(t.GetTypeInfo(), _ => !_.IsGenericParameter);
             lock (typeNameCache)
             {
                 typeNameCache[t.TypeHandle] = name;

@@ -104,7 +104,7 @@ namespace Orleans.CodeGeneration
 
         protected override CodeTypeDeclaration GetStateClass(GrainInterfaceData grainInterfaceData, Action<Type> referred, string stateClassBaseName, string stateClassName, out bool hasStateClass)
         {
-            var sourceType = grainInterfaceData.Type;
+            var sourceType = grainInterfaceData.TypeInfo;
             stateClassName = FixupTypeName(stateClassName);
             CodeTypeParameterCollection genericTypeParams = grainInterfaceData.GenericTypeParams;
             Func<Type, bool> nonamespace = t => false;
@@ -130,7 +130,7 @@ namespace Orleans.CodeGeneration
             StartNewLine();
             generatedCode.AppendFormat(@"[<System.SerializableAttribute()>]");
             StartNewLine();
-            var grainName = grainInterfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type);
+            var grainName = grainInterfaceData.TypeInfo.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.TypeInfo);
             generatedCode.AppendFormat(@"[<global.Orleans.CodeGeneration.GrainStateAttribute(""{0}"")>]", grainName);
             StartNewLine();
             generatedCode.AppendFormat(@"type {0} {1}", typeAccess, stateClassBaseName);

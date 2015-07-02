@@ -74,7 +74,7 @@ namespace Orleans.Providers
                 ((ProviderConfiguration)provider).SetProviderManager(providerManager);
 
             // Load providers
-            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType);
+            ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).GetTypeInfo().IsAssignableFrom(t), RegisterProviderType);
             ValidateProviders();
         }
 
@@ -190,10 +190,10 @@ namespace Orleans.Providers
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private void RegisterProviderType(Type t)
+        private void RegisterProviderType(TypeInfo typeInfo)
         {
             // First, figure out the provider type name
-            var typeName = TypeUtils.GetFullName(t);
+            var typeName = TypeUtils.GetFullName(typeInfo);
 
             // Now see if we have any config entries for that type 
             // If there's no config entry, then we don't load the type
@@ -205,14 +205,14 @@ namespace Orleans.Providers
                 if (fullConfig.Type != typeName) continue;
                 
                 // Found one! Now look for an appropriate constructor; try TProvider(string, Dictionary<string,string>) first
-                var constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                var constructor = typeInfo.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                     null, constructorBindingTypes, null);
                 var parms = new object[] { typeName, entry.Properties };
 
                 if (constructor == null)
                 {
                     // See if there's a default constructor to use, if there's no two-parameter constructor
-                    constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    constructor = typeInfo.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                         null, Type.EmptyTypes, null);
                     parms = new object[0];
                 }
@@ -226,7 +226,7 @@ namespace Orleans.Providers
                 catch (Exception ex)
                 {
                     logger.Warn(ErrorCode.Provider_InstanceConstructionError1, "Error constructing an instance of a " + typeName +
-                                                                               " provider using type " + t.Name + " for provider with name " + fullConfig.Name, ex);
+                                                                               " provider using type " + typeInfo.Name + " for provider with name " + fullConfig.Name, ex);
                     return;
                 }
 
