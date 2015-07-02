@@ -30,7 +30,7 @@ namespace Orleans.Runtime
 {
     internal class CachedTypeResolver
     {
-        private readonly ConcurrentDictionary<string, Type> cache;
+        private readonly ConcurrentDictionary<string, TypeInfo> cache;
 
         static CachedTypeResolver()
         {
@@ -40,62 +40,63 @@ namespace Orleans.Runtime
 
         protected CachedTypeResolver()
         {
-            cache = new ConcurrentDictionary<string, Type>();
+            cache = new ConcurrentDictionary<string, TypeInfo>();
         }
 
-        public Type ResolveType(string name)
+        public TypeInfo ResolveType(string name)
         {
-            Type result;
+            TypeInfo result;
             if (TryResolveType(name, out result)) return result;
             
             throw new KeyNotFoundException(string.Format("Unable to find a type named {0}", name));
         }
 
-        public bool TryResolveType(string name, out Type type)
+        public bool TryResolveType(string name, out TypeInfo typeInfo)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("A FullName must not be null nor consist of only whitespace.", "name");
-            if (TryGetCachedType(name, out type)) return true;
-            if (!TryPerformUncachedTypeResolution(name, out type)) return false;
+            if (TryGetCachedType(name, out typeInfo)) return true;
+            if (!TryPerformUncachedTypeResolution(name, out typeInfo)) return false;
 
-            AddTypeToCache(name, type);
+            AddTypeToCache(name, typeInfo);
             return true;
         }
 
-        protected virtual bool TryPerformUncachedTypeResolution(string name, out Type type)
+        protected virtual bool TryPerformUncachedTypeResolution(string name, out TypeInfo typeInfo)
         {
             IEnumerable<Assembly> assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            if (!TryPerformUncachedTypeResolution(name, out type, assemblies)) return false;
-            if (type.Assembly.ReflectionOnly) throw new InvalidOperationException(string.Format("Type resolution for {0} yielded reflection-only type.", name));
+            if (!TryPerformUncachedTypeResolution(name, out typeInfo, assemblies)) return false;
+            if (typeInfo.Assembly.ReflectionOnly) throw new InvalidOperationException(string.Format("Type resolution for {0} yielded reflection-only type.", name));
             return true;
         }
 
-        private bool TryGetCachedType(string name, out Type result)
+        private bool TryGetCachedType(string name, out TypeInfo result)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("type name was null or whitespace");
             return cache.TryGetValue(name, out result);
         }
 
-        private void AddTypeToCache(string name, Type type)
+        private void AddTypeToCache(string name, TypeInfo typeInfo)
         {
-            Type entry = cache.GetOrAdd(name, _ => type);
-            if (!ReferenceEquals(entry, type)) throw new InvalidOperationException("inconsistent type name association");
+            TypeInfo entry = cache.GetOrAdd(name, _ => typeInfo);
+            if (!ReferenceEquals(entry, typeInfo)) throw new InvalidOperationException("inconsistent type name association");
         }
 
-        private static bool TryPerformUncachedTypeResolution(string fullName, out Type type, IEnumerable<Assembly> assemblies)
+        private static bool TryPerformUncachedTypeResolution(string fullName, out TypeInfo typeInfo, IEnumerable<Assembly> assemblies)
         {
             if (null == assemblies) throw new ArgumentNullException("assemblies");
             if (string.IsNullOrWhiteSpace(fullName)) throw new ArgumentException("A type name must not be null nor consist of only whitespace.", "fullName");
 
             foreach (var assembly in assemblies)
             {
-                type = assembly.GetType(fullName, false);
+               var type = assembly.GetType(fullName, false);
                 if (type != null)
                 {
+                    typeInfo = type.GetTypeInfo();
                     return true;
                 }
             }
 
-            type = null;
+            typeInfo = null;
             return false;
         }
     }

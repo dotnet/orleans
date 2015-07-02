@@ -323,14 +323,14 @@ namespace Orleans.CodeGeneration
                 if (!options.ServerGen && !type.IsNested && !type.IsGenericParameter && type.IsSerializable)
                     SerializerGenerationManager.RecordTypeToGenerate(type);
 
-                if (!options.ServerGen && GrainInterfaceData.IsGrainInterface(type))
+                if (!options.ServerGen && GrainInterfaceData.IsGrainInterface(type.GetTypeInfo()))
                 {
                     NamespaceGenerator grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage.Value);
                     processedGrainTypes.Add(type.FullName);
 
                     try
                     {
-                        var grainInterfaceData = new GrainInterfaceData(options.TargetLanguage.Value, type);
+                        var grainInterfaceData = new GrainInterfaceData(options.TargetLanguage.Value, type.GetTypeInfo());
                         grainNamespace.AddReferenceClass(grainInterfaceData);
                     }
                     catch (GrainInterfaceData.RulesViolationException rve)
@@ -347,7 +347,7 @@ namespace Orleans.CodeGeneration
                     var grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage.Value);
                     try
                     {
-                        var grainInterfaceData = GrainInterfaceData.FromGrainClass(type, options.TargetLanguage.Value);
+                        var grainInterfaceData = GrainInterfaceData.FromGrainClass(type.GetTypeInfo(), options.TargetLanguage.Value);
                         grainNamespace.AddStateClass(grainInterfaceData);
                     }
                     catch (GrainInterfaceData.RulesViolationException rve)

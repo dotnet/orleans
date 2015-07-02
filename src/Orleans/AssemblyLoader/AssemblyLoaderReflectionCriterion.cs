@@ -32,7 +32,7 @@ namespace Orleans.Runtime
     internal class AssemblyLoaderReflectionCriterion : AssemblyLoaderCriterion
     {
         internal delegate bool AssemblyPredicate(Assembly candidate, out IEnumerable<string> complaint);
-        internal delegate bool TypePredicate(Type candidate, out IEnumerable<string> complaint);
+        internal delegate bool TypePredicate(TypeInfo candidate, out IEnumerable<string> complaint);
 
         /// <summary>
         /// Create a new criterion that filters assemblies by predicate. 
@@ -81,7 +81,7 @@ namespace Orleans.Runtime
                         foreach (var type in types)
                         {
                             IEnumerable<string> typeComplaints;
-                            if (typePredicate(type, out typeComplaints))
+                            if (typePredicate(type.GetTypeInfo(), out typeComplaints))
                             {
                                 //  we found a match! load the assembly.
                                 assemblyComplaints = null;

@@ -322,8 +322,8 @@ namespace Orleans.Runtime
             {
                 throw new InvalidCastException(string.Format(
                     "Connet convert type {0} to type List<{1}>", 
-                    TypeUtils.GetFullName(data.GetType()),
-                    TypeUtils.GetFullName(typeof(T))));
+                    TypeUtils.GetFullName(data.GetType().GetTypeInfo()),
+                    TypeUtils.GetFullName(typeof(T).GetTypeInfo())));
             }
             var list = new List<T>();
             list.AddRange(dataArray);

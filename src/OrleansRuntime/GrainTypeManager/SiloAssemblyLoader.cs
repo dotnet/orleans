@@ -65,7 +65,7 @@ namespace Orleans.Runtime
                         TypeUtils.IsConcreteGrainClass,
                         "Assembly does not contain any acceptable grain types."),
                     AssemblyLoaderCriteria.LoadTypesAssignableFrom(
-                        typeof(IProvider))
+                        typeof(IProvider).GetTypeInfo())
                 };
 
             discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
@@ -81,12 +81,12 @@ namespace Orleans.Runtime
 
             foreach (var grainType in grainTypes)
             {
-                var className = TypeUtils.GetFullName(grainType);
+                var className = TypeUtils.GetFullName(grainType.GetTypeInfo());
                 if (result.ContainsKey(className))
                     throw new InvalidOperationException(
                         string.Format("Precondition violated: GetLoadedGrainTypes should not return a duplicate type ({0})", className));
                 
-                var parameterizedName = grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType);
+                var parameterizedName = grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType.GetTypeInfo());
                 Type grainStateType;
                 grainStateTypes.TryGetValue(parameterizedName, out grainStateType);
 
@@ -181,10 +181,10 @@ namespace Orleans.Runtime
                 var assemblyName = grainType.Type.Assembly.FullName.Split(',')[0];
                 if (!typeof(ISystemTarget).IsAssignableFrom(grainType.Type))
                 {
-                    int grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainType.Type);
+                    int grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainType.Type.GetTypeInfo());
                     sb.AppendFormat("Grain class {0}.{1} [{2} (0x{3})] from {4}.dll implementing interfaces: ",
                         grainType.Type.Namespace,
-                        TypeUtils.GetTemplatedName(grainType.Type),
+                        TypeUtils.GetTemplatedName(grainType.Type.GetTypeInfo()),
                         grainClassTypeCode,
                         grainClassTypeCode.ToString("X"),
                         assemblyName);
@@ -195,11 +195,11 @@ namespace Orleans.Runtime
                         if (!first)
                             sb.Append(", ");
                         
-                        sb.Append(iface.Namespace).Append(".").Append(TypeUtils.GetTemplatedName(iface));
+                        sb.Append(iface.Namespace).Append(".").Append(TypeUtils.GetTemplatedName(iface.GetTypeInfo()));
 
                         if (CodeGeneration.GrainInterfaceData.IsGrainType(iface))
                         {
-                            int ifaceTypeCode = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface);
+                            int ifaceTypeCode = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface.GetTypeInfo());
                             sb.AppendFormat(" [{0} (0x{1})]", ifaceTypeCode, ifaceTypeCode.ToString("X"));
                         }
                         first = false;

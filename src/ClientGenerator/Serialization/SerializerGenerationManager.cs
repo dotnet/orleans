@@ -66,7 +66,7 @@ namespace Orleans.CodeGeneration.Serialization
             }
 
             if (t.IsInterface || t.IsAbstract || t.IsEnum || t == typeof (object) || t == typeof (void) 
-                || GrainInterfaceData.IsTaskType(t)) return;
+                || GrainInterfaceData.IsTaskType(t.GetTypeInfo())) return;
 
             if (t.IsGenericType)
             {

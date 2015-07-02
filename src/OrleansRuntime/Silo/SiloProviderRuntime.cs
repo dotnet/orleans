@@ -31,6 +31,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
+using System.Reflection;
 
 namespace Orleans.Runtime.Providers
 {
@@ -199,7 +200,7 @@ namespace Orleans.Runtime.Providers
 
         private static IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
         {
-            var interfaces = CodeGeneration.GrainInterfaceData.GetRemoteInterfaces(handlerType).Values;
+            var interfaces = CodeGeneration.GrainInterfaceData.GetRemoteInterfaces(handlerType.GetTypeInfo()).Values;
             if(interfaces.Count != 1)
                 throw new InvalidOperationException(String.Format("Extension type {0} implements more than one grain interface.", handlerType.FullName));
 

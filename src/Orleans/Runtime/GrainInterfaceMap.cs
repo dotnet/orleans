@@ -24,13 +24,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
 {
     internal interface IGrainTypeResolver
     {
-        bool TryGetGrainClassData(Type grainInterfaceType, out GrainClassData implementation, string grainClassNamePrefix);
+        bool TryGetGrainClassData(TypeInfo grainInterfaceTypenfo, out GrainClassData implementation, string grainClassNamePrefix);
         bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix);
         bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation);
         bool IsUnordered(int grainTypeCode);
@@ -68,7 +69,7 @@ namespace Orleans.Runtime
                 loadedGrainAsemblies = new HashSet<string>();
         }
 
-        internal void AddEntry(int interfaceId, Type iface, int grainTypeCode, string grainInterface, string grainClass, string assembly, 
+        internal void AddEntry(int interfaceId, Type interfaceType, int grainTypeCode, string grainInterface, string grainClass, string assembly, 
                                 bool isGenericGrainClass, PlacementStrategy placement, bool primaryImplementation = false)
         {
             lock (this)
@@ -81,10 +82,10 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    grainInterfaceData = new GrainInterfaceData(interfaceId, iface, grainInterface);
+                    grainInterfaceData = new GrainInterfaceData(interfaceId, interfaceType, grainInterface);
 
                     table[interfaceId] = grainInterfaceData;
-                    var interfaceTypeKey = GetTypeKey(iface, isGenericGrainClass);
+                    var interfaceTypeKey = GetTypeKey(interfaceType.GetTypeInfo(), isGenericGrainClass);
                     typeToInterfaceData[interfaceTypeKey] = grainInterfaceData;
                 }
 
@@ -180,13 +181,13 @@ namespace Orleans.Runtime
             return true;
         }
 
-        public bool TryGetGrainClassData(Type interfaceType, out GrainClassData implementation, string grainClassNamePrefix)
+        public bool TryGetGrainClassData(TypeInfo interfaceTypeInfo, out GrainClassData implementation, string grainClassNamePrefix)
         {
             implementation = null;
             GrainInterfaceData interfaceData;
 
             // First, try to find a non-generic grain implementation:
-            if (this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, false), out interfaceData) &&
+            if (this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceTypeInfo, false), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {
                 return true;
@@ -194,8 +195,8 @@ namespace Orleans.Runtime
 
             // If a concrete implementation was not found and the interface is generic, 
             // try to find a generic grain implementation:
-            if (interfaceType.IsGenericType && 
-                this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, true), out interfaceData) &&
+            if (interfaceTypeInfo.IsGenericType && 
+                this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceTypeInfo, true), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {
                 return true;
@@ -215,18 +216,18 @@ namespace Orleans.Runtime
             return TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix);
         }
 
-        private string GetTypeKey(Type interfaceType, bool isGenericGrainClass)
+        private string GetTypeKey(TypeInfo interfaceTypeInfo, bool isGenericGrainClass)
         {
-            if (isGenericGrainClass && interfaceType.IsGenericType)
+            if (isGenericGrainClass && interfaceTypeInfo.IsGenericType)
             {
-                return interfaceType.GetGenericTypeDefinition().AssemblyQualifiedName;
+                return interfaceTypeInfo.GetGenericTypeDefinition().AssemblyQualifiedName;
             }
             else 
             {
                 return TypeUtils.GetTemplatedName(
-                            TypeUtils.GetFullName(interfaceType),
-                            interfaceType,
-                            interfaceType.GetGenericArguments(),
+                            TypeUtils.GetFullName(interfaceTypeInfo),
+                            interfaceTypeInfo,
+                            interfaceTypeInfo.GetGenericArguments(),
                             t => false);
             }
         }

@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Reflection;
 using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
@@ -152,9 +153,9 @@ namespace Orleans.CodeGeneration
             {
                 throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + interfaceType.FullName);
             }
-            var implementation = TypeCodeMapper.GetImplementation(interfaceType, grainClassNamePrefix);
+            var implementation = TypeCodeMapper.GetImplementation(interfaceType.GetTypeInfo(), grainClassNamePrefix);
             GrainId grainId = getGrainId(implementation);
-            return GrainReference.FromGrainId(grainId, interfaceType.IsGenericType ? interfaceType.UnderlyingSystemType.FullName : null);
+            return GrainReference.FromGrainId(grainId, interfaceType.GetTypeInfo().IsGenericType ? interfaceType.UnderlyingSystemType.FullName : null);
         }
 
         /// <summary>

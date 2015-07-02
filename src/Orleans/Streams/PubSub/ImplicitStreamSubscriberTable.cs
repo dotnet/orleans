@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -49,7 +50,7 @@ namespace Orleans.Streams
         {
             foreach (var grainClass in grainClasses)
             {
-                if (!TypeUtils.IsGrainClass(grainClass))
+                if (!TypeUtils.IsGrainClass(grainClass.GetTypeInfo()))
                 {
                     continue;
                 }
@@ -212,7 +213,7 @@ namespace Orleans.Streams
             }
 
             // we'll need the class type code.
-            int implTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainClass);
+            int implTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainClass.GetTypeInfo());
 
             foreach (string s in namespaces)
             {
@@ -263,7 +264,7 @@ namespace Orleans.Streams
         /// <exception cref="System.InvalidOperationException">duplicate specification of ImplicitConsumerActivationAttribute(...).</exception>
         private static ISet<string> GetNamespacesFromAttributes(Type grainClass)
         {
-            if (!TypeUtils.IsGrainClass(grainClass))
+            if (!TypeUtils.IsGrainClass(grainClass.GetTypeInfo()))
             {
                 throw new ArgumentException(string.Format("{0} is not a grain class.", grainClass.FullName), "grainClass");
             }

@@ -32,7 +32,7 @@ namespace Orleans.Providers
     internal class ProviderTypeLoader
     {
         private readonly Func<Type, bool> condition;
-        private readonly Action<Type> callback;
+        private readonly Action<TypeInfo> callback;
         private readonly HashSet<Type> alreadyProcessed;
         public bool IsActive { get; set; }
 
@@ -46,7 +46,7 @@ namespace Orleans.Providers
             AppDomain.CurrentDomain.AssemblyLoad += ProcessNewAssembly;
         }
 
-        public ProviderTypeLoader(Func<Type, bool> condition, Action<Type> action)
+        public ProviderTypeLoader(Func<Type, bool> condition, Action<TypeInfo> action)
         {
             this.condition = condition;
             callback = action;
@@ -55,7 +55,7 @@ namespace Orleans.Providers
          }
 
 
-        public static void AddProviderTypeManager(Func<Type, bool> condition, Action<Type> action)
+        public static void AddProviderTypeManager(Func<Type, bool> condition, Action<TypeInfo> action)
         {
             var manager = new ProviderTypeLoader(condition, action);
 
@@ -81,12 +81,12 @@ namespace Orleans.Providers
             }
         }
 
-        private void ProcessType(Type type)
+        private void ProcessType(TypeInfo typeInfo)
         {
-            if (alreadyProcessed.Contains(type) || type.IsInterface || type.IsAbstract || !condition(type)) return;
+            if (alreadyProcessed.Contains(typeInfo) || typeInfo.IsInterface || typeInfo.IsAbstract || !condition(typeInfo)) return;
 
-            alreadyProcessed.Add(type);
-            callback(type);
+            alreadyProcessed.Add(typeInfo);
+            callback(typeInfo);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
