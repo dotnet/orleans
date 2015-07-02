@@ -171,7 +171,6 @@ namespace UnitTests.MembershipTests
             Assert.IsNotNull(tableVer, "TableVersion should not be null");
             tableVer = tableVer.Next();
 
-            data = CreateMembershipEntryForTest();
             data.Status = SiloStatus.Active;
 
             logger.Info("Calling UpdateRow with Entry = {0} eTag = {1} New TableVersion={2}", data, eTag, tableVer);
