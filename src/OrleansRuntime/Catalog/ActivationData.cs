@@ -440,14 +440,14 @@ namespace Orleans.Runtime
             currentRequestStartTime = DateTime.MinValue;
         }
 
-        private long currentlyExecutingCount;
+        private long inFlightCount;
         private long enqueuedOnDispatcherCount;
 
         /// <summary>
         /// Number of messages that are actively being processed [as opposed to being in the Waiting queue].
         /// In most cases this will be 0 or 1, but for Reentrant grains can be >1.
         /// </summary>
-        public long CurrentlyExecutingCount { get { return Interlocked.Read(ref currentlyExecutingCount); } }
+        public long InFlightCount { get { return Interlocked.Read(ref inFlightCount); } }
 
         /// <summary>
         /// Number of messages that are being received [as opposed to being in the scheduler queue or actively processed].
@@ -455,10 +455,10 @@ namespace Orleans.Runtime
         public long EnqueuedOnDispatcherCount { get { return Interlocked.Read(ref enqueuedOnDispatcherCount); } }
 
         /// <summary>Increment the number of in-flight messages currently being processed.</summary>
-        public void IncrementInFlightCount() { Interlocked.Increment(ref currentlyExecutingCount); }
+        public void IncrementInFlightCount() { Interlocked.Increment(ref inFlightCount); }
         
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
-        public void DecrementInFlightCount() { Interlocked.Decrement(ref currentlyExecutingCount); }
+        public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
         /// <summary>Increment the number of messages currently in the prcess of being received.</summary>
         public void IncrementEnqueuedOnDispatcherCount() { Interlocked.Increment(ref enqueuedOnDispatcherCount); }
@@ -553,7 +553,7 @@ namespace Orleans.Runtime
             lock (this)
             {
                 long numInDispatcher = EnqueuedOnDispatcherCount;
-                long numActive = CurrentlyExecutingCount;
+                long numActive = InFlightCount;
                 long numWaiting = WaitingCount;
                 return (int)(numInDispatcher + numActive + numWaiting);
             }
@@ -782,16 +782,20 @@ namespace Orleans.Runtime
 
         internal string ToDetailedString()
         {
-            return String.Format("[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} CurrentlyExecutingCount={7} NumRunning={8}]",
-                 Silo.ToLongString(),
-                 Grain.ToDetailedString(),
-                 ActivationId,
-                 GetActivationInfoString(),
-                 State,                         // 4
-                 WaitingCount,                  // 5 NonReentrancyQueueSize
-                 EnqueuedOnDispatcherCount,     // 6 EnqueuedOnDispatcher
-                 CurrentlyExecutingCount,       // 7 CurrentlyExecutingCount
-                 numRunning);                   // 8 NumRunning
+            return
+                String.Format(
+                    "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}]",
+                    Silo.ToLongString(),
+                    Grain.ToDetailedString(),
+                    ActivationId,
+                    GetActivationInfoString(),
+                    State,                          // 4
+                    WaitingCount,                   // 5 NonReentrancyQueueSize
+                    EnqueuedOnDispatcherCount,      // 6 EnqueuedOnDispatcher
+                    InFlightCount,                  // 7 InFlightCount
+                    numRunning,                     // 8 NumRunning
+                    GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
+                    CollectionAgeLimit);            // 10 CollectionAgeLimit
         }
 
         public string Name
