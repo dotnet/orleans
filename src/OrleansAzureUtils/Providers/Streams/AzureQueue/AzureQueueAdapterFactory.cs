@@ -36,9 +36,6 @@ namespace Orleans.Providers.Streams.AzureQueue
         private const string CACHE_SIZE_PARAM = "CacheSize";
         private const int DEFAULT_CACHE_SIZE = 4096;
         private const string NUM_QUEUES_PARAM = "NumQueues";
-        private const string FAULT_ON_DELIVERY_FAILURE = "FaultOnDeliveryFailure";
-        private const bool DEFAULT_FAULT_ON_DELIVERY_FAILURE = true;
-        private bool faultOnDeliveryFailure;
 
         /// <summary> Default number oi\f Azure Queue used in this stream provider.</summary>
         public const int DEFAULT_NUM_QUEUES = 8; // keep as power of 2.
@@ -80,13 +77,6 @@ namespace Orleans.Providers.Streams.AzureQueue
                     throw new ArgumentException(String.Format("{0} invalid.  Must be int", NUM_QUEUES_PARAM));
             }
 
-            string boolString;
-            if (!config.Properties.TryGetValue(FAULT_ON_DELIVERY_FAILURE, out boolString))
-                faultOnDeliveryFailure = DEFAULT_FAULT_ON_DELIVERY_FAILURE;
-            else
-                faultOnDeliveryFailure = ConfigUtilities.ParseBool(boolString,
-                    "Invalid time value for the " + FAULT_ON_DELIVERY_FAILURE + " property in the provider config values.");
-
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
             adapterCache = new SimpleQueueAdapterCache(this, cacheSize, logger);
@@ -118,7 +108,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <returns></returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(faultOnDeliveryFailure));
+            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
         }
     }
 }
