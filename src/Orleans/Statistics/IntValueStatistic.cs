@@ -124,7 +124,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return Name + "=" + GetCurrentValue();
+            return Name + "=" + GetValueString();
         }
     }
 }
