@@ -24,7 +24,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Orleans.Runtime
 {
@@ -138,7 +137,7 @@ namespace Orleans.Runtime
         public string GetValueString()
         {
             float current = GetCurrentValue();
-            return current.ToString();
+            return String.Format("{0:0.000}", current);
         }
 
         public string GetDeltaString()
@@ -158,7 +157,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return String.Format("{0}={1:0.000}", Name, GetCurrentValue());
+            return String.Format("{0}={1}", Name, GetValueString());
         }
     }
 }
