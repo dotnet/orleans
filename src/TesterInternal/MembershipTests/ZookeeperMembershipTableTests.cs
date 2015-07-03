@@ -96,10 +96,10 @@ namespace UnitTests.MembershipTests
         }
 
         [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
-        public async Task MembershipTable_ZooKeeper_ReadAll()
+        public async Task MembershipTable_ZooKeeper_ReadAll_EmptyTable()
         {
             await Initialize();
-            await MembershipTablePluginTests.MembershipTable_ReadAll(membership);
+            await MembershipTablePluginTests.MembershipTable_ReadAll_EmptyTable(membership);
         }
 
         [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
@@ -109,26 +109,18 @@ namespace UnitTests.MembershipTests
             await MembershipTablePluginTests.MembershipTable_InsertRow(membership);
         }
 
-
-        [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
-        public async Task MembershipTable_ZooKeeper_ReadRow_EmptyTable()
-        {
-            await Initialize();
-            await MembershipTablePluginTests.MembershipTable_ReadRow_EmptyTable(membership, siloAddress);
-        }
-
         [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task MembershipTable_ZooKeeper_ReadRow_Insert_Read()
         {
             await Initialize();
-            await MembershipTablePluginTests.MembershipTable_ReadRow_Insert_Read(membership, siloAddress);
+            await MembershipTablePluginTests.MembershipTable_ReadRow_Insert_Read(membership);
         }
 
         [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task MembershipTable_ZooKeeper_ReadAll_Insert_ReadAll()
         {
             await Initialize();
-            await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership, siloAddress);
+            await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership);
         }
 
         [TestMethod, TestCategory("Membership"), TestCategory("ZooKeeper")]

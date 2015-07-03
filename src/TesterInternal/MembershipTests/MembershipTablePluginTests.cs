@@ -36,77 +36,55 @@ namespace UnitTests.MembershipTests
         private static string hostName = Dns.GetHostName();
         private static readonly TraceLogger logger = TraceLogger.GetLogger("MembershipTablePluginTests");
 
-        internal static async Task MembershipTable_ReadAll(IMembershipTable membership)
+        internal static async Task MembershipTable_ReadAll_EmptyTable(IMembershipTable membership)
         {
-            var membershipData = await membership.ReadAll();
-            Assert.IsNotNull(membershipData, "Membership Data not null");
+            var data = await membership.ReadAll();
+            Assert.IsNotNull(data, "Membership Data not null");
 
-            TableVersion tableVersion = membershipData.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, membershipData);
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
-            Assert.AreEqual(0, membershipData.Members.Count, "Number of records returned - no table version row");
-
-            string eTag = tableVersion.VersionEtag;
-            int ver = tableVersion.Version;
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.AreEqual(0, ver, "Initial tabel version should be zero");
+            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
+            Assert.IsNotNull(data.Version.VersionEtag, "ETag should not be null");
+            Assert.AreEqual(0, data.Version.Version, "Initial tabel version should be zero");
         }
 
         internal static async Task MembershipTable_InsertRow(IMembershipTable membership)
         {
             var membershipEntry = CreateMembershipEntryForTest();
 
-            var membershipData = await membership.ReadAll();
-            Assert.IsNotNull(membershipData, "Membership Data not null");
-            Assert.AreEqual(0, membershipData.Members.Count, "Should be no data initially: {0}", membershipData);
+            var data = await membership.ReadAll();
+            Assert.IsNotNull(data, "Membership Data not null");
+            Assert.AreEqual(0, data.Members.Count, "Should be no data initially: {0}", data);
 
-            bool ok = await membership.InsertRow(membershipEntry, membershipData.Version);
+            bool ok = await membership.InsertRow(membershipEntry, data.Version.Next());
             Assert.IsTrue(ok, "InsertRow OK");
 
-            membershipData = await membership.ReadAll();
-            Assert.AreEqual(1, membershipData.Members.Count, "Should be one row after insert: {0}", membershipData);
+            data = await membership.ReadAll();
+            Assert.AreEqual(1, data.Members.Count, "Should be one row after insert: {0}", data);
         }
 
-        internal static async Task MembershipTable_ReadRow_EmptyTable(IMembershipTable membership, SiloAddress siloAddress)
-        {
-            MembershipTableData data = await membership.ReadRow(siloAddress);
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
-
-            Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-
-            string eTag = tableVersion.VersionEtag;
-            int ver = tableVersion.Version;
-
-            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} TableVersion={1}", eTag, tableVersion);
-
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.AreEqual(0, ver, "Initial table version should be zero");
-        }
-
-        internal static async Task MembershipTable_ReadRow_Insert_Read(IMembershipTable membership, SiloAddress siloAddress)
+        internal static async Task MembershipTable_ReadRow_Insert_Read(IMembershipTable membership)
         {
             MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+            //TableVersion tableVersion = data.Version;
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-                        
-            TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(CreateActiveMembershipEntryForTest(siloAddress), newTableVersion);
+
+            TableVersion newTableVersion = data.Version.Next();
+            MembershipEntry newEntry = CreateMembershipEntryForTest();
+            bool ok = await membership.InsertRow(newEntry, newTableVersion);
 
             Assert.IsTrue(ok, "InsertRow completed successfully");
 
-            data = await membership.ReadRow(siloAddress);
-            tableVersion = data.Version;
-            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", tableVersion, data);
+            data = await membership.ReadRow(newEntry.SiloAddress);
+            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
 
-            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
-            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
-            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
+            Assert.IsNotNull(data.Version.VersionEtag, "New version ETag should not be null");
+            Assert.AreNotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag, "New VersionEtag differetnfrom last");
+            Assert.AreEqual(newTableVersion.Version, data.Version.Version, "New table version number");
 
             MembershipEntry MembershipEntry = data.Members[0].Item1;
             string eTag = data.Members[0].Item2;
@@ -116,28 +94,27 @@ namespace UnitTests.MembershipTests
             Assert.IsNotNull(MembershipEntry, "MembershipEntry should not be null");
         }
 
-        internal static async Task MembershipTable_ReadAll_Insert_ReadAll(IMembershipTable membership, SiloAddress siloAddress)
+        internal static async Task MembershipTable_ReadAll_Insert_ReadAll(IMembershipTable membership)
         {
             MembershipTableData data = await membership.ReadAll();
-            TableVersion tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.AreEqual(0, data.Members.Count, "Number of records returned - no table version row");
-                        
-            TableVersion newTableVersion = tableVersion.Next();
-            bool ok = await membership.InsertRow(CreateActiveMembershipEntryForTest(siloAddress), newTableVersion);
+
+            TableVersion newTableVersion = data.Version.Next();
+            MembershipEntry newEntry = CreateMembershipEntryForTest();
+            bool ok = await membership.InsertRow(newEntry, newTableVersion);
 
             Assert.IsTrue(ok, "InsertRow completed successfully");
 
             data = await membership.ReadAll();
-            tableVersion = data.Version;
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", tableVersion, data);
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.AreEqual(1, data.Members.Count, "Number of records returned - data row only");
 
-            Assert.IsNotNull(tableVersion.VersionEtag, "New version ETag should not be null");
-            Assert.AreNotEqual(newTableVersion.VersionEtag, tableVersion.VersionEtag, "New VersionEtag differetnfrom last");
-            Assert.AreEqual(newTableVersion.Version, tableVersion.Version, "New table version number");
+            Assert.IsNotNull(data.Version.VersionEtag, "New version ETag should not be null");
+            Assert.AreNotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag, "New VersionEtag differetnfrom last");
+            Assert.AreEqual(newTableVersion.Version, data.Version.Version, "New table version number");
 
             MembershipEntry MembershipEntry = data.Members[0].Item1;
             string eTag = data.Members[0].Item2;
@@ -152,32 +129,35 @@ namespace UnitTests.MembershipTests
             MembershipEntry data = CreateMembershipEntryForTest();
 
             MembershipTableData tableData = await membership.ReadAll();
-            TableVersion tableVer = tableData.Version;
+            //TableVersion tableVer = tableData.Version;
+            Assert.IsNotNull(tableData.Version, "TableVersion should not be null");
+            Assert.AreEqual(0, tableData.Version.Version, "TableVersion should be zero");
             Assert.AreEqual(0, tableData.Members.Count, "Should be no data initially: {0}", tableData);
 
-            logger.Info("Calling InsertRow with Entry = {0} TableVersion = {1}", data, tableVer);
-            bool ok = await membership.InsertRow(data, tableVer);
+            TableVersion newTableVer = tableData.Version.Next();
+            logger.Info("Calling InsertRow with Entry = {0} TableVersion = {1}", data, newTableVer);
+            bool ok = await membership.InsertRow(data, newTableVer);
 
             Assert.IsTrue(ok, "InsertRow OK");
 
             tableData = await membership.ReadAll();
+            Assert.IsNotNull(tableData.Version, "TableVersion should not be null");
+            Assert.AreEqual(1, tableData.Version.Version, "TableVersion should be 1");
             Assert.AreEqual(1, tableData.Members.Count, "Should be one row after insert: {0}", tableData);
 
-            Tuple<MembershipEntry, string> newEntryData = tableData.Get(data.SiloAddress);
-            string eTag = newEntryData.Item2;
-            Assert.IsNotNull(eTag, "ETag should not be null");
+            Tuple<MembershipEntry, string> insertedData = tableData.Get(data.SiloAddress);
+            Assert.IsNotNull(insertedData.Item2, "ETag should not be null");
+            insertedData.Item1.Status = SiloStatus.Active;
 
-            tableVer = tableData.Version;
-            Assert.IsNotNull(tableVer, "TableVersion should not be null");
-            tableVer = tableVer.Next();
+            newTableVer = tableData.Version.Next();
 
-            data.Status = SiloStatus.Active;
-
-            logger.Info("Calling UpdateRow with Entry = {0} eTag = {1} New TableVersion={2}", data, eTag, tableVer);
-            ok = await membership.UpdateRow(data, eTag, tableVer);
+            logger.Info("Calling UpdateRow with Entry = {0} eTag = {1} New TableVersion={2}", insertedData.Item1, insertedData.Item2, newTableVer);
+            ok = await membership.UpdateRow(insertedData.Item1, insertedData.Item2, newTableVer);
 
             tableData = await membership.ReadAll();
-            Assert.AreEqual(1, tableData.Members.Count, "Should be one row after update: {0}", tableData);
+            Assert.IsNotNull(tableData.Version, "TableVersion should not be null");
+            Assert.AreEqual(2, tableData.Version.Version, "TableVersion should be 2");
+            Assert.AreEqual(1, tableData.Members.Count, "Should be one row after insert: {0}", tableData);
 
             Assert.IsTrue(ok, "UpdateRow OK - Table Data = {0}", tableData);
         }
@@ -188,7 +168,6 @@ namespace UnitTests.MembershipTests
             var siloAddress = SiloAddress.NewLocalAddress(SiloAddress.AllocateNewGeneration());
 
             var now = DateTime.UtcNow;
-
             var membershipEntry = new MembershipEntry
             {
                 SiloAddress = siloAddress,
@@ -209,11 +188,11 @@ namespace UnitTests.MembershipTests
             return new MembershipEntry
             {
                 SiloAddress = siloAddress,
-                StartTime = now,
-                Status = SiloStatus.Active,
                 HostName = "TestHost",
                 RoleName = "TestRole",
-                InstanceName = "TestInstance"
+                InstanceName = "TestInstance",
+                Status = SiloStatus.Active,
+                StartTime = now,
             };
         }
     }
