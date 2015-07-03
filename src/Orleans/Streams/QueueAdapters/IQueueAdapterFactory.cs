@@ -39,5 +39,7 @@ namespace Orleans.Streams
         IQueueAdapterCache GetQueueAdapterCache();
 
         IStreamQueueMapper GetStreamQueueMapper();
+
+        Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
     }
 }

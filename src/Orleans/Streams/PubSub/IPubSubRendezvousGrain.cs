@@ -46,5 +46,7 @@ namespace Orleans.Streams
         Task Validate();
 
         Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
+
+        Task FaultSubscription(GuidId subscriptionId);
     }
 }

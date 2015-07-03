@@ -21,20 +21,24 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Threading.Tasks;
-using Orleans.Concurrency;
+using Orleans;
 
-namespace Orleans.Streams
+namespace UnitTests.GrainInterfaces
 {
-    internal interface IPersistentStreamPullingAgent : ISystemTarget, IStreamProducerExtension
+    public interface IFaultableConsumerGrain : IGrainWithGuidKey
     {
-        // The queue adapter have to be Immutable<>, since we want deliberately to pass it by reference.
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> deliveryFailureHandler);
-        Task Shutdown();
-    }
+        Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
-    internal interface IPersistentStreamPullingManager : ISystemTarget
-    {
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter);
+        Task SetFailPeriod(TimeSpan failPeriod);
+
+        Task StopConsuming();
+
+        Task<int> GetNumberConsumed();
+
+        Task<int> GetNumberFailed();
+
+        Task<int> GetErrorCount();
     }
 }

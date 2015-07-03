@@ -761,11 +761,6 @@ namespace Orleans.AzureUtils
             }
         }
 
-        private static Type ResolveEntityType(string name)
-        {
-            return typeof(T);
-        }
-
         #endregion
     }
 }

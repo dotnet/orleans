@@ -21,20 +21,37 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Concurrency;
+using Orleans.Providers.Streams.PersistentStreams;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Providers.Streams.AzureQueue
 {
-    internal interface IPersistentStreamPullingAgent : ISystemTarget, IStreamProducerExtension
+    /// <summary>
+    /// The entity records stream event delivery failure information for streams from azure queues
+    /// </summary>
+    public class AzureQueueDeliveryFailureEntity : StreamDeliveryFailureEntity
     {
-        // The queue adapter have to be Immutable<>, since we want deliberately to pass it by reference.
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> deliveryFailureHandler);
-        Task Shutdown();
-    }
+        /// <summary>
+        /// This is the default table name where these entites should be stored
+        /// </summary>
+        public const string DefaultTableName = "AzureQueueDeliveryFailures";
 
-    internal interface IPersistentStreamPullingManager : ISystemTarget
-    {
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter);
+        /// <summary>
+        /// Static factory function for creating this entity by queueId.
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
+        public static AzureQueueDeliveryFailureEntity Create(QueueId queueId)
+        {
+            return new AzureQueueDeliveryFailureEntity()
+            {
+                QueueName = queueId.ToString()
+            };
+        }
+
+        /// <summary>
+        /// Azure queue form which failing event came from
+        /// </summary>
+        public string QueueName { get; set; }
     }
 }
