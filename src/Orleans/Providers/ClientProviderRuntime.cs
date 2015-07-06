@@ -190,7 +190,8 @@ namespace Orleans.Providers
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout)
+            TimeSpan initQueueTimeout,
+            TimeSpan maxEventDeliveryTime)
         {        
             return TaskDone.Done;
         }

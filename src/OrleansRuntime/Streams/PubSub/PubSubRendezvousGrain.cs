@@ -136,7 +136,7 @@ namespace Orleans.Streams
             counterProducersTotal.Increment();
             LogPubSubCounts("RegisterProducer {0}", streamProducer);
             await WriteStateAsync();
-            return State.Consumers;
+            return State.Consumers.Where(c => !c.IsFaulted).ToSet();
         }
 
         public async Task UnregisterProducer(StreamId streamId, IStreamProducerExtension streamProducer)
@@ -169,6 +169,9 @@ namespace Orleans.Streams
                 pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer, token, filter);
                 State.Consumers.Add(pubSubState);
             }
+
+            if (pubSubState.IsFaulted)
+                throw new FaultedSubscriptionException(subscriptionId, streamId);
 
             if (filter != null)
                 pubSubState.AddFilter(filter);
@@ -251,31 +254,18 @@ namespace Orleans.Streams
 
         public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId)
         {
+            if(State.Consumers.Any(c => c.IsFaulted && c.Equals(subscriptionId)))
+                throw new FaultedSubscriptionException(subscriptionId, streamId);
+
             int numRemoved = State.Consumers.RemoveWhere(c => c.Equals(subscriptionId));
             counterConsumersRemoved.Increment();
             counterConsumersTotal.DecrementBy(numRemoved);
 
             LogPubSubCounts("UnregisterSubscription {0} NumRemoved={1}", subscriptionId, numRemoved);
-            await WriteStateAsync();
 
-            int numProducers = State.Producers.Count;
-            if (numProducers > 0)
-            {
-                if (logger.IsVerbose) logger.Verbose("Notifying {0} existing producers about unregistered consumer.", numProducers);
-                
-                // Notify producers about unregistered consumer.
-                var tasks = new List<Task>();
-                foreach (var producerState in State.Producers.Where(producerState => IsActiveProducer(producerState.Producer)))
-                    tasks.Add(producerState.Producer.RemoveSubscriber(subscriptionId, streamId));
-                
-                await Task.WhenAll(tasks);
-            }
-            else if (State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
-            {
-                await ClearStateAsync(); //State contains no producers or consumers, remove it from storage
-                // No producers or consumers left now, so flag ourselves to expedite Deactivation
-                DeactivateOnIdle();
-            }
+            await WriteStateAsync();
+            await NotifyProducersOfRemovedSubscription(subscriptionId, streamId);
+            await ClearStateWhenEmpty();
         }
 
         public Task<int> ProducerCount(StreamId streamId)
@@ -295,7 +285,7 @@ namespace Orleans.Streams
 
         private PubSubSubscriptionState[] GetConsumersForStream(StreamId streamId)
         {
-            return State.Consumers.Where(c => c.Stream.Equals(streamId)).ToArray();
+            return State.Consumers.Where(c => !c.IsFaulted && c.Stream.Equals(streamId)).ToArray();
         }
 
         private void LogPubSubCounts(string fmt, params object[] args)
@@ -349,10 +339,51 @@ namespace Orleans.Streams
 
         public Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
-            List<GuidId> subscriptionIds = State.Consumers.Where(c => c.Consumer.Equals(streamConsumer))
+            List<GuidId> subscriptionIds = State.Consumers.Where(c => !c.IsFaulted && c.Consumer.Equals(streamConsumer))
                                                           .Select(c => c.SubscriptionId)
                                                           .ToList();
             return Task.FromResult(subscriptionIds);
+        }
+
+        public async Task FaultSubscription(GuidId subscriptionId)
+        {
+            PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
+            if (pubSubState == null)
+            {
+                return;
+            }
+            pubSubState.Fault();
+            if (logger.IsVerbose) logger.Verbose("Setting subscription {0} to a faulted state.", subscriptionId.Guid);
+
+            await WriteStateAsync();
+            await NotifyProducersOfRemovedSubscription(pubSubState.SubscriptionId, pubSubState.Stream);
+            await ClearStateWhenEmpty();
+        }
+
+        private async Task NotifyProducersOfRemovedSubscription(GuidId subscriptionId, StreamId streamId)
+        {
+            int numProducers = State.Producers.Count;
+            if (numProducers > 0)
+            {
+                if (logger.IsVerbose) logger.Verbose("Notifying {0} existing producers about unregistered consumer.", numProducers);
+
+                // Notify producers about unregistered consumer.
+                var tasks = new List<Task>();
+                foreach (var producerState in State.Producers.Where(producerState => IsActiveProducer(producerState.Producer)))
+                    tasks.Add(producerState.Producer.RemoveSubscriber(subscriptionId, streamId));
+
+                await Task.WhenAll(tasks);
+            }
+        }
+
+        private async Task ClearStateWhenEmpty()
+        {
+            if (State.Producers.Count == 0 && State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
+            {
+                await ClearStateAsync(); //State contains no producers or consumers, remove it from storage
+                // No producers or consumers left now, so flag ourselves to expedite Deactivation
+                DeactivateOnIdle();
+            }
         }
     }
 }

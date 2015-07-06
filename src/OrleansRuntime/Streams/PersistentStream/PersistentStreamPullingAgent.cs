@@ -33,6 +33,7 @@ namespace Orleans.Streams
 {
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
+        private static readonly IBackoffProvider DefaultBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
 
         private readonly string streamProviderName;
         private readonly IStreamProviderRuntime providerRuntime;
@@ -41,6 +42,7 @@ namespace Orleans.Streams
         private readonly SafeRandom safeRandom;
         private readonly TimeSpan queueGetPeriod;
         private readonly TimeSpan initQueueTimeout;
+        private readonly TimeSpan maxDeliveryTime;
         private readonly Logger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
@@ -49,6 +51,7 @@ namespace Orleans.Streams
         private IQueueAdapter queueAdapter;
         private IQueueCache queueCache;
         private IQueueAdapterReceiver receiver;
+        private IStreamFailureHandler streamFailureHandler;
         private IDisposable timer;
 
         internal readonly QueueId QueueId;
@@ -60,7 +63,8 @@ namespace Orleans.Streams
             IStreamProviderRuntime runtime,
             QueueId queueId, 
             TimeSpan queueGetPeriod,
-            TimeSpan initQueueTimeout)
+            TimeSpan initQueueTimeout,
+            TimeSpan maxDeliveryTime)
             : base(id, runtime.ExecutingSiloAddress, true)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
@@ -74,6 +78,7 @@ namespace Orleans.Streams
             safeRandom = new SafeRandom();
             this.queueGetPeriod = queueGetPeriod;
             this.initQueueTimeout = initQueueTimeout;
+            this.maxDeliveryTime = maxDeliveryTime;
             numMessages = 0;
 
             logger = providerRuntime.GetLogger(GrainId + "-" + streamProviderName);
@@ -97,16 +102,19 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="qAdapter"></param>
         /// <param name="queueAdapterCache"></param>
+        /// <param name="failureHandler"></param>
         /// <returns></returns>
-        public async Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IQueueAdapterCache> queueAdapterCache)
+        public async Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> failureHandler)
         {
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
+            if (failureHandler.Value == null) throw new ArgumentNullException("failureHandler", "Init: streamDeliveryFailureHandler should not be null");
 
             logger.Info((int)ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
                 GetType().Name, GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
             
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
+            streamFailureHandler = failureHandler.Value;
 
             try
             {
@@ -130,7 +138,7 @@ namespace Orleans.Streams
                 logger.Error((int)ErrorCode.PersistentStreamPullingAgent_23, String.Format("Exception while calling IQueueAdapterCache.CreateQueueCache."), exc);
                 return;
             }
-            
+
             try
             {
                 var task = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(initQueueTimeout));
@@ -351,6 +359,7 @@ namespace Orleans.Streams
                     IBatchContainer batch = null;
                     Exception ex;
                     Task deliveryTask;
+                    bool deliveryFailed = false;
                     try
                     {
                         batch = consumerData.Cursor.GetCurrent(out ex);
@@ -380,7 +389,8 @@ namespace Orleans.Streams
 
                     if (batch != null)
                     {
-                        deliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
+                        deliveryTask = AsyncExecutorWithRetries.ExecuteWithRetries(i => consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable()),
+                            AsyncExecutorWithRetries.INFINITE_RETRIES, (exception, i) => true, maxDeliveryTime, DefaultBackoffProvider);
                     }
                     else if (ex == null)
                     {
@@ -400,6 +410,35 @@ namespace Orleans.Streams
                     {
                         var message = string.Format("Exception while trying to deliver msgs to stream {0} in PersistentStreamPullingAgentGrain.RunConsumerCursor", consumerData.StreamId);
                         logger.Error((int)ErrorCode.PersistentStreamPullingAgent_14, message, exc);
+                        deliveryFailed = true;
+                    }
+                    // if we failed to deliver a batch
+                    if (deliveryFailed && batch != null)
+                    {
+                        // notify consumer of delivery error, if we can.
+                        consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, new StreamEventDeliveryFailureException(consumerData.StreamId)).Ignore();
+                        // record that there was a delivery failure
+                        await streamFailureHandler.OnDeliveryFailure(consumerData.SubscriptionId, streamProviderName,
+                            consumerData.StreamId, batch.SequenceToken);
+                        // if configured to fault on delivery failure and this is not an implicit subscription, fault and remove the subscription
+                        if (streamFailureHandler.ShouldFaultSubsriptionOnError && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
+                        {
+                            try
+                            {
+                                // notify consumer of faulted subscription, if we can.
+                                consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId,
+                                    new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId))
+                                    .Ignore();
+                                // mark subscription as faulted.
+                                await pubSub.FaultSubscription(consumerData.SubscriptionId, consumerData.StreamId);
+                            }
+                            finally
+                            {
+                                // remove subscription
+                                RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
+                            }
+                            return;
+                        }
                     }
                 }
                 consumerData.State = StreamConsumerDataState.Inactive;

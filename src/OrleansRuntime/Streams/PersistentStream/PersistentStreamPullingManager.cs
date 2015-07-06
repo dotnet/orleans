@@ -39,6 +39,7 @@ namespace Orleans.Streams
 
         private readonly TimeSpan queueGetPeriod;
         private readonly TimeSpan initQueueTimeout;
+        private readonly TimeSpan maxEvenDeliveryTime;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
         private readonly Logger logger;
 
@@ -46,6 +47,7 @@ namespace Orleans.Streams
         private IQueueAdapter queueAdapter;
         private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IStreamQueueBalancer queueBalancer;
+        private readonly IQueueAdapterFactory adapterFactory;
 
         internal PersistentStreamPullingManager(
             GrainId id, 
@@ -54,7 +56,8 @@ namespace Orleans.Streams
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             TimeSpan queueGetPeriod, 
-            TimeSpan initQueueTimeout)
+            TimeSpan initQueueTimeout,
+            TimeSpan maxEvenDeliveryTime)
             : base(id, runtime.ExecutingSiloAddress)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
@@ -75,9 +78,11 @@ namespace Orleans.Streams
             providerRuntime = runtime;
             this.queueGetPeriod = queueGetPeriod;
             this.initQueueTimeout = initQueueTimeout;
+            this.maxEvenDeliveryTime = maxEvenDeliveryTime;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
             latestRingNotificationSequenceNumber = 0;
             queueBalancer = streamQueueBalancer;
+            this.adapterFactory = adapterFactory;
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = providerRuntime.GetLogger(GetType().Name + "-" + streamProviderName);
@@ -169,7 +174,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, queueId, queueGetPeriod, initQueueTimeout);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, queueId, queueGetPeriod, initQueueTimeout, maxEvenDeliveryTime);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);
@@ -188,13 +193,7 @@ namespace Orleans.Streams
                 var initTasks = new List<Task>();
                 foreach (var agent in agents)
                 {
-                    // Init the agent only after it was registered locally.
-                    var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
-                    var queueAdapterCacheAsImmutable = queueAdapterCache != null ? queueAdapterCache.AsImmutable() : new Immutable<IQueueAdapterCache>(null);
-                    // Need to call it as a grain reference.
-                    var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(queueAdapter.AsImmutable(), queueAdapterCacheAsImmutable));
-                    task = task.LogException(logger, ErrorCode.PersistentStreamPullingManager_08, String.Format("PersistentStreamPullingAgent {0} failed to Initialize.", agent.QueueId));
-                    initTasks.Add(task);
+                    initTasks.Add(InitAgent(agent));
                 }
                 await Task.WhenAll(initTasks);
             }
@@ -205,6 +204,17 @@ namespace Orleans.Streams
             }
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_09, "Took {0} new queues under my responsibility: {1}", agents.Count,
                 Utils.EnumerableToString(agents, agent => agent.QueueId.ToStringWithHashCode()));
+        }
+
+        private async Task InitAgent(PersistentStreamPullingAgent agent)
+        {
+            // Init the agent only after it was registered locally.
+            var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
+            var queueAdapterCacheAsImmutable = queueAdapterCache != null ? queueAdapterCache.AsImmutable() : new Immutable<IQueueAdapterCache>(null);
+            IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(agent.QueueId);
+            // Need to call it as a grain reference.
+            var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(queueAdapter.AsImmutable(), queueAdapterCacheAsImmutable, deliveryFailureHandler.AsImmutable()));
+            await task.LogException(logger, ErrorCode.PersistentStreamPullingManager_08, String.Format("PersistentStreamPullingAgent {0} failed to Initialize.", agent.QueueId));
         }
 
         private async Task RemoveQueues(IEnumerable<QueueId> myQueues)

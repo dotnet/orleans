@@ -21,20 +21,27 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Concurrency;
+using System;
+using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal interface IPersistentStreamPullingAgent : ISystemTarget, IStreamProducerExtension
+    /// <summary>
+    /// This exception indicates that an error has occured on a stream subscription that has placed the subscription into
+    ///  a faulted state.  Work on faulted subscriptions should be abandoned.
+    /// </summary>
+    [Serializable]
+    public class FaultedSubscriptionException : OrleansException
     {
-        // The queue adapter have to be Immutable<>, since we want deliberately to pass it by reference.
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> deliveryFailureHandler);
-        Task Shutdown();
-    }
+        private const string ErrorStringFormat =
+            "Subscription is in a Faulted state.  Subscription:{0}, Stream:{1}";
 
-    internal interface IPersistentStreamPullingManager : ISystemTarget
-    {
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter);
+        public FaultedSubscriptionException() { }
+        public FaultedSubscriptionException(string message) : base(message) { }
+        internal FaultedSubscriptionException(GuidId subscriptionId, StreamId streamId)
+            : base(string.Format(ErrorStringFormat, subscriptionId.Guid, streamId)) { }
+        public FaultedSubscriptionException(string message, Exception innerException) : base(message, innerException) { }
+        public FaultedSubscriptionException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 }

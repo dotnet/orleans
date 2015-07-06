@@ -23,7 +23,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-
 using Orleans.Streams;
 using Orleans.Runtime;
 
@@ -69,6 +68,16 @@ namespace Orleans.Providers.Streams.AzureQueue
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             throw new OrleansException("SimpleAzureQueueAdapter does not support multiple queues, it only writes to one queue.");
+        }
+
+        /// <summary>
+        /// Creates a delivery failure handler for the specified queue.
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
+        {
+            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
         }
     }
 }

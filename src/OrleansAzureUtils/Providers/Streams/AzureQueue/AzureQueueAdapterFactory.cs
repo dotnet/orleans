@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-
+using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.Runtime;
 using Orleans.Providers.Streams.Common;
@@ -99,6 +99,16 @@ namespace Orleans.Providers.Streams.AzureQueue
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             return streamQueueMapper;
+        }
+
+        /// <summary>
+        /// Creates a delivery failure handler for the specified queue.
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
+        {
+            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
         }
     }
 }

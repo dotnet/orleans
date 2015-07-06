@@ -22,19 +22,26 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System.Threading.Tasks;
-using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    internal interface IPersistentStreamPullingAgent : ISystemTarget, IStreamProducerExtension
+    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
     {
-        // The queue adapter have to be Immutable<>, since we want deliberately to pass it by reference.
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> deliveryFailureHandler);
-        Task Shutdown();
-    }
+        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
+        {
+            ShouldFaultSubsriptionOnError = faultOnError;
+        }
 
-    internal interface IPersistentStreamPullingManager : ISystemTarget
-    {
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter);
+        public bool ShouldFaultSubsriptionOnError { get; private set; }
+
+        /// <summary>
+        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
+        /// </summary>
+        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+            StreamSequenceToken sequenceToken)
+        {
+            return TaskDone.Done;
+        }
     }
 }

@@ -113,6 +113,10 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
+    <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />
+    <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />
+    <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
     <Compile Include="RelationalStorage\DbExtensions.cs" />
     <Compile Include="RelationalStorage\DictionaryExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorage.cs" />

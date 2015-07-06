@@ -29,6 +29,12 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
+        private enum SubscriptionStates
+        {
+            Active,
+            Faulted,
+        }
+
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         public GuidId SubscriptionId;
@@ -36,6 +42,7 @@ namespace Orleans.Streams
         public IStreamConsumerExtension Consumer;
         public StreamSequenceToken StreamSequenceToken;
         public IStreamFilterPredicateWrapper FilterWrapper; // Serialized func info
+        private SubscriptionStates state;
 
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
@@ -51,6 +58,7 @@ namespace Orleans.Streams
             Consumer = streamConsumer;
             StreamSequenceToken = token;
             FilterWrapper = filterWrapper;
+            state = SubscriptionStates.Active;
         }
 
         public IStreamFilterPredicateWrapper Filter { get { return FilterWrapper; } }
@@ -82,6 +90,8 @@ namespace Orleans.Streams
         }
         public bool Equals(PubSubSubscriptionState other)
         {
+            if ((object)other == null)
+                return false;
             // Note: PubSubSubscriptionState is a struct, so 'other' can never be null.
             return Equals(other.SubscriptionId);
         }
@@ -117,5 +127,12 @@ namespace Orleans.Streams
             return string.Format("PubSubSubscriptionState:SubscriptionId={0},StreamId={1},Consumer={2},SequenceToken={3}.",
                 SubscriptionId, Stream, Consumer, StreamSequenceToken);
         }
+
+        public void Fault()
+        {
+            state = SubscriptionStates.Faulted;
+        }
+
+        public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
     }
 }
