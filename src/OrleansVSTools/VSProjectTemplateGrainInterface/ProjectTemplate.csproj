@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.props')" />
+  <Import Project="$(SolutionDir)packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.props" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.props')" />
   <PropertyGroup>
 		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
 		<Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -33,7 +33,7 @@
 	</PropertyGroup>
 	<ItemGroup>
     <Reference Include="Orleans">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
     </Reference>
     <Reference Include="System" />
 		<Reference Include="System.Core" />
@@ -52,6 +52,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.targets')" />
+  <Import Project="$(SolutionDir)packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.targets" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.targets')" />
 </Project>
 

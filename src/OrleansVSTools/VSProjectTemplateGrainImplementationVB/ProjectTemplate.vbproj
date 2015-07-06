@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.props')" />
+  <Import Project="$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.props" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -11,12 +11,6 @@
     <FileAlignment>512</FileAlignment>
     <MyType>Windows</MyType>
     <TargetFrameworkVersion>v$targetframeworkversion$</TargetFrameworkVersion>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(OrleansSDK)' != '' ">
-    <StartAction>Program</StartAction>
-    <StartProgram>$(OrleansSDK)\LocalSilo\OrleansHost.exe</StartProgram>
-    <StartWorkingDirectory>$(OrleansSDK)\LocalSilo</StartWorkingDirectory>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -48,7 +42,7 @@
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Orleans">
       <Private>False</Private>
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -106,16 +100,6 @@
     </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
-  <PropertyGroup>
-    <PostBuildEvent>
-      if exist "$(OrleansSDK)\LocalSilo" (
-      if not exist "$(OrleansSDK)\LocalSilo\Applications" (md "$(OrleansSDK)\LocalSilo\Applications")
-      if not exist  "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)" (md "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)")
-      copy /y *.dll  "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)\"
-      copy /y *.pdb  "$(OrleansSDK)\LocalSilo\Applications\$(RootNamespace)\"
-      )
-    </PostBuildEvent>
-  </PropertyGroup>
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.targets')" />
+  <Import Project="$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.targets" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.targets')" />
 </Project>
 
