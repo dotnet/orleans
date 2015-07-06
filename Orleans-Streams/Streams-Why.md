@@ -66,7 +66,7 @@ These were the requirements we had in mind for building [**Orleans Streaming**](
 
 ---
 
-_Clarificaton_: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described [here](Streams-Programming-APIs). Providing declarative dataflow expressions is our future goal
+_Clarificaton_: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described [here](Streams-Programming-APIs). Providing declarative dataflow expressions is our future goal.
 
 ## Next
 [Orleans Streams Programming APIs](Streams-Programming-APIs)
