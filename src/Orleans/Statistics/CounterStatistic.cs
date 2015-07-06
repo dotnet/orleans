@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 
@@ -249,7 +250,7 @@ namespace Orleans.Runtime
                 catch (Exception) { }
             }
 
-            return current.ToString();
+            return current.ToString(CultureInfo.InvariantCulture);
         }
 
         public string GetDeltaString()
@@ -266,7 +267,7 @@ namespace Orleans.Runtime
                 catch (Exception) { }
             }
 
-            return delta.ToString();
+            return delta.ToString(CultureInfo.InvariantCulture);
         }
 
         public string GetDisplayString()
@@ -297,11 +298,11 @@ namespace Orleans.Runtime
 
             if (delta == 0)
             {
-                return String.Format("{0}.Current={1}", Name, current);
+                return String.Format("{0}.Current={1}", Name, current.ToString(CultureInfo.InvariantCulture));
             }
             else
             {
-                return String.Format("{0}.Current={1},      Delta={2}", Name, current, delta);
+                return String.Format("{0}.Current={1},      Delta={2}", Name, current.ToString(CultureInfo.InvariantCulture), delta.ToString(CultureInfo.InvariantCulture));
             }
         }
 

@@ -26,7 +26,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage.Relational;
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -64,6 +63,7 @@ namespace Orleans.Providers.SqlServer
         }
 
 
+
         public void AddConfiguration(string deployment, string hostName, string client, IPAddress address)
         {
             deploymentId = deployment;
@@ -96,20 +96,19 @@ namespace Orleans.Providers.SqlServer
             database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, config.DataConnectionString);
             
             await InitOrleansQueriesAsync();
-
         }
 
 
         public Task ReportMetrics(IClientPerformanceMetrics metricsData)
         {
-            if(logger != null) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
+            if(logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
             try
             {
                 return database.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
-                logger.Verbose("SqlStatisticsPublisher.ReportMetrics (client) failed: {0}", ex);
+                if (logger != null && logger.IsVerbose) logger.Verbose("SqlStatisticsPublisher.ReportMetrics (client) failed: {0}", ex);
                 throw;
             }
         }
@@ -123,24 +122,29 @@ namespace Orleans.Providers.SqlServer
 
         public Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
-            if(logger != null) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
+            if (logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
             try
             {
                 return database.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
-                logger.Verbose("SqlStatisticsPublisher.ReportMetrics (silo) failed: {0}", ex);
+                if (logger != null && logger.IsVerbose) logger.Verbose("SqlStatisticsPublisher.ReportMetrics (silo) failed: {0}", ex);
                 throw;
             }
         }
 
 
+        Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
+        {
+            return TaskDone.Done;
+        }
+
         public async Task ReportStats(List<ICounter> statsCounters)
         {
             var siloOrClientName = (isSilo) ? siloName : clientId;
-            var id = (isSilo) ? siloAddress.ToLongString() : string.Format("{0}:{1}", siloOrClientName, generation);            
-            if(logger != null) logger.Verbose3("ReportStats called with {0} counters, name: {1}, id: {2}", statsCounters.Count, siloOrClientName, id);
+            var id = (isSilo) ? siloAddress.ToLongString() : string.Format("{0}:{1}", siloOrClientName, generation);
+            if (logger != null && logger.IsVerbose3) logger.Verbose3("ReportStats called with {0} counters, name: {1}, id: {2}", statsCounters.Count, siloOrClientName, id);
             var insertTasks = new List<Task>();
             try
             {                                    
@@ -158,22 +162,16 @@ namespace Orleans.Providers.SqlServer
             }
             catch(Exception ex)
             {
-                if(logger != null) logger.Verbose("ReportStats faulted: {0}", ex.ToString());                
+                if (logger != null && logger.IsVerbose) logger.Verbose("ReportStats faulted: {0}", ex.ToString());                
                 foreach(var faultedTask in insertTasks.Where(t => t.IsFaulted))
                 {
-                    if(logger != null) logger.Verbose("Faulted task exception: {0}", faultedTask.ToString());
+                    if (logger != null && logger.IsVerbose) logger.Verbose("Faulted task exception: {0}", faultedTask.ToString());
                 }
 
                 throw;
             }
 
-            if(logger != null) logger.Verbose("ReportStats SUCCESS");           
-        }
-
-
-        Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName)
-        {
-            return TaskDone.Done;
+            if (logger != null && logger.IsVerbose) logger.Verbose("ReportStats SUCCESS");           
         }
 
 
