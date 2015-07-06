@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace Orleans.Runtime
@@ -137,7 +138,7 @@ namespace Orleans.Runtime
         public string GetValueString()
         {
             float current = GetCurrentValue();
-            return String.Format("{0:0.000}", current);
+            return String.Format(CultureInfo.InvariantCulture, "{0:0.000}", current);
         }
 
         public string GetDeltaString()
