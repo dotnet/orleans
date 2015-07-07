@@ -1,4 +1,5 @@
 ﻿{
+    "userSecretsId": "aspnet5-Microsoft.Orleans.Core-20150707052440",
     "version": "2.0.0-*",
     "description": "Core library of Microsoft Orleans used both on the client and server.",
     "authors": [ "Microsoft Research" ],
@@ -9,6 +10,7 @@
 
 
     "dependencies": {
+        "System.Reflection.Context": "4.0.0-beta-23019"
     },
     "exclude": "Properties\\orleans.codegen.cs",
     "frameworks": {
@@ -26,17 +28,23 @@
             "dependencies": {
                 "Microsoft.CSharp": "4.0.0-*",
                 "System.Collections": "4.0.10-*",
+                "System.ObjectModel": "4.0.10-*",
                 "System.Collections.Concurrent": "4.0.10-*",
+                "System.Console": "4.0.0-*",
                 "System.Data.SqlClient": "4.0.0-*",
+                "System.Diagnostics.TraceSource": "4.0.0-*",
+                "System.Diagnostics.Tracing": "4.0.20-*",
+                "System.Diagnostics.Contracts": "4.0.0-*",
                 "System.IO": "4.0.0-*",
                 "System.Linq": "4.0.0-*",
+                "System.Net.NameResolution": "4.0.0-*",
                 "System.Net.Primitives": "4.0.10-*",
                 "System.Net.Sockets": "4.0.10-*",
-                "System.Net.NameResolution": "4.0.0-*",
                 "System.Reflection": "4.0.10-*",
                 "System.Reflection.Extensions": "4.0.0-*",
-                "System.Reflection.TypeExtensions": "4.0.0-*",
+                "System.Reflection.Metadata": "1.0.22-*",
                 "System.Reflection.Primitives": "4.0.0-*",
+                "System.Reflection.TypeExtensions": "4.0.0-*",
                 "System.Runtime": "4.0.20-*",
                 "System.Runtime.Extensions": "4.0.10-*",
                 "System.Runtime.InteropServices": "4.0.20-*",
@@ -48,10 +56,7 @@
                 "System.Threading.Tasks": "4.0.10-*",
                 "System.Threading.ThreadPool": "4.0.10-*",
                 "System.Xml.XmlDocument": "4.0.0-beta-*",
-                "System.Xml.XmlSerializer": "4.0.10-beta-*",
-                "System.Diagnostics.Tracing": "4.0.20-*",
-                "System.Diagnostics.TraceSource": "4.0.0-*"
-
+                "System.Xml.XmlSerializer": "4.0.10-beta-*"
             }
         }
 
