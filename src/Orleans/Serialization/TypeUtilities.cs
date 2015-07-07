@@ -43,7 +43,7 @@ namespace Orleans.Serialization
 
         internal static bool IsOrleansPrimitive(this TypeInfo t)
         {
-            return t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(DateTime) || t == typeof(Decimal) || (t.IsArray && t.GetElementType().IsOrleansPrimitive());
+            return t.IsPrimitive || t.IsEnum || t.Equals(typeof(string)) || t.Equals(typeof(DateTime)) || t.Equals(typeof(Decimal)) || (t.IsArray && t.GetElementType().IsOrleansPrimitive());
         }
 
         static readonly Dictionary<RuntimeTypeHandle, bool> shallowCopyableValueTypes = new Dictionary<RuntimeTypeHandle, bool>();
@@ -73,8 +73,8 @@ namespace Orleans.Serialization
 
         internal static bool IsOrleansShallowCopyable(this TypeInfo t)
         {
-            if (t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(DateTime) || t == typeof(Decimal) ||
-                t == typeof(Immutable<>))
+            if (t.IsPrimitive || t.IsEnum || t.Equals(typeof(string)) || t.Equals(typeof(DateTime)) || t.Equals(typeof(Decimal)) ||
+                t.Equals(typeof(Immutable<>)))
                 return true;
 
             if (t.GetCustomAttributes(typeof(ImmutableAttribute), false).Length > 0)
