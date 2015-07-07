@@ -94,7 +94,7 @@ namespace Orleans.CodeGeneration
 
         public string TypeFullName
         {
-            get { return Namespace + "." + TypeUtils.GetParameterizedTemplateName(Type, language: language); }
+            get { return TypeUtils.GetParameterizedTemplateName(Type, language: language); }
         }
 
         private readonly Language language;
@@ -170,16 +170,7 @@ namespace Orleans.CodeGeneration
 
             return methodInfos.ToArray();
         }
-
-        public static string GetFactoryClassForInterface(Type referenceInterface, Language language)
-        {
-            // remove "Reference" from the end of the type name
-            var name = referenceInterface.Name;
-            if (name.EndsWith("Reference", StringComparison.Ordinal)) 
-                name = name.Substring(0, name.Length - 9);
-            return TypeUtils.GetParameterizedTemplateName(GetFactoryNameBase(name), referenceInterface, language: language);
-        }
-
+        
         public static string GetFactoryNameBase(string typeName)
         {
             if (typeName.Length > 1 && typeName[0] == 'I' && Char.IsUpper(typeName[1]))

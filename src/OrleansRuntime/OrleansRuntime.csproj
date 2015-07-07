@@ -175,7 +175,6 @@
     <Compile Include="GrainTypeManager\SiloAssemblyLoader.cs" />
     <Compile Include="GrainTypeManager\GrainTypeData.cs" />
     <Compile Include="Messaging\IncomingMessageAgent.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Silo\Silo.cs" />
     <Compile Include="Catalog\Catalog.cs" />
@@ -191,6 +190,10 @@
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
+      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
+      <Name>OrleansCodeGenerator</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
@@ -203,25 +206,4 @@
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- Begin Orleans: Without these lines the project won't build properly -->
-  <PropertyGroup>
-    <OrleansProjectType>Server</OrleansProjectType>
-  </PropertyGroup>
-  <!-- Set path to ClientGenerator.exe -->
-  <Choose>
-    <When Condition="'$(builduri)' != ''">
-      <PropertyGroup>
-        <!-- TFS build -->
-        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
-      </PropertyGroup>
-    </When>
-    <Otherwise>
-      <PropertyGroup>
-        <!-- Visual Studio or MsBuild .sln build -->
-        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
-      </PropertyGroup>
-    </Otherwise>
-  </Choose>
-  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
-  <!--End Orleans -->
 </Project>

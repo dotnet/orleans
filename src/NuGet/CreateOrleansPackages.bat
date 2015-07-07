@@ -4,7 +4,6 @@
 IF %1.==. GOTO Usage
 
 set NUGET_EXE=%~dp0..\.nuget\nuget.exe
-
 set BASE_PATH=%1
 set VERSION=%2
 IF %2 == "" set VERSION=%~dp0..\Build\Version.txt
@@ -14,26 +13,25 @@ IF %2 == "" set VERSION=%~dp0..\Build\Version.txt
 @echo CreateOrleansNugetPackages version file = %VERSION% from base dir = %BASE_DIR% using nuget location = %NUGET_EXE%
 
 if "%BASE_PATH%" == "." (
-	if EXIST "Release" (
-		set BASE_PATH=Release
-	) else if EXIST "Debug" (
-		set BASE_PATH=Debug
-	)
+  if EXIST "Release" (
+    set BASE_PATH=Release
+  ) else if EXIST "Debug" (
+    set BASE_PATH=Debug
+  )
 )
 @echo Using binary drop location directory %BASE_PATH%
 
 if "%PRODUCT_VERSION%" == "" (
-
   if EXIST "%VERSION%" (
       @Echo Using version number from file %VERSION%
-      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION%"`) do set VERSION=%%i.%%j.%%k
+      FOR /F "usebackq tokens=1-3 delims=." %%i in (`type "%VERSION%"`) do set VERSION=%%i.%%j.%%k
   ) else (
       @Echo ERROR: Unable to read version number from file %VERSION%
       GOTO Usage
   )
 ) else (
-    set VERSION=%PRODUCT_VERSION%
-	@Echo Using version number %VERSION% from %%PRODUCT_VERSION%%
+  set VERSION=%PRODUCT_VERSION%
+  @Echo Using version number %VERSION% from %%PRODUCT_VERSION%%
 )
 
 @echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%

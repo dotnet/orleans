@@ -66,6 +66,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.Core.nuspec = NuGet\Microsoft.Orleans.Core.nuspec
 		NuGet\Microsoft.Orleans.CounterControl.nuspec = NuGet\Microsoft.Orleans.CounterControl.nuspec
 		NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec = NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec
+		NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec
 		NuGet\Microsoft.Orleans.OrleansHost.nuspec = NuGet\Microsoft.Orleans.OrleansHost.nuspec
 		NuGet\Microsoft.Orleans.OrleansManager.nuspec = NuGet\Microsoft.Orleans.OrleansManager.nuspec
 		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
@@ -141,6 +142,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansZooKeeperUtils", "Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCounterControl", "OrleansCounterControl\OrleansCounterControl.csproj", "{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCodeGenerator", "OrleansCodeGenerator\OrleansCodeGenerator.csproj", "{8D937706-F6DA-4D33-B0A9-24A260BD3080}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -203,6 +206,10 @@ Global
 		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D937706-F6DA-4D33-B0A9-24A260BD3080}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D937706-F6DA-4D33-B0A9-24A260BD3080}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D937706-F6DA-4D33-B0A9-24A260BD3080}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D937706-F6DA-4D33-B0A9-24A260BD3080}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
