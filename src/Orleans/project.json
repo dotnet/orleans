@@ -7,9 +7,10 @@
     "licenseUrl": "https://github.com/dotnet/Orleans#license",
 
 
+
     "dependencies": {
     },
-
+    "exclude": "Properties\\orleans.codegen.cs",
     "frameworks": {
         "dnx451": {
             "dependencies": {
@@ -49,7 +50,7 @@
                 "System.Xml.XmlDocument": "4.0.0-beta-*",
                 "System.Xml.XmlSerializer": "4.0.10-beta-*",
                 "System.Diagnostics.Tracing": "4.0.20-*",
-                "System.Diagnostics.TraceSource": "4.0.0-*" 
+                "System.Diagnostics.TraceSource": "4.0.0-*"
 
             }
         }
