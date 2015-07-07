@@ -138,12 +138,12 @@ namespace Orleans.CodeGeneration
         {
             if (t.IsClass)
                 return false;
-            if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
+            if (t.Equals(typeof(IGrainObserver)) || t.Equals(typeof(IAddressable)) || t.Equals(typeof(IGrainExtension)))
                 return false;
-            if (t == typeof(IGrain) || t == typeof(IGrainWithGuidKey) || t == typeof(IGrainWithIntegerKey)
-                || t == typeof(IGrainWithGuidCompoundKey) || t == typeof(IGrainWithIntegerCompoundKey))
+            if (t.Equals(typeof(IGrain)) || t.Equals(typeof(IGrainWithGuidKey)) || t.Equals(typeof(IGrainWithIntegerKey))
+                || t.Equals(typeof(IGrainWithGuidCompoundKey)) || t.Equals(typeof(IGrainWithIntegerCompoundKey)))
                 return false;
-            if (t == typeof (ISystemTarget))
+            if (t.Equals(typeof (ISystemTarget)))
                 return false;
 
             return typeof (IAddressable).IsAssignableFrom(t);
@@ -535,7 +535,7 @@ namespace Orleans.CodeGeneration
                 if (grainTypeInfo.IsClass)
                     mapping = grainTypeInfo.GetInterfaceMap(iType);
 
-                if (grainTypeInfo.IsInterface || mapping.TargetType == grainTypeInfo)
+                if (grainTypeInfo.IsInterface || mapping.TargetType.Equals(grainTypeInfo))
                 {
                     foreach (var methodInfo in iType.GetMethods())
                     {
@@ -543,7 +543,7 @@ namespace Orleans.CodeGeneration
                         {
                             var mi = methodInfo;
                             var match = mapping.TargetMethods.Any(info => methodComparer.Equals(mi, info) &&
-                                info.DeclaringType == grainTypeInfo);
+                                info.DeclaringType.Equals(grainTypeInfo));
 
                             if (match)
                                 if (!methodInfos.Contains(mi, methodComparer))
