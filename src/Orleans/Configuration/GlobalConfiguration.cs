@@ -31,6 +31,7 @@ using System.Xml;
 using Orleans.Providers;
 using Orleans.Streams;
 using Orleans.Storage;
+using System.Reflection;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -720,10 +721,10 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
         public void RegisterBootstrapProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
         {
-            Type providerType = typeof(T);
+            TypeInfo providerType = typeof(T).GetTypeInfo();
             if (providerType.IsAbstract ||
                 providerType.IsGenericType ||
-                !typeof(IBootstrapProvider).IsAssignableFrom(providerType))
+                !typeof(IBootstrapProvider).GetTypeInfo().IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
@@ -748,10 +749,10 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            Type providerType = typeof(T);
+            TypeInfo providerType = typeof(T).GetTypeInfo();
             if (providerType.IsAbstract ||
                 providerType.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+                !typeof(Orleans.Streams.IStreamProvider).GetTypeInfo().IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
@@ -776,10 +777,10 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to storage provider upon initialization</param>
         public void RegisterStorageProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStorageProvider
         {
-            Type providerType = typeof(T);
+            TypeInfo providerType = typeof(T).GetTypeInfo();
             if (providerType.IsAbstract ||
                 providerType.IsGenericType ||
-                !typeof(IStorageProvider).IsAssignableFrom(providerType))
+                !typeof(IStorageProvider).GetTypeInfo().IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
