@@ -141,6 +141,19 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansZooKeeperUtils", "Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCounterControl", "OrleansCounterControl\OrleansCounterControl.csproj", "{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Remote Deployment Scripts", "Remote Deployment Scripts", "{2EC6D21F-7590-4C57-8AF8-415A308D25D1}"
+	ProjectSection(SolutionItems) = preProject
+		..\misc\scripts\RemoteDeployment\Deployment.xml = ..\misc\scripts\RemoteDeployment\Deployment.xml
+		..\misc\scripts\RemoteDeployment\DeployOrleansSilos.ps1 = ..\misc\scripts\RemoteDeployment\DeployOrleansSilos.ps1
+		..\misc\scripts\RemoteDeployment\GatherOrleansSiloLogs.ps1 = ..\misc\scripts\RemoteDeployment\GatherOrleansSiloLogs.ps1
+		..\misc\scripts\RemoteDeployment\MonitorOrleansSilos.ps1 = ..\misc\scripts\RemoteDeployment\MonitorOrleansSilos.ps1
+		..\misc\scripts\RemoteDeployment\ShowOrleansSilos.ps1 = ..\misc\scripts\RemoteDeployment\ShowOrleansSilos.ps1
+		..\misc\scripts\RemoteDeployment\StartOrleansSilos.ps1 = ..\misc\scripts\RemoteDeployment\StartOrleansSilos.ps1
+		..\misc\scripts\RemoteDeployment\StopOrleansSilos.ps1 = ..\misc\scripts\RemoteDeployment\StopOrleansSilos.ps1
+		..\misc\scripts\RemoteDeployment\UndeployOrleansSilos.ps1 = ..\misc\scripts\RemoteDeployment\UndeployOrleansSilos.ps1
+		..\misc\scripts\RemoteDeployment\UtilityFunctions.ps1 = ..\misc\scripts\RemoteDeployment\UtilityFunctions.ps1
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
