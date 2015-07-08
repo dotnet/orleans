@@ -917,6 +917,7 @@ namespace Orleans.Serialization
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
         public static void SerializeInner(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
+            TypeInfo expectedTypeInfo = expected != null ? expected.GetTypeInfo() : null;
             // Nulls get special handling
             if (obj == null)
             {
@@ -928,7 +929,7 @@ namespace Orleans.Serialization
             // Enums are extra-special
             if (typeInfo.IsEnum)
             {
-                stream.WriteTypeHeader(typeInfo.GetTypeInfo(), expected.GetTypeInfo());
+                stream.WriteTypeHeader(typeInfo.GetTypeInfo(), expectedTypeInfo);
                 stream.Write(Convert.ToInt32(obj));
                 return;
             }
@@ -965,7 +966,7 @@ namespace Orleans.Serialization
                 var et = typeInfo.GetElementType().GetTypeInfo();
                 if (HasOrleansSerialization(et))
                 {
-                    SerializeArray((Array)obj, stream, expected.GetTypeInfo(), et);
+                    SerializeArray((Array)obj, stream, expectedTypeInfo, et);
                 }
                 else if (et.IsSerializable)
                 {
@@ -981,8 +982,8 @@ namespace Orleans.Serialization
             Serializer ser = GetSerializer(typeInfo);
             if (ser != null)
             {
-                stream.WriteTypeHeader(typeInfo, expected.GetTypeInfo());
-                ser(obj, stream, expected);
+                stream.WriteTypeHeader(typeInfo, expectedTypeInfo);
+                ser(obj, stream, expectedTypeInfo);
                 return;
             }
 
