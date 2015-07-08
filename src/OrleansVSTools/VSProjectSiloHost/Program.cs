@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Threading.Tasks;
 
 namespace $safeprojectname$
 {
