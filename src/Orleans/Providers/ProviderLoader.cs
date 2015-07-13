@@ -30,6 +30,7 @@ using System.Xml;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 
 namespace Orleans.Providers
 {
@@ -90,6 +91,28 @@ namespace Orleans.Providers
                 var msg = String.Format("Provider of type {0} name {1} was not loaded.", fullConfig.Type, fullConfig.Name);
                 logger.Error(ErrorCode.Provider_ConfiguredProviderNotLoaded, msg);
                 throw new OrleansException(msg);
+            }
+        }
+        
+        public async Task InjectStreamProviderManagerToBootstrapProvider(IStreamProviderManager streamProviderManager)  
+        {  
+            Dictionary<string, IBootstrapProvider> copy;  
+            lock (providers)  
+            {  
+                copy = providers.Where(p=>p.Value is IBootstrapProvider).ToDictionary(p => p.Key, p => p.Value as IBootstrapProvider);  
+            }  
+            foreach (var provider in copy)  
+            {
+                string name = provider.Key;  
+                try  
+                {
+                    await provider.Value.SetStreamProviderManager(streamProviderManager);  
+                }  
+                catch (Exception exc)  
+                {  
+                    logger.Error(ErrorCode.Provider_ErrorFromInit, string.Format("Exception setting stream provider Name={0} Type={1}", name, provider), exc);  
+                    throw;  
+                }
             }
         }
 

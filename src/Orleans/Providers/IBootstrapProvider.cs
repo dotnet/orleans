@@ -21,12 +21,16 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿namespace Orleans.Providers
+using System.Threading.Tasks;
+using Orleans.Streams;
+
+namespace Orleans.Providers
 {
     /// <summary>
     /// Marker interface to be implemented by any app bootstrap classes that want to be loaded and auto-run during silo startup
     /// </summary>
     public interface IBootstrapProvider : IProvider
     {
+        Task SetStreamProviderManager(IStreamProviderManager streamProviderManager); 
     }
 }

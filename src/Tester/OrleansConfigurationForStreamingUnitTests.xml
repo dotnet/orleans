@@ -8,6 +8,9 @@
       <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
       <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider"/>
     </StreamProviders>
+    <BootstrapProviders>
+      <Provider Type="UnitTests.StreamingTests.StreamBootstrapper" Name="bootstrap1" />
+    </BootstrapProviders>
     <SeedNode Address="localhost" Port="22222"/>
     <Messaging ResponseTimeout="30s"/>
   </Globals>
