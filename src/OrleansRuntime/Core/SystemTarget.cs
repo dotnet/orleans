@@ -22,15 +22,16 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
+    internal abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable, IStreamable
     {
         private IGrainMethodInvoker lastInvoker;
+        private ExtensionInvoker extensionInvoker;
         private readonly SchedulingContext schedulingContext;
         
         protected SystemTarget(GrainId grainId, SiloAddress silo) 
@@ -52,15 +53,56 @@ namespace Orleans.Runtime
 
         internal SchedulingContext SchedulingContext { get { return schedulingContext; } }
 
+        #region Method invocation
+
         public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {
-            if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId)
-                return lastInvoker;
+            return ActivationData.GetInvoker(ref lastInvoker, ref extensionInvoker, interfaceId, genericGrainType);
+        }
 
-            var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
-            lastInvoker = invoker;
-            
-            return lastInvoker;
+        public bool TryAddExtension(IGrainExtensionMethodInvoker invoker, IGrainExtension extension)
+        {
+            if(extensionInvoker == null)
+                extensionInvoker = new ExtensionInvoker();
+
+            return extensionInvoker.TryAddExtension(invoker, extension);
+        }
+
+        public void RemoveExtension(IGrainExtension extension)
+        {
+            if (extensionInvoker != null)
+            {
+                if (extensionInvoker.Remove(extension))
+                    extensionInvoker = null;
+            }
+            else
+                throw new InvalidOperationException("Grain extensions not installed.");
+        }
+
+        public bool TryGetExtensionHandler(Type extensionType, out IGrainExtension result)
+        {
+            result = null;
+            return extensionInvoker != null && extensionInvoker.TryGetExtensionHandler(extensionType, out result);
+        }
+
+        #endregion
+
+        private Streams.StreamDirectory streamDirectory;
+        public Streams.StreamDirectory GetStreamDirectory()
+        {
+            return streamDirectory ?? (streamDirectory = new Streams.StreamDirectory());
+        }
+
+        public bool IsUsingStreams
+        {
+            get { return streamDirectory != null; }
+        }
+
+        public async Task DeactivateStreamResources()
+        {
+            if (streamDirectory == null) return; // No streams - Nothing to do.
+            if (extensionInvoker == null) return; // No installed extensions - Nothing to do.
+            await streamDirectory.Cleanup();
         }
 
         public void HandleNewRequest(Message request)

@@ -21,7 +21,6 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
 using Orleans.Streams;
 
 namespace Orleans.Providers
@@ -31,6 +30,6 @@ namespace Orleans.Providers
     /// </summary>
     public interface IBootstrapProvider : IProvider
     {
-        Task SetStreamProviderManager(IStreamProviderManager streamProviderManager); 
+        void SetStreamProviderManager(IStreamProviderManager streamProviderManager); 
     }
 }

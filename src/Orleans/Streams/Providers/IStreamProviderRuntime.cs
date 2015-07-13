@@ -39,7 +39,7 @@ namespace Orleans.Streams
         /// Just for logging purposes.
         /// </summary>
         /// <param name="handler"></param>
-        string ExecutingEntityIdentity();
+        string ExecutingEntityName();
 
         SiloAddress ExecutingSiloAddress { get; }
 
@@ -96,7 +96,7 @@ namespace Orleans.Streams
         /// <param name="asyncFunc"></param>
         Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context);
 
-        object GetCurrentSchedulingContext();
+        ISchedulingContext GetCurrentSchedulingContext();
 
         /// <summary>
         /// Start the pulling agents for a given persistent stream provider.

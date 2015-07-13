@@ -23,10 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Streams;
 
 using Orleans.Runtime;
@@ -100,7 +97,7 @@ namespace Orleans.Providers
             }
         }
 
-        public string ExecutingEntityIdentity()
+        public string ExecutingEntityName()
         {
             return RuntimeClient.Current.Identity;
         }
@@ -181,7 +178,7 @@ namespace Orleans.Providers
             return Task.Run(asyncFunc);
         }
 
-        public object GetCurrentSchedulingContext()
+        public ISchedulingContext GetCurrentSchedulingContext()
         {
             return null;
         }

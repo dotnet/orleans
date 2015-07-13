@@ -88,7 +88,7 @@ namespace Orleans.Runtime
                 providerLoader.LoadProviders(providers, this);
                 logger.Info(ErrorCode.SiloCallingProviderInit, "Calling Init for {0} classes", typeof(T).Name);
 
-                await providerLoader.InjectStreamProviderManagerToBootstrapProvider(streamProviderManager); 
+                providerLoader.InjectStreamProviderManagerToBootstrapProvider(streamProviderManager); 
 
                 // Await here to force any errors to show this method name in stack trace, for better diagnostics
                 await providerLoader.InitProviders(SiloProviderRuntime.Instance);

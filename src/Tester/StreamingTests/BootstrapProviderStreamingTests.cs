@@ -27,6 +27,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using UnitTests.Tester;
@@ -45,6 +46,7 @@ namespace UnitTests.StreamingTests
                 StartFreshOrleans = true,
                 StartSecondary = false,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+                BootstrapProviderType = typeof(StreamBootstrapper).FullName,
             })
         {
         }
@@ -65,24 +67,38 @@ namespace UnitTests.StreamingTests
 
     public class StreamBootstrapper : IBootstrapProvider
     {
-        private const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
-        private const string StreamNamespace = "SampleStreamNamespace";
-
+        private Logger logger;
         private IStreamProviderManager _streamProviderManager;
+
         public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            var pro = _streamProviderManager.GetProvider(SMS_STREAM_PROVIDER_NAME) as IStreamProvider;
-            //var str = pro.GetStream<int>(Guid.Empty, StreamNamespace);
-            //await str.OnNextAsync(23);
-            await TaskDone.Done;
+            logger = providerRuntime.GetLogger(GetType().Name);
+
+            var provider = _streamProviderManager.GetProvider(SampleStreamingTests.SMS_STREAM_PROVIDER_NAME) as IStreamProvider;
+            var stream = provider.GetStream<int>(Guid.Empty, SampleStreamingTests.StreamNamespace);
+            await stream.OnNextAsync(23);
+
+            try
+            {
+                await stream.SubscribeAsync((item, token) =>
+                {
+                    logger.Info("OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null");
+                    return TaskDone.Done;
+                });
+                Assert.Fail("The call to stream.SubscribeAsync should have thrown since subsribing to a stream from within IBootstrapProvider is not allowed.");
+            }
+            catch (OrleansException)
+            {
+                logger.Info("Subsribing to a stream from within IBootstrapProvider is not allowed.");
+            }
         }
 
         public string Name { get; private set; }
-        public Task SetStreamProviderManager(IStreamProviderManager streamProviderManager)
+
+        public void SetStreamProviderManager(IStreamProviderManager streamProviderManager)
         {
             _streamProviderManager = streamProviderManager;
-            return TaskDone.Done;
         }
     }
 }

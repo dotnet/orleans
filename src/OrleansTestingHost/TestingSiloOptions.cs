@@ -47,6 +47,7 @@ namespace Orleans.TestingHost
         public bool ParallelStart { get; set; }
         public GlobalConfiguration.ReminderServiceProviderType ReminderServiceType { get; set; }
         public string DataConnectionString { get; set; }
+        public string BootstrapProviderType { get; set; }
 
         public TestingSiloOptions()
         {
@@ -82,7 +83,7 @@ namespace Orleans.TestingHost
                 ReminderServiceType = ReminderServiceType,
                 DataConnectionString = DataConnectionString,
                 ParallelStart = ParallelStart,
-
+                BootstrapProviderType = BootstrapProviderType,
             };
         }
     }

@@ -39,6 +39,8 @@ namespace Orleans.Streams
         [NonSerialized]
         private IInternalStreamProvider                         provider;
         [NonSerialized]
+        private IStreamProviderRuntime                          providerRuntime;
+        [NonSerialized]
         private volatile IAsyncBatchObserver<T>                 producerInterface;
         [NonSerialized]
         private IInternalAsyncObservable<T>                     consumerInterface;
@@ -75,14 +77,16 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
         {
-            return GetConsumerInterface().SubscribeAsync(observer, null);
+            CheckExecutingContext("SubscribeAsync 1");
+            return GetConsumerInterface().SubscribeAsync(observer, null); 
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
             StreamFilterPredicate filterFunc = null,
             object filterData = null)
         {
-            return GetConsumerInterface().SubscribeAsync(observer, token, filterFunc, filterData);
+            CheckExecutingContext("SubscribeAsync 2");
+            return GetConsumerInterface().SubscribeAsync(observer, token, filterFunc, filterData);            
         }
 
         public async Task Cleanup()
@@ -122,6 +126,7 @@ namespace Orleans.Streams
             IAsyncObserver<T> observer,
             StreamSequenceToken token)
         {
+            CheckExecutingContext("ResumeAsync");
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
         }
 
@@ -132,7 +137,17 @@ namespace Orleans.Streams
 
         internal Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
         {
+            CheckExecutingContext("UnsubscribeAsync");
             return GetConsumerInterface().UnsubscribeAsync(handle);
+        }
+
+        private void CheckExecutingContext(string caller)
+        {
+            var context = GetStreamProviderRuntime().GetCurrentSchedulingContext();
+            if (context != null && !context.ContextType.Equals(SchedulingContextType.Activation))
+            {
+                throw new OrleansException(String.Format("Attemping to {0} on a stream not from within Grain context.", caller));
+            }
         }
 
         internal IAsyncBatchObserver<T> GetProducerInterface()
@@ -173,6 +188,23 @@ namespace Orleans.Streams
         private IInternalStreamProvider GetStreamProvider()
         {
             return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IInternalStreamProvider;
+        }
+
+        private IStreamProviderRuntime GetStreamProviderRuntime()
+        {
+            if (providerRuntime != null) return providerRuntime;
+
+            lock (initLock)
+            {
+                if (providerRuntime != null)
+                    return providerRuntime;
+
+                if (provider == null)
+                    provider = GetStreamProvider();
+
+                providerRuntime = provider.StreamProviderRuntime;
+            }
+            return providerRuntime;
         }
 
         #region IComparable<IAsyncStream<T>> Members

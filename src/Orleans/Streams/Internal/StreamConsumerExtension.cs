@@ -130,7 +130,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream);
+                if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityName(), stream);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 IStreamObservers obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>());
@@ -141,7 +141,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 logger.Error((int)ErrorCode.StreamProvider_AddObserverException, String.Format("{0} StreamConsumerExtension.AddObserver({1}) caugth exception.", 
-                    providerRuntime.ExecutingEntityIdentity(), stream), exc);
+                    providerRuntime.ExecutingEntityName(), stream), exc);
                 throw;
             }
         }
@@ -173,7 +173,7 @@ namespace Orleans.Streams
                 return observers.DeliverItem(item.Value, token);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+                providerRuntime.ExecutingEntityName(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
@@ -189,7 +189,7 @@ namespace Orleans.Streams
                 return observers.DeliverBatch(batch.Value);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+                providerRuntime.ExecutingEntityName(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
@@ -204,7 +204,7 @@ namespace Orleans.Streams
                 return observers.CompleteStream();
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got a Complete for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+                providerRuntime.ExecutingEntityName(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
@@ -219,7 +219,7 @@ namespace Orleans.Streams
                 return observers.ErrorInStream(exc);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an Error for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
-                providerRuntime.ExecutingEntityIdentity(), subscriptionId);
+                providerRuntime.ExecutingEntityName(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;

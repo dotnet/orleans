@@ -94,7 +94,7 @@ namespace Orleans.Providers
             }
         }
         
-        public async Task InjectStreamProviderManagerToBootstrapProvider(IStreamProviderManager streamProviderManager)  
+        public void InjectStreamProviderManagerToBootstrapProvider(IStreamProviderManager streamProviderManager)  
         {  
             Dictionary<string, IBootstrapProvider> copy;  
             lock (providers)  
@@ -106,7 +106,7 @@ namespace Orleans.Providers
                 string name = provider.Key;  
                 try  
                 {
-                    await provider.Value.SetStreamProviderManager(streamProviderManager);  
+                    provider.Value.SetStreamProviderManager(streamProviderManager);  
                 }  
                 catch (Exception exc)  
                 {  

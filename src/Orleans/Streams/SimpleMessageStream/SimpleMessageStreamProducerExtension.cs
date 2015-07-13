@@ -73,7 +73,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         internal void AddSubscribers(StreamId streamId, ICollection<PubSubSubscriptionState> newSubscribers)
         {
-            if (logger.IsVerbose) logger.Verbose("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(newSubscribers), streamId);
+            if (logger.IsVerbose) logger.Verbose("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityName(), Utils.EnumerableToString(newSubscribers), streamId);
             
             StreamConsumerExtensionCollection consumers;
             if (remoteConsumers.TryGetValue(streamId, out consumers))
@@ -145,7 +145,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (logger.IsVerbose)
             {
-                logger.Verbose("{0} AddSubscriber {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), streamConsumer, streamId);
+                logger.Verbose("{0} AddSubscriber {1} for stream {2}", providerRuntime.ExecutingEntityName(), streamConsumer, streamId);
             }
 
             StreamConsumerExtensionCollection consumers;
@@ -165,7 +165,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (logger.IsVerbose)
             {
-                logger.Verbose("{0} RemoveSubscription {1}", providerRuntime.ExecutingEntityIdentity(),
+                logger.Verbose("{0} RemoveSubscription {1}", providerRuntime.ExecutingEntityName(),
                     subscriptionId);
             }
 
