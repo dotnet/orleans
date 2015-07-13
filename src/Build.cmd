@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 @REM NOTE: This script must be run from a Visual Studio command prompt window
 
 @setlocal
@@ -72,3 +73,6 @@ if "%STEP%" == "" set STEP=%CONFIGURATION%
 @echo ===== Build FAILED for %PROJ% -- %STEP% with error %RC% - CANNOT CONTINUE =====
 exit /B %RC%
 :EOF
+=======
+@REM Empty Build file to suppress CI build failures
+>>>>>>> c320dc03a54091ff65a55b70be17274795e91fa2
