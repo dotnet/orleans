@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
     <StorageProviders>
@@ -12,13 +12,9 @@
   <Defaults>
     <Networking Address="localhost" Port="11111" />
     <ProxyingGateway Address="localhost" Port="30000" />
-    <Tracing DefaultTraceLevel="Warning" TraceToConsole="true" TraceToFile="{0}-{1}.log">
-      <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" BulkMessageLimit="1000">
+        <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
     </Tracing>
-    <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true"/>
+    <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
   </Defaults>
-  <Override Node="Primary">
-    <Networking Address="localhost" Port="11111" />
-    <ProxyingGateway Address="localhost" Port="30000" />
-  </Override>
 </OrleansConfiguration>

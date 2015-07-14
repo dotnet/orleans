@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using HelloWorldNugetInterfaces;
+using HelloWorldInterfaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.TestingHost;
