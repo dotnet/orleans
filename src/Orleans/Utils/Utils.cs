@@ -200,7 +200,7 @@ namespace Orleans.Runtime
         /// <returns>An integer hash for the string.</returns>
         public static int CalculateIdHash(string text)
         {
-            SHA256 sha = new SHA256CryptoServiceProvider(); // This is one implementation of the abstract class SHA1.
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
             int hash = 0;
             try
             {
@@ -322,8 +322,8 @@ namespace Orleans.Runtime
             {
                 throw new InvalidCastException(string.Format(
                     "Connet convert type {0} to type List<{1}>", 
-                    TypeUtils.GetFullName(data.GetType()),
-                    TypeUtils.GetFullName(typeof(T))));
+                    TypeUtils.GetFullName(data.GetType().GetTypeInfo()),
+                    TypeUtils.GetFullName(typeof(T).GetTypeInfo())));
             }
             var list = new List<T>();
             list.AddRange(dataArray);

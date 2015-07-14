@@ -72,21 +72,21 @@ namespace Orleans.Runtime.Messaging
             stopped = false;
         }
 
-        public bool SendMessage(Message msg)
+        public void SendMessage(Message msg)
         {
-            if (msg == null) return true;
+            if (msg == null) throw new ArgumentNullException("msg", "Can't send a null message.");
 
             if (stopped)
             {
                 logger.Info(ErrorCode.Runtime_Error_100112, "Message was queued for sending after outbound queue was stopped: {0}", msg);
-                return true;
+                return;
             }
 
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
                 msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Send);
-                return true;
+                return;
             }
 
             if (!msg.ContainsMetadata(QUEUED_TIME_METADATA))
@@ -97,14 +97,14 @@ namespace Orleans.Runtime.Messaging
             // First check to see if it's really destined for a proxied client, instead of a local grain.
             if (messageCenter.IsProxying && messageCenter.TryDeliverToProxy(msg))
             {
-                return true;
+                return;
             }
 
             if (!msg.ContainsHeader(Message.Header.TARGET_SILO))
             {
                 logger.Error(ErrorCode.Runtime_Error_100113, "Message does not have a target silo: " + msg + " -- Call stack is: " + (new System.Diagnostics.StackTrace()));
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo");
-                return true;
+                return;
             }
 
             if (Message.WriteMessagingTraces)
@@ -122,7 +122,7 @@ namespace Orleans.Runtime.Messaging
                 if (stopped)
                 {
                     logger.Info(ErrorCode.Runtime_Error_100115, "Message was queued for sending after outbound queue was stopped: {0}", msg);
-                    return true;
+                    return;
                 }
 
                 // Prioritize system messages
@@ -140,17 +140,17 @@ namespace Orleans.Runtime.Messaging
                     {
                         int index = Math.Abs(msg.TargetSilo.GetConsistentHashCode()) % senders.Length;
                         senders[index].Value.QueueRequest(msg);
-                    }
                         break;
+                    }
                 }
             }
-            return true;
         }
 
         public void Start()
         {
             pingSender.Start();
             systemSender.Start();
+            stopped = false;
         }
 
         public void Stop()
@@ -170,6 +170,7 @@ namespace Orleans.Runtime.Messaging
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1816:CallGCSuppressFinalizeCorrectly")]
         public void Dispose()
         {
+            stopped = true;
             foreach (var sender in senders)
             {
                 sender.Value.Stop();

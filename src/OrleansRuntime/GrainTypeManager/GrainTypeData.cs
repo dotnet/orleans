@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Orleans.Concurrency;
 using Orleans.Placement;
 
@@ -48,7 +49,7 @@ namespace Orleans.Runtime
             Type = type;
             IsReentrant = Type.GetCustomAttributes(typeof (ReentrantAttribute), true).Length > 0;
             IsStatelessWorker = Type.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Length > 0;
-            GrainClass = TypeUtils.GetFullName(type);
+            GrainClass = TypeUtils.GetFullName(type.GetTypeInfo());
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
         }
@@ -68,7 +69,7 @@ namespace Orleans.Runtime
                 {
                     if (t == typeof(IAddressable)) continue;
 
-                    if (CodeGeneration.GrainInterfaceData.IsGrainInterface(t) && !interfaceTypes.Contains(t))
+                    if (CodeGeneration.GrainInterfaceData.IsGrainInterface(t.GetTypeInfo()) && !interfaceTypes.Contains(t))
                         interfaceTypes.Add(t);
                 }
 

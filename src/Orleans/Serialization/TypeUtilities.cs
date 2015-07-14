@@ -35,9 +35,15 @@ namespace Orleans.Serialization
 {
     internal static class TypeUtilities
     {
+        [Obsolete("Use TypeInfo version")]
         internal static bool IsOrleansPrimitive(this Type t)
         {
-            return t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(DateTime) || t == typeof(Decimal) || (t.IsArray && t.GetElementType().IsOrleansPrimitive());
+            return t.GetTypeInfo().IsOrleansPrimitive();
+        }
+
+        internal static bool IsOrleansPrimitive(this TypeInfo t)
+        {
+            return t.IsPrimitive || t.IsEnum || t.Equals(typeof(string)) || t.Equals(typeof(DateTime)) || t.Equals(typeof(Decimal)) || (t.IsArray && t.GetElementType().IsOrleansPrimitive());
         }
 
         static readonly Dictionary<RuntimeTypeHandle, bool> shallowCopyableValueTypes = new Dictionary<RuntimeTypeHandle, bool>();
@@ -59,16 +65,22 @@ namespace Orleans.Serialization
             shallowCopyableValueTypes[typeof(CorrelationId).TypeHandle] = true;
         }
 
+        [Obsolete("Use TypeInfo version")]
         internal static bool IsOrleansShallowCopyable(this Type t)
         {
-            if (t.IsPrimitive || t.IsEnum || t == typeof (string) || t == typeof (DateTime) || t == typeof (Decimal) ||
-                t == typeof (Immutable<>))
+            return t.GetTypeInfo().IsOrleansShallowCopyable();
+        }
+
+        internal static bool IsOrleansShallowCopyable(this TypeInfo t)
+        {
+            if (t.IsPrimitive || t.IsEnum || t.Equals(typeof(string)) || t.Equals(typeof(DateTime)) || t.Equals(typeof(Decimal)) ||
+                t.Equals(typeof(Immutable<>)))
                 return true;
 
-            if (t.GetCustomAttributes(typeof (ImmutableAttribute), false).Length > 0) 
-                return true;  
+            if (t.GetCustomAttributes(typeof(ImmutableAttribute), false).Length > 0)
+                return true;
 
-            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof (Immutable<>))
+            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Immutable<>))
                 return true;
 
             if (t.IsValueType && !t.IsGenericType && !t.IsGenericTypeDefinition)
@@ -90,12 +102,14 @@ namespace Orleans.Serialization
             return false;
         }
 
-        internal static bool IsSpecializationOf(this Type t, Type match)
+
+        internal static bool IsSpecializationOf(this TypeInfo t, Type match)
         {
             return t.IsGenericType && t.GetGenericTypeDefinition() == match;
         }
 
-        internal static string OrleansTypeName(this Type t)
+
+        internal static string OrleansTypeName(this TypeInfo t)
         {
             string name;
             lock (typeNameCache)
@@ -111,7 +125,7 @@ namespace Orleans.Serialization
             return name;
         }
 
-        public static byte[] OrleansTypeKey(this Type t)
+        public static byte[] OrleansTypeKey(this TypeInfo t)
         {
             byte[] key;
             lock (typeKeyCache)
@@ -127,7 +141,8 @@ namespace Orleans.Serialization
             return key;
         }
 
-        public static string OrleansTypeKeyString(this Type t)
+
+        public static string OrleansTypeKeyString(this TypeInfo t)
         {
             string key;
             lock (typeKeyStringCache)
@@ -155,13 +170,13 @@ namespace Orleans.Serialization
                         sb.Append(',');
                     }
                     first = false;
-                    sb.Append(OrleansTypeKeyString(genericArgument));
+                    sb.Append(OrleansTypeKeyString(genericArgument.GetTypeInfo()));
                 }
                 sb.Append('>');
             }
             else if (t.IsArray)
             {
-                sb.Append(OrleansTypeKeyString(t.GetElementType()));
+                sb.Append(OrleansTypeKeyString(t.GetElementType().GetTypeInfo()));
                 sb.Append('[');
                 if (t.GetArrayRank() > 1)
                 {
@@ -183,7 +198,8 @@ namespace Orleans.Serialization
             return key;
         }
 
-        private static string GetBaseTypeKey(Type t)
+
+        private static string GetBaseTypeKey(TypeInfo t)
         {
             string namespacePrefix = "";
             if ((t.Namespace != null) && !t.Namespace.StartsWith("System.") && !t.Namespace.Equals("System"))
@@ -193,7 +209,7 @@ namespace Orleans.Serialization
 
             if (t.IsNestedPublic)
             {
-                return namespacePrefix + OrleansTypeKeyString(t.DeclaringType) + "." + t.Name;
+                return namespacePrefix + OrleansTypeKeyString(t.DeclaringType.GetTypeInfo()) + "." + t.Name;
             }
 
             return namespacePrefix + t.Name;
@@ -217,9 +233,15 @@ namespace Orleans.Serialization
             }
         }
 
+        [Obsolete("Use TypeInfo version")]
         public static bool IsTypeIsInaccessibleForSerialization(Type t, Module currentModule, Assembly grainAssembly)
         {
-            if(t.GetCustomAttributes(typeof(SerializableAttribute), false).Length > 0)
+            return IsTypeIsInaccessibleForSerialization(t.GetTypeInfo(), currentModule, grainAssembly);
+        }
+
+        public static bool IsTypeIsInaccessibleForSerialization(TypeInfo t, Module currentModule, Assembly grainAssembly)
+        {
+            if (t.GetCustomAttributes(typeof(SerializableAttribute), false).Length > 0)
                 return false;
 
             if (t.IsNotPublic)
@@ -231,5 +253,6 @@ namespace Orleans.Serialization
             return t.IsNestedPrivate || t.IsNestedFamily ||
                 (t.IsArray && IsTypeIsInaccessibleForSerialization(t.GetElementType(), currentModule, grainAssembly));
         }
+
     }
 }

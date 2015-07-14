@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿//#define TRACE_SERIALIZATION
+//#define TRACE_SERIALIZATION
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -32,6 +32,7 @@ using System.Text;
 
 using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using System.Reflection;
 
 namespace Orleans.Serialization
 {
@@ -283,7 +284,7 @@ namespace Orleans.Serialization
         /// <summary> Write a type header for the specified Type to the stream. </summary>
         /// <param name="t">Type to write header for.</param>
         /// <param name="expected">Currently expected Type for this stream.</param>
-        public void WriteTypeHeader(Type t, Type expected = null)
+        public void WriteTypeHeader(TypeInfo t, TypeInfo expected = null)
         {
             Trace("-Writing type header for type {0}, expected {1}", t, expected);
             if (t == expected)
@@ -297,7 +298,7 @@ namespace Orleans.Serialization
             if (t.IsArray)
             {
                 ab.Append((byte)(SerializationTokenType.Array + (byte)t.GetArrayRank()));
-                WriteTypeHeader(t.GetElementType());
+                WriteTypeHeader(t.GetElementType().GetTypeInfo());
                 return;
             }
 
@@ -315,7 +316,7 @@ namespace Orleans.Serialization
                     ab.Append((byte)token);
                     foreach (var tp in t.GetGenericArguments())
                     {
-                        WriteTypeHeader(tp);
+                        WriteTypeHeader(tp.GetTypeInfo());
                     }
                     return;
                 }                
@@ -552,9 +553,9 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="a">Data object for which header should be written.</param>
         /// <param name="expected">The most recent Expected Type currently active for this stream.</param>
-        internal void WriteArrayHeader(Array a, Type expected = null)
+        internal void WriteArrayHeader(Array a, TypeInfo expected = null)
         {
-            WriteTypeHeader(a.GetType(), expected);
+            WriteTypeHeader(a.GetType().GetTypeInfo(), expected);
             for (var i = 0; i < a.Rank; i++)
             {
                 ab.Append(a.GetLength(i));

@@ -1,4 +1,4 @@
-﻿# Utility functions used by verious Orleans Deployment scripts.
+﻿# Utility functions used by various Orleans Deployment scripts.
 #requires -version 2.0
 
 # Function to determine if the current session has administrator privledges.
@@ -25,7 +25,7 @@ Function ChangeLogfile
 	$xml.Save($configfile)
 }
 
-# Function to modifiy the  OrleansConfiguration.xml with values from the OrleansDeploy.list file.
+# Function to modify the OrleansConfiguration.xml with values from the OrleansDeploy.list file.
 Function UpdateConfiguration
 {param ($sourcePath, $silos, $maxSeedNodes) 
 	# If the number of seed nodes is not valid, default to 2.
@@ -162,9 +162,7 @@ Function CleanRemoteDirectory
 	{
 		#Take a shot at confirming that the directory we are about to delete is an Orleans folder.
 		if ((Test-Path ("{0}\OrleansHost.exe" -f $uncPath)) -or
-			(Test-Path ("{0}\Orleans.dll" -f $uncPath)) -or
-			(Test-Path ("{0}\SiloControlFactory.dll" -f $uncPath)) -or
-			(Test-Path ("{0}\GrainControlFactory.dll" -f $uncPath)) 		
+			(Test-Path ("{0}\Orleans.dll" -f $uncPath)) 		
 			)
 		{		
 			$filesBefore = (Get-ChildItem $uncPath -Recurse).Count
@@ -186,7 +184,7 @@ Function CleanRemoteDirectory
 	return $remoteResultMessage 
 }
 
-# Wraper function for Write-Host so that the scripts can proceed in the unit test environment.
+# Wrapper function for Write-Host so that the scripts can proceed in the unit test environment.
 # (For details, see http://blogs.msdn.com/b/mwories/archive/2009/09/30/the-use-of-write-host-and-sql-server-agent-powershell-job-steps.aspx)
 Function WriteHostSafe
 {param ($foregroundColor = "Gray", $text, $noNewLine = $false)
@@ -203,15 +201,19 @@ Function WriteHostSafe
 # Stops all instances of Orleans on each of the machines in the semicolon delimited list passed to it.
 # If machineList is not provided it defaults to the local machine.
 Function StopOrleans
-{param ($machineList)
+{param ($machineList, $exeName)
 	if (!$machineList)
 	{
 		$machineList = $Env:COMPUTERNAME
 	}
+	if (!$exeName)
+	{
+		$exeName = "OrleansHost"
+	}
 
 	# TODO: Need to handle case where some machines are running and some are not.
 	
-	$command = "Get-WmiObject Win32_Process -ComputerName $machineList -filter ""name='OrleansHost.exe'""" 
+	$command = "Get-WmiObject Win32_Process -ComputerName $machineList -filter ""name='$exeName'""" 
 
 	# TODO: Need to trap errors that occur when params are wrong such as invalid machine names.
 	$processes = Invoke-Expression $command
@@ -234,7 +236,7 @@ Function StopOrleans
 	}
 	else 
 	{
-		WriteHostSafe Yellow -text ("`tOrleansHost is not running on deployment machine(s):`n`r`t`t`t {0}" -f $machineList.ToString().Replace(",", "`n`r`t`t`t"))
+		WriteHostSafe Yellow -text ("`t$exeName is not running on deployment machine(s):`n`r`t`t`t {0}" -f $machineList.ToString().Replace(",", "`n`r`t`t`t"))
 	}
 }
 # Determines if the given process is running, and returns the process id(s) if it does.

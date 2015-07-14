@@ -195,3 +195,5 @@ Test/
 
 # Temporary working files
 **/pingme.txt
+.vs/
+**/project.lock.json

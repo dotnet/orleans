@@ -39,13 +39,19 @@ namespace Orleans.Runtime
 
         public static new CachedReflectionOnlyTypeResolver Instance { get; private set; }
 
-        protected override bool TryPerformUncachedTypeResolution(string name, out Type type)
+        protected override bool TryPerformUncachedTypeResolution(string name, out TypeInfo typeInfo)
         {
             AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve += OnReflectionOnlyAssemblyResolve;
             try
             {
-                type = Type.ReflectionOnlyGetType(name, false, false);
-                return type != null;
+                var type = TypeInfo.ReflectionOnlyGetType(name, false, false);
+                if (type != null)
+                {
+                    typeInfo = type.GetTypeInfo();
+                    return true;
+                }
+                typeInfo = null;
+                return false;
             }
             finally
             {

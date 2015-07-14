@@ -50,7 +50,7 @@ namespace Orleans.CodeGeneration
 
             referred(type);
 
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.CSharp);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type.GetTypeInfo(), Language.CSharp);
 
             if (!type.IsGenericType)
             {
@@ -193,7 +193,7 @@ namespace Orleans.CodeGeneration
                 var t = new System.Threading.Tasks.TaskCompletionSource<object>();
                 t.SetException(new NotImplementedException(""No grain interfaces for type {0}""));
                 return t.Task;
-                ", TypeUtils.GetFullName(grainType, Language.CSharp));
+                ", TypeUtils.GetFullName(grainType.GetTypeInfo(), Language.CSharp));
             }
 
             var builder = new StringBuilder();
@@ -281,7 +281,7 @@ namespace Orleans.CodeGeneration
 ",
                         invokeGrainMethod);
                 }
-                else if (GrainInterfaceData.IsTaskType(returnType))
+                else if (GrainInterfaceData.IsTaskType(returnType.GetTypeInfo()))
                 {
                     if (returnType != typeof(Task))
                         GetGenericTypeName(returnType.GetGenericArguments()[0]);
@@ -376,16 +376,16 @@ namespace Orleans.CodeGeneration
         protected override void AddGetGrainMethods(GrainInterfaceData iface, CodeTypeDeclaration factoryClass)
         {
             RecordReferencedNamespaceAndAssembly(typeof(GrainId));
-            RecordReferencedNamespaceAndAssembly(iface.Type);
-            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.Type);
+            RecordReferencedNamespaceAndAssembly(iface.TypeInfo);
+            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.TypeInfo);
             Action<string> add = codeFmt => factoryClass.Members.Add(
                 new CodeSnippetTypeMember(String.Format(codeFmt, iface.InterfaceTypeName)));
 
-            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
-            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
-            bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
-            bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
-            bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
+            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.TypeInfo);
+            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.TypeInfo);
+            bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.TypeInfo);
+            bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.TypeInfo);
+            bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.TypeInfo);
             bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
 
             if (isLongCompoundKey)
@@ -501,7 +501,7 @@ namespace Orleans.CodeGeneration
                     @"({0}) global::Orleans.Runtime.GrainReference.CastInternal(typeof({0}), (global::Orleans.Runtime.GrainReference gr) => {{ return new {1}(gr);}}, grainRef, {2})",
                     si.InterfaceTypeName, // Interface type for references for this grain
                     si.ReferenceClassName, // Concrete class for references for this grain
-                    GrainInterfaceData.GetGrainInterfaceId(si.Type));
+                    GrainInterfaceData.GetGrainInterfaceId(si.TypeInfo));
             }
 
             var methodImpl = string.Format(@"
@@ -525,7 +525,7 @@ namespace Orleans.CodeGeneration
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("{0} is global::Orleans.Grain ? {0}.AsReference<{1}>() : {0}",
                         GetParameterName(paramInfo),
-                        TypeUtils.GetTemplatedName(paramInfo.ParameterType, _ => true, Language.CSharp));
+                        TypeUtils.GetTemplatedName(paramInfo.ParameterType.GetTypeInfo(), _ => true, Language.CSharp));
                 else
                     invokeArguments += GetParameterName(paramInfo);
 

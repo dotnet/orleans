@@ -53,22 +53,32 @@ if(!$machineNames)
 	return
 }
 
-"Stopping Orleans on {0} machines" -f $machineNames.Count
+if ($configXml.Deployment.Program)
+{
+	$exeName = $configXml.Deployment.Program.ExeName
+	if (!$exeName)
+	{
+		$exeName = "OrleansHost"
+	}
+}
+Echo "Program executable = $exeName"
+
+"Stopping $exeName on {0} machines" -f $machineNames.Count
 foreach ($machineName in $machineNames) 
 {
 	# TODO: Test to see if the machine is accessible.
 	# Stop all instances of OrleansHost down on the target computer.
-	Echo "Stopping OrleansHost on $machineName ..."
-	StopOrleans $machineName
+	Echo "Stopping $exeName on $machineName ..."
+	StopOrleans $machineName $exeName
 }
 
 foreach ($machineName in $machineNames) 
 {
 	# TODO: Add a way to break out of the loop.
 	#Wait until the processes shut down.
-	while (IsProcessRunning OrleansHost $machineName)
+	while (IsProcessRunning $exeName $machineName)
 	{
-		Echo "Waiting for Orleans to shut down on $machineName ..."
+		Echo "Waiting for $exeName to shut down on $machineName ..."
 		Start-Sleep -Seconds 5
 	}
 	#TODO: Add code to abort if shutdown failed.
@@ -79,10 +89,10 @@ WriteHostSafe Green -text "Checking for active processes"
 $numProcesses = 0
 foreach ($machineName in $machineNames) 
 {
-	$process = Get-Process -ComputerName $machineName -Name "OrleansHost" -ErrorAction SilentlyContinue
+	$process = Get-Process -ComputerName $machineName -Name "$exeName" -ErrorAction SilentlyContinue
 	if ($process)
 	{
-		WriteHostSafe -foregroundColor Red -text "OrleansHost is still running on $machineName :"
+		WriteHostSafe -foregroundColor Red -text "$exeName is still running on $machineName :"
 		if ($process.Count)
 		{
 			$processCount = 1

@@ -258,7 +258,7 @@ namespace Orleans
             var loadProvidersCriteria =
                 new AssemblyLoaderReflectionCriterion[]
                     {
-                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IProvider))
+                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IProvider).GetTypeInfo())
                     };
 
             AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);

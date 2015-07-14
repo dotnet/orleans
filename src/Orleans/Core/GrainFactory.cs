@@ -30,6 +30,7 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    using System.Reflection;
     using System.Threading.Tasks;
 
     /// <summary>
@@ -40,14 +41,14 @@ namespace Orleans
         /// <summary>
         /// The collection of <see cref="IGrainObserver"/> <c>CreateObjectReference</c> delegates.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Delegate> referenceCreators =
-            new ConcurrentDictionary<Type, Delegate>();
+        private readonly ConcurrentDictionary<TypeInfo, Delegate> referenceCreators =
+            new ConcurrentDictionary<TypeInfo, Delegate>();
 
         /// <summary>
         /// The collection of <see cref="IGrainObserver"/> <c>DeleteObjectReference</c> delegates.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Delegate> referenceDestoyers =
-            new ConcurrentDictionary<Type, Delegate>();
+        private readonly ConcurrentDictionary<TypeInfo, Delegate> referenceDestoyers =
+            new ConcurrentDictionary<TypeInfo, Delegate>();
 
         // Make this internal so that client code is forced to access the IGrainFactory using the 
         // GrainClient (to make sure they don't forget to initialize the client).
@@ -66,8 +67,8 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo()),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -82,8 +83,8 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo()),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -98,8 +99,8 @@ namespace Orleans
         {
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface)),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo()),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -118,8 +119,8 @@ namespace Orleans
 
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
-                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
-                    typeof(TGrainInterface),
+                    baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface).GetTypeInfo(), keyExtension),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -139,7 +140,7 @@ namespace Orleans
             return Cast<TGrainInterface>(
                 GrainFactoryBase.MakeGrainReference_FromType(
                     baseTypeCode => TypeCodeMapper.ComposeGrainId(baseTypeCode, primaryKey, typeof(TGrainInterface), keyExtension),
-                    typeof(TGrainInterface),
+                    typeof(TGrainInterface).GetTypeInfo(),
                     grainClassNamePrefix));
         }
 
@@ -165,27 +166,27 @@ namespace Orleans
 
         private Task<TGrainObserverInterface> CreateObjectReferenceImpl<TGrainObserverInterface>(object obj)
         {
-            var interfaceType = typeof(TGrainObserverInterface);
-            if (!interfaceType.IsInterface)
+            var interfaceTypeInfo = typeof(TGrainObserverInterface).GetTypeInfo();
+            if (!interfaceTypeInfo.IsInterface)
             {
                 throw new ArgumentException(
                     string.Format(
                         "The provided type parameter must be an interface. '{0}' is not an interface.",
-                        interfaceType.FullName));
+                        interfaceTypeInfo.FullName));
             }
 
-            if (!interfaceType.IsInstanceOfType(obj))
+            if (!interfaceTypeInfo.IsInstanceOfType(obj))
             {
                 throw new ArgumentException(
-                    string.Format("The provided object must implement '{0}'.", interfaceType.FullName),
+                    string.Format("The provided object must implement '{0}'.", interfaceTypeInfo.FullName),
                     "obj");
             }
 
             Delegate creator;
 
-            if (!referenceCreators.TryGetValue(interfaceType, out creator))
+            if (!referenceCreators.TryGetValue(interfaceTypeInfo, out creator))
             {
-                creator = referenceCreators.GetOrAdd(interfaceType, MakeCreateObjectReferenceDelegate);
+                creator = referenceCreators.GetOrAdd(interfaceTypeInfo, MakeCreateObjectReferenceDelegate);
             }
 
             var resultTask = ((Func<TGrainObserverInterface, Task<TGrainObserverInterface>>)creator)((TGrainObserverInterface)obj);
@@ -203,67 +204,67 @@ namespace Orleans
         public Task DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
-            var interfaceType = typeof(TGrainObserverInterface);
-            if (!interfaceType.IsInterface)
+            var interfaceTypeInfo = typeof(TGrainObserverInterface).GetTypeInfo();
+            if (!interfaceTypeInfo.IsInterface)
             {
                 throw new ArgumentException(
                     string.Format(
                         "The provided type parameter must be an interface. '{0}' is not an interface.",
-                        interfaceType.FullName));
+                        interfaceTypeInfo.FullName));
             }
 
-            if (!interfaceType.IsInstanceOfType(obj))
+            if (!interfaceTypeInfo.IsInstanceOfType(obj))
             {
                 throw new ArgumentException(
-                    string.Format("The provided object must implement '{0}'.", interfaceType.FullName),
+                    string.Format("The provided object must implement '{0}'.", interfaceTypeInfo.FullName),
                     "obj");
             }
 
             Delegate destroyer;
 
-            if (!referenceDestoyers.TryGetValue(interfaceType, out destroyer))
+            if (!referenceDestoyers.TryGetValue(interfaceTypeInfo, out destroyer))
             {
-                destroyer = referenceDestoyers.GetOrAdd(interfaceType, MakeDeleteObjectReferenceDelegate);
+                destroyer = referenceDestoyers.GetOrAdd(interfaceTypeInfo, MakeDeleteObjectReferenceDelegate);
             }
 
             return ((Func<TGrainObserverInterface, Task>)destroyer)((TGrainObserverInterface)obj);
         }
 
         #region IGrainObserver Methods
-        private static Delegate MakeCreateObjectReferenceDelegate(Type interfaceType)
+        private static Delegate MakeCreateObjectReferenceDelegate(TypeInfo interfaceTypeInfo)
         {
-            var delegateType = typeof(Func<,>).MakeGenericType(interfaceType, typeof(Task<>).MakeGenericType(interfaceType));
-            return MakeFactoryDelegate(interfaceType, "CreateObjectReference", delegateType);
+            var delegateType = typeof(Func<,>).MakeGenericType(interfaceTypeInfo, typeof(Task<>).MakeGenericType(interfaceTypeInfo));
+            return MakeFactoryDelegate(interfaceTypeInfo, "CreateObjectReference", delegateType);
         }
 
-        private static Delegate MakeDeleteObjectReferenceDelegate(Type interfaceType)
+        private static Delegate MakeDeleteObjectReferenceDelegate(TypeInfo interfaceTypeInfo)
         {
-            var delegateType = typeof(Func<,>).MakeGenericType(interfaceType, typeof(Task));
-            return MakeFactoryDelegate(interfaceType, "DeleteObjectReference", delegateType);
+            var delegateType = typeof(Func<,>).MakeGenericType(interfaceTypeInfo, typeof(Task));
+            return MakeFactoryDelegate(interfaceTypeInfo, "DeleteObjectReference", delegateType);
         }
         #endregion
 
         #region Interface Casting
-        private readonly ConcurrentDictionary<Type, Func<IAddressable, object>> casters
-            = new ConcurrentDictionary<Type, Func<IAddressable, object>>();
+        private readonly ConcurrentDictionary<TypeInfo, Func<IAddressable, object>> casters
+            = new ConcurrentDictionary<TypeInfo, Func<IAddressable, object>>();
 
         internal TGrainInterface Cast<TGrainInterface>(IAddressable grain)
         {
-            var interfaceType = typeof(TGrainInterface);
+            var interfaceTypeInfo = typeof(TGrainInterface).GetTypeInfo();
             Func<IAddressable, object> caster;
 
-            if (!casters.TryGetValue(interfaceType, out caster))
+            if (!casters.TryGetValue(interfaceTypeInfo, out caster))
             {
-                caster = casters.GetOrAdd(interfaceType, MakeCaster);
+                caster = casters.GetOrAdd(interfaceTypeInfo, MakeCaster);
             }
 
             return (TGrainInterface)caster(grain);
         }
 
-        private static Func<IAddressable, object> MakeCaster(Type interfaceType)
+        private static Func<IAddressable, object> MakeCaster(TypeInfo interfaceTypeInfo)
         {
             var delegateType = typeof(Func<IAddressable, object>);
-            return (Func<IAddressable, object>)MakeFactoryDelegate(interfaceType, "Cast", delegateType);
+            return (Func<IAddressable, object>)MakeFactoryDelegate(interfaceTypeInfo, "Cast", delegateType);
         }
         #endregion
 
@@ -303,16 +304,16 @@ namespace Orleans
         #region Utility functions
         /// <summary>
         /// Creates a delegate for calling into the static method named <paramref name="methodName"/> on the generated
-        /// factory for <paramref name="interfaceType"/>.
+        /// factory for <paramref name="interfaceTypeInfo"/>.
         /// </summary>
-        /// <param name="interfaceType">The interface type.</param>
+        /// <param name="interfaceTypeInfo">The interface type.</param>
         /// <param name="methodName">The name of the static factory method.</param>
         /// <param name="delegateType">The type of delegate to create.</param>
         /// <returns>The created delegate.</returns>
-        private static Delegate MakeFactoryDelegate(Type interfaceType, string methodName, Type delegateType)
+        private static Delegate MakeFactoryDelegate(TypeInfo interfaceTypeInfo, string methodName, Type delegateType)
         {
-            var grainFactoryName = TypeUtils.GetSimpleTypeName(interfaceType, t => false);
-            if (interfaceType.IsInterface && grainFactoryName.Length > 1 && grainFactoryName[0] == 'I'
+            var grainFactoryName = TypeUtils.GetSimpleTypeName(interfaceTypeInfo, t => false);
+            if (interfaceTypeInfo.IsInterface && grainFactoryName.Length > 1 && grainFactoryName[0] == 'I'
                 && char.IsUpper(grainFactoryName[1]))
             {
                 grainFactoryName = grainFactoryName.Substring(1);
@@ -320,27 +321,27 @@ namespace Orleans
 
             grainFactoryName = grainFactoryName + "Factory";
 
-            if (interfaceType.IsGenericType)
+            if (interfaceTypeInfo.IsGenericType)
             {
-                grainFactoryName = grainFactoryName + "`" + interfaceType.GetGenericArguments().Length;
+                grainFactoryName = grainFactoryName + "`" + interfaceTypeInfo.GetGenericArguments().Length;
             }
 
             // expect grain reference to be generated into same namespace that interface is declared within
-            if (!string.IsNullOrEmpty(interfaceType.Namespace))
+            if (!string.IsNullOrEmpty(interfaceTypeInfo.Namespace))
             {
-                grainFactoryName = interfaceType.Namespace + "." + grainFactoryName;
+                grainFactoryName = interfaceTypeInfo.Namespace + "." + grainFactoryName;
             }
 
-            var grainFactoryType = interfaceType.Assembly.GetType(grainFactoryName);
+            var grainFactoryType = interfaceTypeInfo.Assembly.GetType(grainFactoryName);
             if (grainFactoryType == null)
             {
                 throw new InvalidOperationException(
-                    string.Format("Cannot find generated factory type for interface '{0}'", interfaceType));
+                    string.Format("Cannot find generated factory type for interface '{0}'", interfaceTypeInfo));
             }
 
-            if (interfaceType.IsGenericType)
+            if (interfaceTypeInfo.IsGenericType)
             {
-                grainFactoryType = grainFactoryType.MakeGenericType(interfaceType.GetGenericArguments());
+                grainFactoryType = grainFactoryType.MakeGenericType(interfaceTypeInfo.GetGenericArguments());
             }
 
             var method = grainFactoryType.GetMethod(
@@ -350,7 +351,7 @@ namespace Orleans
             if (method == null)
             {
                 throw new InvalidOperationException(
-                    string.Format("Cannot find '{0}' method for interface '{1}'", methodName, interfaceType));
+                    string.Format("Cannot find '{0}' method for interface '{1}'", methodName, interfaceTypeInfo));
             }
 
             return method.CreateDelegate(delegateType);
