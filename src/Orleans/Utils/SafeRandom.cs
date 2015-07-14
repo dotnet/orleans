@@ -33,7 +33,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class SafeRandom
     {
-        private static readonly RNGCryptoServiceProvider globalCryptoProvider = new RNGCryptoServiceProvider();
+        private static readonly RandomNumberGenerator globalCryptoProvider = RandomNumberGenerator.Create();
         
         [ThreadStatic]
         private static Random random;
