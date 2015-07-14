@@ -1,0 +1,441 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <DownloadNuGetExe>true</DownloadNuGetExe>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>10.0.20506</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Orleans</RootNamespace>
+    <AssemblyName>Orleans</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <PlatformTarget>x86</PlatformTarget>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkProfile />
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
+    <DocumentationFile>obj\Debug\Orleans.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+    <CodeAnalysisIgnoreGeneratedCode>false</CodeAnalysisIgnoreGeneratedCode>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
+    <DocumentationFile>obj\Release\Orleans.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Transactions" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Async\AsyncBatchedContinuationQueue.cs" />
+    <Compile Include="Async\MultiTaskCompletionSource.cs" />
+    <Compile Include="Async\AsyncSerialExecutor.cs" />
+    <Compile Include="Async\AsyncExecutorWithRetries.cs" />
+    <Compile Include="Async\AsyncLock.cs" />
+    <Compile Include="Async\AsyncPipeline.cs" />
+    <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
+    <Compile Include="Async\TaskExtensions.cs" />
+    <Compile Include="CodeGeneration\GrainState.cs" />
+    <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
+    <Compile Include="CodeGeneration\Language.cs" />
+    <Compile Include="Configuration\LimitNames.cs" />
+    <Compile Include="Configuration\LimitValue.cs" />
+    <Compile Include="Core\Exceptions.cs" />
+    <Compile Include="Core\GrainStateStorageBridge.cs" />
+    <Compile Include="Core\IGrainIdentity.cs" />
+    <Compile Include="Core\IGrainState.cs" />
+    <Compile Include="Core\IStorage.cs" />
+    <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="IDs\GuidId.cs" />
+    <Compile Include="Messaging\GatewayManager.cs" />
+    <Compile Include="Messaging\IncomingMessageBuffer.cs" />
+    <Compile Include="Messaging\RequestInvocationHistory.cs" />
+    <Compile Include="Messaging\Response.cs" />
+    <Compile Include="Providers\StorageProviderUtils.cs" />
+    <Compile Include="Runtime\GrainRuntime.cs" />
+    <Compile Include="Runtime\IAddressable.cs" />
+    <Compile Include="Placement\PreferLocalPlacement.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoader.cs" />
+    <Compile Include="Providers\IMemoryStorageGrain.cs" />
+    <Compile Include="AssemblyLoader\CachedReflectionOnlyTypeResolver.cs" />
+    <Compile Include="Runtime\IActivationData.cs" />
+    <Compile Include="IDs\UniqueKey.cs" />
+    <Compile Include="Core\IGrainFactory.cs" />
+    <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
+    <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />
+    <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />
+    <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
+    <Compile Include="RelationalStorage\DbExtensions.cs" />
+    <Compile Include="RelationalStorage\DictionaryExtensions.cs" />
+    <Compile Include="RelationalStorage\RelationalStorage.cs" />
+    <Compile Include="RelationalStorage\IRelationalStorage.cs" />
+    <Compile Include="RelationalStorage\OrleansRelationalConstants.cs" />
+    <Compile Include="RelationalStorage\OrleansRelationalExtensions.cs" />
+    <Compile Include="RelationalStorage\RelationalConstants.cs" />
+    <Compile Include="RelationalStorage\RelationalManagementExtensions.cs" />
+    <Compile Include="RelationalStorage\RelationalStorageExtensions.cs" />
+    <Compile Include="RelationalStorage\RelationalStorageUtilities.cs" />
+    <Compile Include="RelationalStorage\SqlFormatProvider.cs" />
+    <Compile Include="Timers\IReminderRegistry.cs" />
+    <Compile Include="Runtime\IRuntimeClient.cs" />
+    <Compile Include="Runtime\IGrainExtension.cs" />
+    <Compile Include="Timers\ITimerRegistry.cs" />
+    <Compile Include="Statistics\StageAnalysis.cs" />
+    <Compile Include="Core\GrainFactory.cs" />
+    <Compile Include="Runtime\HashRing.cs" />
+    <Compile Include="Statistics\AverageTimeSpanStatistic.cs" />
+    <Compile Include="Statistics\StorageStatisticsGroup.cs" />
+    <Compile Include="Core\GrainExtensions.cs" />
+    <Compile Include="Runtime\IConsistentRingProviderForGrains.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderCriteria.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderReflectionCriterion.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderPathNameCriterion.cs" />
+    <Compile Include="AssemblyLoader\AssemblyLoaderCriterion.cs" />
+    <Compile Include="Providers\StatisticsProviderManager.cs" />
+    <Compile Include="AssemblyLoader\CachedTypeResolver.cs" />
+    <Compile Include="Configuration\MessagingConfiguration.cs" />
+    <Compile Include="Configuration\ProviderConfiguration.cs" />
+    <Compile Include="Configuration\IStatisticsConfiguration.cs" />
+    <Compile Include="Configuration\ApplicationConfiguration.cs" />
+    <Compile Include="IDs\TypeCodeMapper.cs" />
+    <Compile Include="Messaging\SqlMembershipTable.cs" />
+    <Compile Include="Providers\ILocalDataStore.cs" />
+    <Compile Include="Streams\Core\AsyncObservableExtensions.cs" />
+    <Compile Include="Streams\Core\StreamSubscriptionHandleExtensions.cs" />
+    <Compile Include="Streams\Internal\GenericAsyncObserver.cs" />
+    <Compile Include="Streams\Internal\IInternalAsyncObservable.cs" />
+    <Compile Include="Streams\Internal\IInternalStreamProvider.cs" />
+    <Compile Include="Streams\Internal\StreamSubscriptionHandleImpl.cs" />
+    <Compile Include="Streams\PersistentStreams\IStreamQueueBalancer.cs" />
+    <Compile Include="Streams\PersistentStreams\PersistentStreamProvider.cs" />
+    <Compile Include="Streams\PersistentStreams\StreamConsumerCollection.cs" />
+    <Compile Include="Streams\PersistentStreams\StreamQueueBalancerType.cs" />
+    <Compile Include="Streams\Predicates\FilterPredicateWrapperData.cs" />
+    <Compile Include="Streams\Predicates\IStreamFilterPredicateWrapper.cs" />
+    <Compile Include="Streams\Core\IAsyncObservable.cs" />
+    <Compile Include="Streams\Internal\IStreamControl.cs" />
+    <Compile Include="Streams\Core\IStreamIdentity.cs" />
+    <Compile Include="Streams\Providers\StreamProviderDirection.cs" />
+    <Compile Include="Streams\Providers\IStreamProviderImpl.cs" />
+    <Compile Include="Streams\Providers\IStreamProviderManager.cs" />
+    <Compile Include="Streams\Providers\IStreamProviderRuntime.cs" />
+    <Compile Include="Streams\QueueAdapters\HashRingBasedStreamQueueMapper.cs" />
+    <Compile Include="Streams\QueueAdapters\DataNotAvailableException.cs" />
+    <Compile Include="Streams\QueueAdapters\IConsistentRingStreamQueueMapper.cs" />
+    <Compile Include="Streams\QueueAdapters\QueueAdapterConstants.cs" />
+    <Compile Include="Streams\QueueAdapters\IQueueCache.cs" />
+    <Compile Include="Streams\QueueAdapters\IQueueAdapterCache.cs" />
+    <Compile Include="Streams\QueueAdapters\IQueueAdapterReceiver.cs" />
+    <Compile Include="Streams\QueueAdapters\IQueueCacheCursor.cs" />
+    <Compile Include="Streams\Predicates\OrFilter.cs" />
+    <Compile Include="Streams\PubSub\ImplicitStreamSubscriberTable.cs" />
+    <Compile Include="Streams\PubSub\PubSubPublisherState.cs" />
+    <Compile Include="Streams\PubSub\PubSubRuntime.cs" />
+    <Compile Include="Providers\IBootstrapProvider.cs" />
+    <Compile Include="Providers\ClientProviderRuntime.cs" />
+    <Compile Include="Providers\IOrleansProvider.cs" />
+    <Compile Include="Providers\IProviderRuntime.cs" />
+    <Compile Include="Statistics\ThreadCycleStopWatch.cs" />
+    <Compile Include="Streams\PubSub\PubSubSubscriptionState.cs" />
+    <Compile Include="Streams\QueueAdapters\QueueCacheMissException.cs" />
+    <Compile Include="Streams\PubSub\SubscriptionMarker.cs" />
+    <Compile Include="Streams\SimpleMessageStream\SimpleMessageStreamProducer.cs" />
+    <Compile Include="Streams\QueueAdapters\IBatchContainer.cs" />
+    <Compile Include="Streams\QueueAdapters\IQueueAdapter.cs" />
+    <Compile Include="Streams\QueueAdapters\IQueueAdapterFactory.cs" />
+    <Compile Include="Streams\SimpleMessageStream\SimpleMessageStreamProvider.cs" />
+    <Compile Include="Streams\Internal\StreamConsumer.cs" />
+    <Compile Include="Streams\Internal\StreamConsumerExtension.cs" />
+    <Compile Include="Streams\Internal\StreamDirectory.cs" />
+    <Compile Include="Streams\Internal\StreamImpl.cs" />
+    <Compile Include="Streams\SimpleMessageStream\SimpleMessageStreamProducerExtension.cs" />
+    <Compile Include="Streams\PersistentStreams\IPersistentStreamPullingAgent.cs" />
+    <Compile Include="Streams\PersistentStreams\PersistentStreamProducer.cs" />
+    <Compile Include="Streams\QueueAdapters\IStreamQueueMapper.cs" />
+    <Compile Include="Streams\PersistentStreams\QueueStreamDataStructures.cs" />
+    <Compile Include="IDs\QueueId.cs" />
+    <Compile Include="IDs\StreamId.cs" />
+    <Compile Include="Streams\Internal\IStreamGrainExtensions.cs" />
+    <Compile Include="Streams\PubSub\IPubSubRendezvousGrain.cs" />
+    <Compile Include="Streams\Core\StreamSequenceToken.cs" />
+    <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
+    <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
+    <Compile Include="Timers\ReminderRegistry.cs" />
+    <Compile Include="Timers\TimerRegistry.cs" />
+    <Compile Include="Utils\SetExtensions.cs" />
+    <Compile Include="Placement\ActivationCountBasedPlacement.cs" />
+    <Compile Include="Placement\StatelessWorkerPlacement.cs" />
+    <Compile Include="Placement\PlacementStrategy.cs" />
+    <Compile Include="Placement\RandomPlacement.cs" />
+    <Compile Include="Placement\SystemPlacement.cs" />
+    <Compile Include="Statistics\ApplicationRequestsStatisticsGroup.cs" />
+    <Compile Include="Statistics\AverageValueStatistic.cs" />
+    <Compile Include="Statistics\QueueTrackingStatistic.cs" />
+    <Compile Include="Statistics\StatisticsCollector.cs" />
+    <Compile Include="Statistics\ThreadTrackingStatistic.cs" />
+    <Compile Include="Runtime\RuntimeQueue.cs" />
+    <Compile Include="Statistics\TimeInterval.cs" />
+    <Compile Include="Statistics\MessagingProcessingStatisticsGroup.cs" />
+    <Compile Include="Messaging\GatewayClientReceiver.cs" />
+    <Compile Include="Messaging\GatewayConnection.cs" />
+    <Compile Include="Runtime\GrainInterfaceMap.cs" />
+    <Compile Include="Messaging\OutgoingMessageSender.cs" />
+    <Compile Include="Streams\Core\IAsyncObserver.cs" />
+    <Compile Include="Runtime\ITypeManager.cs" />
+    <Compile Include="Statistics\ClientStatisticsManager.cs" />
+    <Compile Include="Statistics\HistogramValueStatistic.cs" />
+    <Compile Include="Statistics\StatisticNames.cs" />
+    <Compile Include="Statistics\SchedulerStatisticsGroup.cs" />
+    <Compile Include="Statistics\NetworkingStatisticsGroup.cs" />
+    <Compile Include="Statistics\FloatValueStatistic.cs" />
+    <Compile Include="Statistics\LogStatistics.cs" />
+    <Compile Include="Statistics\RuntimeStatisticsGroup.cs" />
+    <Compile Include="Statistics\ClientTableStatistics.cs" />
+    <Compile Include="Core\Immutable.cs" />
+    <Compile Include="Providers\ProviderLoader.cs" />
+    <Compile Include="Providers\ProviderTypeLoader.cs" />
+    <Compile Include="Messaging\IOutgoingMessage.cs" />
+    <Compile Include="IDs\JenkinsHash.cs" />
+    <Compile Include="Streams\Core\IAsyncStream.cs" />
+    <Compile Include="Streams\Providers\IStreamProvider.cs" />
+    <Compile Include="Providers\IStorageProvider.cs" />
+    <Compile Include="Streams\Providers\StreamProviderManager.cs" />
+    <Compile Include="SystemTargetInterfaces\ICatalog.cs" />
+    <Compile Include="SystemTargetInterfaces\IMembershipTable.cs" />
+    <Compile Include="SystemTargetInterfaces\IManagementGrain.cs" />
+    <Compile Include="SystemTargetInterfaces\IMembershipService.cs" />
+    <Compile Include="SystemTargetInterfaces\IReminderTable.cs" />
+    <Compile Include="SystemTargetInterfaces\IReminderService.cs" />
+    <Compile Include="SystemTargetInterfaces\IRemoteGrainDirectory.cs" />
+    <Compile Include="SystemTargetInterfaces\IDeploymentLoadPublisher.cs" />
+    <Compile Include="SystemTargetInterfaces\ISiloControl.cs" />
+    <Compile Include="SystemTargetInterfaces\ISystemTarget.cs" />
+    <Compile Include="Timers\IRemindable.cs" />
+    <Compile Include="Statistics\MessagingStatisticsGroup.cs" />
+    <Compile Include="Statistics\StringValueStatistic.cs" />
+    <Compile Include="Messaging\GatewayProviderFactory.cs" />
+    <Compile Include="Messaging\BufferPool.cs" />
+    <Compile Include="Statistics\IPerformanceMetrics.cs" />
+    <Compile Include="Configuration\LimitManager.cs" />
+    <Compile Include="Timers\SafeTimerBase.cs" />
+    <Compile Include="Timers\SafeTimer.cs" />
+    <Compile Include="Utils\StandardExtensions.cs" />
+    <Compile Include="Runtime\GrainReferenceCache.cs" />
+    <Compile Include="Runtime\RequestContext.cs" />
+    <Compile Include="Logging\ErrorCodes.cs" />
+    <Compile Include="Messaging\IGatewayListProvider.cs" />
+    <Compile Include="Statistics\CounterStatistic.cs" />
+    <Compile Include="Statistics\IntValueStatistic.cs" />
+    <Compile Include="Runtime\RuntimeVersion.cs" />
+    <Compile Include="Utils\SafeRandom.cs" />
+    <Compile Include="Serialization\BinaryTokenStreamReader.cs" />
+    <Compile Include="Serialization\BinaryTokenStreamWriter.cs" />
+    <Compile Include="Serialization\SerializationTokenType.cs" />
+    <Compile Include="Serialization\TypeUtilities.cs" />
+    <Compile Include="Runtime\ISchedulingContext.cs" />
+    <Compile Include="Runtime\SiloStatus.cs" />
+    <Compile Include="Core\GrainClient.cs" />
+    <Compile Include="Runtime\OutsideRuntimeClient.cs" />
+    <Compile Include="Placement\GrainStrategy.cs" />
+    <Compile Include="Runtime\CallbackData.cs" />
+    <Compile Include="Core\GrainAttributes.cs" />
+    <Compile Include="CodeGeneration\GrainFactoryBase.cs" />
+    <Compile Include="Runtime\IClientObserverRegistrar.cs" />
+    <Compile Include="Logging\LogWriters.cs" />
+    <Compile Include="Logging\ILogConsumer.cs" />
+    <Compile Include="CodeGeneration\ActivationAttribute.cs" />
+    <Compile Include="Core\IGrainObserver.cs" />
+    <Compile Include="Core\IGrain.cs" />
+    <Compile Include="Messaging\ProxiedMessageCenter.cs" />
+    <Compile Include="Messaging\SocketManager.cs" />
+    <Compile Include="Async\ObserverSubscriptionManager.cs" />
+    <Compile Include="CodeGeneration\GrainInterfaceData.cs" />
+    <Compile Include="IDs\ActivationAddress.cs" />
+    <Compile Include="IDs\ActivationId.cs" />
+    <Compile Include="Runtime\AsynchAgent.cs" />
+    <Compile Include="Runtime\AsynchQueueAgent.cs" />
+    <Compile Include="Messaging\ByteArrayBuilder.cs" />
+    <Compile Include="Configuration\ClientConfiguration.cs" />
+    <Compile Include="Configuration\ConfigUtilities.cs" />
+    <Compile Include="Configuration\GlobalConfiguration.cs" />
+    <Compile Include="Configuration\ITraceConfiguration.cs" />
+    <Compile Include="Configuration\NodeConfiguration.cs" />
+    <Compile Include="Configuration\ClusterConfiguration.cs" />
+    <Compile Include="Logging\ConsoleText.cs" />
+    <Compile Include="Runtime\Constants.cs" />
+    <Compile Include="Messaging\CorrelationId.cs" />
+    <Compile Include="IDs\GrainId.cs" />
+    <Compile Include="Messaging\IMessageCenter.cs" />
+    <Compile Include="IDs\Interner.cs" />
+    <Compile Include="Placement\PlacementResult.cs" />
+    <Compile Include="Logging\TraceLogger.cs" />
+    <Compile Include="Utils\LRU.cs" />
+    <Compile Include="Messaging\Message.cs" />
+    <Compile Include="Logging\Logger.cs" />
+    <Compile Include="CodeGeneration\InvokeMethodRequest.cs" />
+    <Compile Include="IDs\SiloAddress.cs" />
+    <Compile Include="Runtime\SystemStatus.cs" />
+    <Compile Include="CodeGeneration\TypeUtils.cs" />
+    <Compile Include="IDs\UniqueIdentifier.cs" />
+    <Compile Include="Runtime\RuntimeContext.cs" />
+    <Compile Include="Serialization\BuiltInTypes.cs" />
+    <Compile Include="Serialization\DeserializationContext.cs" />
+    <Compile Include="Serialization\SerializationContext.cs" />
+    <Compile Include="Serialization\SerializationManager.cs" />
+    <Compile Include="Core\Grain.cs" />
+    <Compile Include="Runtime\RuntimeClient.cs" />
+    <Compile Include="Runtime\GrainReference.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="Utils\Utils.cs" />
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs">
+      <Link>Properties\GlobalAssemblyInfo.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\Orleans.SDK.targets">
+      <Link>Orleans.SDK.targets</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="..\NuGet\Orleans.Grains.props">
+      <Link>Orleans.Grains.props</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\NuGet\Orleans.Interfaces.props">
+      <Link>Orleans.Interfaces.props</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Configuration\OrleansConfiguration.xsd">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Orleans.snk">
+      <Link>Orleans.snk</Link>
+    </None>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <CodeGenToolReferences>System.Data.dll;$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll;</CodeGenToolReferences>
+  </PropertyGroup>
+  <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
+    <PropertyGroup Condition="'$(BuildNumber)' == ''">
+      <BuildNumber>1</BuildNumber>
+    </PropertyGroup>
+  </Target>
+  <Target Name="VersionInit" BeforeTargets="BeforeBuild">
+    <Copy SourceFiles="$(SolutionDir)NuGet\EmptyFile.cs" DestinationFolder="$(TargetDir)" ContinueOnError="true" />
+  </Target>
+  <Target Name="LogBuildProperties" BeforeTargets="CoreCompile" AfterTargets="VersionInit">
+    <!-- Show values of some useful properties -->
+    <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
+  </Target>
+  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
+    <!-- Clean Generated directory -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
+    <MakeDir Directories="$(IntermediateOutputPath)Generated" />
+    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
+    <!-- Extract the sources for Orleans codegen tool -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Searching for Orleans CodeGen tool sources" Importance="high" />
+    <ItemGroup>
+      <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*.cs" />
+      <CodeGenSrcFiles Include="$(SolutionDir)ClientGenerator\*\*.cs" />
+    </ItemGroup>
+    <PropertyGroup>
+      <CodeGenToolSources>@(CodeGenSrcFiles->'%(Identity)')</CodeGenToolSources>
+    </PropertyGroup>
+    <Message Text="CodeGenToolSources extracted: $(CodeGenToolSources)" Importance="high" />
+    <!-- Compile orleans dll -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for boot strap" Importance="high" />
+    <csc Sources="@(Compile)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(CodeGenToolReferences)" DefineConstants="$(DefineConstants);EXCLUDE_CODEGEN" KeyFile="$(AssemblyOriginatorKeyFile)" TargetType="$(OutputType)" />
+    <!-- Compile codegen tool exe -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans codegen tool for BootStrap" Importance="high" />
+    <csc Sources="$(CodeGenToolSources)" OutputAssembly="$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" EmitDebugInformation="true" PdbFile="$(PdbFile)" Platform="$(PlatformTarget)" References="$(CodeGenToolReferences);$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" DefineConstants="$(DefineConstants);CLIENTGEN_PROJECT" KeyFile="$(AssemblyOriginatorKeyFile)" />
+    <!-- Finally invoke ClientGenerator.exe on the recently built Orleans.dll -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
+    <PropertyGroup>
+      <CodeGenToolExecCmd>"$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" /nomerge /bootstrap "/in:$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</CodeGenToolExecCmd>
+    </PropertyGroup>
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - CodeGen Cmd = $(CodeGenToolExecCmd)" />
+    <Exec Command="$(CodeGenToolExecCmd)" />
+  </Target>
+  <Target Name="WriteArgsToFileForDebugging" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
+    <MakeDir Directories="$(IntermediateOutputPath)Generated" />
+    <PropertyGroup>
+      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+    </PropertyGroup>
+    <Message Text="[OrleansClientPreprocessing] - Code-gen args file=$(ArgsFile)" />
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/nomerge" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(AssemblyOriginatorKeyFile)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/fsharp:$(FSharpCompilerPath)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/cwd:$(ProjectDir)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/config:$(Configuration)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionExplicit:$(OptionExplicit)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionCompare:$(OptionCompare)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionStrict:$(OptionStrict)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)" />
+    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')" />
+  </Target>
+</Project>

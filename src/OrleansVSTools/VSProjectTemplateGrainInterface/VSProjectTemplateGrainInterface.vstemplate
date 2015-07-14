@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005">
+  <TemplateData>
+    <Name>Orleans Grain Interface Collection</Name>
+    <Description>A project for defining a collection of grain communication interfaces and their payloads</Description>
+    <Icon>Orleans.ico</Icon>
+    <ProjectType>CSharp</ProjectType>
+    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <SortOrder>1000</SortOrder>
+    <TemplateID>Orleans.Templates.Project.GrainInterface</TemplateID>
+    <TemplateGroupID>Orleans</TemplateGroupID>
+    <ShowByDefault>false</ShowByDefault>
+    <CreateNewFolder>true</CreateNewFolder>
+    <DefaultName>IGrain1</DefaultName>
+    <ProvideDefaultName>true</ProvideDefaultName>
+  </TemplateData>
+  <TemplateContent>
+    <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
+      <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" OpenInEditor="true">IGrain1.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="true" TargetFileName="Properties\orleans.codegen.cs">orleans.codegen.cs</ProjectItem>
+      <ProjectItem ReplaceParameters="false" TargetFileName="packages.config">packages.config.txt</ProjectItem>
+    </Project>
+  </TemplateContent>
+</VSTemplate>
