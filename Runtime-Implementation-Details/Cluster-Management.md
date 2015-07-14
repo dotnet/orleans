@@ -10,9 +10,9 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 ### The Basic Membership Protocol:
 
-1. Upon startup every silo writes itself into a well-known table (passed via config) in [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/). We use the Azure deployment id as partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment.
+1. Upon startup every silo writes itself into a well-known table (passed via config) in a configured data storage such as [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) or one provided by a ADO.NET. When Azure Table Storage is used, the Azure deployment id is used as a partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment. Otherwise the deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration.
 
-2. Silos monitor each other directly, via application pings (“are you alive" `heartbeats`). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer))).
+2. Silos monitor each other directly, via application pings ("are you alive" `heartbeats`). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer))).
 
 3. If a silo S does not get Y ping replies from a monitored servers P, it suspects it by writing its timestamped suspicion into P’s row in the Azure table.
 
@@ -34,7 +34,7 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 	5.6 In either case the write back uses the etag that was read, so the updates to this row are serialized. In case the write has failed due to etag mismatch, S retries (read again, and try to write, unless P was already marked dead).
 
-	5.7 At a high level this sequence of “read, local modify, write back” is a transaction. However, we are not using storage transactions to do that. “Transaction” code executes locally on a server and we use optimistic concurrency control with etags to ensure isolation and atomicity.
+	5.7 At a high level this sequence of "read, local modify, write back" is a transaction. However, we are not using storage transactions to do that. “Transaction” code executes locally on a server and we use optimistic concurrency control with etags to ensure isolation and atomicity.
 
 6. Every silo periodically reads the entire membership table for its deployment. That way silos learn about new silos joining and about other silos being declared dead.
 
@@ -72,7 +72,7 @@ The basic membership protocol described above was later extended to support tota
 
 **Extended Membership Protocol:**
 
-1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or transactions in SQL server.
+1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or properly locked rows in a relational database.
 
 2. We add a membership-version row to the table that tracks table changes.
 
@@ -108,7 +108,7 @@ There are 3 types of liveness implemented. The type of the liveness protocol is 
 
 2. `AzureTable` - membership table is stored in Azure table.
 
-3. `SqlServer` - membership table is stored in SQL server.
+3. `SqlServer` - membership table is stored in a relational database.
 	
 For all liveness types the common configuration variables are defined in `Globals.Liveness` element:
 	
