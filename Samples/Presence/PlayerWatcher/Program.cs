@@ -42,7 +42,7 @@ namespace PlayerWatcher
         {
             try
             {
-                GrainClient.Initialize();
+                GrainClient.Initialize("DevTestClientConfiguration.xml");
 
                 // Hardcoded player ID
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.21005.1
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PresenceGrainInterfaces", "PresenceGrainInterfaces\PresenceGrainInterfaces.csproj", "{60A27932-4B5E-4743-B351-A2C4D4924D94}"
 EndProject
@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		2.Demo Player Watcher.cmd = 2.Demo Player Watcher.cmd
 		3.Demo Load Generator.cmd = 3.Demo Load Generator.cmd
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Host", "Host\Host.csproj", "{14895BD1-CD4D-4071-ADF8-740CDFD61671}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -40,6 +42,10 @@ Global
 		{FF9B1A14-45D5-41FA-9899-B4DC5BF4F542}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FF9B1A14-45D5-41FA-9899-B4DC5BF4F542}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FF9B1A14-45D5-41FA-9899-B4DC5BF4F542}.Release|Any CPU.Build.0 = Release|Any CPU
+		{14895BD1-CD4D-4071-ADF8-740CDFD61671}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{14895BD1-CD4D-4071-ADF8-740CDFD61671}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{14895BD1-CD4D-4071-ADF8-740CDFD61671}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{14895BD1-CD4D-4071-ADF8-740CDFD61671}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

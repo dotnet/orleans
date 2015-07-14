@@ -18,7 +18,7 @@ namespace LoadGenerator
         {
             try
             {
-                GrainClient.Initialize();
+                GrainClient.Initialize("DevTestClientConfiguration.xml");
 
                 int nGames = 10; // number of games to simulate
                 int nPlayersPerGame = 4; // number of players in each game
