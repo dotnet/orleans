@@ -55,7 +55,7 @@
       <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="Orleans">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.8\lib\net45\Orleans.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
     </Reference>
     <Reference Include="OrleansAzureUtils">
       <HintPath>..\packages\Microsoft.Orleans.OrleansAzureUtils.1.0.8\lib\net45\OrleansAzureUtils.dll</HintPath>

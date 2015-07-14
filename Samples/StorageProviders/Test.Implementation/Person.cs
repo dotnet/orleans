@@ -32,14 +32,14 @@ using Test.Interfaces;
 namespace Test.Implementation
 {
     [StorageProvider(ProviderName = "TestStore")]
-    public class Person : Grain<IPersonState>, Test.Interfaces.IPerson
+    public class Person : Grain<PersonState>, Test.Interfaces.IPerson
     {
         Task IPerson.SetPersonalAttributes(PersonalAttributes props)
         {
             State.FirstName = props.FirstName;
             State.LastName = props.LastName;
             State.Gender = props.Gender;
-            return State.WriteStateAsync();
+            return WriteStateAsync();
         }
 
         Task<string> IPerson.GetFirstName()
@@ -58,10 +58,10 @@ namespace Test.Implementation
         }
     }
 
-    public interface IPersonState : IGrainState
+    public class PersonState : GrainState
     {
-        string FirstName { get; set; }
-        string LastName { get; set; }
-        GenderType Gender { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public GenderType Gender { get; set; }
     }
 }

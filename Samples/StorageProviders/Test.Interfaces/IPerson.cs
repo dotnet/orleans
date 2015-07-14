@@ -40,7 +40,7 @@ namespace Test.Interfaces
     /// <summary>
     /// Orleans grain communication interface IPerson
     /// </summary>
-    public interface IPerson : Orleans.IGrain
+    public interface IPerson : IGrainWithIntegerKey
     {
         Task SetPersonalAttributes(PersonalAttributes person);
 
