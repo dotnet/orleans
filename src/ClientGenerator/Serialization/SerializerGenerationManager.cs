@@ -85,7 +85,8 @@ namespace Orleans.CodeGeneration.Serialization
             if (t.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
                 typeof (IAddressable).IsAssignableFrom(t)) return;
 
-            if (t.Namespace.Equals("System") || t.Namespace.StartsWith("System."))
+            bool isSystemType = t.Namespace != null && (t.Namespace.Equals("System") || t.Namespace.StartsWith("System."));
+            if (isSystemType)
             {
                 ConsoleText.WriteWarning("System type " + t.Name + " may require a custom serializer for optimal performance. " +
                     "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.");
@@ -145,7 +146,8 @@ namespace Orleans.CodeGeneration.Serialization
                 ConsoleText.WriteStatus("\ttype " + toGen.FullName + " in namespace " + toGen.Namespace);
                 NamespaceGenerator typeNamespace;
 
-                if (!namespaceDictionary.TryGetValue(toGen.Namespace, out typeNamespace))
+                string nspace = toGen.Namespace ?? String.Empty;
+                if (!namespaceDictionary.TryGetValue(nspace, out typeNamespace))
                 {
                     if (extraNamespace == null)
                     {

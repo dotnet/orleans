@@ -51,6 +51,7 @@
     <Compile Include="GrainInterfaceHierarchyIGrains.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
+    <Compile Include="CodegenTestInterfaces.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />
     <Compile Include="ISimpleGrain.cs" />
