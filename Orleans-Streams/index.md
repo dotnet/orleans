@@ -38,7 +38,6 @@ public async Task OnHttpCall(DeviceEvent deviceEvent)
      // Post data directly into device's stream.
      IAsyncStream<DeviceEventData> deviceStream = GetStream<DeviceEventData>(deviceEvent.DeviceId);
      await chatStream.OnNextAsync(deviceEvent.Data);
-     return;
 }
 ```
 
@@ -51,7 +50,6 @@ public class ChatUser: Grain
     {
        IAsyncStream<string> chatStream = GetStream<string>(chatGroupName);
        await chatStream.SubscribeAsync((string chatEvent) => Console.Out.Write(chatEvent));
-       return;
     }
 }
 ```
