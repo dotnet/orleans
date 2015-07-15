@@ -29,8 +29,7 @@ namespace TwitterGrainInterfaces
     /// <summary>
     /// A grain to maintain a sentiment score against a hashtag
     /// </summary>
-    [ExtendedPrimaryKey]
-    public interface IHashtagGrain : Orleans.IGrain
+    public interface IHashtagGrain : IGrainWithIntegerCompoundKey
     {
         Task AddScore(int score, string lastTweet);
 
