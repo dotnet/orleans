@@ -15,7 +15,7 @@ IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider");
 IAsyncStream<T> stream = streamProvider.GetStream<T>(Guid, "MyStreamNamespace"); 
 ```
 
-Application can get a refeernce to the stream provider either by calling the `GetStreamProvider` method on the `Grain` class when inside a grain, or by calling `GrainClient.GetStreamProvider()` method when on the client.
+Application can get a reference to the stream provider either by calling the `GetStreamProvider` method on the `Grain` class when inside a grain, or by calling `GrainClient.GetStreamProvider()` method when on the client.
 
 [**`Orleans.Streams.IAsyncStream<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) is a **logical, strongly-typed handle to a virtual stream**. It is similar in spirit to Orleans Grain Reference. Calls to `GetStreamProvider` and `GetStream` are purely local. The arguments to `GetStream` are a GUID and an additional string that we call a stream namespace (which can be null). Together the GUID and the namespace string comprise the stream identity (similar in sprit to the arguments to `GrainFactory.GetGrain`). The combination of GUID and namespace string provide extra flexibility in determining stream identities. Just like grain 7 may exist within the Grain type `PlayerGrain` and a different grain 7 may exist within the grain type `ChatRoomGrain`, Stream 123 may exist with the stream namespace `PlayerEventsStream` and a different stream 123 may exist within the stream namespace `ChatRoomMessagesStream`.
 
