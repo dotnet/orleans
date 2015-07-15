@@ -304,7 +304,7 @@ namespace Orleans.Runtime
                         return;
                     }
                     logOutput.Flush();
-                    logOutput.Close();
+                    logOutput.Dispose();
                 }
             }
             catch (Exception exc)
