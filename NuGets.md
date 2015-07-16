@@ -20,8 +20,8 @@ If you don't care about fine granularity of the NuGet packages, the Client and S
 
 Package   | Purpose
 ------------- | -------------
-[Microsoft.Orleans.Server](http://www.nuget.org/packages/Microsoft.Orleans.Server/) | <br>Includes everything you need to host a silo, in a process or in Azure Worker Role.
-[Microsoft.Orleans.Client](http://www.nuget.org/packages/Microsoft.Orleans.Client/) | <br>Includes everything you need for an Orleans client (frontend), in a process or in Azure Web Role.
+[Microsoft.Orleans.Server](http://www.nuget.org/packages/Microsoft.Orleans.Server/) | Includes everything you need to host a silo, in a process or in Azure Worker Role.
+[Microsoft.Orleans.Client](http://www.nuget.org/packages/Microsoft.Orleans.Client/) | Includes everything you need for an Orleans client (frontend), in a process or in Azure Web Role.
 
 <br>
 
@@ -34,4 +34,6 @@ Package   | Purpose
 [Microsoft.Orleans.OrleansProviders](http://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/) | Contains a set of built-in persistence and stream providers. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server.
 [Microsoft.Orleans.CounterControl](http://www.nuget.org/packages/Microsoft.Orleans.CounterControl/) | Includes OrleansCounterControl.exe, which registers Windows performance counter categories for Orleans statistics and for deployed grain classes. Requires elevation. Can be executed in Azure as part of a role startup task. Included in Microsoft.Orleans.Server.
 [Microsoft.Orleans.OrleansManager](http://www.nuget.org/packages/Microsoft.Orleans.OrleansManager/) | Includes Orleans management tool - OrleansManager.exe.
+[Microsoft.Orleans.OrleansZooKeeperUtils](https://www.nuget.org/packages/Microsoft.Orleans.OrleansZooKeeperUtils/) | Includes the plugin for using ZooKeeper for storing cluster membership data.
+[Microsoft.Orleans.TestingHost](https://www.nuget.org/packages/Microsoft.Orleans.TestingHost/) | Includes the library for hosting silos in a testing project.
 
