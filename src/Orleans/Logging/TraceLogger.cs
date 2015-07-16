@@ -408,7 +408,7 @@ namespace Orleans.Runtime
         {
             FileInfo file = GetLogFile(logName);
             string logText;
-            using (var f = new StreamReader(file.FullName))
+            using (var f = new StreamReader(File.OpenRead(file.FullName)))
             {
                 logText = f.ReadToEnd();
             }
