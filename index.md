@@ -63,10 +63,10 @@ Various community projects, including Orleans Monitoring, Design Patterns, Stora
 
 * **[Orleans Community - Gitter Chat Forum](https://gitter.im/dotnet/orleans)**
 
+* **[Orleans Community - Twitter](https://twitter.com/projectorleans)**
+
 * **[Who Is Using Orleans?](Who-Is-Using-Orleans)** 
 A partial list of companies, projects and applications which are using Orleans.
-
-* **[Orleans Community - Twitter](https://twitter.com/projectorleans)**
 
 ### Contributing To This Project
 
