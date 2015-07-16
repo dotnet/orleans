@@ -323,21 +323,17 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public static ClientConfiguration LoadFromFile(string fileName)
         {
-            if (fileName == null) return null;
+            if (fileName == null)
+            { return null; }
 
-            TextReader input = null;
-            try
+            using (TextReader input = File.OpenText(fileName))
             {
                 var config = new ClientConfiguration();
-                input = File.OpenText(fileName);
                 config.Load(input);
                 config.SourceFile = fileName;
                 return config;
             }
-            finally
-            {
-                if (input != null) input.Close();
-            }
+            
         }
 
         /// <summary>
