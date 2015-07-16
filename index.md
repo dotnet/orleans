@@ -66,6 +66,8 @@ Various community projects, including Orleans Monitoring, Design Patterns, Stora
 * **[Who Is Using Orleans?](Who-Is-Using-Orleans)** 
 A partial list of companies, projects and applications which are using Orleans.
 
+* **[Orleans Community - Twitter](https://twitter.com/projectorleans)**
+
 ### Contributing To This Project
 
 * **[Orleans GitHub Repository](https://github.com/dotnet/orleans)** 
