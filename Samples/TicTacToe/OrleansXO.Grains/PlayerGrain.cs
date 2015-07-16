@@ -58,7 +58,7 @@ namespace OrleansXO.Grains
 
         public async Task<PairingSummary[]> GetAvailableGames()
         {
-            var grain = PairingGrainFactory.GetGrain(0);
+            var grain = GrainFactory.GetGrain<IPairingGrain>(0);
             return (await grain.GetGames()).Where(x => !this.ListOfActiveGames.Contains(x.GameId)).ToArray();
         }
 
@@ -68,7 +68,7 @@ namespace OrleansXO.Grains
             this.gamesStarted += 1;
 
             var gameId = Guid.NewGuid();
-            var gameGrain = GameGrainFactory.GetGrain(gameId);  // create new game
+            var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);  // create new game
 
             // add ourselves to the game
             var playerId = this.GetPrimaryKey();  // our player id
@@ -77,7 +77,7 @@ namespace OrleansXO.Grains
             var name = this.username + "'s " + AddOrdinalSuffix(this.gamesStarted.ToString()) + " game";
             await gameGrain.SetName(name);
 
-            var pairingGrain = PairingGrainFactory.GetGrain(0);
+            var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
             await pairingGrain.AddGame(gameId, name);
 
             return gameId;
@@ -87,12 +87,12 @@ namespace OrleansXO.Grains
         // join a game that is awaiting players
         public async Task<GameState> JoinGame(Guid gameId)
         {
-            var gameGrain = GameGrainFactory.GetGrain(gameId);
+            var gameGrain = GrainFactory.GetGrain<IGameGrain>(gameId);
 
             var state = await gameGrain.AddPlayerToGame(this.GetPrimaryKey());
             this.ListOfActiveGames.Add(gameId);
 
-            var pairingGrain = PairingGrainFactory.GetGrain(0);
+            var pairingGrain = GrainFactory.GetGrain<IPairingGrain>(0);
             await pairingGrain.RemoveGame(gameId);
 
             return state;
@@ -122,7 +122,7 @@ namespace OrleansXO.Grains
             var tasks = new List<Task<GameSummary>>();
             foreach (var gameId in this.ListOfActiveGames)
             {
-                var game = GameGrainFactory.GetGrain(gameId);
+                var game = GrainFactory.GetGrain<IGameGrain>(gameId);
                 tasks.Add(game.GetSummary(this.GetPrimaryKey()));
             }
             await Task.WhenAll(tasks);

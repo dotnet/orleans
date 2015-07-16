@@ -30,7 +30,7 @@ using Orleans;
 
 namespace OrleansXO.GrainInterfaces
 {
-    public interface IGameGrain : Orleans.IGrain
+    public interface IGameGrain : IGrainWithGuidKey
     {
         // add a player into a game
         Task<GameState> AddPlayerToGame(Guid player);

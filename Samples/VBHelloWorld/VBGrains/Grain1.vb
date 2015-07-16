@@ -1,4 +1,6 @@
-﻿''' <summary>
+﻿Imports Orleans
+
+''' <summary>
 ''' Orleans grain implementation class Grain1
 ''' </summary>
 Public Class Grain1

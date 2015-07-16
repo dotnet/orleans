@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using Orleans;
 using System;
 using System.IO;
+using System.Reflection;
 
 namespace AdventureSetup
 {
@@ -31,7 +32,8 @@ namespace AdventureSetup
     {
         static int Main(string [] args)
         {
-            string mapFileName = "..\\..\\AdventureMap.json";
+            var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string mapFileName = path + @"\..\..\AdventureMap.json";
 
             switch (args.Length)
             {
@@ -51,7 +53,16 @@ namespace AdventureSetup
                 return -2;
             }
 
-            GrainClient.Initialize();
+             // The Orleans silo environment is initialized in its own app domain in order to more
+            // closely emulate the distributed situation, when the client and the server cannot
+            // pass data via shared memory.
+            AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, new AppDomainSetup
+            {
+                AppDomainInitializer = InitSilo,
+                AppDomainInitializerArguments = args,
+            });
+
+            Orleans.GrainClient.Initialize("ClientConfiguration.xml");
 
             Console.WriteLine("Map file name is '{0}'.", mapFileName);
             Console.WriteLine("Setting up Adventure, please wait ...");
@@ -60,7 +71,30 @@ namespace AdventureSetup
             Console.WriteLine("Adventure setup completed.");
             Console.ReadLine();
 
+            hostDomain.DoCallBack(ShutdownSilo);
+                        
             return 0;
         }
+
+        static void InitSilo(string[] args)
+        {
+            hostWrapper = new OrleansHostWrapper(args);
+
+            if (!hostWrapper.Run())
+            {
+                Console.Error.WriteLine("Failed to initialize Orleans silo");
+            }
+        }
+
+        static void ShutdownSilo()
+        {
+            if (hostWrapper != null)
+            {
+                hostWrapper.Dispose();
+                GC.SuppressFinalize(hostWrapper);
+            }
+        }
+
+        private static OrleansHostWrapper hostWrapper;
     }
 }

@@ -27,7 +27,7 @@ using System.Threading.Tasks;
 namespace OrleansXO.GrainInterfaces
 {
 
-    public interface IPairingGrain : Orleans.IGrain
+    public interface IPairingGrain : Orleans.IGrainWithIntegerKey
     {
         Task AddGame(Guid gameId, string name);
         Task RemoveGame(Guid gameId);

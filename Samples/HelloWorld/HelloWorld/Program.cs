@@ -50,8 +50,8 @@ namespace HelloWorld
 #endif
             GrainClient.Initialize("DevTestClientConfiguration.xml");
 
-            var friend = GrainFactory.GetGrain<IHello>(0);
-            Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
+            var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
+            Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning, my friend!").Result);
 
             Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
             Console.ReadLine();

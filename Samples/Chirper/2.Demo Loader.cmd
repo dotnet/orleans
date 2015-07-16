@@ -3,7 +3,6 @@
 @if NOT "%ECHO%"=="" @echo %ECHO%
 
 set CMDHOME=%~dp0.
-set SDKHOME=%CMDHOME%\..\..
 
 set DATADIR=%CMDHOME%\NetworkLoader\bin\Debug\GraphData
 set DATAFILE=Network-1000nodes-27000edges.graphml
