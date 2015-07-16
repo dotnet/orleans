@@ -326,14 +326,14 @@ namespace Orleans.Runtime.Configuration
             if (fileName == null)
             { return null; }
 
-            var config = null;
             using (TextReader input = File.OpenText(fileName))
             {
-                config = new ClientConfiguration();
+                var config = new ClientConfiguration();
                 config.Load(input);
                 config.SourceFile = fileName;
+                return config;
             }
-            return config;
+            
         }
 
         /// <summary>
