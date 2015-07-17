@@ -100,13 +100,12 @@ In the extended version of the protocol all writes are serialized via one row. T
 
 As already mentioned, `MembershipTable` is used as a rendezvous point for silos to find each other and Orleans clients to find silos and also helps coordinate the agreement on the membership view. We currently have 4 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache Zookeper and in-memory emaulation for development.
 
+1.  [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) - in this implementation we use Azure deployment ID as a partition key and the silo identity (`ip:port:epoch`) as row key. Together they guaratee unique silo key per silo. For concurrency control we use optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx). For multi row transactions we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key)  
 
-Upon startup every silo writes itself into a well-known table (passed via config) in a configured data storage such as [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) or one provided by a ADO.NET. When Azure Table Storage is used, the Azure deployment id is used as a partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment. Otherwise the deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration.
+2.  SQL Server - deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration and silo identity (`ip:port:epoch`) is used as primart table key. or properly locked rows in a relational database.
 
-The suspicion is written using optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
+3.  Zookeper - 
 
-1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or properly locked rows in a relational database.
-2. 
 
 ### Configuration:
 
@@ -125,6 +124,8 @@ There are 3 types of liveness implemented. The type of the liveness protocol is 
 2. `AzureTable` - membership table is stored in Azure table.
 
 3. `SqlServer` - membership table is stored in a relational database.
+
+4. `Zookeper` - membership table is stored in a Zookeeper cluster.
 	
 For all liveness types the common configuration variables are defined in `Globals.Liveness` element:
 	
@@ -154,6 +155,7 @@ For all liveness types the common configuration variables are defined in `Global
 ### Acknowledgements:
 
 We would to acknowledge the contribution of [Alex Kogan](https://www.linkedin.com/pub/alex-kogan/4/b52/3a2) to the design and implementation of the first version of this protocol. This work was done as part of summer internship in Microsoft Research in the Summer of 2011.
+The implementation of Zookeper based `MembershipTable` was done by [Shay Hazor](https://github.com/shayhatsor) and the implementation of SQL `MembershipTable` was done by [Veikko Eeva](https://github.com/veikkoeeva).
 
 
 
