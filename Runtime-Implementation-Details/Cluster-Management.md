@@ -6,10 +6,8 @@ title: Cluster Management
 
 Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as **Silo Membership**. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.
 
-We describe the internal implementation of the Orleans's membership protocol below.
-
-The protocol relies on an external service to provide an abstraction of `MembershipTable`. `MembershipTable` is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used as to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 4 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache Zookeper and in-memory emaulation for development.
-In addition to `MembershipTable` each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on alive silos. We start by desribing the membership protocol and later on desrcribe the implementation of the `MembershipTable`. 
+The protocol relies on an external service to provide an abstraction of `MembershipTable`. `MembershipTable` is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 4 implementations of the `MembershipTable`: based on [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/), SQL server, [Apache Zookeper](https://zookeeper.apache.org/) and in-memory emaulation for development.
+In addition to the `MembershipTable` each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on a set alive silos. We start by desribing the internal implementation of the Orleans's membership protocol below and later on describe the implementation of the `MembershipTable`. 
 
 
 ### The Basic Membership Protocol:
