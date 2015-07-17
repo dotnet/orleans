@@ -100,11 +100,11 @@ As already mentioned, `MembershipTable` is used as a rendezvous point for silos 
 
 1.  [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) - in this implementation we use Azure deployment ID as partition key and the silo identity (`ip:port:epoch`) as row key. Together they guaratee a unique key per silo. For concurrency control we use optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx). Every time we read from the table we store the etag for every read row and use that eTag when we try to wrote back. etags are automatically assigned and checked by Azure Table service on every write. For multi-row transactions we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx), which guarantee serializale transactions over rows with the same partition key.
 
-2.  SQL Server - deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration and silo identity (`ip:port:epoch`) is used as primart table key or properly locked rows in a relational database.
+2.  SQL Server - TBD. (deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration and silo identity (`ip:port:epoch`) is used as properly locked rows in a relational database.)
 
-3.  [Zookeper](https://zookeeper.apache.org/) - 
+3.  [Zookeper](https://zookeeper.apache.org/) - TBD
 
-4. In memory emulation for development setup. We use a special system grain, called `MembershipTableGrain` for that implementation.
+4. In-memory emulation for development setup. We use a special system grain, called `MembershipTableGrain`, for that implementation.
 
 
 ### Configuration:
