@@ -102,7 +102,7 @@ As already mentioned, `MembershipTable` is used as a rendezvous point for silos 
 
 2.  SQL Server - deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration and silo identity (`ip:port:epoch`) is used as primart table key or properly locked rows in a relational database.
 
-3.  Zookeper - 
+3.  [Zookeper](https://zookeeper.apache.org/) - 
 
 
 ### Configuration:
