@@ -71,7 +71,9 @@
     <None Include="ProjectTemplate.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <VSTemplate Include="VSProjectTemplateGrainInterface.vstemplate" />
+    <VSTemplate Include="VSProjectTemplateGrainInterface.vstemplate">
+      <OutputSubPath>Orleans</OutputSubPath>
+    </VSTemplate>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Orleans.ico" />

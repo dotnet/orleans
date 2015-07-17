@@ -67,6 +67,7 @@
   <ItemGroup>
     <VSTemplate Include="VSItemTemplatePersistedGrainVB.vstemplate">
       <SubType>Designer</SubType>
+      <OutputSubPath>Orleans</OutputSubPath>
     </VSTemplate>
   </ItemGroup>
   <ItemGroup>

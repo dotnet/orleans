@@ -65,7 +65,9 @@
     <None Include="GrainImplementationClassTemplate.vb" />
   </ItemGroup>
   <ItemGroup>
-    <VSTemplate Include="VSItemTemplateGrainImplementationVB.vstemplate" />
+    <VSTemplate Include="VSItemTemplateGrainImplementationVB.vstemplate">
+      <OutputSubPath>Orleans</OutputSubPath>
+    </VSTemplate>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Orleans.ico" />

@@ -60,7 +60,9 @@
     <None Include="DevTestClientConfiguration.xml" />
   </ItemGroup>
   <ItemGroup>
-    <VSTemplate Include="VSProjectSiloHost.vstemplate" />
+    <VSTemplate Include="VSProjectSiloHost.vstemplate">
+      <OutputSubPath>Orleans</OutputSubPath>
+    </VSTemplate>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Orleans.ico" />

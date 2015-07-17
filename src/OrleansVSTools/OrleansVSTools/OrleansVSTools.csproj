@@ -144,6 +144,10 @@
     <Content Include="License.txt">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
+    <Content Include="Orleans-nuget.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
     <Content Include="Orleans.ico">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>

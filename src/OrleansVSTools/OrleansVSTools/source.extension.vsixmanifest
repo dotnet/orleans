@@ -2,18 +2,22 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
     <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.0.9" Language="en-US" Publisher="Microsoft" />
-    <DisplayName>OrleansVSTools</DisplayName>
-    <Description>Orleans Tools for Visual Studio 2012, 2013, 2015</Description>
+    <DisplayName>Microsoft Orleans Tools for Visual Studio</DisplayName>
+    <Description xml:space="preserve">Microsoft Orleans Tools for Visual Studio 2012, 2013, 2015
+C#, VB, F#  Project templates and item templates
+</Description>
     <MoreInfo>htts://github.com/dotnet/orleans/</MoreInfo>
     <License>License.txt</License>
-    <Icon>Orleans.ico</Icon>
-    <PreviewImage>orleans-poster.jpg</PreviewImage>
+    <Icon>Orleans-nuget.png</Icon>
+    <PreviewImage>Orleans-nuget.png</PreviewImage>
     <Tags>Orleans,Cloud-Computing,Actor-Model,Actors,Distributed-Systems,C#,VB,F#</Tags>
   </Metadata>
   <Installation AllUsers="false">
     <InstallationTarget Version="[11.0,15.0)" Id="Microsoft.VisualStudio.Premium" />
     <InstallationTarget Version="[11.0,15.0)" Id="Microsoft.VisualStudio.Pro" />
     <InstallationTarget Version="[11.0,15.0)" Id="Microsoft.VisualStudio.Ultimate" />
+    <InstallationTarget Version="[14.0,15.0)" Id="Microsoft.VisualStudio.Enterprise" />
+    <InstallationTarget Version="[14.0,15.0)" Id="Microsoft.VisualStudio.Community" />
   </Installation>
   <Dependencies>
     <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5,)" />
