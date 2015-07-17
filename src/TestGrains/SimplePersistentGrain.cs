@@ -46,7 +46,6 @@ namespace UnitTests.Grains
     /// <summary>
     /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
-    [StorageProvider(ProviderName = "MemoryStore")]
     public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimplePersistentGrain
     {
         private Guid version;
