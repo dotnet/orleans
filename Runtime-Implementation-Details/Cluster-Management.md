@@ -96,13 +96,15 @@ In the extended version of the protocol all writes are serialized via one row. T
 
 ### Membership Table:
 
-As already mentioned, `MembershipTable` is used as a rendezvous point for silos to find each other and Orleans clients to find silos and also helps coordinate the agreement on the membership view. We currently have 4 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache Zookeper and in-memory emaulation for development.
+As already mentioned, `MembershipTable` is used as a rendezvous point for silos to find each other and Orleans clients to find silos and also helps coordinate the agreement on the membership view. We currently have 4 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache Zookeper and in-memory emulation for development. The interface for `MembershipTable` is defined in [**`IMembershipTable`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs).
 
 1.  [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) - in this implementation we use Azure deployment ID as partition key and the silo identity (`ip:port:epoch`) as row key. Together they guaratee a unique key per silo. For concurrency control we use optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx). Every time we read from the table we store the etag for every read row and use that eTag when we try to wrote back. etags are automatically assigned and checked by Azure Table service on every write. For multi-row transactions we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx), which guarantee serializale transactions over rows with the same partition key.
 
 2.  SQL Server - deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration and silo identity (`ip:port:epoch`) is used as primart table key or properly locked rows in a relational database.
 
 3.  [Zookeper](https://zookeeper.apache.org/) - 
+
+4. In memory emulation for development setup. We use a special system grain, called `MembershipTableGrain` for that implementation.
 
 
 ### Configuration:
@@ -115,7 +117,7 @@ Sample config element:
     <Liveness ProbeTimeout = "5s" TableRefreshTimeout ="10s  DeathVoteExpirationTimeout ="80s" NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" />
 
 
-There are 3 types of liveness implemented. The type of the liveness protocol is configured via the `SystemStoreType` attribute of the `SystemStore` element in the `Globals` section in `OrleansConfiguration.xml` file.
+There are 4 types of liveness implemented. The type of the liveness protocol is configured via the `SystemStoreType` attribute of the `SystemStore` element in the `Globals` section in `OrleansConfiguration.xml` file.
 
 1. `MembershipTableGrain` - membership table is stored in a grain on primary silo. This is development setup.
 
