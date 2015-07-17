@@ -8,21 +8,25 @@ Orleans provides cluster management via a built-in membership protocol, which we
 
 We describe the internal implementation of the Orleans's membership protocol below.
 
+The protocol relies on an external service to provide an abstraction of `MembershipTable`. `MembershipTable` is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used as to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 4 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache Zookeper and in-memory emaulation for development.
+In addition to `MembershipTable` each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on alive silos. We start by desribing the membership protocol and later on desrcribe the implementation of the `MembershipTable`. 
+
+
 ### The Basic Membership Protocol:
 
-1. Upon startup every silo writes itself into a well-known table (passed via config) in a configured data storage such as [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) or one provided by a ADO.NET. When Azure Table Storage is used, the Azure deployment id is used as a partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment. Otherwise the deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration.
+1. Upon startup every silo writes itself into a well-known `MembershipTable` (passed via config). A combination of silo identity (`ip:port:epoch`) and service deployment id are used as unique keys in the table (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment. 
 
 2. Silos monitor each other directly, via application pings ("are you alive" `heartbeats`). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer))).
 
-3. If a silo S does not get Y ping replies from a monitored servers P, it suspects it by writing its timestamped suspicion into P’s row in the Azure table.
+3. If a silo S does not get Y ping replies from a monitored servers P, it suspects it by writing its timestamped suspicion into P’s row in the `MembershipTable`.
 
 4. If P has more than Z suspicions within K seconds, then S writes that P is dead into P’s row, and broadcasts a request for all silos to re-read the membership table (which they’ll do anyway periodically).
 
 5. In more details:
 
-	5.1 Suspicion is written to the Azure table, in a special column in the row corresponding to P. When S suspects P it writes: “at time TTT S suspected P”.
+	5.1 Suspicion is written to the `MembershipTable`, in a special column in the row corresponding to P. When S suspects P it writes: “at time TTT S suspected P”.
 
-	5.2 One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
+	5.2 One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control provided by the `MembershipTable`.
 
 
         5.3 The suspecting silo S reads P's row. 
@@ -56,9 +60,9 @@ We describe the internal implementation of the Orleans's membership protocol bel
 
 16. **Diagnostics** - the table is also very convenient for diagnostics and troubleshooting. System administrator can instantaneously find in the table the current list of alive silos, as well as see the history of all killed silos and suspicions. This is especially useful when diagnosing problems.
 
-11. **Why do we need reliable persistent storage?** - we use persistent storage (Azure table or SQL server) for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, we use the reliable storage to help us coordinate the agreement on the membership view. While we perform failure detection directly in a peer to peer fashion between the silos, we store the membership view in a reliable storage and use the concurrency control mechanism provided by this storage to reach agreement of who is alive and who is dead. That way, in a sense, our protocol outsources the hard problem of distributed consensus to the cloud. In that we fully utilize the power of the underlying cloud platform, using it truly as "Platform as a Service".
+11. **Why do we need reliable persistent storage?** - we use persistent storage (Azure table, SQL server or Apache Zookeper) for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, we use the reliable storage to help us coordinate the agreement on the membership view. While we perform failure detection directly in a peer to peer fashion between the silos, we store the membership view in a reliable storage and use the concurrency control mechanism provided by this storage to reach agreement of who is alive and who is dead. That way, in a sense, our protocol outsources the hard problem of distributed consensus to the cloud. In that we fully utilize the power of the underlying cloud platform, using it truly as "Platform as a Service".
 
-14. **What happens if the table is not accessible for some time?** (Azure storage is down, unavailable, or there are communication problems with it) – our protocol will NOT declare silos as dead by mistake in such a case.  Currently operational silos will keep working without any problems. However, we won't be able to declare a silo dead (if we detected some silo is dead via missed pings we won’t be able to write this fact to the table) and also won't be able to allow new silos to join. So completeness will suffer, but accuracy will not - partitioning from the table will never cause us to declare silo as dead by mistake. Also, in case of a partial network partition (if some silos can access the table and some not), it could happen that we will declare a dead silo as dead, but it will take some time until all other silos learn about it. So detection could be delayed, but we will never wrongly kill someone due to table un-availability.
+14. **What happens if the table is not accessible for some time?** (storage service is down, unavailable, or there are communication problems with it) – our protocol will NOT declare silos as dead by mistake in such a case.  Currently operational silos will keep working without any problems. However, we won't be able to declare a silo dead (if we detected some silo is dead via missed pings we won’t be able to write this fact to the table) and also won't be able to allow new silos to join. So completeness will suffer, but accuracy will not - partitioning from the table will never cause us to declare silo as dead by mistake. Also, in case of a partial network partition (if some silos can access the table and some not), it could happen that we will declare a dead silo as dead, but it will take some time until all other silos learn about it. So detection could be delayed, but we will never wrongly kill someone due to table un-availability.
 
 ### Extension to totally order membership views:
 
@@ -72,7 +76,7 @@ The basic membership protocol described above was later extended to support tota
 
 **Extended Membership Protocol:**
 
-1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or properly locked rows in a relational database.
+1. For implementation of this feature we utilize the support for transactions over multiple rows that is provided by the `MembershipTable`..
 
 2. We add a membership-version row to the table that tracks table changes.
 
@@ -91,6 +95,18 @@ The basic membership protocol described above was later extended to support tota
 **Scalability of the Extended Membership Protocol:**
 
 In the extended version of the protocol all writes are serialized via one row. This can potentially heart the scalability of the cluster managemenet protocol, since it increases the risk of conflicts between concurrent table writes. To partially mitigate this problem silos retry all their writes to the table by using exponential backoff. We have observed the extended protocols to work smoothly in production environment in Azure with up to 200 silos. However, we do think the protocol might have problems to scale beyond a thousand silos. In such large setups the updates to version row may be easily disabled, essentially maintaining the rest of the cluster managemenet protocol and giving up on the total ordering property. Please also note that we refer here to the scalability of the cluster management protocol, not the rest of Orleans. We believe that other parts of the Orleans runtime (messaging, distributed directory, grain hosting, client to gateway connectivity) are scalable way beyond hundreds of silos.
+
+### Membership Table:
+
+As already mentioned, `MembershipTable` is used as a rendezvous point for silos to find each other and Orleans clients to find silos and also helps coordinate the agreement on the membership view. We currently have 4 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache Zookeper and in-memory emaulation for development.
+
+
+Upon startup every silo writes itself into a well-known table (passed via config) in a configured data storage such as [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) or one provided by a ADO.NET. When Azure Table Storage is used, the Azure deployment id is used as a partition key and the silo identity (`ip:port:epoch`) as row key (epoch is just time in ticks when this silo started). Thus `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment. Otherwise the deployment ID is configured as appropriate for the given deployment environment and storage backend in configuration.
+
+The suspicion is written using optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx).
+
+1. For implementation of this feature we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx) (transactions over rows with the same partition key) or properly locked rows in a relational database.
+2. 
 
 ### Configuration:
 
