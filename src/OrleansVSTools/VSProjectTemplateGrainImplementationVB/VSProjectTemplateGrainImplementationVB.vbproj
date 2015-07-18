@@ -74,7 +74,9 @@
     <None Include="Settings.settings" />
   </ItemGroup>
   <ItemGroup>
-    <VSTemplate Include="VSProjectTemplateGrainImplementationVB.vstemplate" />
+    <VSTemplate Include="VSProjectTemplateGrainImplementationVB.vstemplate">
+      <OutputSubPath>Orleans</OutputSubPath>
+    </VSTemplate>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Orleans.ico" />

@@ -70,6 +70,7 @@
   <ItemGroup>
     <VSTemplate Include="VSProjectTemplateGrainImplementation.vstemplate">
       <SubType>Designer</SubType>
+      <OutputSubPath>Orleans</OutputSubPath>
     </VSTemplate>
   </ItemGroup>
   <ItemGroup>
