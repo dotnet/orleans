@@ -171,7 +171,7 @@ namespace Orleans.CodeGeneration
 
             var interfaceId = GrainInterfaceData.GetGrainInterfaceId(interfaceData.Type);
             var interfaceIdMethod = new CodeMemberProperty
-        {
+            {
                 Name = "InterfaceId",
                 Type = new CodeTypeReference(typeof (int)),
                 Attributes = MemberAttributes.Family | MemberAttributes.Override,
@@ -477,7 +477,7 @@ namespace Orleans.CodeGeneration
             CodeTypeReference returnType;
             if (!isObserver)
             {
-                // Method is expected to return either a Task or a grin reference
+                // Method is expected to return either a Task or a grain reference
                 if (!GrainInterfaceData.IsTaskType(methodInfo.ReturnType) &&
                     !typeof (IAddressable).IsAssignableFrom(methodInfo.ReturnType))
                     throw new InvalidOperationException(
@@ -641,7 +641,7 @@ namespace Orleans.CodeGeneration
             interfaceIdProperty.PrivateImplementationType = new CodeTypeReference(typeof(IGrainMethodInvoker), CodeTypeReferenceOptions.GlobalReference);
             invokerClass.Members.Add(interfaceIdProperty);
 
-            //Add invoke method for Orleans message 
+            // Add invoke method for Orleans message 
             var orleansInvoker = new CodeMemberMethod
             {
                 Attributes = MemberAttributes.Public | MemberAttributes.Final,
@@ -658,7 +658,7 @@ namespace Orleans.CodeGeneration
             orleansInvoker.Statements.Add(orleansInvokerImpl);
             invokerClass.Members.Add(orleansInvoker);
 
-            //Add TryInvoke method for Orleans message, if the type is an extension interface
+            // Add TryInvoke method for Orleans message, if the type is an extension interface
             if (si.IsExtension)
             {
                 var orleansTryInvoker = new CodeMemberMethod
@@ -678,7 +678,7 @@ namespace Orleans.CodeGeneration
                 invokerClass.Members.Add(orleansTryInvoker);
             }
 
-            //Add GetMethodName() method 
+            // Add GetMethodName() method 
             var getMethodName = new CodeMemberMethod
             {
                 Attributes = MemberAttributes.Public | MemberAttributes.Final | MemberAttributes.Static,
