@@ -80,6 +80,11 @@ namespace Orleans.Runtime.Storage
             get { return providerRuntime.ServiceId; }
         }
 
+        public string SiloIdentity
+        {
+            get { return providerRuntime.SiloIdentity; }
+        }
+
         public IGrainFactory GrainFactory { get; private set; }
 
         /// <summary>

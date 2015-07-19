@@ -99,5 +99,10 @@ namespace Orleans.Providers
         {
             get { return runtime.ServiceId; }
         }
+
+        public string SiloIdentity
+        {
+            get { return runtime.SiloIdentity; }
+        }
     }
 }

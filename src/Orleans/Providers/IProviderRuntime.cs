@@ -55,6 +55,12 @@ namespace Orleans.Providers
         Guid ServiceId { get; }
 
         /// <summary>
+        /// A unique identifier for the current silo.
+        /// There is no semantic content to this string, but it may be useful for logging.
+        /// </summary>
+        string SiloIdentity { get; }
+
+        /// <summary>
         /// Factory for getting references to grains.
         /// </summary>
         IGrainFactory GrainFactory { get; }

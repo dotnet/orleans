@@ -43,14 +43,16 @@ namespace Orleans.Runtime.Providers
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         public IGrainFactory GrainFactory { get; private set; }
         public Guid ServiceId { get; private set; }
+        public string SiloIdentity { get; private set; }
 
         private SiloProviderRuntime()
         {
         }
 
-        internal static void Initialize(GlobalConfiguration config, IGrainFactory grainFactory)
+        internal static void Initialize(GlobalConfiguration config, string siloIdentity, IGrainFactory grainFactory)
         {
             Instance.ServiceId = config.ServiceId;
+            Instance.SiloIdentity = siloIdentity;
             Instance.GrainFactory = grainFactory;
         }
 
