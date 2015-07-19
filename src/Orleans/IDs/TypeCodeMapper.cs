@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -30,16 +31,16 @@ namespace Orleans.Runtime
     /// </summary>
     internal static class TypeCodeMapper
     {
-        internal static GrainClassData GetImplementation(Type interfaceType, string grainClassNamePrefix = null)
+        internal static GrainClassData GetImplementation(TypeInfo interfaceTypeInfo, string grainClassNamePrefix = null)
         {
             GrainClassData implementation;
             IGrainTypeResolver grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
-            if (!grainTypeResolver.TryGetGrainClassData(interfaceType, out implementation, grainClassNamePrefix))
+            if (!grainTypeResolver.TryGetGrainClassData(interfaceTypeInfo, out implementation, grainClassNamePrefix))
             {
                 var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
                 throw new ArgumentException(
                     String.Format("Cannot find an implementation class for grain interface: {0}{2}. Make sure the grain assembly was correctly deployed and loaded in the silo.{1}",
-                                  interfaceType,
+                                  interfaceTypeInfo,
                                   String.IsNullOrEmpty(loadedAssemblies) ? String.Empty : String.Format(" Loaded grain assemblies: {0}", loadedAssemblies),
                                   String.IsNullOrEmpty(grainClassNamePrefix) ? String.Empty : ", grainClassNamePrefix=" + grainClassNamePrefix));
             }

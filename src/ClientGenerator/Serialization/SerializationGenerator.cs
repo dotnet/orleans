@@ -69,7 +69,7 @@ namespace Orleans.CodeGeneration.Serialization
             // Create the class declaration, including any required generic parameters
             // At one time this was a struct, not a class, so all the variable names are "structFoo". Too bad.
             // Note that we need to replace any periods in the type name with _ to properly handle nested classes
-            var className = TypeUtils.GetSimpleTypeName(TypeUtils.GetFullName(t));
+            var className = TypeUtils.GetSimpleTypeName(TypeUtils.GetFullName(t.GetTypeInfo()));
             var serializationClassName = className.Replace('.', '_') + SERIALIZER_CLASS_NAME_SUFFIX;
             var serializationClassOpenName = serializationClassName;
             var classDecl = new CodeTypeDeclaration(serializationClassName) {IsClass = true};
@@ -97,7 +97,7 @@ namespace Orleans.CodeGeneration.Serialization
 
                     var constraints = genericParameter.GetGenericParameterConstraints();
                     foreach (var constraintType in constraints)
-                        param.Constraints.Add( new CodeTypeReference(TypeUtils.GetParameterizedTemplateName(constraintType)));
+                        param.Constraints.Add( new CodeTypeReference(TypeUtils.GetParameterizedTemplateName(constraintType.GetTypeInfo())));
 
                     if ((genericParameter.GenericParameterAttributes & GenericParameterAttributes.DefaultConstructorConstraint) != GenericParameterAttributes.None)
                         param.HasConstructorConstraint = true;
@@ -212,7 +212,7 @@ namespace Orleans.CodeGeneration.Serialization
                 }
                 else
                 {
-                    var typeName = TypeUtils.GetParameterizedTemplateName(t, tt => tt.Namespace != container.Name && !referencedNamespaces.Contains(tt.Namespace), true);
+                    var typeName = TypeUtils.GetParameterizedTemplateName(t.GetTypeInfo(), tt => tt.Namespace != container.Name && !referencedNamespaces.Contains(tt.Namespace), true);
                     if (language == Language.VisualBasic)
                         typeName = typeName.Replace("<", "(Of ").Replace(">", ")");
                     constructor = new CodeVariableDeclarationStatement(classTypeReference, "result", 
@@ -222,8 +222,8 @@ namespace Orleans.CodeGeneration.Serialization
             else if (t.IsValueType)
             {
                 constructor = !t.ContainsGenericParameters 
-                    ? new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(t))) 
-                    : new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(TypeUtils.GetTemplatedName(t))));
+                    ? new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(t.GetTypeInfo()))) 
+                    : new CodeVariableDeclarationStatement(classTypeReference, "result", new CodeDefaultValueExpression(new CodeTypeReference(TypeUtils.GetTemplatedName(t.GetTypeInfo()))));
                 }
                 else
                 {
@@ -237,7 +237,7 @@ namespace Orleans.CodeGeneration.Serialization
                 {
                     constructor = new CodeVariableDeclarationStatement(classTypeReference, "result",
                         new CodeCastExpression(className, new CodeMethodInvokeExpression(new CodeTypeReferenceExpression(typeof(System.Runtime.Serialization.FormatterServices)),
-                            "GetUninitializedObject", new CodeTypeOfExpression(TypeUtils.GetTemplatedName(t)))));
+                            "GetUninitializedObject", new CodeTypeOfExpression(TypeUtils.GetTemplatedName(t.GetTypeInfo())))));
                 }
             }
             if (!shallowCopyable)
@@ -308,7 +308,7 @@ namespace Orleans.CodeGeneration.Serialization
                     }
                 }
 
-                var typeName = TypeUtils.GetTemplatedName(fld.FieldType, _ => !_.IsGenericParameter, language);
+                var typeName = TypeUtils.GetTemplatedName(fld.FieldType.GetTypeInfo(), _ => !_.IsGenericParameter, language);
 
                 // See if it's a public field
                 if ((getter == null) || (setter == null))
@@ -353,7 +353,7 @@ namespace Orleans.CodeGeneration.Serialization
                             fieldAccessType = classType;
                         else
                             fieldAccessType = fld.DeclaringType.IsGenericType
-                                ? new CodeTypeOfExpression(TypeUtils.GetTemplatedName(fld.DeclaringType))
+                                ? new CodeTypeOfExpression(TypeUtils.GetTemplatedName(fld.DeclaringType.GetTypeInfo()))
                                 : new CodeTypeOfExpression(fld.DeclaringType);
                     }
 
@@ -452,7 +452,7 @@ namespace Orleans.CodeGeneration.Serialization
             // Special processing for generic types, necessary so that the appropriate closed types will get generated at run-time
             if (t.IsGenericType)
             {
-                var masterClassName = TypeUtils.GetSimpleTypeName(t) + "GenericMaster";
+                var masterClassName = TypeUtils.GetSimpleTypeName(t.GetTypeInfo()) + "GenericMaster";
 
                 var masterClass = new CodeTypeDeclaration(masterClassName);
                 container.Types.Add(masterClass);

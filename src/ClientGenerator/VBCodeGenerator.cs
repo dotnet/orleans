@@ -57,13 +57,13 @@ namespace Orleans.CodeGeneration
             referred(type);
 
             var name = (noNamespace(type) && !type.IsNested) ? 
-                    TypeUtils.GetTemplatedName(type, language: Language.VisualBasic) 
-                    : TypeUtils.GetFullName(type, Language.VisualBasic);
+                    TypeUtils.GetTemplatedName(type.GetTypeInfo(), language: Language.VisualBasic) 
+                    : TypeUtils.GetFullName(type.GetTypeInfo(), Language.VisualBasic);
 
             if (!type.IsGenericType)
             {
                 if (type.FullName == null)
-                    return TypeUtils.GetTemplatedName(type, language: Language.VisualBasic);
+                    return TypeUtils.GetTemplatedName(type.GetTypeInfo(), language: Language.VisualBasic);
 
                 var result = GetNestedClassName(name);
                 return result == "Void" ? "void" : result;
@@ -248,7 +248,7 @@ End If", pair.Key, pair.Value);
             Dim t = New System.Threading.Tasks.TaskCompletionSource(Of Object)()
             t.SetException(New NotImplementedException(""No grain interfaces for type {0}""))
             Return t.Task
-                ", TypeUtils.GetFullName(grainType, Language.VisualBasic));
+                ", TypeUtils.GetFullName(grainType.GetTypeInfo(), Language.VisualBasic));
             }
 
             var builder = new StringBuilder();
@@ -333,7 +333,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
 ",
                         invokeGrainMethod);
                 }
-                else if (GrainInterfaceData.IsTaskType(returnType))
+                else if (GrainInterfaceData.IsTaskType(returnType.GetTypeInfo()))
                 {
                     if (returnType == typeof(Task))
                     {
@@ -377,20 +377,20 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
         protected override void AddGetGrainMethods(GrainInterfaceData iface, CodeTypeDeclaration factoryClass)
         {
             RecordReferencedNamespaceAndAssembly(typeof(GrainId));
-            RecordReferencedNamespaceAndAssembly(iface.Type);
-            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.Type);
+            RecordReferencedNamespaceAndAssembly(iface.TypeInfo);
+            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.TypeInfo);
             var interfaceName = iface.InterfaceTypeName;
 
             Action<string> add = codeFmt =>
                 factoryClass.Members.Add(new CodeSnippetTypeMember(
                      String.Format(codeFmt, FixupTypeName(interfaceName))));
 
-            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
-            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
+            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.TypeInfo);
+            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.TypeInfo);
 
-            bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
-            bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
-            bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
+            bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.TypeInfo);
+            bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.TypeInfo);
+            bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.TypeInfo);
             bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
 
             if (isLongCompoundKey)
@@ -503,7 +503,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                     @"CType(Global.Orleans.Runtime.GrainReference.CastInternal(GetType({0}), Function(gr As GrainReference) New {1}(gr), grainRef, {2}),{0})",
                     FixupTypeName(si.InterfaceTypeName), // Interface type for references for this grain
                     FixupTypeName(si.ReferenceClassName), // Concrete class for references for this grain
-                    GrainInterfaceData.GetGrainInterfaceId(si.Type));
+                    GrainInterfaceData.GetGrainInterfaceId(si.TypeInfo));
             }
 
             var methodImpl = string.Format(@"
@@ -530,7 +530,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 if (paramInfo.ParameterType.GetInterface("Orleans.Runtime.IAddressable") != null && !typeof(GrainReference).IsAssignableFrom(paramInfo.ParameterType))
                     invokeArguments += string.Format("If(typeof({0}) is Global.Orleans.Grain, {0}.AsReference<{1}>(),{0})",
                         GetParameterName(paramInfo),
-                        TypeUtils.GetTemplatedName(paramInfo.ParameterType, _ => true, Language.VisualBasic));
+                        TypeUtils.GetTemplatedName(paramInfo.ParameterType.GetTypeInfo(), _ => true, Language.VisualBasic));
                 else
                     invokeArguments += GetParameterName(paramInfo);
 
@@ -680,7 +680,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
                 foreach (Type argument in type.GetGenericArguments())
                     AddReferencedAssembly(argument);
 
-            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace), Language.VisualBasic);
+            var typeName = TypeUtils.GetTemplatedName(type.GetTypeInfo(), t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace), Language.VisualBasic);
             typeName = GetNestedClassName(typeName);
             typeName = typeName.Replace("<", "(Of ").Replace(">", ")");
             return typeName;

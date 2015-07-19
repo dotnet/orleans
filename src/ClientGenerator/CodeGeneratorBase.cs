@@ -100,7 +100,7 @@ namespace Orleans.CodeGeneration
         internal static GrainInterfaceInfo GetInterfaceInfo(Type grainType)
         {
             var result = new GrainInterfaceInfo();
-            Dictionary<int, Type> interfaces = GrainInterfaceData.GetRemoteInterfaces(grainType);
+            Dictionary<int, TypeInfo> interfaces = GrainInterfaceData.GetRemoteInterfaces(grainType.GetTypeInfo());
             if (interfaces.Keys.Count == 0)
             {
                 // Should never happen!
@@ -110,7 +110,7 @@ namespace Orleans.CodeGeneration
             IEqualityComparer<InterfaceInfo> ifaceComparer = new InterfaceInfoComparer();
             foreach (var interfaceId in interfaces.Keys)
             {
-                Type interfaceType = interfaces[interfaceId];
+                TypeInfo interfaceType = interfaces[interfaceId];
                 var interfaceInfo = new InterfaceInfo(interfaceType);
 
                 if (!result.Interfaces.Values.Contains(interfaceInfo, ifaceComparer))
@@ -268,7 +268,7 @@ namespace Orleans.CodeGeneration
                     AddReferencedAssembly(argument);
             }
 
-            var typeName = TypeUtils.GetTemplatedName(type, t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace), language);
+            var typeName = TypeUtils.GetTemplatedName(type.GetTypeInfo(), t => CurrentNamespace != t.Namespace && !ReferencedNamespaces.Contains(t.Namespace), language);
             return GetNestedClassName(typeName);
         }
 
@@ -304,7 +304,7 @@ namespace Orleans.CodeGeneration
             private Dictionary<int, MethodInfo> GetGrainMethods()
             {
                 var grainMethods = new Dictionary<int, MethodInfo>();
-                foreach (var interfaceMethodInfo in GrainInterfaceData.GetMethods(InterfaceType))
+                foreach (var interfaceMethodInfo in GrainInterfaceData.GetMethods(InterfaceType.GetTypeInfo()))
                 {
                     ParameterInfo[] parameters = interfaceMethodInfo.GetParameters();
                     var args = new Type[parameters.Length];
@@ -343,8 +343,8 @@ namespace Orleans.CodeGeneration
 
             public bool Equals(InterfaceInfo x, InterfaceInfo y)
             {
-                var xFullName = TypeUtils.GetFullName(x.InterfaceType);
-                var yFullName = TypeUtils.GetFullName(y.InterfaceType);
+                var xFullName = TypeUtils.GetFullName(x.InterfaceType.GetTypeInfo());
+                var yFullName = TypeUtils.GetFullName(y.InterfaceType.GetTypeInfo());
                 return String.CompareOrdinal(xFullName, yFullName) == 0;
             }
 

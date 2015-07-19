@@ -24,7 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
+using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime.Providers;
@@ -170,17 +170,17 @@ namespace Orleans.Runtime
 
         private void AddToGrainInterfaceToClassMap(Type grainClass, IEnumerable<Type> grainInterfaces, bool isUnordered)
         {
-            var grainClassCompleteName = TypeUtils.GetFullName(grainClass);
+            var grainClassCompleteName = TypeUtils.GetFullName(grainClass.GetTypeInfo());
             var isGenericGrainClass = grainClass.ContainsGenericParameters;
-            var grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainClass);
+            var grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainClass.GetTypeInfo());
             var placement = GrainTypeData.GetPlacementStrategy(grainClass);
 
             foreach (var iface in grainInterfaces)
             {
-                var ifaceCompleteName = TypeUtils.GetFullName(iface);
+                var ifaceCompleteName = TypeUtils.GetFullName(iface.GetTypeInfo());
                 var ifaceName = TypeUtils.GetRawClassName(ifaceCompleteName);
                 var isPrimaryImplementor = IsPrimaryImplementor(grainClass, iface);
-                var ifaceId = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface);
+                var ifaceId = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface.GetTypeInfo());
                 grainInterfaceMap.AddEntry(ifaceId, iface, grainClassTypeCode, ifaceName, grainClassCompleteName, 
                     grainClass.Assembly.CodeBase, isGenericGrainClass, placement, isPrimaryImplementor);
             }

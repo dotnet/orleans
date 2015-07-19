@@ -70,7 +70,7 @@ namespace Orleans.CodeGeneration
                 noNamespace = t => true;
 
             referred(type);
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.FSharp);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type.GetTypeInfo(), Language.FSharp);
 
             if (!type.IsGenericType)
             {
@@ -104,7 +104,7 @@ namespace Orleans.CodeGeneration
 
         protected override CodeTypeDeclaration GetStateClass(GrainInterfaceData grainInterfaceData, Action<Type> referred, string stateClassBaseName, string stateClassName, out bool hasStateClass)
         {
-            var sourceType = grainInterfaceData.Type;
+            var sourceType = grainInterfaceData.TypeInfo;
             stateClassName = FixupTypeName(stateClassName);
             CodeTypeParameterCollection genericTypeParams = grainInterfaceData.GenericTypeParams;
             Func<Type, bool> nonamespace = t => false;
@@ -114,7 +114,7 @@ namespace Orleans.CodeGeneration
                 .ToDictionary(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1), p => p);
 
             Dictionary<string, string> properties = asyncProperties.ToDictionary(p => p.Key,
-                    p => GetGenericTypeName(GrainInterfaceData.GetPromptType(p.Value.PropertyType), referred, nonamespace));
+                    p => GetGenericTypeName(GrainInterfaceData.GetPromptType(p.Value.PropertyType.GetTypeInfo()), referred, nonamespace));
 
             hasStateClass = properties.Count > 0;
 
@@ -130,7 +130,7 @@ namespace Orleans.CodeGeneration
             StartNewLine();
             generatedCode.AppendFormat(@"[<System.SerializableAttribute()>]");
             StartNewLine();
-            var grainName = grainInterfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type);
+            var grainName = grainInterfaceData.TypeInfo.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.TypeInfo);
             generatedCode.AppendFormat(@"[<global.Orleans.CodeGeneration.GrainStateAttribute(""{0}"")>]", grainName);
             StartNewLine();
             generatedCode.AppendFormat(@"type {0} {1}", typeAccess, stateClassBaseName);

@@ -28,6 +28,7 @@ using System.Net;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;
+using System.Reflection;
 
 namespace Orleans.Serialization
 {
@@ -1043,7 +1044,7 @@ namespace Orleans.Serialization
 
         internal static void SerializeType(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            stream.Write(((Type)obj).OrleansTypeName());
+            stream.Write(((TypeInfo)obj).OrleansTypeName());
         }
 
         internal static object DeserializeType(Type expected, BinaryTokenStreamReader stream)
