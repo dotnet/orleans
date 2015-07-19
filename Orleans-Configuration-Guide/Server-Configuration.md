@@ -52,7 +52,7 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
 
  Usually, a service built on Orleans is deployed on a cluster of nodes, either on dedicated hardware or in Azure. For development and basic testing, Orleans can be deployed in a single node configuration. When deployed to a cluster of nodes, Orleans internally implements a set of protocols to discover and maintain membership of Orleans silos in the cluster, including detection of node failures and automatic reconfiguration.
 
- For reliable management of cluster membership, Orleans uses the Azure Table or SQL Server for synchronization of nodes. The reliable membership setup requires configuring the 'SystemStore' element settings in the silo configuration file:
+ For reliable management of cluster membership, Orleans uses Azure Table, SQL Server or Apache ZooKeeper for synchronization of nodes. The reliable membership setup requires configuring the 'SystemStore' element settings in the silo configuration file:
 
 
 ``` xml
@@ -67,6 +67,16 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
 <SystemStore SystemStoreType="SqlServer"
              DeploymentId="..."
              DataConnectionString="..."/>
+
+```
+
+ or 
+
+``` xml
+<SystemStore SystemStoreType="ZooKeeper"
+             DeploymentId="..."
+             DataConnectionString="..."/>
+
 ```
 
  DeploymentId is a unique string that defines a particular deployment. When deploying an Orleans based service to Azure it makes most sense to use the Azure deployment ID of the worker role.
@@ -79,11 +89,11 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
 ```
 
 ## Primary Silo
-In a reliable deployment, one that is configured with membership using Azure Table, all silos are created equal, with no notion of primary or secondary silos. That is the configuration that is recommended for production that will survive a failure of any individual node or a combination of nodes. For example, Azure periodically rolls out OS patches and that causes all of the role instances to reboot eventually.
+In a reliable deployment, one that is configured with membership using Azure Table, SQL Server or ZooKeeper, all silos are created equal, with no notion of primary or secondary silos. That is the configuration that is recommended for production that will survive a failure of any individual node or a combination of nodes. For example, Azure periodically rolls out OS patches and that causes all of the role instances to reboot eventually.
 
  For development or a non-reliable deployment when MembershipTableGrain is used, one of the silos has to be designated as Primary and has to start and initialize before other, Secondary, silos that wait for Primary to initialize before joining the cluster. In case of a failure of the Primary node, the whole deployment stops working properly and has to be restarted. 
 
- In a non-Azure environment, Primary is designated in the configuration file with the following setting within the Globals section.
+Primary is designated in the configuration file with the following setting within the Globals section.
 
 
 ``` xml
