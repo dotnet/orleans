@@ -102,6 +102,7 @@ namespace Orleans.Runtime
         
         
         internal readonly string Name;
+        internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; private set; }
         internal GlobalConfiguration GlobalConfig { get { return globalConfig; } }
         internal NodeConfiguration LocalConfig { get { return nodeConfig; } }
@@ -225,8 +226,13 @@ namespace Orleans.Runtime
             
             messageCenter = mc;
 
+            SiloIdentity = SiloAddress.ToLongString();
+
             // GrainRuntime can be created only here, after messageCenter was created.
-            grainRuntime = new GrainRuntime(SiloAddress.ToLongString(), grainFactory,
+            grainRuntime = new GrainRuntime(
+                globalConfig.ServiceId,
+                SiloIdentity, 
+                grainFactory,
                 new TimerRegistry(),
                 new ReminderRegistry(),
                 new StreamProviderManager());
@@ -397,7 +403,7 @@ namespace Orleans.Runtime
             // Set up an execution context for this thread so that the target creation steps can use asynch values.
             RuntimeContext.InitializeMainThread();
 
-            SiloProviderRuntime.Initialize(GlobalConfig, grainFactory);
+            SiloProviderRuntime.Initialize(GlobalConfig, SiloIdentity, grainFactory);
             statisticsProviderManager = new StatisticsProviderManager("Statistics", SiloProviderRuntime.Instance);
             string statsProviderName =  statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
                 .WaitForResultWithThrow(initTimeout);

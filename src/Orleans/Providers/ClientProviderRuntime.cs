@@ -98,6 +98,14 @@ namespace Orleans.Providers
             }
         }
 
+        public string SiloIdentity
+        {
+            get
+            {
+                throw new InvalidOperationException("Cannot access SiloIdentity from client.");
+            }
+        }
+
         public string ExecutingEntityIdentity()
         {
             return RuntimeClient.Current.Identity;
