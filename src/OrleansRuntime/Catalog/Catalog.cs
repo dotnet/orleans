@@ -554,7 +554,8 @@ namespace Orleans.Runtime
             Type stateObjectType = grainTypeData.StateObjectType;
             lock (data)
             {
-                var grain = (Grain) Activator.CreateInstance(grainType);
+                //var grain = (Grain) Activator.CreateInstance(grainType);
+                var grain = (Grain) Runtime.Silo.CurrentSilo.DependencyResolver.GetService(grainType);
                 grain.Identity = data.Identity;
                 grain.Runtime = grainRuntime;
                 data.SetGrainInstance(grain);

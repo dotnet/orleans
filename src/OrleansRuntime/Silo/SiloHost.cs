@@ -95,6 +95,9 @@ namespace Orleans.Runtime.Host
         /// <summary> Whether this silo started successfully and is currently running. </summary>
         public bool IsStarted { get; private set; }
 
+        /// <summary> Depdendency resolver to use by the system. It will be automatically disposed when the Silo is terminated.</summary>
+        public IDependencyResolver DependencyResolver { get; private set; }
+
         private TraceLogger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
@@ -151,7 +154,7 @@ namespace Orleans.Runtime.Host
                 if (!GCSettings.IsServerGC)
                     logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\"> and <configuration>-<runtime>-<gcConcurrent enabled=\"false\"/>");
                 
-                orleans = new Silo(Name, Type, Config);
+                orleans = new Silo(Name, Type, Config, DependencyResolver);
             }
             catch (Exception exc)
             {
@@ -534,6 +537,12 @@ namespace Orleans.Runtime.Host
             {
                 if (disposing)
                 {
+                    if (DependencyResolver != null)
+                    {
+                        DependencyResolver.Dispose();
+                        DependencyResolver = null;
+                    }
+
                     if (startupEvent != null)
                     {
                         startupEvent.Dispose();

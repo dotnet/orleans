@@ -584,7 +584,7 @@ namespace Orleans.TestingHost
 
             appDomain = AppDomain.CreateDomain(siloName, null, setup);
 
-            var args = new object[] { siloName, type, config };
+            var args = new object[] { siloName, type, config, null };
 
             var silo = (Silo)appDomain.CreateInstanceFromAndUnwrap(
                 "OrleansRuntime.dll", typeof(Silo).FullName, false,
