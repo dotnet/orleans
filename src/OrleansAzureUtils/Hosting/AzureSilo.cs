@@ -87,7 +87,7 @@ namespace Orleans.Runtime.Host
         #region Azure RoleEntryPoint methods
 
         /// <summary>
-        /// Initialize this Orleans silo for execution with the current Azure deploymentId and role instance
+        /// Initialize this Orleans silo for execution
         /// </summary>
         /// <returns><c>true</c> is the silo startup was successful</returns>
         public bool Start()
@@ -96,22 +96,12 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
-        /// Initialize this Orleans silo for execution
-        /// </summary>
-        /// <param name="config">If null, Config data will be read from silo config file as normal, otherwise use the specified config data.</param>
-        /// <returns><c>true</c> is the silo startup was successful</returns>
-        public bool Start(ClusterConfiguration config)
-        {
-            return Start(null, config);
-        }
-
-        /// <summary>
         /// Initialize this Orleans silo for execution with the specified Azure deploymentId
         /// </summary>
-        /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
         /// <param name="config">If null, Config data will be read from silo config file as normal, otherwise use the specified config data.</param>
+        /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
         /// <returns><c>true</c> is the silo startup was successful</returns>
-        public bool Start(string deploymentId, ClusterConfiguration config)
+        public bool Start(ClusterConfiguration config, string deploymentId = null)
         {
             // Program ident
             Trace.TraceInformation("Starting {0} v{1}", this.GetType().FullName, RuntimeVersion.Current);
@@ -124,7 +114,6 @@ namespace Orleans.Runtime.Host
             string instanceName = serviceRuntimeWrapper.InstanceName;
 
             // Configure this Orleans silo instance
-
             if (config == null)
             {
                 host = new SiloHost(instanceName);
