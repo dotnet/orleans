@@ -96,7 +96,7 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
-        /// Initialize this Orleans silo for execution with the specified Azure deploymentId and role instance
+        /// Initialize this Orleans silo for execution
         /// </summary>
         /// <param name="config">If null, Config data will be read from silo config file as normal, otherwise use the specified config data.</param>
         /// <returns><c>true</c> is the silo startup was successful</returns>
@@ -106,7 +106,7 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
-        /// Initialize this Orleans silo for execution with the specified Azure deploymentId and role instance
+        /// Initialize this Orleans silo for execution with the specified Azure deploymentId
         /// </summary>
         /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
         /// <param name="config">If null, Config data will be read from silo config file as normal, otherwise use the specified config data.</param>
