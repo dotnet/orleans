@@ -69,6 +69,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task InitializeGatewayListProvider(ClientConfiguration config, TraceLogger traceLogger)
         {
+            logger = traceLogger;
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.InitializeGatewayListProvider called.");
 
             deploymentId = config.DeploymentId;            
