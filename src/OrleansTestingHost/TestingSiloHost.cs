@@ -305,6 +305,16 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Start a Secondary silo with a given instanceCounter 
+        /// (allows to set the port number as before or new, depending on the scenario).
+        /// </summary>
+        public void StartSecondarySilo(TestingSiloOptions secondarySiloOptions, int instanceCounter)
+        {
+            secondarySiloOptions.PickNewDeploymentId = false;
+            Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, instanceCounter);
+        }
+
+        /// <summary>
         /// Do a semi-graceful Stop of the specified silo.
         /// </summary>
         /// <param name="instance">Silo to be stopped.</param>
