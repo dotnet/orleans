@@ -11,6 +11,8 @@ Orleans - Distributed Actor Model
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/orleans?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
+[![Issues Tracking](https://waffle.io/dotnet/orleans)](http://waffle.io/dotnet/orleans)
+
 Orleans is a framework that provides a straight-forward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
 It was created by [Microsoft Research][MSR-ProjectOrleans] and designed for use in the cloud. 
 Orleans has been used extensively running in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 cloud services, as well as by [a number of other projects and companies](http://dotnet.github.io/orleans/Who-Is-Using-Orleans).
