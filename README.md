@@ -1,6 +1,9 @@
 Orleans - Distributed Actor Model
 =======
 
+![Orleans logo](https://github.com/dotnet/orleans/blob/gh-pages/Icons/Orleans/OrleansSDK_128x.png)
+
+
 [![Build status](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/)
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
 [![Issue Stats](http://www.issuestats.com/github/dotnet/orleans/badge/pr)](http://www.issuestats.com/github/dotnet/orleans)
