@@ -231,10 +231,7 @@ namespace Orleans.Messaging
                 // Only try to reconnect if we're not shutting down
                 if (Cts.IsCancellationRequested) return 0;
 
-                if (ex is SocketException)
-                {
-                    Log.Warn(ErrorCode.Runtime_Error_100158, "Exception receiving from gateway " + gatewayConnection.Address);
-                }
+                Log.Warn(ErrorCode.Runtime_Error_100158, String.Format("Exception receiving from gateway {0}: {1}", gatewayConnection.Address, ex.Message));
                 gatewayConnection.MarkAsDisconnected(socketCapture);
                 return 0;
             }

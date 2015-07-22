@@ -80,6 +80,7 @@
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
+    <Compile Include="MembershipTests\LivenessTests.cs" />
     <Compile Include="ObserverTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">

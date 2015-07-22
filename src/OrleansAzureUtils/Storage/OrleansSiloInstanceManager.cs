@@ -241,21 +241,28 @@ namespace Orleans.AzureUtils
 
         private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()
         {
-            logger.Info(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0} ...", this.DeploymentId);
+            if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
             const string zeroPort = "0";
 
-            Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
-                instance.PartitionKey == this.DeploymentId
-                && instance.Status == INSTANCE_STATUS_ACTIVE
-                && instance.ProxyPort != zeroPort;
+            try
+            {
+                Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
+                    instance.PartitionKey == this.DeploymentId
+                    && instance.Status == INSTANCE_STATUS_ACTIVE
+                    && instance.ProxyPort != zeroPort;
 
-            var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
-                                .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+                var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
+                                    .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
 
-            List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
+                List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
-            logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos.", gatewaySiloInstances.Count);
-            return gatewaySiloInstances;
+                logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);
+                return gatewaySiloInstances;
+            }catch(Exception exc)
+            {
+                logger.Error(ErrorCode.Runtime_Error_100331, string.Format("Error searching for active gateway silos for deployment {0} ", this.DeploymentId), exc);
+                throw;
+            }
         }
 
         public async Task<string> DumpSiloInstanceTable()

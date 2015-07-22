@@ -20,7 +20,7 @@ namespace UnitTests.MembershipTests
     public class LivenessTestsBase : UnitTestSiloHost
     {
         private const int numAdditionalSilos = 1;
-        private const int numGrains = 100;
+        private const int numGrains = 20;
 
         public TestContext TestContext { get; set; }
 
@@ -99,19 +99,9 @@ namespace UnitTests.MembershipTests
             List<SiloHandle> moreSilos = StartAdditionalSilos(numAdditionalSilos);
             await WaitForLivenessToStabilizeAsync();
 
-            var grains = new List<ILivenessTestGrain>();
             for (int i = 0; i < numGrains; i++)
             {
-                long key = i + 1;
-                var g1 = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
-                grains.Add(g1);
-                Assert.AreEqual(key, g1.GetPrimaryKeyLong());
-                Assert.AreEqual(key.ToString(CultureInfo.InvariantCulture), await g1.GetLabel());
-                if (startTimers)
-                {
-                    await g1.StartTimer();
-                }
-                await LogGrainIdentity(logger, g1);
+                await SendTraffic(i + 1, startTimers);
             }
 
             SiloHandle silo2KillHandle;
@@ -134,25 +124,77 @@ namespace UnitTests.MembershipTests
 
             logger.Info("\n\n\n\nAbout to start sending msg to grain again\n\n\n");
 
-            for (int i = 0; i < grains.Count; i++)
+            for (int i = 0; i < numGrains; i++)
             {
-                long key = i + 1;
-                ILivenessTestGrain g1 = grains[i];
-                Assert.AreEqual(key, g1.GetPrimaryKeyLong());
-                Assert.AreEqual(key.ToString(CultureInfo.InvariantCulture), await g1.GetLabel());
-                await LogGrainIdentity(logger, g1);
+                await SendTraffic(i + 1);
             }
 
             for (int i = numGrains; i < 2 * numGrains; i++)
             {
-                long key = i + 1;
-                ILivenessTestGrain g1 = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
-                grains.Add(g1);
-                Assert.AreEqual(key, g1.GetPrimaryKeyLong());
-                Assert.AreEqual(key.ToString(CultureInfo.InvariantCulture), await g1.GetLabel());
-                await LogGrainIdentity(logger, g1);
+                await SendTraffic(i + 1);
             }
             logger.Info("======================================================");
+        }
+
+        protected async Task Do_Liveness_OracleTest_3()
+        {
+            List<SiloHandle> moreSilos = StartAdditionalSilos(1);
+            await WaitForLivenessToStabilizeAsync();
+
+            await TestTraffic();
+
+            logger.Info("\n\n\n\nAbout to stop a first silo.\n\n\n");
+            TestingSiloOptions secondarySiloOptions = Secondary.Options;
+            StopSilo(Secondary);
+
+            await TestTraffic();
+
+            logger.Info("\n\n\n\nAbout to re-start a first silo.\n\n\n");
+            StartSecondarySilo(secondarySiloOptions, 1);
+
+            await TestTraffic();
+
+            logger.Info("\n\n\n\nAbout to stop a second silo.\n\n\n");
+            StopSilo(moreSilos[0]);
+
+            await TestTraffic();
+
+            logger.Info("======================================================");
+        }
+
+        private async Task TestTraffic()
+        {
+            logger.Info("\n\n\n\nAbout to start sending msg to grain again.\n\n\n");
+            // same grains
+            for (int i = 0; i < numGrains; i++)
+            {
+                await SendTraffic(i + 1);
+            }
+            // new random grains
+            for (int i = 0; i < numGrains; i++)
+            {
+                await SendTraffic(random.Next(10000));
+            }
+        }
+
+        private async Task SendTraffic(long key, bool startTimers = false)
+        {
+            try
+            {
+                ILivenessTestGrain grain = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
+                Assert.AreEqual(key, grain.GetPrimaryKeyLong());
+                Assert.AreEqual(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
+                await LogGrainIdentity(logger, grain);
+                if (startTimers)
+                {
+                    await grain.StartTimer();
+                }
+            }
+            catch (Exception exc)
+            {
+                logger.Info("Exception making grain call: {0}", exc);
+                throw;
+            }
         }
 
         private static async Task LogGrainIdentity(Logger logger, ILivenessTestGrain grain)
@@ -218,8 +260,6 @@ namespace UnitTests.MembershipTests
         //[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("Gabi")]
         public async Task Liveness_Grain_1()
         {
-            GlobalConfiguration config = Primary.Silo.GlobalConfig;
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, config.LivenessType, "LivenessType");
             await Do_Liveness_OracleTest_1();
         }
 
@@ -239,6 +279,12 @@ namespace UnitTests.MembershipTests
         public async Task Liveness_Grain_4_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
+        }
+
+        //[TestMethod, TestCategory("Functional"), TestCategory("Membership")]
+        public async Task Liveness_Grain_5_ShutdownRestartZeroLoss()
+        {
+            await Do_Liveness_OracleTest_3();
         }
     }
 
@@ -280,8 +326,6 @@ namespace UnitTests.MembershipTests
         //[TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_1()
         {
-            GlobalConfiguration config = Primary.Silo.GlobalConfig;
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, config.LivenessType, "LivenessType");
             await Do_Liveness_OracleTest_1();
         }
 
@@ -348,8 +392,6 @@ namespace UnitTests.MembershipTests
         //[TestMethod,  TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_1()
         {
-            GlobalConfiguration config = Primary.Silo.GlobalConfig;
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, config.LivenessType, "LivenessType");
             await Do_Liveness_OracleTest_1();
         }
 
@@ -458,8 +500,6 @@ namespace UnitTests.MembershipTests
         //[TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
         public async Task Liveness_Sql_1()
         {
-            GlobalConfiguration config = Primary.Silo.GlobalConfig;
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.SqlServer, config.LivenessType, "LivenessType");
             await Do_Liveness_OracleTest_1();
         }
 

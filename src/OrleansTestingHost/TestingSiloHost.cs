@@ -305,6 +305,15 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Restart the default Primary and Secondary silos.
+        /// </summary>
+        public void StartSecondarySilo(TestingSiloOptions secondarySiloOptions, int instanceCounter)
+        {
+            secondarySiloOptions.PickNewDeploymentId = false;
+            Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, instanceCounter);
+        }
+
+        /// <summary>
         /// Do a semi-graceful Stop of the specified silo.
         /// </summary>
         /// <param name="instance">Silo to be stopped.</param>
