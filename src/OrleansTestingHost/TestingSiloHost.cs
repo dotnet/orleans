@@ -305,7 +305,8 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// Restart the default Primary and Secondary silos.
+        /// Start a Secondary silo with a given instanceCounter 
+        /// (allows to set the port number as before or new, depending on the scenario).
         /// </summary>
         public void StartSecondarySilo(TestingSiloOptions secondarySiloOptions, int instanceCounter)
         {
