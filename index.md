@@ -105,11 +105,10 @@ Where the journey began!
 * **[Orleans Best Practices](http://research.microsoft.com/apps/pubs/default.aspx?id=244727)** A collection of tips and trick to help design, build, and run an Orleans-based application.
 
 * **[Original Orleans Codeplex site](https://orleans.codeplex.com)** 
-with documentation, samples and discussion forum. 
-Now **deprecated** - all source code, documentation and samples have now been migrated to GitHub.
+[Discussion forum and questions](https://orleans.codeplex.com/discussions).
 
 * **[Orleans on StackOverflow](http://stackoverflow.com/questions/tagged/orleans)** 
-questions about Orleans on stackoverflow. We generally prefer that people ask questions on GitHub or [Codeplex](https://orleans.codeplex.com/discussions) but will answer SO questions as well.
+More questions about Orleans. We generally prefer people ask questions on GitHub or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
 
 * **[Links](Links)** 
 Blog posts, articles and other links about Orleans.
