@@ -108,6 +108,9 @@ Where the journey began!
 with documentation, samples and discussion forum. 
 Now **deprecated** - all source code, documentation and samples have now been migrated to GitHub.
 
+* **[Orleans on StackOverflow](http://stackoverflow.com/questions/tagged/orleans)** 
+questions about Orleans on stackoverflow. We generally prefer that people ask questions on GitHub or [Codeplex](https://orleans.codeplex.com/discussions) but will answer SO questions as well.
+
 * **[Links](Links)** 
 Blog posts, articles and other links about Orleans.
 
