@@ -1035,7 +1035,7 @@ BEGIN
 				[ServiceId] = @serviceId AND @serviceId IS NOT NULL
 				AND [GrainId] = @grainId AND @grainId IS NOT NULL
 				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL
-				AND ETag = @etag AND @etag IS NOT NULL;
+				AND ETag = @etag OR @etag IS NULL;
 		END	
 		COMMIT TRANSACTION;
 		SELECT @newEtag;',
