@@ -465,7 +465,7 @@ namespace Orleans.Runtime.Storage.Relational
         /// <returns></returns>
         internal static async Task DeleteReminderRowsAsync(this IRelationalStorage storage, string serviceId)
         {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpsertReminderRowKey);
+            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.DeleteReminderRowsKey);
             await storage.ExecuteAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;

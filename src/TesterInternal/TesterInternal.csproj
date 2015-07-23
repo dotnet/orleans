@@ -79,6 +79,9 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="MembershipTests\SQLMembershipTableTests.cs" />
+    <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
+    <Compile Include="RemindersTest\SqlRemindersTableTests.cs" />
+    <Compile Include="SqlTestsEnvironment.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />

@@ -25,52 +25,52 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
+using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
-using Orleans.TestingHost;
-using Orleans.AzureUtils;
+using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Storage.Relational;
-using Orleans.Runtime.Storage.Management;
-using System.IO;
-using Orleans.Runtime.Storage.RelationalExtensions;
 using UnitTests.StorageTests;
 
-namespace UnitTests.MembershipTests
+namespace UnitTests.RemindersTest
 {
     /// <summary>
-    /// Tests for operation of Orleans Membership Table using SQL
+    /// Tests for operation of Orleans Reminders Table using SQL
     /// </summary>
     [TestClass]
     [DeploymentItem("CreateOrleansTables_SqlServer.sql")]
-    public class SQLMembershipTableTests
+    public class SQLRemindersTableTests
     {
         public TestContext TestContext { get; set; }
 
         private string deploymentId;
         private SiloAddress siloAddress;
-        private IMembershipTable membership;
         private static IRelationalStorage relationalStorage;
         private const string testDatabaseName = "OrleansTest";
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
-        private readonly TraceLogger logger = TraceLogger.GetLogger("SQLMembershipTableTests", TraceLogger.LoggerType.Application);
+
+        private readonly TraceLogger logger = TraceLogger.GetLogger("SQLReminderTableTests",
+            TraceLogger.LoggerType.Application);
+
+        private Guid serviceId;
+        private SqlReminderTable reminder;
 
         // Use ClassInitialize to run code before running the first test in the class
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("SQLMembershipTableTests", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("SQLReminderTableTests", Logger.Severity.Verbose3);
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
-
             relationalStorage = SqlTestsEnvironment.Setup(testDatabaseName);
         }
 
 
         private async Task Initialize()
         {
+            serviceId = Guid.NewGuid();
             deploymentId = "test-" + Guid.NewGuid();
             int generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddress.NewLocalAddress(generation);
@@ -78,14 +78,14 @@ namespace UnitTests.MembershipTests
             logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
 
             GlobalConfiguration config = new GlobalConfiguration
-            {
-                DeploymentId = deploymentId,                
-                DataConnectionString = relationalStorage.ConnectionString                
-            };
+                                         {
+                                             DeploymentId = deploymentId,
+                                             DataConnectionString = relationalStorage.ConnectionString
+                                         };
 
-            var mbr = new SqlMembershipTable();
-            await mbr.InitializeMembershipTable(config, true, logger).WithTimeout(timeout);
-            membership = mbr;
+            var rmndr = new SqlReminderTable(config);
+            await rmndr.Init(serviceId, deploymentId, config.DataConnectionString).WithTimeout(timeout);
+            reminder = rmndr;
         }
 
 
@@ -93,10 +93,10 @@ namespace UnitTests.MembershipTests
         [TestCleanup]
         public void TestCleanup()
         {
-            if (membership != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
+            if (reminder != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                membership.DeleteMembershipTableEntries(deploymentId).Wait();
-                membership = null;
+                reminder.TestOnlyClearTable().Wait();
+                reminder = null;
             }
             logger.Info("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
         }
@@ -110,50 +110,19 @@ namespace UnitTests.MembershipTests
         }
 
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task MembershipTable_SqlServer_Init()
+        [TestMethod, TestCategory("Reminders"), TestCategory("SqlServer")]
+        public async Task RemindersTable_SqlServer_Init()
         {
             await Initialize();
-            Assert.IsNotNull(membership, "Membership Table handler created");
+            Assert.IsNotNull(reminder, "Reminder Table handler created");
         }
 
 
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task MembershipTable_SqlServer_ReadAll_EmptyTable()
+        [TestMethod, TestCategory("Reminders"), TestCategory("SqlServer")]
+        public async Task RemindersTable_SqlServer_UpsertReminderTwice()
         {
             await Initialize();
-            await MembershipTablePluginTests.MembershipTable_ReadAll_EmptyTable(membership);
-        }
-
-
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task MembershipTable_SqlServer_InsertRow()
-        {
-            await Initialize();
-            await MembershipTablePluginTests.MembershipTable_InsertRow(membership);
-        }
-
-
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task MembershipTable_SqlServer_ReadRow_Insert_Read()
-        {
-            await Initialize();
-            await MembershipTablePluginTests.MembershipTable_ReadRow_Insert_Read(membership);
-        }
-
-
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task MembershipTable_SqlServer_ReadAll_Insert_ReadAll()
-        {
-            await Initialize();
-            await MembershipTablePluginTests.MembershipTable_ReadAll_Insert_ReadAll(membership);
-        }
-
-        [TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task MembershipTable_SqlServer_UpdateRow()
-        {
-            await Initialize();
-            await MembershipTablePluginTests.MembershipTable_UpdateRow(membership);
+            await ReminderTablePluginTests.ReminderTableUpsertTwice(reminder);
         }
     }
 }
