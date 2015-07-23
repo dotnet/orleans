@@ -149,7 +149,18 @@ For all liveness types the common configuration variables are defined in `Global
 
 11. `ExpectedClusterSize` - The expected size of a cluster. Need not be very accurate, can be an overestimate. Used to tune the exponential backoff algorithm of retries to write to Azure table. Default is 20.       
 
-	
+### Design Rationale:
+
+A natural question that might be asked is why not to rely completely on Zookeeper for the cluster membership implementation, potentially by using its out of the box support for [group membership with ephemeral nodes] (http://zookeeper.apache.org/doc/trunk/recipes.html#sc_outOfTheBox)? Why did we bother implementing our own membership protocol? There were primarily three reason:
+
+1) Deployment/Hosting in the Cloud - Zookeeper is not a hosted service (at least at the time of this writing and definitely when we first implemented this protocol there was no version of Zookeeper running as a hosted service by major cloud provider). It means that in the cloud environment Orleans customers will need to deploy/run/manage their own instance of ZK cluster. This is just yet another unnecessary burden, that we did not want to force on our customers. By using Azure Table, we rely on a  hosted, managed service which makes our customers lives much simpler.
+
+2) Direct failure detection - when running with ZK out of the box group membership with ephemeral nodes the failure detection is performed between the cluster nodes (ZK clients) and ZK servers. This may not necessarily correlate with the actual network problems between Orleans servers. Our desired was that the failure detection would more accurately reflect the intra-cluster state of the communication. Specifically, in our design, if Orleans silo cannot communicate with the `MembershipTable` it is not considered dead and can keep working. On the other hand, have we used ZK group membership with ephemeral nodes a disconnection from the ZK server may cause an Orleans client be declared dead, while he may be actually alive and fully functional.
+
+3) Portability and flexibility - as part of Orleans's philosophy, we did not want to have a strong dependence on any particular technology, but rather a flexible design when different components can be switched with different implementations.
+
+
+
 ### Acknowledgements:
 
 We would to acknowledge the contribution of [Alex Kogan](https://www.linkedin.com/pub/alex-kogan/4/b52/3a2) to the design and implementation of the first version of this protocol. This work was done as part of summer internship in Microsoft Research in the Summer of 2011.
