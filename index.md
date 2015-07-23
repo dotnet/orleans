@@ -108,7 +108,7 @@ Where the journey began!
 [Discussion forum and questions](https://orleans.codeplex.com/discussions).
 
 * **[Orleans on StackOverflow](http://stackoverflow.com/questions/tagged/orleans)** 
-More questions about Orleans. We generally prefer people ask questions on GitHub or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
+More questions about Orleans. We generally prefer that people ask questions on [GitHub](https://github.com/dotnet/orleans/issues) or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
 
 * **[Links](Links)** 
 Blog posts, articles and other links about Orleans.
