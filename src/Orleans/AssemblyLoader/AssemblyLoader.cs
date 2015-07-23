@@ -107,7 +107,7 @@ namespace Orleans.Runtime
             try
             {
                 var assembly = Assembly.Load(assemblyName);
-                var foundType = TypeUtils.GetTypes(assembly, type => typeof (T).IsAssignableFrom(type)).First();
+                var foundType = TypeUtils.GetTypes(assembly, type => typeof (T).IsAssignableFrom(type) && !type.IsInterface).First(HasParameterlessConstructor);
 
                 return (T) Activator.CreateInstance(foundType, true);
             }
@@ -116,6 +116,11 @@ namespace Orleans.Runtime
                 logger.Error(ErrorCode.Loader_LoadAndCreateInstance_Failure, exc.Message, exc);
                 throw;
             }
+        }
+
+        private static bool HasParameterlessConstructor(Type t)
+        {
+            return t.GetConstructor(Type.EmptyTypes) != null;
         }
 
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
