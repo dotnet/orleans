@@ -390,9 +390,8 @@ namespace Orleans.Runtime.Storage.Relational
         /// <param name="serviceId">The service ID.</param>
         /// <param name="grainref">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
-        /// <param name="etag">The etag of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-        internal static async Task<string> UpsertReminderRowAsync(this IRelationalStorage storage, string serviceId, GrainReference grainRef, string reminderName, DateTime startTime, TimeSpan period, string etag)
+        internal static async Task<string> UpsertReminderRowAsync(this IRelationalStorage storage, string serviceId, GrainReference grainRef, string reminderName, DateTime startTime, TimeSpan period)
         {
             var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpsertReminderRowKey);
             var ret = await storage.ReadAsync(query, command =>
@@ -415,9 +414,6 @@ namespace Orleans.Runtime.Storage.Relational
 
                 var grainIdConsistentHashParameter = CreateGrainIdConsistentHashParameter(command, grainRef.GetUniformHashCode(), direction);
                 command.Parameters.Add(grainIdConsistentHashParameter);
-
-                var etagParameter = CreateEtagParameter(command, etag, direction);
-                command.Parameters.Add(etagParameter);
             }, (selector, _) =>
             {
                 return Convert.ToBase64String(selector.GetValueOrDefault<byte[]>("ETag"));
@@ -469,7 +465,7 @@ namespace Orleans.Runtime.Storage.Relational
         /// <returns></returns>
         internal static async Task DeleteReminderRowsAsync(this IRelationalStorage storage, string serviceId)
         {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpsertReminderRowKey);
+            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.DeleteReminderRowsKey);
             await storage.ExecuteAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
