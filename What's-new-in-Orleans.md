@@ -24,7 +24,7 @@ If your projects still reference those binaries directly from the SDK folder, yo
 
 **4. Local Silo test environment has been removed from the Orleans SDK**
 
-If you were using the Local Silo environment from the SDK folder for testing your grains, you need to add a silo host project to your solution using the "Orleans Dev/Test Host" Visual Studio project template. Before you do that, make sure you install the [v1.0.9 version of the SDK](https://github.com/dotnet/orleans/releases/download/v1.0.8/orleans_setup.msi). Refer to [samples](https://github.com/dotnet/orleans/tree/master/Samples) for examples of how that is done.
+If you were using the Local Silo environment from the SDK folder for testing your grains, you need to add a silo host project to your solution using the "Orleans Dev/Test Host" Visual Studio project template. Before you do that, make sure you install the [v1.0.9 version of the SDK](https://github.com/dotnet/orleans/releases/download/v1.0.9/orleans_setup.msi). Refer to [samples](https://github.com/dotnet/orleans/tree/master/Samples) for examples of how that is done.
 
 ### Release notes
 
