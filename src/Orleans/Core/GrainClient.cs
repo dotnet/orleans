@@ -228,8 +228,6 @@ namespace Orleans
                         isFullyInitialized = false;
                         grainFactory = new GrainFactory();
 
-                        ClientProviderRuntime.InitializeSingleton(grainFactory);
-
                         if (runtimeClient == null)
                         {
                             runtimeClient = new OutsideRuntimeClient(config, grainFactory);
@@ -285,12 +283,6 @@ namespace Orleans
                 catch (Exception) { }
 
                 RuntimeClient.Current = null;
-
-                try
-                {
-                    ClientProviderRuntime.UninitializeSingleton();
-                }
-                catch (Exception) { }
             }
             outsideRuntimeClient = null;
             grainFactory = null;

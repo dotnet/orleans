@@ -58,6 +58,7 @@ namespace Orleans
         private bool listenForMessages;
         private CancellationTokenSource listeningCts;
 
+        private readonly ClientProviderRuntime clientProviderRuntime;
         private readonly StatisticsProviderManager statisticsProviderManager;
 
         internal ClientStatisticsManager ClientStatistics;
@@ -67,6 +68,7 @@ namespace Orleans
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan resetTimeout = TimeSpan.FromMinutes(1);
 
         private const string BARS = "----------";
 
@@ -179,7 +181,8 @@ namespace Orleans
                     }
                 }
 
-                statisticsProviderManager = new StatisticsProviderManager("Statistics", ClientProviderRuntime.Instance);
+                clientProviderRuntime = new ClientProviderRuntime(grainFactory);
+                statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
                 var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
                     .WaitForResultWithThrow(initTimeout);
                 if (statsProviderName != null)
@@ -227,12 +230,12 @@ namespace Orleans
         private void StreamingInitialize()
         {
             var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable(grainFactory).Result;
-            ClientProviderRuntime.StreamingInitialize(grainFactory, implicitSubscriberTable);
+            clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
             var streamProviderManager = new Streams.StreamProviderManager();
             streamProviderManager
                 .LoadStreamProviders(
                     this.config.ProviderConfigurations,
-                    ClientProviderRuntime.Instance)
+                    clientProviderRuntime)
                 .Wait();
             CurrentStreamProviderManager = streamProviderManager;
         }
@@ -725,6 +728,13 @@ namespace Orleans
 
             Utils.SafeExecute(() =>
             {
+                if (clientProviderRuntime != null)
+                {
+                    clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
+                }
+            }, logger, "Client.clientProviderRuntime.Reset");
+            Utils.SafeExecute(() =>
+            {
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     incomingMessagesThreadTimeTracking.OnStopExecution();
@@ -740,13 +750,13 @@ namespace Orleans
 
             listenForMessages = false;
             Utils.SafeExecute(() =>
+            {
+                if (listeningCts != null)
                 {
-                    if (listeningCts != null)
-                    {
-                        listeningCts.Cancel();
-                    }
-                }, logger, "Client.Stop-ListeningCTS");
-            Utils.SafeExecute(() =>
+                    listeningCts.Cancel();
+                }
+            }, logger, "Client.Stop-ListeningCTS");
+        Utils.SafeExecute(() =>
             {
                 if (transport != null)
                 {
@@ -776,6 +786,14 @@ namespace Orleans
             try
             {
                 UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
+            }
+            catch (Exception) { }
+            try
+            {
+                if (clientProviderRuntime != null)
+                {
+                    clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
+                }
             }
             catch (Exception) { }
             try
