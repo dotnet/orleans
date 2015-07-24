@@ -92,7 +92,6 @@ It is IMPORTANT to start the silo not in OnStart but in Run. Azure may not have 
 Then, in the `ServiceDefinition.csdef` file for this role, add some required configuration items used by the Orleans Azure hosting library to the WorkerRole configuration:
 
 * Add a `ConfigurationSettings` declaration named 'DataConnectionString'. This is the Azure storage location where Orleans Azure hosting library will place / look for its silo instance table. 
-* Add a `LocalStorage` declaration named 'LocalStoreDirectory'. This is the directory that will be used for any local cache directories. 
 * Add an `InternalEndpoint` declaration for a TCP endpoint named 'OrleansSiloEndpoint' 
 * Add an `InternalEndpoint` declaration for a TCP endpoint named 'OrleansProxyEndpoint' 
 
