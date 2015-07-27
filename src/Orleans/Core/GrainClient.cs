@@ -25,15 +25,13 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Core;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 
 namespace Orleans
 {
@@ -347,6 +345,11 @@ namespace Orleans
         public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()
         {
             return RuntimeClient.Current.CurrentStreamProviderManager.GetStreamProviders();
+        }
+
+        internal static IStreamProviderRuntime CurrentStreamProviderRuntime
+        {
+            get { return RuntimeClient.Current.CurrentStreamProviderRuntime; }
         }
 
         public static Streams.IStreamProvider GetStreamProvider(string name)
