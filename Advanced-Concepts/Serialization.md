@@ -16,6 +16,16 @@ There are 2 important features of Orleans's serializer that set it apart from a 
 
 The above two behaviours are provided by the standard .NET binary serializer and it was therefore important for us to support this standard and familiar behaviour in Orleans as well.
 
+# Auto Generated Custom Serializers
+
+Orleans uses the following rules upon which it decides what serializers to generate.
+The rules are:
+
+1) Go over all grain interface and grain class implementation assemblies (these are the assemblies that have the code gen step defined on them via referencing Orleans templates nuget).
+
+2) Out of those assemblies: generate serializers for types that are directly referenced in grain interfaces method signatures or state class signature OR for any type that is marked with  `[Serializable]` attribute.
+
+
 
 
 # Writing Custom Serializers
