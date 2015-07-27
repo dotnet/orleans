@@ -83,9 +83,9 @@ namespace UnitTests.General
         }
 
         [Orleans.CodeGeneration.RegisterSerializerAttribute()]
-        internal class JObjectSerialization
+        internal class JObjectSerialization_Example1
         {
-            static JObjectSerialization()
+            static JObjectSerialization_Example1()
             {
                 Register();
             }
