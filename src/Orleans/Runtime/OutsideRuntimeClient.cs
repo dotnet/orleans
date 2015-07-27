@@ -29,7 +29,6 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Messaging;
 using Orleans.Providers;
@@ -38,6 +37,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Runtime.Configuration;
 using System.Collections.Concurrent;
+using Orleans.Streams;
 
 namespace Orleans
 {
@@ -130,7 +130,12 @@ namespace Orleans
             }
         }
 
-        public Streams.IStreamProviderManager CurrentStreamProviderManager { get; private set; }
+        public IStreamProviderManager CurrentStreamProviderManager { get; private set; }
+
+        public IStreamProviderRuntime CurrentStreamProviderRuntime
+        {
+            get { return clientProviderRuntime; }
+        }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]

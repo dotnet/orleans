@@ -404,6 +404,7 @@ namespace Orleans.Runtime
             RuntimeContext.InitializeMainThread();
 
             SiloProviderRuntime.Initialize(GlobalConfig, SiloIdentity, grainFactory);
+            InsideRuntimeClient.Current.CurrentStreamProviderRuntime = SiloProviderRuntime.Instance;
             statisticsProviderManager = new StatisticsProviderManager("Statistics", SiloProviderRuntime.Instance);
             string statsProviderName =  statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
                 .WaitForResultWithThrow(initTimeout);
