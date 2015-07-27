@@ -146,7 +146,7 @@ namespace Orleans.Streams
             var context = GetStreamProviderRuntime().GetCurrentSchedulingContext();
             if (context != null && !context.ContextType.Equals(SchedulingContextType.Activation))
             {
-                throw new OrleansException(String.Format("Attemping to {0} on a stream not from within Grain context.", caller));
+                throw new OrleansException(String.Format("Attempting to {0} on a stream from outside a Grain context.", caller));
             }
         }
 

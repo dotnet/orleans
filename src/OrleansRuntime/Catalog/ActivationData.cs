@@ -84,12 +84,12 @@ namespace Orleans.Runtime
         #region Method invocation
 
         private ExtensionInvoker extensionInvoker;
-        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType=null)
+        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {
             return GetInvoker(ref lastInvoker, ref extensionInvoker, interfaceId, genericGrainType);
         }
 
-        public static IGrainMethodInvoker GetInvoker(ref IGrainMethodInvoker lastInvoker, ref ExtensionInvoker extensionInvoker, 
+        internal static IGrainMethodInvoker GetInvoker(ref IGrainMethodInvoker lastInvoker, ref ExtensionInvoker extensionInvoker, 
             int interfaceId, string genericGrainType = null)
         {
             // Return previous cached invoker, if applicable
