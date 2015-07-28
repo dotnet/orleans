@@ -269,22 +269,23 @@ namespace Orleans
 
         #region SystemTargets
 
-        private readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
-                    new Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>>();
+        private readonly Dictionary<Tuple<GrainId,Type>, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
+                    new Dictionary<Tuple<GrainId, Type>, Dictionary<SiloAddress, ISystemTarget>>();
 
         internal TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
             where TGrainInterface : ISystemTarget
         {
             Dictionary<SiloAddress, ISystemTarget> cache;
+            Tuple<GrainId, Type> key = Tuple.Create(grainId, typeof(TGrainInterface));
 
             lock (typedSystemTargetReferenceCache)
             {
-                if (typedSystemTargetReferenceCache.ContainsKey(grainId))
-                    cache = typedSystemTargetReferenceCache[grainId];
+                if (typedSystemTargetReferenceCache.ContainsKey(key))
+                    cache = typedSystemTargetReferenceCache[key];
                 else
                 {
                     cache = new Dictionary<SiloAddress, ISystemTarget>();
-                    typedSystemTargetReferenceCache[grainId] = cache;
+                    typedSystemTargetReferenceCache[key] = cache;
                 }
             }
 
@@ -301,16 +302,7 @@ namespace Orleans
                     cache[destination] = reference; // Store for next time
                 }
             }
-
-            if (reference is TGrainInterface)
-            {
-                return (TGrainInterface) reference;
-            }
-            else
-            {
-                // This system target may implement multiple interfaces, so Cast to the one we need
-                return Cast<TGrainInterface>(reference);
-            }
+            return (TGrainInterface) reference;
         }
 
         #endregion
