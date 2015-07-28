@@ -269,33 +269,40 @@ namespace Orleans
 
         #region SystemTargets
 
-        private readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
-                    new Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>>();
+        private readonly Dictionary<Tuple<GrainId,Type>, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
+                    new Dictionary<Tuple<GrainId, Type>, Dictionary<SiloAddress, ISystemTarget>>();
 
         internal TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
             where TGrainInterface : ISystemTarget
         {
             Dictionary<SiloAddress, ISystemTarget> cache;
+            Tuple<GrainId, Type> key = Tuple.Create(grainId, typeof(TGrainInterface));
 
             lock (typedSystemTargetReferenceCache)
             {
-                if (typedSystemTargetReferenceCache.ContainsKey(grainId))
-                    cache = typedSystemTargetReferenceCache[grainId];
+                if (typedSystemTargetReferenceCache.ContainsKey(key))
+                    cache = typedSystemTargetReferenceCache[key];
                 else
                 {
                     cache = new Dictionary<SiloAddress, ISystemTarget>();
-                    typedSystemTargetReferenceCache[grainId] = cache;
+                    typedSystemTargetReferenceCache[key] = cache;
                 }
             }
+
+            ISystemTarget reference;
             lock (cache)
             {
                 if (cache.ContainsKey(destination))
-                    return (TGrainInterface)cache[destination];
-
-                var reference = Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
-                cache[destination] = reference;
-                return reference;
+                {
+                    reference = cache[destination];
+                }
+                else
+                {
+                    reference = Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
+                    cache[destination] = reference; // Store for next time
+                }
             }
+            return (TGrainInterface) reference;
         }
 
         #endregion
