@@ -76,7 +76,7 @@ namespace Orleans
         /// Determines if the SubscriptionManager has the input observer
         /// </summary>
         /// <param name="observer">True if the the observer is already subscribed, otherwise False.</returns>
-        public void HasObserver(T observer)
+        public bool HasObserver(T observer)
         {
             return observers.Contains(observer);
         }
