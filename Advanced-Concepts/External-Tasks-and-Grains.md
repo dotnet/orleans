@@ -12,7 +12,7 @@ In some cases grain code might need to “break out” of the Orleans task sched
 
 1) `await`, `Task.Factory.StartNew`, `Task.ContinuewWith`, `Task.WhenAny`, `Task.WhenAll`, `Task.Delay` all respect the current Task Scheduler. That means that using them in the default way, without passing a different TaskScheduler, will cause them to execute in the grain context.
 
-2) Both `Task.Run and the `endMethod` delegate of `Task.Factory.FromAsync` do NOT respect the current task Scheduler. They both use the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler. Therefore, they will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx). Any continuation of `await` code chained to them will run back under the “current” scheduler at the point the task was created, which is the grain context. 
+2) Both `Task.Run` and the `endMethod` delegate of `Task.Factory.FromAsync` do NOT respect the current task Scheduler. They both use the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler. Therefore, they will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx). Any continuation of `await` code chained to them will run back under the “current” scheduler at the point the task was created, which is the grain context. 
 
 3) `configureAwait(false)` is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler and will thus break the single-threaded execution of Orleans grain.
 
@@ -62,7 +62,7 @@ What are you trying to do?   | How to do it
 ------------- | -------------
 Run background work on .NET thread-pool threads. No grain code or grain calls allowed.  |  `Task.Run`
 Run worker task from grain code with Orleans turn-based concurrency guarantees. | `Task.Factory.StartNew`  
+Grain interface call | Method return types = `Task` or `Task<T>` 
 Timeouts for executing work items  | `Task.Delay` + `Task.WhenAny` 
-Grain interface | Method return types = `Task` or `Task<T>` 
-Use with async/await | The normal .NET Task-Async programming model. Supported & recommended  
+Use with `async`/`await` | The normal .NET Task-Async programming model. Supported & recommended  
  `configureAwait(false)` | Do not use. Will escape Orleans's scheduler
