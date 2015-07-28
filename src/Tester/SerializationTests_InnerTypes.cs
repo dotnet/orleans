@@ -1,10 +1,10 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Collections.Generic;
-using Orleans.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
+using UnitTests.GrainInterfaces;
 
 namespace Tester
 {
@@ -18,73 +18,54 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
-        public void InnerTypeSerializationTests_DictionaryTest()
+        public void InnerTypeSerializationTests_DictionaryTest_TypeNameHandling()
+        {
+            var original = new RootType();
+            var str = JsonConvert.SerializeObject(original, JsonSerialization_Example2.Settings);
+            var jsonDeser = JsonConvert.DeserializeObject<RootType>(str, JsonSerialization_Example2.Settings);
+            // JsonConvert fully deserializes the object back into RootType and InnerType since we are using TypeNameHandling.All setting.
+            Assert.AreEqual(typeof(InnerType), original.MyDictionary["obj1"].GetType());
+            Assert.AreEqual(typeof(InnerType), jsonDeser.MyDictionary["obj1"].GetType());
+            Assert.AreEqual(original, jsonDeser);
+
+            // Orleans's SerializationManager also deserializes everything correctly, but it serializes it into its own binary format
+            var orleansDeser = SerializationManager.RoundTripSerializationForTesting(original);
+            Assert.AreEqual(typeof(InnerType), jsonDeser.MyDictionary["obj1"].GetType());
+            Assert.AreEqual(original, orleansDeser);
+    
+            Console.WriteLine("Done OK.");
+        }
+
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void InnerTypeSerializationTests_DictionaryTest_NoTypeNameHandling()
         {
             var original = new RootType();
             var str = JsonConvert.SerializeObject(original);
-            var jasonDeser = JsonConvert.DeserializeObject<RootType>(str);
-            // The below Assert actualy fails!
-            // JsonConvert leaves inner types as strings after Deserialization.
-            //Assert.AreEqual(original, jasonDeser);
+            var jsonDeser = JsonConvert.DeserializeObject<RootType>(str);
+            // Here we don't use TypeNameHandling.All setting, therefore the full type information is not preserved.
+            // As a result JsonConvert leaves the inner types as JObjects after Deserialization.
+            Assert.AreEqual(typeof(InnerType), original.MyDictionary["obj1"].GetType());
+            Assert.AreEqual(typeof(JObject), jsonDeser.MyDictionary["obj1"].GetType());
+            // The below Assert actualy fails since jsonDeser has JObjects instead of InnerTypes!
+            // Assert.AreEqual(original, jsonDeser);
+    
+            // If we now take this half baked object: RootType at the root and JObject in the leaves
+            // and pass it through .NET binary serializer it would fail on this object since JObject is not marked as [Serializable]
+            // and therefore .NET binary serializer cannot serialize it.
 
+            // If we now take this half baked object: RootType at the root and JObject in the leaves
+            // and pass it through Orleans serializer it would work:
+            // RootType will be serialized with Orleans custom serializer that will be generated since RootType is defined
+            // in GrainInterfaces assembly and markled as [Serializable].
+            // JObject that is referenced from RootType will be serialized with JsonSerialization_Example2 below.
 
-            var orleansDeser = SerializationManager.RoundTripSerializationForTesting(original);
-            // Orleans's SerializationManager deserializes everything correctly!
-            Assert.AreEqual(original, orleansDeser);
+            var orleansJsonDeser = SerializationManager.RoundTripSerializationForTesting(jsonDeser);
+            Assert.AreEqual(typeof(JObject), orleansJsonDeser.MyDictionary["obj1"].GetType());
+            // The below assert fails, but only since JObject does not correctly implement Equals.
+            //Assert.AreEqual(jsonDeser, orleansJsonDeser);
 
             Console.WriteLine("Done OK.");
-        }
-    }
-
-    [Serializable]
-    public class RootType
-    {
-        public RootType()
-        {
-            MyDictionary = new Dictionary<string, object>();
-            MyDictionary.Add("obj1", new InnerType());
-            MyDictionary.Add("obj2", new InnerType());
-            MyDictionary.Add("obj3", new InnerType());
-            MyDictionary.Add("obj4", new InnerType());
-        }
-        public Dictionary<string, object> MyDictionary { get; set; }
-
-        public override bool Equals(object obj)
-        {
-            var actual = obj as RootType;
-            if (actual == null)
-            {
-                return false;
-            }
-            if (MyDictionary == null) return actual.MyDictionary == null;
-            if (actual.MyDictionary == null) return false;
-
-            var set1 = new HashSet<KeyValuePair<string, object>>(MyDictionary);
-            var set2 = new HashSet<KeyValuePair<string, object>>(actual.MyDictionary);
-            bool ret = set1.SetEquals(set2);
-            return ret;
-        }
-    }
-
-    [Serializable]
-    public class InnerType
-    {
-        public InnerType()
-        {
-            Id = Guid.NewGuid();
-            Something = Id.ToString();
-        }
-        public Guid Id { get; set; }
-        public string Something { get; set; }
-
-        public override bool Equals(object obj)
-        {
-            var actual = obj as InnerType;
-            if (actual == null)
-            {
-                return false;
-            }
-            return Id.Equals(actual.Id) && Equals(Something, actual.Something);
         }
     }
 
@@ -94,9 +75,10 @@ namespace Tester
     [RegisterSerializer]
     public class JsonSerialization_Example2
     {
-        private static readonly JsonSerializerSettings _settings = new JsonSerializerSettings
+        internal static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
         {
-            NullValueHandling = NullValueHandling.Ignore
+            NullValueHandling = NullValueHandling.Ignore,
+            TypeNameHandling = TypeNameHandling.All
         };
 
         static JsonSerialization_Example2()
@@ -111,7 +93,7 @@ namespace Tester
 
         public static void Serialize(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            var str = JsonConvert.SerializeObject(obj, _settings);
+            var str = JsonConvert.SerializeObject(obj, Settings);
             SerializationManager.SerializeInner(str, stream, typeof(string));
         }
 
