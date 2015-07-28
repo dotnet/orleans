@@ -14,7 +14,7 @@ In some cases grain code might need to “break out” of the Orleans task sched
 
 2) Both `Task.Run` and the `endMethod` delegate of `Task.Factory.FromAsync` do NOT respect the current task Scheduler. They both use the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler. Therefore, they will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx). Any continuation of `await` code chained to them will run back under the “current” scheduler at the point the task was created, which is the grain context. 
 
-3) `configureAwait(false)` is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler and will thus break the single-threaded execution of Orleans grain.
+3) `configureAwait(false)` is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the `TaskScheduler.Default` scheduler, which is the .NET thread pool and will thus break the single-threaded execution of Orleans grain. You should in general **never ever use `configureAwait(false)` in the grain code.**
 
 4) Methods with signature `async void` should not be used with grains, they are intended for graphical user interface event handlers.
 
