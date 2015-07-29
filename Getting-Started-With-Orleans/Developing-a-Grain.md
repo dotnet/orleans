@@ -16,13 +16,13 @@ The grain client project can use any standard .NET code project template, such a
 A grain cannot be explicitly created or deleted. 
 It always exists "virtually" and is activated automatically when a request is sent to it. 
 A grain has either a GUID or a long integer key within the grain type. 
-Application code creates a reference to a grain by calling the `GetGrain(Guid id)` or `GetGrain(long id)` static factory methods for a specific grain identity. 
+Application code creates a reference to a grain by calling the `GetGrain(Guid id)` or `GetGrain(long id)` of a generic grain factory methods for a specific grain identity. 
 The `GetGrain()` call is a purely local operation to create a grain reference. 
 It does not trigger creation of a grain activation and has not impact on its life cycle. 
 A grain activation is automatically created by the Orleans runtime upon a first request sent to the grain.
 
 A grain interface must inherit from `IGrain`. 
-The GUID or long integer key of a grain can later be retrieved via the `IGrain.GetPrimaryKey()` or `IGrain.GetPrimaryKeyLong()` extension methods, respectively.
+The GUID or long integer key of a grain can later be retrieved via the `GetPrimaryKey()` or `GetPrimaryKeyLong()` extension methods, respectively.
 
 ## Defining the Grain Interface
 
@@ -42,15 +42,17 @@ public interface IPlayerGrain : IGrain
 } 
 ```
 
-## Generating the Class Factory
+## Using the generic Factory class to get an instance of a grain reference proxy
 
-After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate a client proxy and factory classes corresponding to the user-defined grain interfaces and to merge this additional code back into the interface DLL. 
+After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate a client proxy classes corresponding to the user-defined grain interfaces and to merge this additional code back into the interface DLL. 
 The code generation tool, _ClientGenerator.exe_, can also be invoked directly as a part of post-build processing. 
 However this should be used with caution and is generally not recommended.
 
-The most important class in the generated proxy code is the grain factory class, which is named after the grain interface by stripping off the initial "I" and appending "Factory". 
-For instance, if your grain interface is `IPlayerGrain`, then your grain factory class will be called `PlayerGrainFactory`. 
-The namespace for this factory class is the same as that of the grain interface.
+Application shouls use the generic grain factory class to get refernces to other grains.
+
+``` csharp
+    this.GrainFactory.GetGrain<IPlayerGrain>(grainKey);
+```
 
 ## The Implementation Class
 
