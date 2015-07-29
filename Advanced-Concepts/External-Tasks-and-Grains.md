@@ -73,20 +73,20 @@ Below is a code that demonstrates how a grain call can be made from a piece of c
              Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
              // do what ever you need to do here. Now lets say you need to make a grain call.
              Task<int>  t2 = Task<int> .Factory.StartNew(() =>
-            {
+             {
                 // This code runs on Orleans task scheduler since we specified scheduler: orleansTs.
                 Assert.AreEqual(orleansTS, TaskScheduler.Current);
-            },
-            CancellationToken.None, TaskCreationOptions.None,
-            scheduler: orleansTs);
-            int res = await t2;
-            // This code runs back on the thread pool scheduler, not on Orleans task scheduler
+             },
+             CancellationToken.None, TaskCreationOptions.None,
+             scheduler: orleansTs);
+             int res = await t2;
+             // This code runs back on the thread pool scheduler, not on Orleans task scheduler
              Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
              // do more of what you need
              return res;
         } );
-        int result = await t1;
         
+        int result = await t1;
         // We are back to Orleans task scheduler, since await was executed in Orleans task scheduler context we are now back to that context.
         Assert.AreEqual(orleansTS, TaskScheduler.Current); 
    }
