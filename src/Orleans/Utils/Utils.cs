@@ -219,6 +219,32 @@ namespace Orleans.Runtime
             return hash;
         }
 
+        /// <summary>
+        /// Calculates a Guid hash value based on the consistent identity a string.
+        /// </summary>
+        /// <param name="text">The string to hash.</param>
+        /// <returns>An integer hash for the string.</returns>
+        public static Guid CalculateGuidHash(string text)
+        {
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
+            byte[] hash = new byte[16];
+            try
+            {
+                byte[] data = Encoding.Unicode.GetBytes(text);
+                byte[] result = sha.ComputeHash(data);
+                for (int i = 0; i < result.Length; i ++)
+                {
+                    byte tmp =  (byte)(hash[i % 16] ^ result[i]);
+                    hash[i%16] = tmp;
+                }
+            }
+            finally
+            {
+                sha.Dispose();
+            }
+            return new Guid(hash);
+        }
+
         public static bool TryFindException(Exception original, Type targetType, out Exception target)
         {
             if (original.GetType() == targetType)
