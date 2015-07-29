@@ -58,13 +58,24 @@ namespace Orleans
 
         private static GrainFactory grainFactory;
 
+        // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
+        // That means we are running in side a silo.
+        private static bool IsRunningInsideGrain { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
+
         //TODO: prevent client code from using this from inside a Grain
         public static IGrainFactory GrainFactory
         {
             get
             {
+                if (IsRunningInsideGrain)
+                {
+                    throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
+                                               "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+                }
+
                 if (!IsInitialized)
                 {
+               
                     throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
                 }
 
