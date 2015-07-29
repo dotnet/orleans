@@ -13,6 +13,11 @@ Each walkthrough is focused narrowly on just a couple of specific concepts in is
 
 This walkthrough shows you how to create a "Hello World" application using Orleans and run it in the simplest possible single-process environment, one that is convenient for debugging your code. 
 
+## [Minimal Orleans Application](Minimal-Orleans-Application)
+
+This walkthrough is an alternative to the [My First Orleans Application](My-First-Orleans-Application) tutorial. It walks step by step through a basic application, using only the nuget packages. 
+
+
 ## [Running in a Stand-Alone Silo](Running-in-a-Stand-alone-Silo)
 
 In this walkthrough, the simple "Hello World" application is modified to use a more typical environment for services: separate processes for the client and service code. 
