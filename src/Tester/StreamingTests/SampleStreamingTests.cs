@@ -38,9 +38,9 @@ namespace UnitTests.StreamingTests
     [TestClass]
     public class SampleStreamingTests : UnitTestSiloHost
     {
-        private const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        internal const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
         private const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
-        private const string StreamNamespace = "SampleStreamNamespace";
+        internal const string StreamNamespace = "SampleStreamNamespace";
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private Guid streamId;

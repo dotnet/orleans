@@ -500,7 +500,7 @@ namespace Orleans.Runtime
 
                 var bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
-                    () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations),
+                    () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations, siloStreamProviderManager),
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
                 BootstrapProviders = bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics

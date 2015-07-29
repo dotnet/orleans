@@ -21,6 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 
 using Orleans.CodeGeneration;
@@ -51,5 +53,16 @@ namespace Orleans
     internal interface IInvokable
     {
         IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null);
+        bool TryAddExtension(IGrainExtensionMethodInvoker invoker, IGrainExtension extension);
+        void RemoveExtension(IGrainExtension extension);
+        bool TryGetExtensionHandler(Type extensionType, out IGrainExtension result);
+    }
+
+    // Runtime component that supports using streams from within it (SystemTarget and ActivationData)
+    internal interface IStreamable
+    {
+        Streams.StreamDirectory GetStreamDirectory();
+        bool IsUsingStreams { get; }
+        Task DeactivateStreamResources();
     }
 }

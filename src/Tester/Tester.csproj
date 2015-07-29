@@ -93,6 +93,7 @@
     <Compile Include="SimpleGrainTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
+    <Compile Include="StreamingTests\BootstrapProviderStreamingTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
     <Compile Include="UnitTestSiloHost.cs" />
   </ItemGroup>
