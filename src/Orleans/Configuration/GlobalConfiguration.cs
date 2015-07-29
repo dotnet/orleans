@@ -619,13 +619,22 @@ namespace Orleans.Runtime.Configuration
                             MembershipTableAssembly = child.GetAttribute("MembershipTableAssembly");
                             if (LivenessType != LivenessProviderType.Custom)
                                 throw new FormatException("SystemStoreType should be \"Custom\" when MembershipTableAssembly specified");
+                            if (MembershipTableAssembly.EndsWith(".dll"))
+                                throw new FormatException("Use fully qualified assembly name for \"MembershipTableAssembly\"");
                         }
                         if (child.HasAttribute("ReminderTableAssembly"))
                         {
                             ReminderTableAssembly = child.GetAttribute("ReminderTableAssembly");
                             if (ReminderServiceType != ReminderServiceProviderType.Custom)
                                 throw new FormatException("ReminderServiceType should be \"Custom\" when ReminderTableAssembly specified");
+                            if (ReminderTableAssembly.EndsWith(".dll"))
+                                throw new FormatException("Use fully qualified assembly name for \"ReminderTableAssembly\"");
                         }
+                        if (LivenessType == LivenessProviderType.Custom && string.IsNullOrEmpty(MembershipTableAssembly))
+                            throw new FormatException("MembershipTableAssembly should be set when SystemStoreType is \"Custom\"");
+                        if (ReminderServiceType == ReminderServiceProviderType.Custom && String.IsNullOrEmpty(ReminderTableAssembly))
+                            throw new FormatException("ReminderTableAssembly should be set when ReminderServiceType is \"Custom\"");
+
                         if (child.HasAttribute("ServiceId"))
                         {
                             ServiceId = ConfigUtilities.ParseGuid(child.GetAttribute("ServiceId"),
