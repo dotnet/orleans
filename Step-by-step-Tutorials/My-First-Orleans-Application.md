@@ -119,7 +119,7 @@ In place of the comment following the call to `OrleansClient.Initialize()`, add 
 
 
 ``` csharp
-    var hello = MyGrainInterfaces1.Grain1Factory.GetGrain(0);
+    var hello = GrainClient.GrainFactory.GetGrain<IGrain1 >(0);
     Console.WriteLine("\n\n{0}\n\n", hello.SayHello().Result);
 ```
 
