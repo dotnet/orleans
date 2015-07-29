@@ -35,6 +35,6 @@ namespace Orleans.Streams
         /// Perform cleanup functions for this stream.
         /// </summary>
         /// <returns>Completion promise for the cleanup operstions for this stream.</returns>
-        Task Cleanup(bool cleanupProducers = true, bool cleanupConsumers = false);
+        Task Cleanup(bool cleanupProducers, bool cleanupConsumers);
     }
 }

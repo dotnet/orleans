@@ -238,11 +238,13 @@ namespace Orleans.Streams
                                      .Aggregate(0, (count,o) => count + o.GetObserverCountForStream(streamId));
         }
 
-        internal List<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
+        internal IList<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
         {
             return allStreamObservers.Values
                 .OfType<ObserversCollection<T>>()
-                .Select(o => o.GetLocalObserver()).ToList();
+                .Select(o => o.GetLocalObserver())
+                .Where(o => o != null)
+                .ToList();
         }
     }
 }
