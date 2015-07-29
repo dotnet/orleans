@@ -48,14 +48,14 @@ After the grain interface has been defined, building the project originally crea
 The code generation tool, _ClientGenerator.exe_, can also be invoked directly as a part of post-build processing. 
 However this should be used with caution and is generally not recommended.
 
-Application should use the generic grain factory class to get references to grains. Inside the grain the factory is availiable via the Grain class member property. On the client side the factory is availiable via `GrainClient.GrainFactory` static field.
+Application should use the generic grain factory class to get references to grains. Inside the grain code the factory is availiable via the protected Grain class member property. On the client side the factory is availiable via the `GrainClient.GrainFactory` static field.
 
-When running inside a grain the following code should be used to get grain reference:
+When running inside a grain the following code should be used to get the grain reference:
 
 ``` csharp
     this.GrainFactory.GetGrain<IPlayerGrain>(grainKey);
 ```
-When running on the Orleans client side the following code should be used to get grain reference:
+When running on the Orleans client side the following code should be used to get the grain reference:
 
 ``` csharp
     GrainClient.GrainFactory.GetGrain<IPlayerGrain>(grainKey);
