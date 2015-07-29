@@ -11,12 +11,12 @@ In distributed systems, object references cannot represent instance identity, si
 That is certainly the case for .NET references. 
 Furthermore, a virtual actor must have an identity regardless of whether it is active, so that we can activate it on demand. 
 Therefore grains have a primary key. 
-The primary key can be either a GUID (A Globally Unique Identifier) or a long integer.
+The primary key can be either a GUID (A Globally Unique Identifier), a long integer, or a string.
 
 The primary key is scoped to the grain type. 
 Therefore, the complete identity of a grain is formed from the actor type and its key. 
 
-The caller of the grain decides whether a long or a GUID scheme should be used. 
+The caller of the grain decides a long, a GUID, or a string scheme should be used. 
 In fact the underlying data is the same, so the schemes can be used interchangeably. 
 When a long is used, a GUID is actually created, and padded with zeros.
 
@@ -32,7 +32,7 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
 Referencing a grain by GUID in client code:
 
 ``` csharp
-var grain = ExampleGrainFactor.GetGrain(Guid.NewGuid());
+var grain = GrainClient.GrainFactory.GetGrain<IExample>(Guid.NewGuid());
 ```
 
 Retrieving the primary key from grain code:
@@ -52,7 +52,7 @@ A long integer is also available, which would make sense if the grain is persist
 Referencing a grain by GUID in client code:
 
 ``` csharp
-var grain = ExampleGrainFactor.GetGrain(1);
+var grain = GrainClient.GrainFactory.GetGrain<IExample>(1);
 ```
 
 Retrieving the primary key form grain code:
@@ -61,6 +61,26 @@ Retrieving the primary key form grain code:
 public override Task OnActivateAsync()
 {
     long primaryKey = this.GetPrimaryKeyLong();
+    return base.OnActivateAsync();
+}
+```
+
+## Using Strings
+
+A string is also available.
+
+Referencing a grain by String in client code:
+
+``` csharp
+var grain = GrainClient.GrainFactory.GetGrain<IExample>("myGrainKey");
+```
+
+Retrieving the primary key form grain code:
+
+``` csharp
+public override Task OnActivateAsync()
+{
+    string primaryKey = this.GetPrimaryKeyString();
     return base.OnActivateAsync();
 }
 ```
@@ -82,7 +102,7 @@ public interface IExampleGrain : Orleans.IGrain
 In client code, this adds a second argument to the `GetGrain` method on the grain factory.
 
 ``` csharp
-var grain = ExampleGrainFactory.GetGrain(0, "a string!");
+var grain = GrainClient.GrainFactory.GetGrain<IExample>(0, "a string!");
 ```
 
 Notice we still have a primary key, which can still be either a GUID or a long. 
@@ -95,7 +115,7 @@ public class ExampleGrain : Orleans.GrainBase, IExampleGrain
 {
     public Task Hello()
     {
-	    string extendedKey;
+	string extendedKey;
         long primaryKey = this.GetPrimaryKey(out extendedKey);
         Console.WriteLine("Hello from " + extendedKey);
         return TaskDone.Done;
