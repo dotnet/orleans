@@ -67,21 +67,21 @@ Below is a code that demonstrates how a grain call can be made from a piece of c
    {
         // Grab the Orleans task scheduler
         var orleansTs = TaskScheduler.Current; 
-        Task<int> t1 = Task<int>.Run( () => 
+        Task<int> t1 = Task.Run(async () => 
         { 
              // This code runs on the thread pool scheduler, not on Orleans task scheduler
              Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
              // You can do what ever you need to do here. Now lets say you need to make a grain call.
-             Task<int> t2 = Task<int>.Factory.StartNew(async () =>
+             Task<Task<int>> t2 = Task.Factory.StartNew(() =>
              {
-                // This code runs on Orleans task scheduler since we specified scheduler: orleansTs.
+                // This code runs on Orleans task scheduler since we specified the scheduler: orleansTs.
                 Assert.AreEqual(orleansTS, TaskScheduler.Current);
+                return GrainFactory.GetGrain<IFooGrain>(0).MakeGrainCall();
              }, CancellationToken.None, TaskCreationOptions.None, scheduler: orleansTs);
              
-             int res = await t2;
+             int res = await (await t2); // double await, unrelated to Orleans, just part of TPL APIs.
              // This code runs back on the thread pool scheduler, not on Orleans task scheduler
              Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
-             // do more of what you need
              return res;
         } );
         
