@@ -19,7 +19,7 @@ To subscribe to a notification, the client must first create a local C# object t
 It then calls a static method on the observer factory, `CreateObjectReference()`, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.
 
 This model can also be used by other grains to receive asynchronous notifications. 
-Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `MyGrainFactory.Cast(this)`).
+Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `this.AsReference<IMyGrainObserverInterface>`).
 
 ##Next
 
