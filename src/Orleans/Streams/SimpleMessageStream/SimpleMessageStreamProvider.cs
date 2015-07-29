@@ -65,7 +65,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 () => new StreamImpl<T>(streamId, this, IsRewindable));
         }
 
-        public IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime, fireAndForgetDelivery, IsRewindable);
         }

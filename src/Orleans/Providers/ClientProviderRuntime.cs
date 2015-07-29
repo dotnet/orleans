@@ -70,7 +70,7 @@ namespace Orleans.Providers
             {
                 var tmp = streamDirectory;
                 streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
-                await tmp.Cleanup();
+                await tmp.Cleanup(true, true);
             }
         }
 

@@ -1022,6 +1022,7 @@ namespace Orleans
         Stream_ExtensionNotInstalled                = StreamProviderManagerBase + 5,
         Stream_ProducerIsDead                       = StreamProviderManagerBase + 6,
         StreamProvider_NoStreamForBatch             = StreamProviderManagerBase + 7,
+        StreamProvider_ConsumerFailedToUnregister   = StreamProviderManagerBase + 8,
 
         PersistentStreamPullingManagerBase = Runtime + 3500,
         PersistentStreamPullingManager_01 = PersistentStreamPullingManagerBase + 1,
