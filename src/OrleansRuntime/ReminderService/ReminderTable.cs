@@ -31,7 +31,7 @@ namespace Orleans.Runtime.ReminderService
     {
         internal static IReminderTable Singleton { get; private set; }
 
-        public static void Initialize(Silo silo, IGrainFactory grainFactory, string reminderTableAssembly)
+        public static void Initialize(Silo silo, IGrainFactory grainFactory, string reminderTableAssembly = null)
         {
             var config = silo.GlobalConfig;
             var serviceType = config.ReminderServiceType;

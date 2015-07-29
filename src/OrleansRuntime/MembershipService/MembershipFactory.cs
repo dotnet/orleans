@@ -58,7 +58,7 @@ namespace Orleans.Runtime.MembershipService
             return new MembershipOracle(silo, membershipTable);
         }
 
-        internal IMembershipTable GetMembershipTable(GlobalConfiguration.LivenessProviderType livenessType, string membershipTableAssembly)
+        internal IMembershipTable GetMembershipTable(GlobalConfiguration.LivenessProviderType livenessType, string membershipTableAssembly = null)
         {
             IMembershipTable membershipTable;
             if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
