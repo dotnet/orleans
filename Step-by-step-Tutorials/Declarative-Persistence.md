@@ -39,14 +39,14 @@ static void Main(string[] args)
         "2eef0ac5-540f-4421-b9a9-79d89400f7ab" 
     };
 
-    var e0 = EmployeeFactory.GetGrain(Guid.Parse(ids[0]));
-    var e1 = EmployeeFactory.GetGrain(Guid.Parse(ids[1]));
-    var e2 = EmployeeFactory.GetGrain(Guid.Parse(ids[2]));
-    var e3 = EmployeeFactory.GetGrain(Guid.Parse(ids[3]));
-    var e4 = EmployeeFactory.GetGrain(Guid.Parse(ids[4]));
+    var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[0]));
+    var e1 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[1]));
+    var e2 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[2]));
+    var e3 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[3]));
+    var e4 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[4]));
 
-    var m0 = ManagerFactory.GetGrain(Guid.Parse(ids[5]));
-    var m1 = ManagerFactory.GetGrain(Guid.Parse(ids[6]));
+    var m0 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[5]));
+    var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[6]));
     ... 
 }
 ```
