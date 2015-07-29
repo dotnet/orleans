@@ -20,11 +20,11 @@ OrleansClient.Initialize();
 
 // Hardcoded player ID 
 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
-IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId); 
+IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId); 
 
 IGameGrain game = player.CurrentGame.Result; 
 var watcher = new GameObserver(); 
-var observer = GameObserverFactory.CreateObjectReference(watcher); 
+var observer = GrainClient.GrainFactory.CreateObjectReference<IGameObserver>(watcher); 
 await game.SubscribeForGameUpdates(); 
 ```
 
@@ -34,10 +34,7 @@ See the Key Concepts section for more details on the various ways to use `Task`s
 
 ## Find or create grains
 
-After establishing a connection by calling `OrleansClient.Initialize()`, static methods in the generated factory classes may be used to get a reference to a grain, such as `PlayerGrainFactory.GetGrain()` for the `PlayerGrain`.
-
-Starting with the September 2014 preview update, there is also a static class `GrainFactory` in the Orleans namespace, which can be used to create grain references without using the generated classes. 
-The grain interface is passed as a type argument to `GrainFactory.GetGrain<T>()` when using this methodology.
+After establishing a connection by calling `OrleansClient.Initialize()`, static methods in the generic factory class may be used to get a reference to a grain, such as `GrainClient.GrainFactory.GetGrain<IPlayerGrain>()` for the `PlayerGrain`. The grain interface is passed as a type argument to `GrainFactory.GetGrain<T>()`.
 
 ## Sending messages to grains
 
@@ -61,13 +58,10 @@ The Orleans runtime will ensure one-way delivery of the notifications.
 A grain that publishes such notifications should provide an API to add or remove observers.
 
 To subscribe to a notification, the client must first create a local C# object that implements the observer interface. 
-It then calls a static method on the observer factory, `CreateObjectReference()`, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.
+It then calls `CreateObjectReference()` method on the grain factory, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.
 
 This model can also be used by other grains to receive asynchronous notifications. 
-Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `ChirperViewerFactory.Cast(this)`).
-
-
-> Note: starting with the September 2014 refresh, there is also a generic method `Cast<T>()` in the static class `GrainFactory`.
+Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `this.AsReference<IChirperViewer>`).
 
 ###Example
 
@@ -91,9 +85,7 @@ namespace PlayerWatcher
   
                 // Hardcoded player ID 
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
-                IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId);
-                // Alternatively: 
-                //  IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
+                IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
                 IGameGrain game = null; 
   
                 while (game == null) 
@@ -116,7 +108,7 @@ namespace PlayerWatcher
   
                 // Subscribe for updates 
                 var watcher = new GameObserver(); 
-                game.SubscribeForGameUpdates(GameObserverFactory.CreateObjectReference(watcher)).Wait(); 
+                game.SubscribeForGameUpdates(GrainClient.GrainFactory.CreateObjectReference<IGameObserver>(watcher)).Wait(); 
   
                 // .Wait will block main thread so that the process doesn't exit. 
                 // Updates arrive on thread pool threads. 
