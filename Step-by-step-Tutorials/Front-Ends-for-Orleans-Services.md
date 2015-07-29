@@ -54,7 +54,7 @@ public class EmployeeController : ApiController
 {
     public Task<int> Get(long id)
     {
-        var employee = EmployeeFactory.GetGrain(id);
+        var employee = GrainClient.GrainFactory.GetGrain<IEmployee>(id);
         return employee.Level;
     }
 }
