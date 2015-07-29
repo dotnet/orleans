@@ -24,7 +24,7 @@ Below is a sample code that demonstrates the usage of `TaskScheduler.Current`, `
 
 ``` csharp
    public Task MyGrainMethod()
-    {
+   {
         // Grab the Orleans task scheduler
         var orleansTs = TaskScheduler.Current; 
         await TaskDelay(10000);
@@ -53,8 +53,38 @@ Below is a sample code that demonstrates the usage of `TaskScheduler.Current`, `
         await t2;
         // We are back to Orleans task scheduler.
         Assert.AreEqual(orleansTS, TaskScheduler.Current); 
-    }
+   }
 ```
+
+### Advanced Example - making grain call from a code that runs in a garin but on a thread pool
+
+There is sometimes an even more advanced scenario of a piece of code that needs to “break out” of the Orleans task scheduling model and run on a thread pool (or some other, non-Orleans context) but still needs an ability to make a grain call to another grain. If you just try to make a grain call not from within Orleans context, you will get an exception telling you that you are "trying to send a message on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext)". Below is a code taht demonstrates how this can be done.
+
+
+``` csharp
+   public Task MyGrainMethod()
+   {
+        // Grab the Orleans task scheduler
+        var orleansTs = TaskScheduler.Current; 
+        Task<int> t1 = Task<int>.Run( () => 
+        { 
+             // This code runs on the thread pool scheduler, not on Orleans task scheduler
+             Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
+             // do what ever you need to do here. Now lets say you need to make a grain call.
+             Task<int>  t2 = Task<int> .Factory.StartNew(() =>
+            {
+                // This code runs back  Orleans task scheduler
+                Assert.AreEqual(orleansTS, TaskScheduler.Current);
+            },
+            CancellationToken.None, TaskCreationOptions.None,
+            scheduler: orleansTs);
+            return await t2;
+        } );
+        int result = await t1;
+        
+        // We are back to Orleans task scheduler, since await was executed in Orleans task scheduler context we are now back to that context.
+        Assert.AreEqual(orleansTS, TaskScheduler.Current); 
+   }
 
 ## Summary
 
