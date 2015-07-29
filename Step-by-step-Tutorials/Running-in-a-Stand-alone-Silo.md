@@ -67,7 +67,7 @@ public Task<string> SayHello(string greeting)
  We also change the client to send a greeting several times:
 
 ``` csharp
-var hello = MyGrainInterfaces1.Grain1Factory.GetGrain(0);
+var hello = GrainClient.GrainFactory.GetGrain<IGrain1>(0);
 Console.WriteLine(hello.SayHello("First").Result);
 Console.WriteLine(hello.SayHello("Second").Result);
 Console.WriteLine(hello.SayHello("Third").Result);
