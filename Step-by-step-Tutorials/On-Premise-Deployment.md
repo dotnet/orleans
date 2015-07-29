@@ -78,7 +78,7 @@ static void Main(string[] args)
 
     Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
 
-    var friend = HelloWorldInterfaces.HelloFactory.GetGrain(0);
+    var friend = GrainClient.GrainFactory.GetGrain<HelloWorldInterfaces.IHello>(0);
     Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
 
     Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
