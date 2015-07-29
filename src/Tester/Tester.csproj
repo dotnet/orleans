@@ -80,7 +80,6 @@
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
-    <Compile Include="SerializationTests_InnerTypes.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
     <Compile Include="ObserverTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
