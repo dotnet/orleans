@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
@@ -94,6 +95,11 @@ namespace Orleans.Streams
             internal int GetObserverCountForStream(StreamId streamId)
             {
                 return localObserver != null && localObserver.StreamId.Equals(streamId) ? 1 : 0;
+            }
+
+            internal StreamSubscriptionHandleImpl<T> GetLocalObserver()
+            {
+                return localObserver;
             }
 
             public Task CompleteStream()
@@ -230,6 +236,15 @@ namespace Orleans.Streams
             return allStreamObservers.Values
                                      .OfType<ObserversCollection<T>>()
                                      .Aggregate(0, (count,o) => count + o.GetObserverCountForStream(streamId));
+        }
+
+        internal IList<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
+        {
+            return allStreamObservers.Values
+                .OfType<ObserversCollection<T>>()
+                .Select(o => o.GetLocalObserver())
+                .Where(o => o != null)
+                .ToList();
         }
     }
 }

@@ -122,7 +122,7 @@ namespace Orleans.Providers.Streams.Common
                 streamId, () => new StreamImpl<T>(streamId, this, IsRewindable));
         }
 
-        public IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable);
         }
