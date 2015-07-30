@@ -34,30 +34,36 @@ Choose the "Orleans Dev/Test Host" project type, create a directory for the solu
 
 ![](../Images/New DevTest 2.PNG)
 
+At this point go ahead and compile your project to download the packages. 
+
 The project is just a console application populated with code that helps you host a silo in an environment that is "developer friendly," i.e. where everything runs in a single process.
 
 The main code does three things: it creates a silo in a separate app domain, initializes the Orleans client runtime, and waits for user input before terminating:
 
 
 ``` csharp
-static void Main(string[] args)
-{
-    AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, 
-        new AppDomainSetup
+        static void Main(string[] args)
         {
-            AppDomainInitializer = InitSilo,
-            AppDomainInitializerArguments = args,
-        });
+            // The Orleans silo environment is initialized in its own app domain in order to more
+            // closely emulate the distributed situation, when the client and the server cannot
+            // pass data via shared memory.
+            AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, new AppDomainSetup
+            {
+                AppDomainInitializer = InitSilo,
+                AppDomainInitializerArguments = args,
+            });
 
-    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
+            Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
 
-    // TODO: once the previous call returns, the silo is up and running.
-    //       This is the place your custom logic, for example calling client logic
-    //       or initializing an HTTP front end for accepting incoming requests.
+            // TODO: once the previous call returns, the silo is up and running.
+            //       This is the place your custom logic, for example calling client logic
+            //       or initializing an HTTP front end for accepting incoming requests.
 
-    Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
-    Console.ReadLine();
-}
+            Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
+            Console.ReadLine();
+
+            hostDomain.DoCallBack(ShutdownSilo);
+        }
 ```
 
 ## Adding Some Grains
@@ -81,14 +87,16 @@ We should have something like this:
 
 
 ``` csharp
-public interface IGrain1 : Orleans.IGrain
+public interface IGrain1 : IGrainWithIntegerKey
 {
     Task<string> SayHello();
 }
 ```
 
 
-Note that we're relying on TPL tasks in the interface method's return type -- an essential means to achieving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so. 
+One of the important things is choosing a Key type for your grains, in this example we are using Integer there are Guids, strings and various compound keys that may meet your needs.
+
+Additionally, Orleans relies on TPL tasks in the interface method's return type -- an essential means to achieving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so. 
 Use `Task` or `Task<T>` as the return type of all methods of communication interfaces.
 Next, we turn our attention to the grain implementation, which is found in _Grain1.cs_. The first thing to do is make sure that the interface it implements is the right one: it should be `MyGrainInterfaces1.IGrain1`, unless you renamed the project and/or the interface in the previous step.
 
@@ -119,8 +127,8 @@ In place of the comment following the call to `OrleansClient.Initialize()`, add 
 
 
 ``` csharp
-    var hello = GrainClient.GrainFactory.GetGrain<IGrain1 >(0);
-    Console.WriteLine("\n\n{0}\n\n", hello.SayHello().Result);
+    var friend = GrainClient.GrainFactory.GetGrain<MyGrainInterfaces1.IGrain1>(0);
+    Console.WriteLine("\n\n{0}\n\n", friend.SayHello().Result);
 ```
 
 
