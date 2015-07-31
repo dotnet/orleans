@@ -204,7 +204,7 @@ namespace Orleans.Runtime.Configuration
             else
             {
                 string traceFileDir = Path.GetDirectoryName(config.TraceFilePattern);
-                if (!Directory.Exists(traceFileDir))
+                if (!String.IsNullOrEmpty(traceFileDir) && !Directory.Exists(traceFileDir))
                 {
                     string traceFileName = Path.GetFileName(config.TraceFilePattern);
                     string[] alternateDirLocations = { "appdir", "." };
