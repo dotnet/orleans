@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Configuration
             set
             {
                 siloName = value;
-                ConfigUtilities.SetTraceFileName(this, SiloName, creationTimestamp);
+                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
             }
         }
 
@@ -177,7 +177,7 @@ namespace Orleans.Runtime.Configuration
             set
             {
                 traceFilePattern = value;
-                ConfigUtilities.SetTraceFileName(this, this.SiloName, this.creationTimestamp);
+                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
             }
         }
         /// <summary>
