@@ -72,7 +72,7 @@ namespace Orleans.Runtime
         public static ActivationId GetClientGWActivation(GrainId grain, SiloAddress location)
         {
             if (!grain.IsClient)
-                throw new ArgumentException("ClientGW activation IDs can only be created for system grains");
+                throw new ArgumentException("ClientGW activation IDs can only be created for client grains");
 
             // Construct a unique and deterministic ActivationId based on GrainId and SiloAddress.
             string stringToHash = grain.ToParsableString() + location.Endpoint + location.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);

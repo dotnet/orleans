@@ -224,7 +224,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="text">The string to hash.</param>
         /// <returns>An integer hash for the string.</returns>
-        public static Guid CalculateGuidHash(string text)
+        internal static Guid CalculateGuidHash(string text)
         {
             SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
             byte[] hash = new byte[16];
