@@ -114,7 +114,8 @@ namespace Orleans.Streams
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout);
+            TimeSpan initQueueTimeout,
+            TimeSpan maxEventDeliveryTime);
     }
 
     internal enum StreamPubSubType
@@ -139,5 +140,7 @@ namespace Orleans.Streams
         Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
 
         GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId);
+
+        Task<bool> FaultSubscription(GuidId subscriptionId, StreamId streamId);
     }
 }

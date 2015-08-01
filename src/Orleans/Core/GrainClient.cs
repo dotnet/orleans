@@ -25,15 +25,13 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Core;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 
 namespace Orleans
 {
@@ -60,13 +58,24 @@ namespace Orleans
 
         private static GrainFactory grainFactory;
 
+        // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
+        // That means we are running in side a silo.
+        private static bool IsRunningInsideGrain { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
+
         //TODO: prevent client code from using this from inside a Grain
         public static IGrainFactory GrainFactory
         {
             get
             {
+                if (IsRunningInsideGrain)
+                {
+                    throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
+                                               "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+                }
+
                 if (!IsInitialized)
                 {
+               
                     throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
                 }
 
@@ -228,8 +237,6 @@ namespace Orleans
                         isFullyInitialized = false;
                         grainFactory = new GrainFactory();
 
-                        ClientProviderRuntime.InitializeSingleton(grainFactory);
-
                         if (runtimeClient == null)
                         {
                             runtimeClient = new OutsideRuntimeClient(config, grainFactory);
@@ -285,12 +292,6 @@ namespace Orleans
                 catch (Exception) { }
 
                 RuntimeClient.Current = null;
-
-                try
-                {
-                    ClientProviderRuntime.UninitializeSingleton();
-                }
-                catch (Exception) { }
             }
             outsideRuntimeClient = null;
             grainFactory = null;
@@ -355,6 +356,11 @@ namespace Orleans
         public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()
         {
             return RuntimeClient.Current.CurrentStreamProviderManager.GetStreamProviders();
+        }
+
+        internal static IStreamProviderRuntime CurrentStreamProviderRuntime
+        {
+            get { return RuntimeClient.Current.CurrentStreamProviderRuntime; }
         }
 
         public static Streams.IStreamProvider GetStreamProvider(string name)

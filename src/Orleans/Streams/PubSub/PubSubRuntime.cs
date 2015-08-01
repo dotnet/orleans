@@ -94,6 +94,12 @@ namespace Orleans.Streams
             return GuidId.GetNewGuidId();
         }
 
+        public async Task<bool> FaultSubscription(GuidId subscriptionId, StreamId streamId)
+        {
+            var streamRendezvous = GetRendezvousGrain(streamId);
+            await streamRendezvous.FaultSubscription(subscriptionId);
+            return true;
+        }
     }
     
     internal class StreamPubSubImpl : IStreamPubSub
@@ -187,6 +193,13 @@ namespace Orleans.Streams
                 subscriptionId = SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid());
             }
             return GuidId.GetGuidId(subscriptionId);
+        }
+
+        public Task<bool> FaultSubscription(GuidId subscriptionId, StreamId streamId)
+        {
+            return IsImplicitSubscriber(subscriptionId, streamId)
+                ? Task.FromResult(false)
+                : explicitPubSub.FaultSubscription(subscriptionId, streamId);
         }
     }
 }

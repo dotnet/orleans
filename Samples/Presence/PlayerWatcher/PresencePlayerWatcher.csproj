@@ -11,10 +11,14 @@
     <AssemblyName>PresencePlayerWatcher</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SccProjectName></SccProjectName>
-    <SccLocalPath></SccLocalPath>
-    <SccAuxPath></SccAuxPath>
-    <SccProvider></SccProvider>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -37,7 +41,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Orleans">
-      <HintPath>$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -53,6 +57,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PresenceGrainInterfaces\PresenceGrainInterfaces.csproj">
@@ -61,9 +66,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="$(OrleansSDK)\Binaries\OrleansClient\ClientConfiguration.xml">
-      <Link>ClientConfiguration.xml</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <Content Include="..\Host\DevTestClientConfiguration.xml">
+      <Link>DevTestClientConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

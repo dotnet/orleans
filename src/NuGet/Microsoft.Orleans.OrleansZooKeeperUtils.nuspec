@@ -21,7 +21,7 @@
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Newtonsoft.Json" version="5.0.8" />
-      <dependency id="log4net" version="2.0.3" />
+	  <dependency id="ZooKeeperNetEx" version="3.4.6.1001" />
     </dependencies>
   </metadata>
   <files>

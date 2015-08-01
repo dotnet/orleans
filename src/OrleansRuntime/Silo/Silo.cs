@@ -103,6 +103,7 @@ namespace Orleans.Runtime
         private IDependencyResolver dependencyResolver = DefaultResolver.Instance;
 
         internal readonly string Name;
+        internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; private set; }
         internal GlobalConfiguration GlobalConfig { get { return globalConfig; } }
         internal NodeConfiguration LocalConfig { get { return nodeConfig; } }
@@ -248,8 +249,13 @@ namespace Orleans.Runtime
 
             messageCenter = mc;
 
+            SiloIdentity = SiloAddress.ToLongString();
+
             // GrainRuntime can be created only here, after messageCenter was created.
-            grainRuntime = new GrainRuntime(SiloAddress.ToLongString(), grainFactory,
+            grainRuntime = new GrainRuntime(
+                globalConfig.ServiceId,
+                SiloIdentity, 
+                grainFactory,
                 new TimerRegistry(),
                 new ReminderRegistry(),
                 new StreamProviderManager());
@@ -420,7 +426,8 @@ namespace Orleans.Runtime
             // Set up an execution context for this thread so that the target creation steps can use asynch values.
             RuntimeContext.InitializeMainThread();
 
-            SiloProviderRuntime.Initialize(GlobalConfig, grainFactory);
+            SiloProviderRuntime.Initialize(GlobalConfig, SiloIdentity, grainFactory);
+            InsideRuntimeClient.Current.CurrentStreamProviderRuntime = SiloProviderRuntime.Instance;
             statisticsProviderManager = new StatisticsProviderManager("Statistics", SiloProviderRuntime.Instance);
             string statsProviderName = statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
                 .WaitForResultWithThrow(initTimeout);
@@ -431,7 +438,7 @@ namespace Orleans.Runtime
             siloStatistics.SetSiloStatsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
             siloStatistics.SetSiloMetricsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
 
-            IMembershipTable membershipTable = membershipFactory.GetMembershipTable(this.GlobalConfig.LivenessType);
+            IMembershipTable membershipTable = membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly);
             membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
 
             // This has to follow the above steps that start the runtime components

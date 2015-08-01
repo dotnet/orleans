@@ -40,7 +40,7 @@ namespace Orleans.Providers
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
 
-        private ClientProviderRuntime(IGrainFactory grainFactory) 
+        public ClientProviderRuntime(IGrainFactory grainFactory) 
         {
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
@@ -49,25 +49,14 @@ namespace Orleans.Providers
 
         public IGrainFactory GrainFactory { get; private set; }
 
-        public static ClientProviderRuntime Instance { get; private set; }
-
-        public static void InitializeSingleton(IGrainFactory grainFactory) 
-        {
-            if (Instance != null)
-            {
-                UninitializeSingleton();
-            }
-            Instance = new ClientProviderRuntime(grainFactory);
-        }
-
-        public static void StreamingInitialize(IGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
             if (null == implicitStreamSubscriberTable)
             {
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
-            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(grainFactory), implicitStreamSubscriberTable);
-            Instance.streamDirectory = new StreamDirectory();
+            pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(GrainFactory), implicitStreamSubscriberTable);
+            streamDirectory = new StreamDirectory();
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -75,9 +64,14 @@ namespace Orleans.Providers
             return streamDirectory;
         }
 
-        public static void UninitializeSingleton()
+        public async Task Reset()
         {
-            Instance = null;
+            if (streamDirectory != null)
+            {
+                var tmp = streamDirectory;
+                streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
+                await tmp.Cleanup(true, true);
+            }
         }
 
         public Logger GetLogger(string loggerName)
@@ -95,6 +89,14 @@ namespace Orleans.Providers
                 // so we return default value here instead of throw exception.
                 //
                 return Guid.Empty;
+            }
+        }
+
+        public string SiloIdentity
+        {
+            get
+            {
+                throw new InvalidOperationException("Cannot access SiloIdentity from client.");
             }
         }
 
@@ -190,7 +192,8 @@ namespace Orleans.Providers
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout)
+            TimeSpan initQueueTimeout,
+            TimeSpan maxEventDeliveryTime)
         {        
             return TaskDone.Done;
         }

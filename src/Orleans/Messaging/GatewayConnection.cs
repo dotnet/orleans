@@ -168,7 +168,7 @@ namespace Orleans.Messaging
                                 return;
 
                             MarkAsDisconnected(Socket); // clean up the socket before reconnecting.
-                            }
+                        }
                         if (lastConnect != new DateTime())
                         {
                             var millisecondsSinceLastAttempt = DateTime.UtcNow - lastConnect;
@@ -248,6 +248,7 @@ namespace Orleans.Messaging
 
         protected override void OnGetSendingSocketFailure(Message msg, string error)
         {
+            msg.TargetSilo = null; // clear previous destination!
             MsgCenter.SendMessage(msg);
         }
 

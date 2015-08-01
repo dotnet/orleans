@@ -45,11 +45,13 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGenericInterfaces.cs" />
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyIGrains.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
+    <Compile Include="CodegenTestInterfaces.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />
     <Compile Include="ISimpleGrain.cs" />

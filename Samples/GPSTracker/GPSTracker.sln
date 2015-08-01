@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.21005.1
+VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GPSTracker.Common", "GPSTracker.Common\GPSTracker.Common.csproj", "{CAFE7FBB-A2E1-43E2-BA7D-725AF8873558}"
 EndProject
@@ -12,6 +12,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GPSTracker.GrainInterface", "GPSTracker.GrainInterface\GPSTracker.GrainInterface.csproj", "{B522A419-E2A5-4003-9CBF-91535BEBA1D3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GPSTracker.Web", "GPSTracker.Web\GPSTracker.Web.csproj", "{3E64342D-03D4-4C95-87BE-F65A08AE8EBF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Host", "Host\Host.csproj", "{B3ECE7C7-E076-4868-B6E1-9AFD16F8FA1F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{3E64342D-03D4-4C95-87BE-F65A08AE8EBF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3E64342D-03D4-4C95-87BE-F65A08AE8EBF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3E64342D-03D4-4C95-87BE-F65A08AE8EBF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3ECE7C7-E076-4868-B6E1-9AFD16F8FA1F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3ECE7C7-E076-4868-B6E1-9AFD16F8FA1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3ECE7C7-E076-4868-B6E1-9AFD16F8FA1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3ECE7C7-E076-4868-B6E1-9AFD16F8FA1F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

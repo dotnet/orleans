@@ -50,7 +50,9 @@
     <None Include="GrainImplementationClassTemplate.cs" />
   </ItemGroup>
   <ItemGroup>
-    <VSTemplate Include="VSItemTemplatePersistedGrain.vstemplate" />
+    <VSTemplate Include="VSItemTemplatePersistedGrain.vstemplate">
+      <OutputSubPath>Orleans</OutputSubPath>
+    </VSTemplate>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Orleans.ico" />

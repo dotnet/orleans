@@ -39,16 +39,19 @@ namespace Orleans.TestingHost
 {
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 
+    /// 
     /// Runs a Primary and Secondary silo in seperate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process if required for particular test cases.
     /// </summary>
     /// <remarks>
-    /// Add the following attributes to any derived test classes, 
-    /// to ensure the config files are included in the test set.
+    /// Make sure the following files are included in any test projects that use <c>TestingSiloHost</c>, 
+    /// and ensure "Copy if Newer" is set to ensure the config files are included in the test set.
     /// <code>
-    /// [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    /// [DeploymentItem("ClientConfigurationForTesting.xml")]
+    /// OrleansConfigurationForTesting.xml
+    /// ClientConfigurationForTesting.xml
     /// </code>
+    /// Also make sure that your test project references your test grains and test grain interfaces 
+    /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
     public abstract class TestingSiloHost
     {
@@ -299,6 +302,16 @@ namespace Orleans.TestingHost
             Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, InstanceCounter++);
             WaitForLivenessToStabilizeAsync().Wait();
             GrainClient.Initialize();
+        }
+
+        /// <summary>
+        /// Start a Secondary silo with a given instanceCounter 
+        /// (allows to set the port number as before or new, depending on the scenario).
+        /// </summary>
+        public void StartSecondarySilo(TestingSiloOptions secondarySiloOptions, int instanceCounter)
+        {
+            secondarySiloOptions.PickNewDeploymentId = false;
+            Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, instanceCounter);
         }
 
         /// <summary>

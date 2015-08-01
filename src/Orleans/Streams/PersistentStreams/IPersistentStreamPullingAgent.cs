@@ -29,7 +29,7 @@ namespace Orleans.Streams
     internal interface IPersistentStreamPullingAgent : ISystemTarget, IStreamProducerExtension
     {
         // The queue adapter have to be Immutable<>, since we want deliberately to pass it by reference.
-        Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IQueueAdapterCache> queueAdapterCache);
+        Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> deliveryFailureHandler);
         Task Shutdown();
     }
 

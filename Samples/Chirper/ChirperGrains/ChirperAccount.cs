@@ -122,7 +122,7 @@ namespace Orleans.Samples.Chirper.Grains
                 if (logger.IsVerbose)
                     logger.Verbose("{0} Setting UserAlias = {1}.", Me, alias);
                 State.UserAlias = alias;
-                await State.WriteStateAsync();
+                await WriteStateAsync();
             }
         }
 
@@ -141,7 +141,7 @@ namespace Orleans.Samples.Chirper.Grains
                 State.MyPublishedMessages.Dequeue();
             }
 
-            await State.WriteStateAsync();
+            await WriteStateAsync();
 
             List<Task> promises = new List<Task>();
 
@@ -240,7 +240,7 @@ namespace Orleans.Samples.Chirper.Grains
                 State.Followers.Remove(userInfo);
             }
             State.Followers[userInfo] = follower;
-            return State.WriteStateAsync();
+            return WriteStateAsync();
         }
 
         public async Task RemoveFollower(string alias, IChirperSubscriber follower)
@@ -250,7 +250,7 @@ namespace Orleans.Samples.Chirper.Grains
             {
                 ChirperUserInfo userInfo = found.FirstOrDefault().Key;
                 State.Followers.Remove(userInfo);
-                await State.WriteStateAsync();
+                await WriteStateAsync();
             }
         }
 
@@ -270,7 +270,7 @@ namespace Orleans.Samples.Chirper.Grains
                 State.MyPublishedMessages.Dequeue();
             }
 
-            await State.WriteStateAsync();
+            await WriteStateAsync();
 
             if (viewers.Count > 0)
             {
@@ -309,7 +309,7 @@ namespace Orleans.Samples.Chirper.Grains
             ChirperUserInfo userInfo = ChirperUserInfo.GetUserInfo(userId, userAlias);
             State.Subscriptions[userInfo] = userToFollow;
 
-            await State.WriteStateAsync();
+            await WriteStateAsync();
 
             // Notify any viewers that a subscription has been added for this user
             viewers.Notify(
@@ -323,7 +323,7 @@ namespace Orleans.Samples.Chirper.Grains
             ChirperUserInfo userInfo = ChirperUserInfo.GetUserInfo(userId, userAlias);
             State.Subscriptions.Remove(userInfo);
 
-            await State.WriteStateAsync();
+            await WriteStateAsync();
 
             // Notify any viewers that a subscription has been removed for this user
             viewers.Notify(

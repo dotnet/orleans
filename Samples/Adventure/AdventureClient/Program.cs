@@ -49,9 +49,9 @@ namespace AdventureClient
             Console.WriteLine("What's you name?");
             string name = Console.ReadLine();
 
-            var player = GrainFactory.GetGrain<IPlayerGrain>(Guid.NewGuid());
+            var player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(Guid.NewGuid());
             player.SetName(name).Wait();
-            var room1 = GrainFactory.GetGrain<IRoomGrain>(0);
+            var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
             player.SetRoomGrain(room1).Wait();
 
             Console.WriteLine(player.Play("look").Result);

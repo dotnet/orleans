@@ -41,16 +41,22 @@ namespace Orleans.Providers.Streams.Common
         private IQueueAdapterFactory    adapterFactory;
         private IStreamProviderRuntime  providerRuntime;
         private IQueueAdapter           queueAdapter;
-        private TimeSpan                getQueueMsgsTimerPeriod;
-        private TimeSpan                initQueueTimeout;
-        private StreamQueueBalancerType balancerType;
 
         private const string GET_QUEUE_MESSAGES_TIMER_PERIOD = "GetQueueMessagesTimerPeriod";
-        private const string INIT_QUEUE_TIMEOUT = "InitQueueTimeout";
-        private const string QUEUE_BALANCER_TYPE = "QueueBalancerType";
         private readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
+        private TimeSpan getQueueMsgsTimerPeriod;
+
+        private const string INIT_QUEUE_TIMEOUT = "InitQueueTimeout";
         private readonly TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT = TimeSpan.FromSeconds(5);
+        private TimeSpan initQueueTimeout;
+
+        private const string QUEUE_BALANCER_TYPE = "QueueBalancerType";
         private const StreamQueueBalancerType DEFAULT_STREAM_QUEUE_BALANCER_TYPE = StreamQueueBalancerType.ConsistentRingBalancer;
+        private StreamQueueBalancerType balancerType;
+
+        private const string MAX_EVENT_DELIVERY_TIME = "MaxEventDeliveryTime";
+        private readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
+        private TimeSpan maxEventDeliveryTime;
 
         public string                   Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
@@ -87,6 +93,12 @@ namespace Orleans.Providers.Streams.Common
                 ? DEFAULT_STREAM_QUEUE_BALANCER_TYPE
                 : (StreamQueueBalancerType)Enum.Parse(typeof(StreamQueueBalancerType), balanceTypeString);
 
+            if (!config.Properties.TryGetValue(MAX_EVENT_DELIVERY_TIME, out timeout))
+                maxEventDeliveryTime = DEFAULT_MAX_EVENT_DELIVERY_TIME;
+            else
+                maxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
+                    "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
+
             logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5} and with Adapter {6}.",
                 typeof(TAdapterFactory).Name, Name, 
                 GET_QUEUE_MESSAGES_TIMER_PERIOD, getQueueMsgsTimerPeriod,
@@ -99,7 +111,7 @@ namespace Orleans.Providers.Streams.Common
             if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
                 queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
-                await providerRuntime.StartPullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout);
+                await providerRuntime.StartPullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
             }
         }
 
@@ -110,7 +122,7 @@ namespace Orleans.Providers.Streams.Common
                 streamId, () => new StreamImpl<T>(streamId, this, IsRewindable));
         }
 
-        public IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable);
         }

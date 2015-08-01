@@ -219,15 +219,10 @@ namespace Orleans.Runtime.Configuration
 
         public void LoadFromFile(string fileName)
         {
-            TextReader input = File.OpenText(fileName);
-            try
+            using (TextReader input = File.OpenText(fileName))
             {
                 Load(input);
                 SourceFile = fileName;
-            }
-            finally
-            {
-                input.Close();
             }
         }
 

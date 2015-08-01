@@ -46,7 +46,8 @@ namespace Orleans.Runtime.Configuration
             AzureTable,         // use Azure, requires SystemStore element
             SqlServer,          // use SQL, requires SystemStore element
             ZooKeeper,          // use ZooKeeper, requires SystemStore element
-            Config              // use Config based static list, requires Config element(s)
+            Config,             // use Config based static list, requires Config element(s)
+            Custom              // use provider from third-party assembly
         }
 
         /// <summary>
@@ -92,6 +93,8 @@ namespace Orleans.Runtime.Configuration
         /// If not set at all, DevelopmentStorageAccount will be used.
         /// </summary>
         public string DataConnectionString { get; set; }
+
+        public string CustomGatewayProviderAssemblyName { get; set; }
 
         public Logger.Severity DefaultTraceLevel { get; set; }
         public IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; private set; }
@@ -246,6 +249,14 @@ namespace Orleans.Runtime.Configuration
                                 var sst = child.GetAttribute("SystemStoreType");
                                 GatewayProvider = (GatewayProviderType)Enum.Parse(typeof(GatewayProviderType), sst);
                             }
+                            if (child.HasAttribute("CustomGatewayProviderAssemblyName"))
+                            {
+                                CustomGatewayProviderAssemblyName = child.GetAttribute("CustomGatewayProviderAssemblyName");
+                                if (CustomGatewayProviderAssemblyName.EndsWith(".dll"))
+                                    throw new FormatException("Use fully qualified assembly name for \"CustomGatewayProviderAssemblyName\"");
+                                if (GatewayProvider != GatewayProviderType.Custom)
+                                    throw new FormatException("SystemStoreType should be \"Custom\" when CustomGatewayProviderAssemblyName is specified");
+                            }
                             if (child.HasAttribute("DeploymentId"))
                             {
                                 DeploymentId = child.GetAttribute("DeploymentId");
@@ -323,21 +334,17 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public static ClientConfiguration LoadFromFile(string fileName)
         {
-            if (fileName == null) return null;
+            if (fileName == null)
+            { return null; }
 
-            TextReader input = null;
-            try
+            using (TextReader input = File.OpenText(fileName))
             {
                 var config = new ClientConfiguration();
-                input = File.OpenText(fileName);
                 config.Load(input);
                 config.SourceFile = fileName;
                 return config;
             }
-            finally
-            {
-                if (input != null) input.Close();
-            }
+            
         }
 
         /// <summary>
@@ -483,6 +490,10 @@ namespace Orleans.Runtime.Configuration
                 case GatewayProviderType.Config:
                     if (!HasStaticGateways)
                         throw new ArgumentException("Config specifies Config based GatewayProviderType, but Gateway element(s) is/are not specified.", "GatewayProvider");
+                    break;
+                case GatewayProviderType.Custom:
+                    if (String.IsNullOrEmpty(CustomGatewayProviderAssemblyName))
+                        throw new ArgumentException("Config specifies Custom GatewayProviderType, but CustomGatewayProviderAssemblyName attribute is not specified", "GatewayProvider");
                     break;
                 case GatewayProviderType.None:
                     if (!UseAzureSystemStore && !HasStaticGateways)

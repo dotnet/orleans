@@ -26,8 +26,6 @@ using System.Linq;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
-using Orleans.Core;
-using Orleans.Providers;
 using Orleans.Concurrency;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
@@ -45,14 +43,16 @@ namespace Orleans.Runtime.Providers
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         public IGrainFactory GrainFactory { get; private set; }
         public Guid ServiceId { get; private set; }
+        public string SiloIdentity { get; private set; }
 
         private SiloProviderRuntime()
         {
         }
 
-        internal static void Initialize(GlobalConfiguration config, IGrainFactory grainFactory)
+        internal static void Initialize(GlobalConfiguration config, string siloIdentity, IGrainFactory grainFactory)
         {
             Instance.ServiceId = config.ServiceId;
+            Instance.SiloIdentity = siloIdentity;
             Instance.GrainFactory = grainFactory;
         }
 
@@ -237,12 +237,13 @@ namespace Orleans.Runtime.Providers
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout)
+            TimeSpan initQueueTimeout,
+            TimeSpan maxEventDeliveryTime)
         {
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
                 balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper());
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var managerGrainRef = manager.AsReference<IPersistentStreamPullingManager>();

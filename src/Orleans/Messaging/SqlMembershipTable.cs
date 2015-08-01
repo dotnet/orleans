@@ -67,8 +67,9 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        public Task InitializeGatewayListProvider(ClientConfiguration config, TraceLogger traceLogger)
+        public async Task InitializeGatewayListProvider(ClientConfiguration config, TraceLogger traceLogger)
         {
+            logger = traceLogger;
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.InitializeGatewayListProvider called.");
 
             deploymentId = config.DeploymentId;            
@@ -77,7 +78,9 @@ namespace Orleans.Runtime.MembershipService
             //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.
             database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, config.DataConnectionString);
 
-            return TaskDone.Done;
+            //This initializes all of Orleans operational queries from the database using a well known view
+            //and assumes the database with appropriate defintions exists already.
+            await InitializeOrleansQueriesAsync();
         }
 
 

@@ -28,6 +28,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
+using Orleans;
 
 namespace OrleansXO.Web.Controllers
 {
@@ -60,7 +61,7 @@ namespace OrleansXO.Web.Controllers
         public async Task<ActionResult> Join(Guid id)
         {
             var guid = GetGuid();
-            var player = PlayerGrainFactory.GetGrain(guid);
+            var player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(guid);
             var state = await player.JoinGame(id);
             return RedirectToAction("Index", id);
         }

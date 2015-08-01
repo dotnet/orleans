@@ -19,10 +19,6 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
-      
-      <dependency id="WindowsAzure.Storage" version="4.2.0.0" />
-      <dependency id="Microsoft.WindowsAzure.ConfigurationManager" version="2.0.0.0" />
-      <dependency id="Newtonsoft.Json" version="5.0.8" />
     </dependencies>
   </metadata>
   <files>

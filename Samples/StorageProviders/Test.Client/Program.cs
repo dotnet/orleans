@@ -21,6 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 using System;
+using Orleans;
 using Test.Interfaces;
 
 namespace Test.Client
@@ -41,9 +42,9 @@ namespace Test.Client
                 AppDomainInitializerArguments = args,
             });
 
-            Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
+            GrainClient.Initialize("DevTestClientConfiguration.xml");
 
-            var grain = PersonFactory.GetGrain(0);
+            var grain = GrainClient.GrainFactory.GetGrain<IPerson>(0);
 
             // If the name is set, we've run this code before.
             var name = grain.GetFirstName().Result;

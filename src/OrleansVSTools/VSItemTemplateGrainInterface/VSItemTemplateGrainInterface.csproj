@@ -47,7 +47,9 @@
     <None Include="GrainInterfaceTemplate.cs" />
   </ItemGroup>
   <ItemGroup>
-    <VSTemplate Include="VSItemTemplateGrainInterface.vstemplate" />
+    <VSTemplate Include="VSItemTemplateGrainInterface.vstemplate">
+      <OutputSubPath>Orleans</OutputSubPath>
+    </VSTemplate>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Orleans.ico" />

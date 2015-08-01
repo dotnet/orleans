@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         void Stop();
 
-        bool SendMessage(Message message);
+        void SendMessage(Message message);
 
         /// <summary>
         /// Current queue length

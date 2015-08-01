@@ -288,7 +288,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            await streamDirectory.Cleanup();
+            await streamDirectory.Cleanup(true, false);
         }
 
         #region IActivationData

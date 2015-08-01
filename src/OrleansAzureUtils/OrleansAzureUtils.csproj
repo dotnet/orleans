@@ -93,6 +93,8 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Providers\Streams\PersistentStreams\AzureTableStorageStreamFailureHandler.cs" />
+    <Compile Include="Providers\Streams\PersistentStreams\StreamDeliveryFailureEntity.cs" />
     <Compile Include="Storage\AzureBasedMembershipTable.cs" />
     <Compile Include="Storage\AzureBasedReminderTable.cs" />
     <Compile Include="Hosting\AzureConfigUtils.cs" />

@@ -27,7 +27,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
-    internal class PersistentStreamProducer<T> : IAsyncBatchObserver<T>
+    internal class PersistentStreamProducer<T> : IInternalAsyncBatchObserver<T>
     {
         private readonly StreamImpl<T> stream;
         private readonly IQueueAdapter queueAdapter;
@@ -72,6 +72,11 @@ namespace Orleans.Streams
         {
             // Maybe send a close message to the rendezvous?
             throw new NotImplementedException("OnErrorAsync is not implemented for now.");
+        }
+
+        public Task Cleanup()
+        {
+            return TaskDone.Done;
         }
     }
 }

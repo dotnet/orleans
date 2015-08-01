@@ -80,7 +80,7 @@ namespace Orleans.Azure.Silos
             // It is IMPORTANT to start the silo not in OnStart but in Run.
             // Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.
             orleansAzureSilo = new AzureSilo();
-            bool ok = orleansAzureSilo.Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance, config);
+            bool ok = orleansAzureSilo.Start(config);
 
             Trace.WriteLine("OrleansAzureSilos-OnStart Orleans silo started ok=" + ok, "Information");
 

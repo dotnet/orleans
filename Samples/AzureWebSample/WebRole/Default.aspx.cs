@@ -50,7 +50,7 @@ namespace Orleans.Azure.Samples.Web
         {
             this.ReplyText.Text = "Talking to Orleans";
 
-            IHelloEnvironment grainRef = GrainFactory.GetGrain<IHelloEnvironment>(0);
+            IHelloEnvironment grainRef = GrainClient.GrainFactory.GetGrain<IHelloEnvironment>(0);
 
             try
             {

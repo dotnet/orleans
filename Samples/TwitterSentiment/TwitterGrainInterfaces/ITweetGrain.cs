@@ -30,7 +30,7 @@ namespace TwitterGrainInterfaces
     /// <summary>
     /// A grain to act as the API into Orleans, and fan out read/writes to multiple hashtag grains
     /// </summary>
-    public interface ITweetDispatcherGrain : Orleans.IGrain
+    public interface ITweetDispatcherGrain : IGrainWithIntegerKey
     {
         Task AddScore(int score, string[] hashtags, string tweet);
 

@@ -78,7 +78,7 @@ namespace Orleans.CodeGeneration
         [Serializable]
         internal class GrainClientGeneratorFlags
         {
-            internal static bool Verbose = true;
+            internal static bool Verbose = false;
             internal static bool FailOnPathNotFound = false;
         }
 

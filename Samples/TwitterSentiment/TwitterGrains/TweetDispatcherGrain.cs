@@ -48,7 +48,7 @@ namespace Grains
             var tasks = new List<Task>();
             foreach (var hashtag in hashtags)
             {
-                var grain = HashtagGrainFactory.GetGrain(0, hashtag);
+                var grain = GrainFactory.GetGrain<IHashtagGrain>(0, hashtag, null);
                 var task = grain.AddScore(score, tweet);
                 tasks.Add(task);
             }
@@ -67,7 +67,7 @@ namespace Grains
             var tasks = new List<Task<Totals>>();
             foreach (var hashtag in hashtags)
             {
-                var grain = HashtagGrainFactory.GetGrain(0, hashtag);
+                var grain = GrainFactory.GetGrain<IHashtagGrain>(0, hashtag, null);
                 tasks.Add(grain.GetTotals());
 
             }

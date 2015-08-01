@@ -13,11 +13,8 @@
     <TargetFrameworkVersion>v$targetframeworkversion$</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(OrleansSDK)' == '' ">
+  <PropertyGroup>
     <OutputPath>bin\$(Configuration)\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(OrleansSDK)' != '' ">
-    <OutputPath>$(OrleansSDK)\LocalSilo\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -38,29 +35,29 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Data.Edm">
-      <HintPath>..\packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Data.OData">
-      <HintPath>..\packages\Microsoft.Data.OData.5.6.0\lib\net40\Microsoft.Data.OData.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Data.OData.5.6.0\lib\net40\Microsoft.Data.OData.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Data.Services.Client">
-      <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.Configuration">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.ServiceRuntime">
       <Private>True</Private>
-      <HintPath>..\packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.4.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.4.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System.Spatial">
-      <HintPath>..\packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
     </Reference>
 
     <Reference Include="System" />
@@ -72,19 +69,19 @@
     <Reference Include="System.Xml" />
 
     <Reference Include="Orleans">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
     </Reference>
     <Reference Include="OrleansAzureUtils">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansAzureUtils.1.0.9\lib\net45\OrleansAzureUtils.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansAzureUtils.1.0.9\lib\net45\OrleansAzureUtils.dll</HintPath>
     </Reference>
     <Reference Include="OrleansHost">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.0.9\lib\net45\OrleansHost.exe</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansHost.1.0.9\lib\net45\OrleansHost.exe</HintPath>
     </Reference>
     <Reference Include="OrleansProviders">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.0.9\lib\net45\OrleansProviders.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansProviders.1.0.9\lib\net45\OrleansProviders.dll</HintPath>
     </Reference>
     <Reference Include="OrleansRuntime">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.0.9\lib\net45\OrleansRuntime.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansRuntime.1.0.9\lib\net45\OrleansRuntime.dll</HintPath>
     </Reference>
 </ItemGroup>
   <ItemGroup>
