@@ -25,7 +25,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Providers;
+
 
 namespace Orleans.Runtime
 {
