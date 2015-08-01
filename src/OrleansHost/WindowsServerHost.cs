@@ -102,7 +102,7 @@ namespace Orleans.Runtime.Host
 
 			try
 			{
-                SiloHost.InitializeOrleansSilo();
+				SiloHost.InitializeOrleansSilo();
 				ok = SiloHost.StartOrleansSilo();
 
 				if (ok)

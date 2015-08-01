@@ -21,40 +21,16 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
-namespace Orleans.Runtime
+namespace Orleans.Providers
 {
-    internal class DefaultResolver : IDependencyResolver
+    /// <summary>
+    /// Interface to be implemented by any app dependency resolver classes that want to be loaded and initialized during silo startup
+    /// </summary>
+    public interface IDependencyResolverProvider : IProvider
     {
-        private static readonly IDependencyResolver _instance = new DefaultResolver();
-
-        private DefaultResolver()
-        {
-        }
-
-        public static IDependencyResolver Instance
-        {
-            get { return _instance; }
-        }
-
-        public IDependencyScope BeginScope()
-        {
-            return this;
-        }
-
-        public void Dispose()
-        {
-        }
-
-        public object GetService(Type serviceType)
-        {
-            return Activator.CreateInstance(serviceType);
-        }
-
-        //public IEnumerable<object> GetServices(Type serviceType)
-        //{
-        //    return Enumerable.Empty<object>();
-        //}
+        IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
     }
 }

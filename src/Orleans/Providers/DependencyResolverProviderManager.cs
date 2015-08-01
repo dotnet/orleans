@@ -21,19 +21,50 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Providers;
 
-namespace Orleans.Runtime
+namespace Orleans.Providers
 {
     internal class DependencyResolverProviderManager : IProviderManager
     {
+        private ProviderLoader<IDependencyResolverProvider> dependencyResolverProviderLoader;
+        private readonly string providerKind;
+
+        public DependencyResolverProviderManager(string kind)
+        {
+            providerKind = kind;
+        }
+
+        public void LoadProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
+        {
+            dependencyResolverProviderLoader = new ProviderLoader<IDependencyResolverProvider>();
+
+            if (!configs.ContainsKey(providerKind))
+            {
+                return;
+            }
+
+            var dependencyResolverProviders = configs[providerKind].Providers;
+
+            if (dependencyResolverProviders.Count == 0)
+            {
+                return;
+            }
+
+            if (dependencyResolverProviders.Count > 1)
+            {
+                throw new ArgumentOutOfRangeException(providerKind + "Providers",
+                    string.Format("Only a single {0} provider is supported.", providerKind));
+            }
+
+            dependencyResolverProviderLoader.LoadProviders(dependencyResolverProviders, this);
+        }
+
         public IProvider GetProvider(string name)
         {
-            throw new System.NotImplementedException();
+            return dependencyResolverProviderLoader.GetProvider(name, true);
         }
     }
 }
