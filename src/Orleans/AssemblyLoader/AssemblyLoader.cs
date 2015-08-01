@@ -107,9 +107,9 @@ namespace Orleans.Runtime
             try
             {
                 var assembly = Assembly.Load(assemblyName);
-                var foundType = TypeUtils.GetTypes(assembly, type => typeof (T).IsAssignableFrom(type) && !type.IsInterface).First(HasParameterlessConstructor);
+                var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type)).First();
 
-                return (T) Activator.CreateInstance(foundType, true);
+                return (T)Activator.CreateInstance(foundType, true);
             }
             catch (Exception exc)
             {
@@ -118,10 +118,6 @@ namespace Orleans.Runtime
             }
         }
 
-        private static bool HasParameterlessConstructor(Type t)
-        {
-            return t.GetConstructor(Type.EmptyTypes) != null;
-        }
 
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
         // process-- not the actual loading of assemblies.
