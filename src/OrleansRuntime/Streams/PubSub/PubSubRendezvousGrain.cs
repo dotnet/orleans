@@ -34,6 +34,12 @@ namespace Orleans.Streams
     {
         public HashSet<PubSubPublisherState> Producers { get; set; }
         public HashSet<PubSubSubscriptionState> Consumers { get; set; }
+        
+        public PubSubGrainState()
+        {
+            this.Producers = new HashSet<PubSubPublisherState>();
+            this.Consumers = new HashSet<PubSubSubscriptionState>();
+        }
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "PubSubStore")]
