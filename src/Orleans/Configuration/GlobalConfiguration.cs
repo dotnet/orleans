@@ -73,6 +73,8 @@ namespace Orleans.Runtime.Configuration
             /// <summary>Apache ZooKeeper is used to store membership information. 
             /// This option can be used in production.</summary>
             ZooKeeper,
+            /// <summary>Use custom provider from third-party assembly</summary>
+            Custom
         }
 
         /// <summary>
@@ -95,6 +97,8 @@ namespace Orleans.Runtime.Configuration
             MockTable,
             /// <summary>Reminder Service is disabled.</summary>
             Disabled,
+            /// <summary>Use custom Reminder Service from third-party assembly</summary>
+            Custom
         }
 
         /// <summary>
@@ -254,6 +258,16 @@ namespace Orleans.Runtime.Configuration
                 livenessServiceType = value;
             }
         }
+
+        /// <summary>
+        /// Assembly to use for custom MembershipTable implementation
+        /// </summary>
+        public string MembershipTableAssembly { get; set; }
+
+        /// <summary>
+        /// Assembly to use for custom ReminderTable implementation
+        /// </summary>
+        public string ReminderTableAssembly { get; set; }
 
         /// <summary>
         /// The ReminderServiceType attribute controls the type of the reminder service implementation used by silos.
@@ -600,6 +614,27 @@ namespace Orleans.Runtime.Configuration
                                     : ReminderServiceProviderType.Disabled);
                             }
                         }
+                        if (child.HasAttribute("MembershipTableAssembly"))
+                        {
+                            MembershipTableAssembly = child.GetAttribute("MembershipTableAssembly");
+                            if (LivenessType != LivenessProviderType.Custom)
+                                throw new FormatException("SystemStoreType should be \"Custom\" when MembershipTableAssembly is specified");
+                            if (MembershipTableAssembly.EndsWith(".dll"))
+                                throw new FormatException("Use fully qualified assembly name for \"MembershipTableAssembly\"");
+                        }
+                        if (child.HasAttribute("ReminderTableAssembly"))
+                        {
+                            ReminderTableAssembly = child.GetAttribute("ReminderTableAssembly");
+                            if (ReminderServiceType != ReminderServiceProviderType.Custom)
+                                throw new FormatException("ReminderServiceType should be \"Custom\" when ReminderTableAssembly is specified");
+                            if (ReminderTableAssembly.EndsWith(".dll"))
+                                throw new FormatException("Use fully qualified assembly name for \"ReminderTableAssembly\"");
+                        }
+                        if (LivenessType == LivenessProviderType.Custom && string.IsNullOrEmpty(MembershipTableAssembly))
+                            throw new FormatException("MembershipTableAssembly should be set when SystemStoreType is \"Custom\"");
+                        if (ReminderServiceType == ReminderServiceProviderType.Custom && String.IsNullOrEmpty(ReminderTableAssembly))
+                            throw new FormatException("ReminderTableAssembly should be set when ReminderServiceType is \"Custom\"");
+
                         if (child.HasAttribute("ServiceId"))
                         {
                             ServiceId = ConfigUtilities.ParseGuid(child.GetAttribute("ServiceId"),

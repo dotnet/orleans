@@ -36,5 +36,13 @@ namespace Orleans.Streams
         Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle);
 
         Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptions();
+
+        Task Cleanup();
+    }
+
+        
+    internal interface IInternalAsyncBatchObserver<in T> : IAsyncBatchObserver<T>
+    {
+        Task Cleanup();
     }
 }

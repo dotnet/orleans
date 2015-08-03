@@ -293,9 +293,6 @@ namespace Orleans.CodeGeneration
 
             if (persistentInterface!=null)
             {
-                if (!sourceType.GetCustomAttributes(typeof (StorageProviderAttribute)).Any())
-                    ReportError(String.Format("No StorageProvider attribute specified for grain class {0}", sourceType.FullName));
-                    
                 if (!persistentInterface.IsInterface)
                 {
                     hasStateClass = false;

@@ -76,7 +76,7 @@ namespace Orleans.Runtime.ReminderService
         
         public Task<string> UpsertRow(ReminderEntry entry)
         {
-            return database.UpsertReminderRowAsync(serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period, entry.ETag);            
+            return database.UpsertReminderRowAsync(serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period);            
         }
 
 

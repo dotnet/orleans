@@ -284,7 +284,7 @@ namespace Orleans.Messaging
         {
             if (msg.TargetSilo != null)
             {
-                RejectMessage(msg, "Target silo is unavailable");
+                RejectMessage(msg, String.Format("Target silo {0} is unavailable", msg.TargetSilo));
             }
             else
             {

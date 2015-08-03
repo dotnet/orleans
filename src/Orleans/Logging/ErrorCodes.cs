@@ -360,6 +360,7 @@ namespace Orleans
         Runtime_Error_100328 = Runtime + 328,
         Runtime_Error_100329 = Runtime + 329,
         Runtime_Error_100330 = Runtime + 330,
+        Runtime_Error_100331 = Runtime + 331,
 
         SiloBase                        = Runtime + 400,
         SiloStarting                    = SiloBase + 1,
@@ -1021,6 +1022,7 @@ namespace Orleans
         Stream_ExtensionNotInstalled                = StreamProviderManagerBase + 5,
         Stream_ProducerIsDead                       = StreamProviderManagerBase + 6,
         StreamProvider_NoStreamForBatch             = StreamProviderManagerBase + 7,
+        StreamProvider_ConsumerFailedToUnregister   = StreamProviderManagerBase + 8,
 
         PersistentStreamPullingManagerBase = Runtime + 3500,
         PersistentStreamPullingManager_01 = PersistentStreamPullingManagerBase + 1,

@@ -581,16 +581,11 @@ namespace Orleans.Runtime
         {
             var grainTypeName = data.GrainInstanceType.FullName;
 
+            // Get the storage provider name, using the default if not specified.
             var attrs = data.GrainInstanceType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
-            var attr = attrs.Length > 0 ? attrs[0] as StorageProviderAttribute : null;
-            if (attr == null)
-            {
-                var errMsg = string.Format("No storage providers specified for grain type {0}", grainTypeName);
-                logger.Error(ErrorCode.Provider_CatalogNoStorageProvider_3, errMsg);
-                throw new BadProviderConfigException(errMsg);
-            }
+            var attr = attrs.FirstOrDefault() as StorageProviderAttribute;
+            var storageProviderName = attr != null ? attr.ProviderName : Constants.DEFAULT_STORAGE_PROVIDER_NAME;
 
-            var storageProviderName = attr.ProviderName;
             IStorageProvider provider;
             if (storageProviderManager == null || storageProviderManager.GetNumLoadedProviders() == 0)
             {

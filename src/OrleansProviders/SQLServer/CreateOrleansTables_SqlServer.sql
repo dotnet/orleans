@@ -494,8 +494,7 @@ BEGIN
 			WHERE
 				[ServiceId] = @serviceId AND @serviceId IS NOT NULL
 				AND [GrainId] = @grainId AND @grainId IS NOT NULL
-				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL
-				AND ETag = @etag AND @etag IS NOT NULL;
+				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
 			END	
 			COMMIT TRANSACTION;',
 		N''
@@ -1034,8 +1033,7 @@ BEGIN
 			WHERE
 				[ServiceId] = @serviceId AND @serviceId IS NOT NULL
 				AND [GrainId] = @grainId AND @grainId IS NOT NULL
-				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL
-				AND ETag = @etag AND @etag IS NOT NULL;
+				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
 		END	
 		COMMIT TRANSACTION;
 		SELECT @newEtag;',

@@ -73,13 +73,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="General\Identifiertests.cs" />
-    <Compile Include="MembershipTests\LivenessTests.cs" />
+    <Compile Include="General\InterfaceRules.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="MembershipTests\SQLMembershipTableTests.cs" />
+    <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
+    <Compile Include="RemindersTest\SqlRemindersTableTests.cs" />
+    <Compile Include="SqlTestsEnvironment.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
@@ -91,13 +94,29 @@
     <Compile Include="MembershipTests\ZookeeperMembershipTableTests.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
+      <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
+      <Name>ClientGenerator</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansCounterControl\OrleansCounterControl.csproj">
+      <Project>{606b9647-cc0c-4058-bfbc-b5b7ed4f3c56}</Project>
+      <Name>OrleansCounterControl</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansHost\OrleansHost.csproj">
+      <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>
+      <Name>OrleansHost</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansManager\OrleansManager.csproj">
       <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
       <Name>OrleansManager</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj">
+      <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
+      <Name>OrleansProviders</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
@@ -123,6 +142,10 @@
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
       <Name>TestGrainInterfaces</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj">
+      <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
+      <Name>TestGrains</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
@@ -130,6 +153,7 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
+    <None Include="ReadMe.md" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\OrleansProviders\SQLServer\CreateOrleansTables_SqlServer.sql">

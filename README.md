@@ -1,12 +1,17 @@
 Orleans - Distributed Actor Model
 =======
 
+![Orleans logo](https://github.com/dotnet/orleans/blob/gh-pages/Icons/Orleans/OrleansSDK_128x.png)
+
+
 [![Build status](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/)
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
 [![Issue Stats](http://www.issuestats.com/github/dotnet/orleans/badge/pr)](http://www.issuestats.com/github/dotnet/orleans)
 [![Issue Stats](http://www.issuestats.com/github/dotnet/orleans/badge/issue)](http://www.issuestats.com/github/dotnet/orleans)
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/orleans?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+
+[![Help Wanted Issues](https://badge.waffle.io/dotnet/orleans.svg?label=help%20wanted&title=Help Wanted Issues)](http://waffle.io/dotnet/orleans)
 
 Orleans is a framework that provides a straight-forward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
 It was created by [Microsoft Research][MSR-ProjectOrleans] and designed for use in the cloud. 

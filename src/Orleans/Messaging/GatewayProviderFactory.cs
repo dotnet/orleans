@@ -51,6 +51,10 @@ namespace Orleans.Messaging
                     listProvider = new SqlMembershipTable();
                     break;
 
+                case ClientConfiguration.GatewayProviderType.Custom:
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(cfg.CustomGatewayProviderAssemblyName, logger);
+                    break;
+
                 case ClientConfiguration.GatewayProviderType.ZooKeeper:
                     listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
                     break;

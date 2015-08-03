@@ -32,7 +32,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Stores all streams associated with a specific grain activation.
     /// </summary>
-    internal class StreamDirectory : IStreamControl
+    internal class StreamDirectory
     {
         private readonly ConcurrentDictionary<StreamId, object> allStreams;
 
@@ -46,7 +46,7 @@ namespace Orleans.Streams
             return allStreams.GetOrAdd(streamId, _ => streamCreator()) as IAsyncStream<T>;
         }
 
-        public async Task Cleanup()
+        internal async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
         {
             var promises = new List<Task>();
             List<StreamId> streamIds = GetUsedStreamIds();
@@ -54,7 +54,7 @@ namespace Orleans.Streams
             {
                 IStreamControl streamControl = GetStreamControl(s);
                 if (streamControl != null)
-                    promises.Add(streamControl.Cleanup());
+                    promises.Add(streamControl.Cleanup(cleanupProducers, cleanupConsumers));
             }
             await Task.WhenAll(promises);
         }

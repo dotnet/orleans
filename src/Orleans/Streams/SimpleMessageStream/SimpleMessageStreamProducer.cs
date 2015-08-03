@@ -30,7 +30,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    internal class SimpleMessageStreamProducer<T> : IAsyncBatchObserver<T>, IStreamControl
+    internal class SimpleMessageStreamProducer<T> : IInternalAsyncBatchObserver<T>
     {
         private readonly StreamImpl<T>                  stream;
         private readonly string                         streamProviderName;

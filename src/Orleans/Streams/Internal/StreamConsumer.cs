@@ -172,6 +172,32 @@ namespace Orleans.Streams
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
 
+        public async Task Cleanup()
+        {
+            if (logger.IsVerbose) logger.Verbose("Cleanup() called");
+            if (myExtension == null)
+                return;
+
+            var allHandles = myExtension.GetAllStreamHandles<T>();
+            var tasks = new List<Task>();
+            foreach (var handle in allHandles)
+            {
+                myExtension.RemoveObserver(handle);
+                tasks.Add(pubSub.UnregisterConsumer(handle.SubscriptionId, stream.StreamId, streamProviderName));
+            }
+            try
+            {
+                await Task.WhenAll(tasks);
+
+            } catch (Exception exc)
+            {
+                logger.Warn((int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
+                    "Ignoring unhandled exception during PubSub.UnregisterConsumer", exc);
+            }
+            myExtension = null;
+        }
+
+        // Used in test.
         internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle)
         {
             return myExtension != null && myExtension.RemoveObserver(handle);
