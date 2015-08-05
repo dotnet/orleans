@@ -27,6 +27,7 @@ using System.Diagnostics;
 using System.Management;
 
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -47,6 +48,7 @@ namespace Orleans.Runtime
 #endif
         private SafeTimer cpuUsageTimer;
         private readonly TimeSpan CPU_CHECK_PERIOD = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan INITIALIZATION_TIMEOUT = TimeSpan.FromMinutes(1);
         private bool countersAvailable;
 
 
@@ -84,7 +86,18 @@ namespace Orleans.Runtime
 #endif
         internal RuntimeStatisticsGroup()
         {
-            InitCpuMemoryCounters();
+            try
+            {
+                Task.Run(() =>
+                {
+                    InitCpuMemoryCounters();
+                }).WaitWithThrow(INITIALIZATION_TIMEOUT);  
+            }
+            catch (TimeoutException)
+            {
+                logger.Warn(ErrorCode.PerfCounterConnectError,
+                    "Timeout occurred during initialization of CPU & Memory perf counters");
+            }          
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
