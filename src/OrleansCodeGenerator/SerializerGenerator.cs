@@ -67,9 +67,15 @@ namespace Orleans.CodeGenerator
             new ConcurrentDictionary<Assembly, Tuple<Assembly, string>>();
 
         /// <summary>
-        /// The types which require serializers.
+        /// The types which require a serializer.
         /// </summary>
         private static readonly SerializableTypeCollector SerializerRequired = new SerializableTypeCollector();
+
+        /// <summary>
+        /// The types which require source code for a serializer.
+        /// </summary>
+        private static readonly SerializableTypeCollector SerializerSourceRequired =
+            new SerializableTypeCollector(includeNonPublic: true);
 
         /// <summary>
         /// The logger.
@@ -97,17 +103,15 @@ namespace Orleans.CodeGenerator
 
         public static string GenerateSourceForAssembly(Assembly assembly)
         {
-            var needSerializer = new SerializableTypeCollector(includeNonPublic: true);
-
             // Get all types in this assembly, skipping anonymous types.
             foreach (var type in assembly.GetTypes().Where(IsSerializationSeedType))
             {
-                needSerializer.Consider(type, assembly, type.Module);
+                SerializerSourceRequired.Consider(type, assembly, type.Module);
             }
 
-            if (needSerializer.HasMore())
+            if (SerializerSourceRequired.HasMore())
             {
-                var syntaxTree = GenerateCompilationUnit(needSerializer.TakeAll(), randomizeNames: false);
+                var syntaxTree = GenerateCompilationUnit(SerializerSourceRequired.TakeAll(), randomizeNames: false);
                 var source = CodeGeneratorCommon.GenerateSourceCode(syntaxTree);
                 return source;
             }
@@ -217,7 +221,10 @@ namespace Orleans.CodeGenerator
             var attributes = new List<AttributeSyntax>
             {
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
-                SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax())
+                SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+                SF.Attribute(typeof(SerializerAttribute).GetNameSyntax())
+                    .AddArgumentListArguments(
+                        SF.AttributeArgument(SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))))
             };
 
             var classSuffix = DateTime.Now.Ticks.ToString("X") + ClassSuffix;

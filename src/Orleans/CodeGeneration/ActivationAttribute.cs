@@ -96,7 +96,7 @@ namespace Orleans.CodeGeneration
 
         public int InterfaceId { get; private set; }
     }
-    
+
     [AttributeUsage(System.AttributeTargets.Class)]
     public sealed class GrainReferenceAttribute : GeneratedAttribute
     {
@@ -112,6 +112,19 @@ namespace Orleans.CodeGeneration
         /// </summary>
         /// <param name="forGrainType">type argument</param>
         public GrainReferenceAttribute(Type forGrainType)
+        {
+            GrainType = forGrainType;
+            ForGrainType = forGrainType.GetParseableName();
+        }
+    }
+
+    [AttributeUsage(System.AttributeTargets.Class)]
+    public sealed class SerializerAttribute : GeneratedAttribute
+    {
+        /// <summary>
+        /// </summary>
+        /// <param name="forGrainType">type argument</param>
+        public SerializerAttribute(Type forGrainType)
         {
             GrainType = forGrainType;
             ForGrainType = forGrainType.GetParseableName();

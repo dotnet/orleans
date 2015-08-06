@@ -206,7 +206,7 @@ namespace Orleans.CodeGenerator
                 {
                     results.Add(attribute.GrainType);
                 }
-                else if (!String.IsNullOrWhiteSpace(attribute.ForGrainType))
+                else if (!string.IsNullOrWhiteSpace(attribute.ForGrainType))
                 {
                     results.Add(Type.GetType(attribute.ForGrainType));
                 }

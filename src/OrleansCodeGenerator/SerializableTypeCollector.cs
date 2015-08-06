@@ -7,6 +7,7 @@
     using System.Reflection;
 
     using Orleans;
+    using Orleans.CodeGeneration;
     using Orleans.Runtime;
     using Orleans.Serialization;
 
@@ -50,6 +51,8 @@
         /// </summary>
         private readonly TraceLogger log = TraceLogger.GetLogger("SerializerGenerator");
 
+        private int numAssemblies;
+
         public SerializableTypeCollector(bool includeNonPublic = false)
         {
             this.includeNonPublic = includeNonPublic;
@@ -68,6 +71,15 @@
         /// </param>
         public void Consider(Type type, Assembly serializerAssembly = null, Module module = null)
         {
+            // Reject all types which have already have generated serializers.
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(_ => !_.IsDynamic).ToList();
+            if (assemblies.Count != this.numAssemblies)
+            {
+                this.rejected.UnionWith(CodeGeneratorCommon.GetTypesWithImplementations<MethodInvokerAttribute>());
+                this.numAssemblies = assemblies.Count;
+            }
+
+            // Consider this type.
             if (!this.considered.Contains(type))
             {
                 this.pending.Enqueue(type);
