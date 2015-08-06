@@ -39,6 +39,8 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
+    using System.CodeDom.Compiler;
+
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
     /// </summary>
@@ -137,7 +139,9 @@ namespace Orleans.Serialization
         public static void InitializeForTesting()
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+
             // Load serialization info for currently-loaded assemblies
+            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 FindSerializationInfo(assembly);
@@ -511,8 +515,6 @@ namespace Orleans.Serialization
         /// <param name="assembly">The assembly to look through.</param>
         internal static void FindSerializationInfo(Assembly assembly)
         {
-            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(assembly);
-
             // If we're using the .Net serializer, then don't bother with this at all
             if (UseStandardSerializer) return;
 
@@ -1914,6 +1916,9 @@ namespace Orleans.Serialization
             AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
 
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
+
             // initialize serialization for already loaded assemblies.
             foreach (var assembly in assemblies)
                 FindSerializationInfo(assembly);

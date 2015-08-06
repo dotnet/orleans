@@ -24,21 +24,15 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 namespace Orleans.CodeGenerator
 {
     using System;
-    using System.CodeDom.Compiler;
-    using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
-    using System.Runtime.CompilerServices;
     using System.Threading.Tasks;
 
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-    using Orleans;
-    using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
@@ -58,108 +52,16 @@ namespace Orleans.CodeGenerator
         private const string ClassSuffix = "Reference";
 
         /// <summary>
-        /// The compiled assemblies.
-        /// </summary>
-        private static readonly ConcurrentDictionary<Assembly, Tuple<Assembly, string>> CompiledAssemblies =
-            new ConcurrentDictionary<Assembly, Tuple<Assembly, string>>();
-
-        /// <summary>
         /// A reference to the CheckGrainObserverParamInternal method.
         /// </summary>
         private static readonly Expression<Action> CheckGrainObserverParamInternalExpression =
             () => GrainFactoryBase.CheckGrainObserverParamInternal(null);
-
-        /// <summary>
-        /// Creates corresponding <see cref="GrainReference"/> for all grain types defined in currently loaded
-        /// assemblies.
-        /// </summary>
-        public static void CreateForCurrentlyLoadedAssemblies()
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(_ => !_.IsDynamic).ToList();
-            if (assemblies.Count == CompiledAssemblies.Count)
-            {
-                // Already up to date.
-                return;
-            }
-
-            // Generate code for newly loaded assemblies.
-            var grainAssemblies =
-                assemblies.Where(
-                    asm =>
-                    !CompiledAssemblies.ContainsKey(asm) && asm.GetCustomAttribute<GeneratedCodeAttribute>() == null
-                    && asm.GetTypes().Any(CodeGeneratorCommon.ShouldGenerate));
-            foreach (var assembly in grainAssemblies)
-            {
-                GenerateAndLoadForAssembly(assembly);
-            }
-        }
-
-        /// <summary>
-        /// Returns generated source code for <see cref="GrainReference"/> implementations for the provided
-        /// <paramref name="assembly"/>.
-        /// </summary>
-        /// <param name="assembly">The assembly.</param>
-        /// <returns>
-        /// Generated source code for <see cref="GrainReference"/> implementations for the provided <paramref name="assembly"/>.
-        /// </returns>
-        public static string GenerateSourceForAssembly(Assembly assembly)
-        {
-            var grainTypes = CodeGeneratorCommon.GetGrainInterfaces(assembly);
-            return CodeGeneratorCommon.GenerateSourceCode(GenerateCompilationUnit(grainTypes));
-        }
-
-        /// <summary>
-        /// Returns all generated source code.
-        /// </summary>
-        /// <returns>All generated source code.</returns>
-        public static IEnumerable<string> GetAllSource()
-        {
-            return CompiledAssemblies.Values.Select(_ => _.Item2);
-        }
-
-        /// <summary>
-        /// Returns a generated assembly containing <see cref="GrainReference"/>s for the grains defined in
-        /// the provided <paramref name="assembly"/>.
-        /// </summary>
-        /// <param name="assembly">
-        /// The grain assembly.
-        /// </param>
-        /// <returns>
-        /// A generated assembly containing <see cref="GrainReference"/>s for the grains defined in the provided
-        /// <paramref name="assembly"/>.
-        /// </returns>
-        public static void GenerateAndLoadForAssembly(Assembly assembly)
-        {
-            if (assembly.IsDynamic)
-            {
-                return;
-            }
-
-            CompiledAssemblies.GetOrAdd(assembly, GenerateForAssembly);
-        }
-
-        private static Tuple<Assembly, string> GenerateForAssembly(Assembly assembly)
-        {
-            var existingReferences = CodeGeneratorCommon.GetTypesWithImplementations<GrainReferenceAttribute>();
-            var grainTypes = CodeGeneratorCommon.GetGrainInterfaces(assembly, existingReferences, _ => _.IsPublic);
-
-            if (grainTypes.Count <= 0)
-            {
-                return Tuple.Create(default(Assembly), string.Empty);
-            }
-
-            var syntaxTree = GenerateCompilationUnit(grainTypes);
-            string source;
-            var compiled = CodeGeneratorCommon.CompileAssembly(syntaxTree, assembly.GetName().Name + "_" + ClassSuffix + ".dll", out source);
-            RegisterGrainReferenceSerializers(assembly);
-            return Tuple.Create(compiled, source);
-        }
-
+        
         /// <summary>
         /// Registers GrainRefernece serializers for the provided <paramref name="assembly"/>.
         /// </summary>
         /// <param name="assembly">The assembly.</param>
-        private static void RegisterGrainReferenceSerializers(Assembly assembly)
+        internal static void RegisterGrainReferenceSerializers(Assembly assembly)
         {
             foreach (var type in assembly.GetTypes())
             {
@@ -189,35 +91,6 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Returns compilation unit syntax for dispatching events to the provided <paramref name="grainTypes"/>.
-        /// </summary>
-        /// <param name="grainTypes">
-        /// The grain types.
-        /// </param>
-        /// <returns>
-        /// Compilation unit syntax for dispatching events to the provided <paramref name="grainTypes"/>.
-        /// </returns>
-        [SuppressMessage("ReSharper", "CoVariantArrayConversion", Justification = "Array is never mutated.")]
-        private static CompilationUnitSyntax GenerateCompilationUnit(IList<Type> grainTypes)
-        {
-            var usings =
-                TypeUtils.GetNamespaces( typeof(TaskUtility), typeof(GrainExtensions))
-                    .Select(_ => SF.UsingDirective(SF.ParseName(_)))
-                    .ToArray();
-
-            var members = new List<MemberDeclarationSyntax>();
-            foreach (var group in grainTypes.GroupBy(_ => CodeGeneratorCommon.GetGeneratedNamespace(_)))
-            {
-                members.Add(
-                    SF.NamespaceDeclaration(SF.ParseName(group.Key))
-                        .AddUsings(usings)
-                        .AddMembers(group.Select(GenerateClass).ToArray()));
-            }
-
-            return SF.CompilationUnit().AddMembers(members.ToArray());
-        }
-
-        /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
         /// <param name="grainType">
@@ -226,7 +99,7 @@ namespace Orleans.CodeGenerator
         /// <returns>
         /// The generated class.
         /// </returns>
-        private static TypeDeclarationSyntax GenerateClass(Type grainType)
+        internal static TypeDeclarationSyntax GenerateClass(Type grainType)
         {
             var genericTypes = grainType.IsGenericTypeDefinition
                                    ? grainType.GetGenericArguments()

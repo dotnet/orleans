@@ -62,6 +62,32 @@
         }
 
         /// <summary>
+        /// Returns true if the type requires serialization, false if it does not, and throw a
+        /// <see cref="CodeGenerationException"/> if the type has not yet been considered.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>
+        /// true if the type requires serialization, false if it does not, and throw a
+        /// <see cref="CodeGenerationException"/> if the type has not yet been considered.
+        /// </returns>
+        public bool IsSerializationRequired(Type type)
+        {
+            if (this.accepted.Contains(type) || this.processed.Contains(type))
+            {
+                return true;
+            }
+
+            if (this.rejected.Contains(type))
+            {
+                return false;
+            }
+
+            throw new CodeGenerationException(
+                "IsSerializationRequired encountered a type which has not been considered yet: '"
+                + type.GetParseableName() + "'");
+        }
+
+        /// <summary>
         /// Considers the specified type, recording whether or not it requires generation of a serializer, recursing
         /// into referenced types.
         /// </summary>
@@ -78,7 +104,7 @@
             var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(_ => !_.IsDynamic).ToList();
             if (assemblies.Count != this.numAssemblies)
             {
-                this.rejected.UnionWith(CodeGeneratorCommon.GetTypesWithImplementations<MethodInvokerAttribute>());
+                this.rejected.UnionWith(CodeGeneratorCommon.GetTypesWithImplementations(typeof(SerializerAttribute)));
                 this.numAssemblies = assemblies.Count;
             }
 
@@ -105,8 +131,14 @@
             while (this.pending.Count > 0)
             {
                 var type = this.pending.Dequeue();
-                if (!this.considered.Add(type) || type.GetCustomAttribute<NonSerializableAttribute>() != null || type.Name.StartsWith("<"))
+                if (!this.considered.Add(type))
                 {
+                    continue;
+                }
+
+                if (type.GetCustomAttribute<NonSerializableAttribute>() != null || type.Name.StartsWith("<"))
+                {
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -117,6 +149,7 @@
                         ErrorCode.CodeGenSerializerGenerator,
                         "Skipping serializer generation for {0} because it is not public.",
                         type);
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -126,6 +159,7 @@
                     Debug.Assert(type.Namespace != null, "type.Namespace != null");
                     if (type.Namespace.StartsWith("System.Threading.Tasks"))
                     {
+                        this.rejected.Add(type);
                         continue;
                     }
 
@@ -134,6 +168,7 @@
                         "System type {0} may require a custom serializer for optimal performance.\n"
                         + "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.",
                         type);
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -158,6 +193,7 @@
                             ErrorCode.CodeGenSerializerGenerator,
                             "Skipping serializer generation for {0} because it contains non-public types.",
                             type);
+                        this.rejected.Add(type);
                         continue;
                     }
 
@@ -167,6 +203,7 @@
                         this.pending.Enqueue(innerType);
                     }
 
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -181,6 +218,7 @@
                             type);
                     }
 
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -191,6 +229,7 @@
                         ErrorCode.CodeGenSerializerGenerator,
                         "Skipping serializer generation for {0} because it is already serializable.",
                         type);
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -201,6 +240,7 @@
                         "Serializer generation is traversing into {0} because it is an array.",
                         type);
                     this.pending.Enqueue(type.GetElementType());
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -211,6 +251,7 @@
                         "Serializer generation is traversing into {0} because it is a by-ref type.",
                         type);
                     this.pending.Enqueue(type.GetElementType());
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -220,6 +261,7 @@
                         ErrorCode.CodeGenSerializerGenerator,
                         "Skipping serializer generation for {0} because it is a MarshalByRefObject, which is not supported.",
                         type);
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -230,6 +272,7 @@
                         ErrorCode.CodeGenSerializerGenerator,
                         "Skipping serializer generation for {0} because it is nested. If this type is used frequently, you may wish to consider making it non-nested.",
                         type);
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -258,6 +301,7 @@
                             type);
                     }
 
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -272,6 +316,7 @@
                             type);
                     }
 
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -282,6 +327,7 @@
                         "Skipping serializer generation for {0} because it is contains fields with non-accessible types.",
                         type);
 
+                    this.rejected.Add(type);
                     continue;
                 }
 
@@ -299,6 +345,7 @@
                                 type);
                         }
 
+                        this.rejected.Add(type);
                         continue;
                     }
 

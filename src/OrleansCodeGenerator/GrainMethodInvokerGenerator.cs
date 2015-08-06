@@ -54,110 +54,7 @@ namespace Orleans.CodeGenerator
         /// The suffix appended to the name of generated classes.
         /// </summary>
         private const string ClassSuffix = "MethodInvoker";
-
-        /// <summary>
-        /// The compiled assemblies.
-        /// </summary>
-        private static readonly ConcurrentDictionary<Assembly, Tuple<Assembly, string>> CompiledAssemblies =
-            new ConcurrentDictionary<Assembly, Tuple<Assembly, string>>();
-
-        /// <summary>
-        /// Creates corresponding <see cref="IGrainMethodInvoker"/> for all grain types defined in currently loaded
-        /// assemblies.
-        /// </summary>
-        public static void CreateForCurrentlyLoadedAssemblies()
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(_ => !_.IsDynamic).ToList();
-            if (assemblies.Count == CompiledAssemblies.Count)
-            {
-                // Already up to date.
-                return;
-            }
-
-            // Generate code for newly loaded assemblies.
-            var grainAssemblies =
-                assemblies.Where(
-                    asm =>
-                    !CompiledAssemblies.ContainsKey(asm) && asm.GetCustomAttribute<GeneratedCodeAttribute>() == null
-                    && asm.GetTypes().Any(CodeGeneratorCommon.ShouldGenerate));
-            foreach (var assembly in grainAssemblies)
-            {
-                GenerateAndLoadForAssembly(assembly);
-            }
-        }
-
-        /// <summary>
-        /// Returns a generated assembly containing <see cref="IGrainMethodInvoker"/>s for the grains defined in
-        /// the provided <paramref name="assembly"/>.
-        /// </summary>
-        /// <param name="assembly">
-        ///     The input assembly.
-        /// </param>
-        /// <returns>
-        /// A generated assembly containing <see cref="IGrainMethodInvoker"/>s for the grains defined in the provided
-        /// <paramref name="assembly"/>.
-        /// </returns>
-        public static void GenerateAndLoadForAssembly(Assembly assembly)
-        {
-            if (assembly.IsDynamic)
-            {
-                return;
-            }
-
-            CompiledAssemblies.GetOrAdd(assembly, GenerateForAssembly);
-        }
-
-        private static Tuple<Assembly, string> GenerateForAssembly(Assembly assembly)
-        {
-            var existingInvokers = CodeGeneratorCommon.GetTypesWithImplementations<MethodInvokerAttribute>();
-            var grainTypes = CodeGeneratorCommon.GetGrainInterfaces(assembly, existingInvokers, _ => _.IsPublic);
-
-            if (grainTypes.Count <= 0)
-            {
-                return Tuple.Create(default(Assembly), string.Empty);
-            }
-
-            var syntaxTree = GenerateCompilationUnit(grainTypes);
-            string source;
-            var compiled = CodeGeneratorCommon.CompileAssembly(syntaxTree, assembly.GetName().Name + "_" + ClassSuffix + ".dll", out source);
-            return Tuple.Create(compiled, source);
-        }
-
-        public static string GenerateSourceForAssembly(Assembly assembly)
-        {
-            var grainTypes = CodeGeneratorCommon.GetGrainInterfaces(assembly);
-            return CodeGeneratorCommon.GenerateSourceCode(GenerateCompilationUnit(grainTypes));
-        }
-
-        /// <summary>
-        /// Returns compilation unit syntax for dispatching events to the provided <paramref name="grainTypes"/>.
-        /// </summary>
-        /// <param name="grainTypes">
-        /// The grain types.
-        /// </param>
-        /// <returns>
-        /// Compilation unit syntax for dispatching events to the provided <paramref name="grainTypes"/>.
-        /// </returns>
-        [SuppressMessage("ReSharper", "CoVariantArrayConversion", Justification = "Array is never mutated.")]
-        private static CompilationUnitSyntax GenerateCompilationUnit(IList<Type> grainTypes)
-        {
-            var usings =
-                TypeUtils.GetNamespaces(typeof(TaskUtility), typeof(GrainExtensions))
-                    .Select(_ => SF.UsingDirective(SF.ParseName(_)))
-                    .ToArray();
-
-            var members = new List<MemberDeclarationSyntax>();
-            foreach (var group in grainTypes.GroupBy(_ => CodeGeneratorCommon.GetGeneratedNamespace(_)))
-            {
-                members.Add(
-                    SF.NamespaceDeclaration(SF.ParseName(group.Key))
-                        .AddUsings(usings)
-                        .AddMembers(group.Select(GenerateClass).ToArray()));
-            }
-
-            return SF.CompilationUnit().AddMembers(members.ToArray());
-        }
-
+        
         /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
@@ -167,7 +64,7 @@ namespace Orleans.CodeGenerator
         /// <returns>
         /// The generated class.
         /// </returns>
-        private static TypeDeclarationSyntax GenerateClass(Type grainType)
+        internal static TypeDeclarationSyntax GenerateClass(Type grainType)
         {
             var baseTypes = new List<BaseTypeSyntax> { SF.SimpleBaseType(typeof(IGrainMethodInvoker).GetTypeSyntax()) };
 

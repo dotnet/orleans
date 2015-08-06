@@ -1,6 +1,7 @@
 ﻿namespace Orleans.CodeGeneration
 {
     using System;
+    using System.Linq;
     using System.Reflection;
 
     using Orleans.Runtime;
@@ -21,6 +22,18 @@
             if (codeGen != null)
             {
                 codeGen.GenerateAndLoadForAssembly(input);
+            }
+        }
+
+        /// <summary>
+        /// Ensures code the the <paramref name="input"/> assembly has been generated and loaded.
+        /// </summary>
+        public static void GenerateAndCacheCodeForAllAssemblies()
+        {
+            var codeGen = CodeGeneratorInstance.Value;
+            if (codeGen != null)
+            {
+                codeGen.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
             }
         }
 

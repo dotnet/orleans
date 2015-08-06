@@ -79,14 +79,14 @@ namespace Orleans.CodeGenerator
         /// <returns>
         /// A value indicating whether or not a class should be generated for the specified type.
         /// </returns>
-        public static bool ShouldGenerate(Type type)
+        public static bool IsGrainInterfaceType(Type type)
         {
             return GrainInterfaceData.IsGrainInterface(type)
                    && type != typeof(IGrainWithGuidCompoundKey) && type != typeof(IGrainWithGuidKey)
                    && type != typeof(IGrainWithIntegerCompoundKey) && type != typeof(IGrainWithIntegerKey)
                    && type != typeof(IGrainWithStringKey);
         }
-        
+
         /// <summary>
         /// Generates and compiles an assembly for the provided grains.
         /// </summary>
@@ -96,28 +96,14 @@ namespace Orleans.CodeGenerator
         /// <param name="assemblyName">
         /// The name for the generated assembly.
         /// </param>
-        /// <param name="source">
-        /// The source.
-        /// </param>
         /// <returns>
         /// The <see cref="Assembly"/>.
         /// </returns>
         /// <exception cref="CodeGenerationException">
         /// An error occurred generating code.
         /// </exception>
-        public static Assembly CompileAssembly(CompilationUnitSyntax code, string assemblyName, out string source)
+        public static Assembly CompileAssembly(CompilationUnitSyntax code, string assemblyName)
         {
-            // Add an attribute to mark the code as generated.
-            code =
-                code.AddAttributeLists(
-                    SF.AttributeList()
-                        .AddAttributes(
-                            SF.Attribute(typeof(GeneratedCodeAttribute).GetNameSyntax())
-                                .AddArgumentListArguments(
-                                    SF.AttributeArgument("Orleans-CodeGenerator".GetLiteralExpression()),
-                                    SF.AttributeArgument(RuntimeVersion.FileVersion.GetLiteralExpression())))
-                        .WithTarget(SF.AttributeTargetSpecifier(SF.Token(SyntaxKind.AssemblyKeyword))));
-
             // Reference everything which can be referenced.
             var assemblies =
                 AppDomain.CurrentDomain.GetAssemblies()
@@ -129,19 +115,24 @@ namespace Orleans.CodeGenerator
 
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
-            source = GenerateSourceCode(code);
 
-            // Compile the code and load the generated assembly.
+            string source = null;
             if (logger.IsVerbose3)
             {
-                logger.LogWithoutBulkingAndTruncating(
-                    Logger.Severity.Verbose3,
-                    ErrorCode.CodeGenSourceGenerated,
-                    "Generating assembly {0} with source:\n{1}",
-                    assemblyName,
-                    source);
-            }
+                source = GenerateSourceCode(code);
 
+                // Compile the code and load the generated assembly.
+                if (logger.IsVerbose3)
+                {
+                    logger.LogWithoutBulkingAndTruncating(
+                        Logger.Severity.Verbose3,
+                        ErrorCode.CodeGenSourceGenerated,
+                        "Generating assembly {0} with source:\n{1}",
+                        assemblyName,
+                        source);
+                }
+            }
+            
             var compilation =
                 CSharpCompilation.Create(assemblyName)
                     .AddSyntaxTrees(code.SyntaxTree)
@@ -153,6 +144,7 @@ namespace Orleans.CodeGenerator
                 var compilationResult = compilation.Emit(stream);
                 if (!compilationResult.Success)
                 {
+                    source = source ?? GenerateSourceCode(code);
                     var errors = string.Join("\n", compilationResult.Diagnostics.Select(_ => _.ToString()));
                     logger.Warn(ErrorCode.CodeGenCompilationFailed, "Compilation of assembly {0} failed with errors:\n{1}", assemblyName, errors, source);
                     throw new CodeGenerationException(errors);
@@ -185,7 +177,7 @@ namespace Orleans.CodeGenerator
         {
             return
                 grainAssembly.GetTypes()
-                    .Where(ShouldGenerate)
+                    .Where(IsGrainInterfaceType)
                     .Where(_ => exclude == null || !exclude.Contains(_))
                     .Where(_ => filter == null || filter(_))
                     .ToList();
@@ -202,14 +194,13 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Get types which have corresponding generated classes marked with <typeparamref name="TMarkerAttribute"/>.
+        /// Get types which have corresponding generated classes marked with the provided marker attributes.
         /// </summary>
-        /// <typeparam name="TMarkerAttribute">The marker attribute for the implementation type.</typeparam>
-        /// <returns>Types which have corresponding generated classes marked with <typeparamref name="TMarkerAttribute"/>.</returns>
-        internal static HashSet<Type> GetTypesWithImplementations<TMarkerAttribute>() where TMarkerAttribute : GeneratedAttribute
+        /// <returns>Types which have corresponding generated classes marked with any of the provided marker attributes.</returns>
+        internal static HashSet<Type> GetTypesWithImplementations(params Type[] markerAttributes)
         {
             var all = AppDomain.CurrentDomain.GetAssemblies().SelectMany(_ => _.GetTypes());
-            var attributes = all.Select(_ => _.GetCustomAttribute<TMarkerAttribute>()).Where(_ => _ != null);
+            var attributes = all.SelectMany(_ => _.GetCustomAttributes()).OfType<GeneratedAttribute>();
             var results = new HashSet<Type>();
             foreach (var attribute in attributes)
             {

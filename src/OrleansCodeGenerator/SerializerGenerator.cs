@@ -25,7 +25,6 @@ namespace Orleans.CodeGenerator
 {
     using System;
     using System.CodeDom.Compiler;
-    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
@@ -59,156 +58,18 @@ namespace Orleans.CodeGenerator
         /// The suffix appended to the name of the generic serializer registration class.
         /// </summary>
         private const string RegistererClassSuffix = "Registerer";
-
-        /// <summary>
-        /// The compiled assemblies.
-        /// </summary>
-        private static readonly ConcurrentDictionary<Assembly, Tuple<Assembly, string>> CompiledAssemblies =
-            new ConcurrentDictionary<Assembly, Tuple<Assembly, string>>();
-
-        /// <summary>
-        /// The types which require a serializer.
-        /// </summary>
-        private static readonly SerializableTypeCollector SerializerRequired = new SerializableTypeCollector();
-
-        /// <summary>
-        /// The types which require source code for a serializer.
-        /// </summary>
-        private static readonly SerializableTypeCollector SerializerSourceRequired =
-            new SerializableTypeCollector(includeNonPublic: true);
-
-        /// <summary>
-        /// The logger.
-        /// </summary>
-        private static readonly Logger Logger = TraceLogger.GetLogger("CodeGenerator");
         
-        /// <summary>
-        /// Creates corresponding serializer classes for all currently loaded types.
-        /// </summary>
-        public static void CreateForCurrentlyLoadedAssemblies()
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(_ => !_.IsDynamic).ToList();
-            if (assemblies.Count == CompiledAssemblies.Count)
-            {
-                // Already up-to-date.
-                return;
-            }
-
-            // Consider all types in the loaded assemblies.
-            foreach (var assembly in assemblies)
-            {
-                if (assembly.GetCustomAttribute<GeneratedCodeAttribute>() != null)
-                {
-                    continue;
-                }
-
-                GenerateAndLoadForAssembly(assembly);
-            }
-        }
-
-        public static string GenerateSourceForAssembly(Assembly assembly)
-        {
-            // Get all types in this assembly, skipping anonymous types.
-            foreach (var type in assembly.GetTypes().Where(IsSerializationSeedType))
-            {
-                SerializerSourceRequired.Consider(type, assembly, type.Module);
-            }
-
-            if (SerializerSourceRequired.HasMore())
-            {
-                var syntaxTree = GenerateCompilationUnit(SerializerSourceRequired.TakeAll(), randomizeNames: false);
-                var source = CodeGeneratorCommon.GenerateSourceCode(syntaxTree);
-                return source;
-            }
-
-            return string.Empty;
-        }
-
-        public static void GenerateAndLoadForAssembly(Assembly input)
-        {
-            if (input.IsDynamic)
-            {
-                return;
-            }
-
-            CompiledAssemblies.GetOrAdd(input, GenerateAssembly);
-        }
-
-        /// <summary>
-        /// Gets the compiled invoker assembly for the provided grain assembly.
-        /// </summary>
-        /// <param name="assembly">
-        /// The input assembly.
-        /// </param>
-        /// <returns>
-        /// The compiled invoker assembly for the provided grain assembly.
-        /// </returns>
-        private static Tuple<Assembly, string> GenerateAssembly(Assembly assembly)
-        {
-            Logger.Info("Generating serializer for types in assembly {0}.", assembly);
-            foreach (var type in assembly.GetTypes().Where(IsSerializationSeedType))
-            {
-                SerializerRequired.Consider(type);
-            }
-
-            if (!SerializerRequired.HasMore())
-            {
-                return Tuple.Create(default(Assembly), string.Empty);
-            }
-
-            string source;
-            var asm = CodeGeneratorCommon.CompileAssembly(
-                GenerateCompilationUnit(SerializerRequired.TakeAll()),
-                assembly.GetName().Name + "_" + ClassSuffix + ".dll",
-                out source);
-            return Tuple.Create(asm, source);
-        }
-
         /// <summary>
         /// Returns true if the provided type is a seed type for serialization generation.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>true if the provided type is a seed type for serialization generation.</returns>
-        private static bool IsSerializationSeedType(Type type)
+        internal static bool IsSerializationSeedType(Type type)
         {
             // Skip compiler-generated types (whose names begin with a '<' character).
             return !type.Name.StartsWith("<") && type.GetCustomAttribute<GeneratedCodeAttribute>() == null
                    && type.GetCustomAttribute<NonSerializableAttribute>() == null
                    && !TypeUtils.IsInSystemNamespace(type);
-        }
-
-        /// <summary>
-        /// Returns compilation unit syntax for serializers for all types pending serializer generation.
-        /// </summary>
-        /// <param name="types">
-        /// The types to include in assembly generation.
-        /// </param>
-        /// <param name="randomizeNames">
-        /// Whether or not to use randomized namespace names.
-        /// </param>
-        /// <returns>
-        /// Compilation unit syntax for serializers for all types pending serializer generation.
-        /// </returns>
-        [SuppressMessage("ReSharper", "CoVariantArrayConversion", Justification = "Array is never mutated.")]
-        private static CompilationUnitSyntax GenerateCompilationUnit(IList<Type> types, bool randomizeNames = true)
-        {
-            var usings =
-                TypeUtils.GetNamespaces(typeof(GrainExtensions))
-                    .Select(_ => SF.UsingDirective(SF.ParseName(_)))
-                    .ToArray();
-
-            var members = new List<MemberDeclarationSyntax>();
-            var groups = types.GroupBy(_ => CodeGeneratorCommon.GetGeneratedNamespace(_, randomizeNames));
-            foreach (var group in groups)
-            {
-
-                members.Add(
-                    SF.NamespaceDeclaration(SF.ParseName(group.Key))
-                        .AddUsings(usings)
-                        .AddMembers(group.SelectMany(GenerateClass).ToArray()));
-            }
-
-            return SF.CompilationUnit().AddMembers(members.ToArray());
         }
 
         /// <summary>
@@ -220,7 +81,7 @@ namespace Orleans.CodeGenerator
         /// <returns>
         /// The generated class.
         /// </returns>
-        private static TypeDeclarationSyntax[] GenerateClass(Type type)
+        internal static IEnumerable<TypeDeclarationSyntax> GenerateClass(Type type)
         {
             var genericTypes = type.IsGenericTypeDefinition
                                    ? type.GetGenericArguments().Select(_ => SF.TypeParameter(_.ToString())).ToArray()
@@ -291,7 +152,7 @@ namespace Orleans.CodeGenerator
                             GenerateConstructor(className + RegistererClassSuffix)));
             }
 
-            return classes.ToArray();
+            return classes;
         }
 
         private static MemberDeclarationSyntax GenerateDeepCopierMethod(Type type, List<FieldInfoMember> fields)

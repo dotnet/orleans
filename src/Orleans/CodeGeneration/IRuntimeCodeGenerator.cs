@@ -31,5 +31,11 @@ namespace Orleans.CodeGeneration
         /// Ensures that code generation has been run for the provided assembly.
         /// </summary>
         void GenerateAndLoadForAssembly(Assembly input);
+
+        /// <summary>
+        /// Generates and loads code for the specified inputs.
+        /// </summary>
+        /// <param name="inputs">The assemblies to generate code for.</param>
+        void GenerateAndLoadForAssemblies(params Assembly[] inputs);
     }
 }

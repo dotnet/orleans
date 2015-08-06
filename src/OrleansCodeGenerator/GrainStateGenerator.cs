@@ -24,19 +24,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 namespace Orleans.CodeGenerator
 {
     using System;
-    using System.CodeDom.Compiler;
     using System.Collections;
-    using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Reflection;
 
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-    using Orleans;
-    using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
@@ -56,12 +51,6 @@ namespace Orleans.CodeGenerator
         private const string ClassSuffix = "GrainState";
 
         /// <summary>
-        /// The compiled assemblies.
-        /// </summary>
-        private static readonly ConcurrentDictionary<Assembly, Tuple<Assembly, string>> CompiledAssemblies =
-            new ConcurrentDictionary<Assembly, Tuple<Assembly, string>>();
-
-        /// <summary>
         /// The mapping between known interface types and a suitable implementation for that interface.
         /// </summary>
         private static readonly Dictionary<Type, Type> InterfaceImplementationMap = new Dictionary<Type, Type>
@@ -77,76 +66,8 @@ namespace Orleans.CodeGenerator
             { typeof(ICollection), typeof(List<object>) },
             { typeof(IDictionary), typeof(Dictionary<object,object>) },
         };
-
-        /// <summary>
-        /// Creates corresponding grain state classes for all currently loaded grain types.
-        /// </summary>
-        public static void CreateForCurrentlyLoadedAssemblies()
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(_ => !_.IsDynamic).ToList();
-            if (assemblies.Count == CompiledAssemblies.Count)
-            {
-                // Already up to date.
-                return;
-            }
-
-            // Generate code for newly loaded assemblies.
-            var grainAssemblies =
-                assemblies.Where(
-                    asm =>
-                    !CompiledAssemblies.ContainsKey(asm) && asm.GetCustomAttribute<GeneratedCodeAttribute>() == null
-                    && asm.GetTypes().Any(CodeGeneratorCommon.ShouldGenerate));
-            foreach (var assembly in grainAssemblies)
-            {
-                GenerateAndLoadForAssembly(assembly);
-            }
-        }
-
-        /// <summary>
-        /// Returns a generated assembly containing grain state classes for all currently loaded grain types.
-        /// </summary>
-        /// <param name="assembly">
-        ///     The input assembly.
-        /// </param>
-        /// <returns>
-        /// A generated assembly containing grain state classes for all currently loaded grain types.
-        /// </returns>
-        public static void GenerateAndLoadForAssembly(Assembly assembly)
-        {
-            if (assembly.IsDynamic)
-            {
-                return;
-            }
-
-            CompiledAssemblies.GetOrAdd(assembly, GenerateForAssembly);
-        }
-
-        private static Tuple<Assembly, string> GenerateForAssembly(Assembly assembly)
-        {
-            var grainTypes = CodeGeneratorCommon.GetGrainImplementations(assembly, filter: IsStatefulGrain);
-
-            if (grainTypes.Count <= 0)
-            {
-                return Tuple.Create(default(Assembly), string.Empty);
-            }
-
-            string source;
-            var syntaxTree = GenerateCompilationUnit(grainTypes);
-            var compiled = CodeGeneratorCommon.CompileAssembly(syntaxTree, assembly.GetName().Name + "_" + ClassSuffix + ".dll", out source);
-            
-            return Tuple.Create(compiled, source);
-        }
-
-        public static string GenerateSourceForAssembly(Assembly assembly)
-        {
-            var grainTypes = CodeGeneratorCommon.GetGrainImplementations(
-                assembly,
-                /*CodeGeneratorCommon.GetTypesWithImplementations<GrainStateAttribute>(),*/
-                filter: IsStatefulGrain);
-            return CodeGeneratorCommon.GenerateSourceCode(GenerateCompilationUnit(grainTypes));
-        }
-
-        private static bool IsStatefulGrain(Type grainType)
+        
+        internal static bool IsStatefulGrain(Type grainType)
         {
             var stateType = GetGrainStateType(grainType);
             return stateType != null && !typeof(GrainState).IsAssignableFrom(stateType);
@@ -182,36 +103,7 @@ namespace Orleans.CodeGenerator
 
             return null;
         }
-
-        /// <summary>
-        /// Returns compilation unit syntax for dispatching events to the provided <paramref name="grainTypes"/>.
-        /// </summary>
-        /// <param name="grainTypes">
-        /// The grain types.
-        /// </param>
-        /// <returns>
-        /// Compilation unit syntax for dispatching events to the provided <paramref name="grainTypes"/>.
-        /// </returns>
-        [SuppressMessage("ReSharper", "CoVariantArrayConversion", Justification = "Array is never mutated.")]
-        private static CompilationUnitSyntax GenerateCompilationUnit(IList<Type> grainTypes)
-        {
-            var usings =
-                TypeUtils.GetNamespaces(typeof(TaskUtility), typeof(GrainExtensions))
-                    .Select(_ => SF.UsingDirective(SF.ParseName(_)))
-                    .ToArray();
-
-            var members = new List<MemberDeclarationSyntax>();
-            foreach (var group in grainTypes.GroupBy(_ => CodeGeneratorCommon.GetGeneratedNamespace(_)))
-            {
-                members.Add(
-                    SF.NamespaceDeclaration(SF.ParseName(group.Key))
-                        .AddUsings(usings)
-                        .AddMembers(group.Select(GenerateClass).ToArray()));
-            }
-
-            return SF.CompilationUnit().AddMembers(members.ToArray());
-        }
-
+        
         /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
@@ -221,7 +113,7 @@ namespace Orleans.CodeGenerator
         /// <returns>
         /// The generated class.
         /// </returns>
-        private static TypeDeclarationSyntax GenerateClass(Type grainType)
+        internal static TypeDeclarationSyntax GenerateClass(Type grainType)
         {
             var stateType = GetGrainStateType(grainType);
             if (stateType == null)
