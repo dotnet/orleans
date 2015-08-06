@@ -166,7 +166,16 @@ namespace Orleans.CodeGenerator
         /// <returns>true if the provided type is a seed type for serialization generation.</returns>
         private static bool IsSerializationSeedType(Type type)
         {
-            return !type.Name.StartsWith("<") && type.GetCustomAttribute<GeneratedCodeAttribute>() == null;
+            // Skip compiler-generated types (whose names begin with a '<' character).
+            if (!type.Name.StartsWith("<") && type.GetCustomAttribute<GeneratedCodeAttribute>() == null
+                && type.GetCustomAttribute<NonSerializableAttribute>() == null)
+            {
+                return true;
+            }
+
+            // Skip types in the "System" namespace
+            var ns = type.GetNamespaceOrEmpty();
+            return ns.StartsWith("System.") || string.Equals(ns, "System");
         }
 
         /// <summary>
