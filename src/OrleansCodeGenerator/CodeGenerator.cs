@@ -1,5 +1,6 @@
 ﻿namespace Orleans.CodeGenerator
 {
+    using System.CodeDom.Compiler;
     using System.Reflection;
 
     using Orleans.CodeGeneration;
@@ -21,6 +22,12 @@
                 return;
             }
 
+            // Skip generated assemblies.
+            if (input.GetCustomAttribute<GeneratedCodeAttribute>() != null)
+            {
+                return;
+            }
+
             GrainReferenceGenerator.GenerateAndLoadForAssembly(input);
             GrainMethodInvokerGenerator.GenerateAndLoadForAssembly(input);
             GrainStateGenerator.GenerateAndLoadForAssembly(input);
@@ -29,6 +36,12 @@
 
         public string GenerateSourceForAssembly(Assembly input)
         {
+            // Skip generated assemblies.
+            if (input.GetCustomAttribute<GeneratedCodeAttribute>() != null)
+            {
+                return string.Empty;
+            }
+
             var methodInvokers = GrainMethodInvokerGenerator.GenerateSourceForAssembly(input);
             var grainReferences = GrainReferenceGenerator.GenerateSourceForAssembly(input);
             var grainState = GrainStateGenerator.GenerateSourceForAssembly(input);

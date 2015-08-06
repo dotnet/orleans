@@ -107,6 +107,17 @@ namespace Orleans.CodeGenerator
         /// </exception>
         public static Assembly CompileAssembly(CompilationUnitSyntax code, string assemblyName, out string source)
         {
+            // Add an attribute to mark the code as generated.
+            code =
+                code.AddAttributeLists(
+                    SF.AttributeList()
+                        .AddAttributes(
+                            SF.Attribute(typeof(GeneratedCodeAttribute).GetNameSyntax())
+                                .AddArgumentListArguments(
+                                    SF.AttributeArgument("Orleans-CodeGenerator".GetLiteralExpression()),
+                                    SF.AttributeArgument(RuntimeVersion.FileVersion.GetLiteralExpression())))
+                        .WithTarget(SF.AttributeTargetSpecifier(SF.Token(SyntaxKind.AssemblyKeyword))));
+
             // Reference everything which can be referenced.
             var assemblies =
                 AppDomain.CurrentDomain.GetAssemblies()

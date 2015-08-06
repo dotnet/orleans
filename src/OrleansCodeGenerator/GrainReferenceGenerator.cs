@@ -24,12 +24,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 namespace Orleans.CodeGenerator
 {
     using System;
+    using System.CodeDom.Compiler;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using System.Runtime.CompilerServices;
     using System.Threading.Tasks;
 
     using Microsoft.CodeAnalysis.CSharp;
@@ -82,8 +84,10 @@ namespace Orleans.CodeGenerator
 
             // Generate code for newly loaded assemblies.
             var grainAssemblies =
-                assemblies.Where(asm => !CompiledAssemblies.ContainsKey(asm))
-                    .Where(_ => _.GetTypes().Any(CodeGeneratorCommon.ShouldGenerate));
+                assemblies.Where(
+                    asm =>
+                    !CompiledAssemblies.ContainsKey(asm) && asm.GetCustomAttribute<GeneratedCodeAttribute>() == null
+                    && asm.GetTypes().Any(CodeGeneratorCommon.ShouldGenerate));
             foreach (var assembly in grainAssemblies)
             {
                 GenerateAndLoadForAssembly(assembly);

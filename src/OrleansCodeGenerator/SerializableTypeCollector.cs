@@ -51,6 +51,9 @@
         /// </summary>
         private readonly TraceLogger log = TraceLogger.GetLogger("SerializerGenerator");
 
+        /// <summary>
+        /// The number of assemblies which have been seen by this instance.
+        /// </summary>
         private int numAssemblies;
 
         public SerializableTypeCollector(bool includeNonPublic = false)
@@ -113,6 +116,23 @@
                     this.log.Verbose3(
                         ErrorCode.CodeGenSerializerGenerator,
                         "Skipping serializer generation for {0} because it is not public.",
+                        type);
+                    continue;
+                }
+
+                // Skip types in the System namespace.
+                if (TypeUtils.IsInSystemNamespace(type))
+                {
+                    Debug.Assert(type.Namespace != null, "type.Namespace != null");
+                    if (type.Namespace.StartsWith("System.Threading.Tasks"))
+                    {
+                        continue;
+                    }
+
+                    this.log.Verbose3(
+                        ErrorCode.CodeGenSerializerGenerator,
+                        "System type {0} may require a custom serializer for optimal performance.\n"
+                        + "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.",
                         type);
                     continue;
                 }
@@ -238,23 +258,6 @@
                             type);
                     }
 
-                    continue;
-                }
-
-                // Skip types in the System namespace.
-                if (TypeUtils.IsInSystemNamespace(type))
-                {
-                    Debug.Assert(type.Namespace != null, "type.Namespace != null");
-                    if (type.Namespace.StartsWith("System.Threading.Tasks"))
-                    {
-                        continue;
-                    }
-
-                    this.log.Verbose3(
-                        ErrorCode.CodeGenSerializerGenerator,
-                        "System type {0} may require a custom serializer for optimal performance.\n"
-                        + "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.",
-                        type);
                     continue;
                 }
 

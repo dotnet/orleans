@@ -97,6 +97,11 @@ namespace Orleans.CodeGenerator
             // Consider all types in the loaded assemblies.
             foreach (var assembly in assemblies)
             {
+                if (assembly.GetCustomAttribute<GeneratedCodeAttribute>() != null)
+                {
+                    continue;
+                }
+
                 GenerateAndLoadForAssembly(assembly);
             }
         }
@@ -167,15 +172,9 @@ namespace Orleans.CodeGenerator
         private static bool IsSerializationSeedType(Type type)
         {
             // Skip compiler-generated types (whose names begin with a '<' character).
-            if (!type.Name.StartsWith("<") && type.GetCustomAttribute<GeneratedCodeAttribute>() == null
-                && type.GetCustomAttribute<NonSerializableAttribute>() == null)
-            {
-                return true;
-            }
-
-            // Skip types in the "System" namespace
-            var ns = type.GetNamespaceOrEmpty();
-            return ns.StartsWith("System.") || string.Equals(ns, "System");
+            return !type.Name.StartsWith("<") && type.GetCustomAttribute<GeneratedCodeAttribute>() == null
+                   && type.GetCustomAttribute<NonSerializableAttribute>() == null
+                   && !TypeUtils.IsInSystemNamespace(type);
         }
 
         /// <summary>
