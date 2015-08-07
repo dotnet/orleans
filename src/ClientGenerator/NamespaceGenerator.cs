@@ -115,7 +115,7 @@ namespace Orleans.CodeGeneration
                 new CodeAttributeDeclaration(
                     new CodeTypeReference(typeof(GrainReferenceAttribute), CodeTypeReferenceOptions.GlobalReference),
                     new CodeAttributeArgument(
-                        new CodePrimitiveExpression(interfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(interfaceData.Type, language: language)))));
+                        new CodePrimitiveExpression(TypeUtils.GetParameterizedTemplateName(interfaceData.Type, language: language)))));
 
             var baseReferenceConstructor2 = new CodeConstructor {Attributes = MemberAttributes.FamilyOrAssembly};
             baseReferenceConstructor2.Parameters.Add(new CodeParameterDeclarationExpression(
@@ -330,7 +330,7 @@ namespace Orleans.CodeGeneration
 
             stateClass.CustomAttributes.Add(new CodeAttributeDeclaration(typeof(SerializableAttribute).Name));
             stateClass.CustomAttributes.Add(new CodeAttributeDeclaration(new CodeTypeReference(typeof(GrainStateAttribute), CodeTypeReferenceOptions.GlobalReference),
-                new CodeAttributeArgument(new CodePrimitiveExpression(grainInterfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type, language: language)))));
+                new CodeAttributeArgument(new CodePrimitiveExpression(TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type, language: language)))));
 
             referred(typeof(SerializableAttribute));
             referred(typeof(OnDeserializedAttribute));
@@ -625,7 +625,7 @@ namespace Orleans.CodeGeneration
             GrainInterfaceInfo grainInterfaceInfo = GetInterfaceInfo(grainType);
             var interfaceId = grainInterfaceInfo.Interfaces.Keys.First();
             invokerClass.CustomAttributes.Add(new CodeAttributeDeclaration( new CodeTypeReference(typeof(MethodInvokerAttribute), CodeTypeReferenceOptions.GlobalReference),
-                new CodeAttributeArgument(new CodePrimitiveExpression(grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType, language: language))),
+                new CodeAttributeArgument(new CodePrimitiveExpression(TypeUtils.GetParameterizedTemplateName(grainType, language: language))),
                 new CodeAttributeArgument(new CodePrimitiveExpression(interfaceId))));
 
             var interfaceIdProperty = new CodeMemberProperty

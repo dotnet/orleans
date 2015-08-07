@@ -217,19 +217,36 @@ namespace Orleans.Serialization
             }
         }
 
-        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module currentModule, Assembly grainAssembly)
+        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module fromModule, Assembly fromAssembly)
         {
-            if(t.GetCustomAttributes(typeof(SerializableAttribute), false).Length > 0)
-                return false;
-
-            if (t.IsNotPublic)
+            if (!t.IsVisible && t.IsConstructedGenericType)
             {
-                if (!t.Module.Equals(currentModule)) return true; // subtype is defined in a different assembly from the outer type
-                if (!t.Assembly.Equals(grainAssembly)) return true; // subtype defined in a different assembly from the one we are generating serializers for.
+                foreach (var inner in t.GetGenericArguments())
+                {
+                    if (IsTypeIsInaccessibleForSerialization(inner, fromModule, fromAssembly))
+                    {
+                        return true;
+                    }
+                }
+
+                return IsTypeIsInaccessibleForSerialization(
+                    t.GetGenericTypeDefinition(),
+                    fromModule,
+                    fromAssembly);
             }
 
-            return t.IsNestedPrivate || t.IsNestedFamily ||
-                (t.IsArray && IsTypeIsInaccessibleForSerialization(t.GetElementType(), currentModule, grainAssembly));
+            if (t.IsNotPublic || !t.IsVisible)
+            {
+                // subtype is defined in a different assembly from the outer type
+                if (!t.Module.Equals(fromModule)) return true;
+
+                // subtype defined in a different assembly from the one we are generating serializers for.
+                if (!t.Assembly.Equals(fromAssembly)) return true;
+            }
+
+            return t.IsNestedPrivate || t.IsNestedFamily
+                   || (t.IsArray
+                       && IsTypeIsInaccessibleForSerialization(t.GetElementType(), fromModule, fromAssembly));
         }
     }
 }

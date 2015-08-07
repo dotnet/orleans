@@ -22,19 +22,26 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.CodeDom;
 using System.Reflection;
 using Orleans.CodeGeneration;
+using System.Linq.Expressions;
+using System.Text;
 
 namespace Orleans.Runtime
 {
+
     /// <summary>
     /// A collection of utility functions for dealing with Type information.
     /// </summary>
     internal static class TypeUtils
     {
+        private static readonly ConcurrentDictionary<Tuple<Type, string, bool, bool>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, string, bool, bool>, string>();
+
+        private static readonly ConcurrentDictionary<Tuple<Type, bool>, List<Type>> ReferencedTypes = new ConcurrentDictionary<Tuple<Type, bool>, List<Type>>();
 
         private static string GetSimpleNameHandleArray(Type t, Language language)
         {
@@ -130,7 +137,7 @@ namespace Orleans.Runtime
 
         public static string GetGenericTypeArgs(Type[] args, Func<Type, bool> fullName, Language language = Language.CSharp)
         {
-            string s = String.Empty;
+            string s = string.Empty;
 
             bool first = true;
             foreach (var genericParameter in args)
@@ -264,7 +271,7 @@ namespace Orleans.Runtime
                 foreach (var constraintType in constraints)
                 {
                     param.Constraints.Add(
-                        new CodeTypeReference(TypeUtils.GetParameterizedTemplateName(constraintType, false,
+                        new CodeTypeReference(GetParameterizedTemplateName(constraintType, false,
                             x => true)));
                 }
                 if ((genericParameter.GenericParameterAttributes &
@@ -298,6 +305,28 @@ namespace Orleans.Runtime
                        + (isVB ? ")" : "]");
             }
             return t.FullName ?? ( t.IsGenericParameter ? GetSimpleNameHandleArray(t, language) : t.Namespace + "." + GetSimpleNameHandleArray(t, language));
+        }
+
+        /// <summary>
+        /// Returns all fields of the specified type.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>All fields of the specified type.</returns>
+        public static IEnumerable<FieldInfo> GetAllFields(this Type type)
+        {
+            const BindingFlags AllFields =
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+            var current = type;
+            while ((current != typeof(object)) && (current != null))
+            {
+                var fields = current.GetFields(AllFields);
+                foreach (var field in fields)
+                {
+                    yield return field;
+                }
+
+                current = current.BaseType;
+            }
         }
 
         /// <summary>
@@ -367,6 +396,40 @@ namespace Orleans.Runtime
         public static bool IsGeneratedType(Type type)
         {
             return TypeHasAttribute(type, typeof(GeneratedAttribute));
+        }
+
+        /// <summary>
+        /// Returns true if the provided <paramref name="type"/> is in the System namespace, false otherwise.
+        /// </summary>
+        /// <param name="type">The type to check.</param>
+        /// <returns>true if the provided <paramref name="type"/> is in the System namespace, false otherwise.</returns>
+        public static bool IsInSystemNamespace(Type type)
+        {
+            return type.Namespace != null && (type.Namespace.Equals("System") || type.Namespace.StartsWith("System."));
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="type"/> has implementations of all serialization methods, false otherwise.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>
+        /// true if <paramref name="type"/> has implementations of all serialization methods, false otherwise.
+        /// </returns>
+        public static bool HasAllSerializationMethods(Type type)
+        {
+            // Check if the type has any of the serialization methods.
+            var hasCopier = false;
+            var hasSerializer = false;
+            var hasDeserializer = false;
+            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public))
+            {
+                hasSerializer |= method.GetCustomAttribute<SerializerMethodAttribute>(false) != null;
+                hasDeserializer |= method.GetCustomAttribute<DeserializerMethodAttribute>(false) != null;
+                hasCopier |= method.GetCustomAttribute<CopierMethodAttribute>(false) != null;
+            }
+
+            var hasAllSerializationMethods = hasCopier && hasSerializer && hasDeserializer;
+            return hasAllSerializationMethods;
         }
 
         public static bool IsGrainMethodInvokerType(Type type)
@@ -440,6 +503,24 @@ namespace Orleans.Runtime
             return result;
         }
 
+        /// <summary>
+        /// Returns a value indicating whether or not the provided <paramref name="methodInfo"/> is a grain method.
+        /// </summary>
+        /// <param name="methodInfo">The method.</param>
+        /// <returns>A value indicating whether or not the provided <paramref name="methodInfo"/> is a grain method.</returns>
+        public static bool IsGrainMethod(MethodInfo methodInfo)
+        {
+            if (methodInfo == null) throw new ArgumentNullException("methodInfo", "Cannot inspect null method info");
+
+            if (methodInfo.IsStatic || methodInfo.IsSpecialName || methodInfo.DeclaringType == null)
+            {
+                return false;
+            }
+
+            return methodInfo.DeclaringType.IsInterface
+                   && typeof(IAddressable).IsAssignableFrom(methodInfo.DeclaringType);
+        }
+
         public static bool TypeHasAttribute(Type type, Type attribType)
         {
             if (type.Assembly.ReflectionOnly || attribType.Assembly.ReflectionOnly)
@@ -451,6 +532,553 @@ namespace Orleans.Runtime
             // we can't use Type.GetCustomAttributes here because we could potentially be working with a reflection-only type.
             return CustomAttributeData.GetCustomAttributes(type).Any(
                     attrib => attribType.IsAssignableFrom(attrib.AttributeType));
+        }
+
+        /// <summary>
+        /// Returns a sanitized version of <paramref name="type"/>s name which is suitable for use as a class name.
+        /// </summary>
+        /// <param name="type">
+        /// The grain type.
+        /// </param>
+        /// <returns>
+        /// A sanitized version of <paramref name="type"/>s name which is suitable for use as a class name.
+        /// </returns>
+        public static string GetSuitableClassName(Type type)
+        {
+            return GetClassNameFromInterfaceName(type.GetUnadornedTypeName());
+        }
+
+        /// <summary>
+        /// Returns a class-like version of <paramref name="interfaceName"/>.
+        /// </summary>
+        /// <param name="interfaceName">
+        /// The interface name.
+        /// </param>
+        /// <returns>
+        /// A class-like version of <paramref name="interfaceName"/>.
+        /// </returns>
+        public static string GetClassNameFromInterfaceName(string interfaceName)
+        {
+            string cleanName;
+            if (interfaceName.StartsWith("i", StringComparison.OrdinalIgnoreCase))
+            {
+                cleanName = interfaceName.Substring(1);
+            }
+            else
+            {
+                cleanName = interfaceName;
+            }
+
+            return cleanName;
+        }
+
+        /// <summary>
+        /// Returns the non-generic type name without any special characters.
+        /// </summary>
+        /// <param name="type">
+        /// The type.
+        /// </param>
+        /// <returns>
+        /// The non-generic type name without any special characters.
+        /// </returns>
+        public static string GetUnadornedTypeName(this Type type)
+        {
+            var index = type.Name.IndexOf('`');
+
+            // An ampersand can appear as a suffix to a by-ref type.
+            return (index > 0 ? type.Name.Substring(0, index) : type.Name).TrimEnd('&');
+        }
+
+        /// <summary>
+        /// Returns the non-generic method name without any special characters.
+        /// </summary>
+        /// <param name="method">
+        /// The method.
+        /// </param>
+        /// <returns>
+        /// The non-generic method name without any special characters.
+        /// </returns>
+        public static string GetUnadornedMethodName(this MethodInfo method)
+        {
+            var index = method.Name.IndexOf('`');
+
+            return index > 0 ? method.Name.Substring(0, index) : method.Name;
+        }
+
+        /// <summary>
+        /// Returns a string representation of <paramref name="type"/>.
+        /// </summary>
+        /// <param name="type">
+        /// The type.
+        /// </param>
+        /// <param name="includeNamespace">
+        /// A value indicating whether or not to include the namespace name.
+        /// </param>
+        /// <returns>
+        /// A string representation of the <paramref name="type"/>.
+        /// </returns>
+        public static string GetParseableName(this Type type, string nameSuffix = null, bool includeNamespace = true, bool includeGenericParameters = true)
+        {
+            return
+                ParseableNameCache.GetOrAdd(
+                    Tuple.Create(type, nameSuffix, includeNamespace, includeGenericParameters),
+                    _ =>
+                    {
+                        var builder = new StringBuilder();
+                        GetParseableName(
+                            type,
+                            nameSuffix ?? string.Empty,
+                            builder,
+                            new Queue<Type>(
+                                type.IsGenericTypeDefinition ? type.GetGenericArguments() : type.GenericTypeArguments),
+                            includeNamespace,
+                            includeGenericParameters);
+                        return builder.ToString();
+                    });
+        }
+
+        /// <summary>
+        /// Returns a string representation of <paramref name="type"/>.
+        /// </summary>
+        /// <param name="type">
+        /// The type.
+        /// </param>
+        /// <param name="builder">
+        /// The <see cref="StringBuilder"/> to append results to.
+        /// </param>
+        /// <param name="typeArguments">
+        /// The type arguments of <paramref name="type"/>.
+        /// </param>
+        /// <param name="includeNamespace">
+        /// A value indicating whether or not to include the namespace name.
+        /// </param>
+        private static void GetParseableName(
+            Type type,
+            string nameSuffix,
+            StringBuilder builder,
+            Queue<Type> typeArguments,
+            bool includeNamespace = true,
+            bool includeGenericParameters = true)
+        {
+            if (type.IsArray)
+            {
+                builder.AppendFormat(
+                    "{0}[{1}]",
+                    type.GetElementType()
+                        .GetParseableName(
+                            includeNamespace: includeNamespace,
+                            includeGenericParameters: includeGenericParameters),
+                    string.Concat(Enumerable.Range(0, type.GetArrayRank() - 1).Select(_ => ',')));
+                return;
+            }
+
+            if (type.IsGenericParameter)
+            {
+                if (includeGenericParameters)
+                {
+                    builder.Append(type.GetUnadornedTypeName());
+                }
+
+                return;
+            }
+
+            if (type.DeclaringType != null)
+            {
+                // This is not the root type.
+                GetParseableName(type.DeclaringType, string.Empty, builder, typeArguments, includeNamespace, includeGenericParameters);
+                builder.Append('.');
+            }
+            else if (!string.IsNullOrWhiteSpace(type.Namespace) && includeNamespace)
+            {
+                // This is the root type.
+                builder.AppendFormat("global::{0}.", type.Namespace);
+            }
+
+            if (type.IsConstructedGenericType)
+            {
+                // Get the unadorned name, the generic parameters, and add them together.
+                var unadornedTypeName = type.GetUnadornedTypeName() + nameSuffix;
+                builder.Append(EscapeIdentifier(unadornedTypeName));
+                var generics =
+                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
+                        .Select(_ => typeArguments.Dequeue())
+                        .ToList();
+                if (generics.Count > 0)
+                {
+                    var genericParameters = string.Join(
+                        ",",
+                        generics.Select(
+                            generic =>
+                            GetParseableName(
+                                generic,
+                                includeNamespace: includeNamespace,
+                                includeGenericParameters: includeGenericParameters)));
+                    builder.AppendFormat("<{0}>", genericParameters);
+                }
+            }
+            else if (type.IsGenericTypeDefinition)
+            {
+                // Get the unadorned name, the generic parameters, and add them together.
+                var unadornedTypeName = type.GetUnadornedTypeName() + nameSuffix;
+                builder.Append(EscapeIdentifier(unadornedTypeName));
+                var generics =
+                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
+                        .Select(_ => typeArguments.Dequeue())
+                        .ToList();
+                if (generics.Count > 0)
+                {
+                    var genericParameters = string.Join(
+                        ",",
+                        generics.Select(_ => includeGenericParameters ? _.ToString() : string.Empty));
+                    builder.AppendFormat("<{0}>", genericParameters);
+                }
+            }
+            else
+            {
+                builder.Append(EscapeIdentifier(type.GetUnadornedTypeName() + nameSuffix));
+            }
+        }
+
+        /// <summary>
+        /// Returns the namespaces of the specified types.
+        /// </summary>
+        /// <param name="types">
+        /// The types to include.
+        /// </param>
+        /// <returns>
+        /// The namespaces of the specified types.
+        /// </returns>
+        public static IEnumerable<string> GetNamespaces(params Type[] types)
+        {
+            return types.Select(type => "global::" + type.Namespace).Distinct();
+        }
+
+        /// <summary>
+        /// Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The containing type of the method.
+        /// </typeparam>
+        /// <typeparam name="TResult">
+        /// The return type of the method.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static MethodInfo Method<T, TResult>(Expression<Func<T, TResult>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>
+        /// Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The containing type of the method.
+        /// </typeparam>
+        /// <typeparam name="TResult">
+        /// The return type of the method.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="MemberInfo"/> for the simple member access call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static MemberInfo Member<T, TResult>(Expression<Func<T, TResult>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            var property = expression.Body as MemberExpression;
+            if (property != null)
+            {
+                return property.Member;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+        /// <summary>
+        /// Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The containing type of the method.
+        /// </typeparam>
+        /// <typeparam name="TResult">
+        /// The return type of the method.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="MemberInfo"/> for the simple member access call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static MemberInfo Member<TResult>(Expression<Func<TResult>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            var property = expression.Body as MemberExpression;
+            if (property != null)
+            {
+                return property.Member;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>
+        /// Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The containing type of the method.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static MethodInfo Method<T>(Expression<Func<T>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>
+        /// Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The containing type of the method.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static MethodInfo Method<T>(Expression<Action<T>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>
+        /// Returns the namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>
+        /// The namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.
+        /// </returns>
+        public static string GetNamespaceOrEmpty(this Type type)
+        {
+            if (type == null || string.IsNullOrEmpty(type.Namespace))
+            {
+                return string.Empty;
+            }
+
+            return type.Namespace;
+        }
+
+        /// <summary>
+        /// Returns the types referenced by the provided <paramref name="type"/>.
+        /// </summary>
+        /// <param name="type">
+        /// The type.
+        /// </param>
+        /// <param name="includeMethods">
+        /// Whether or not to include the types referenced in the methods of this type.
+        /// </param>
+        /// <returns>
+        /// The types referenced by the provided <paramref name="type"/>.
+        /// </returns>
+        public static IList<Type> GetTypes(this Type type, bool includeMethods = false)
+        {
+            List<Type> results;
+            var key = Tuple.Create(type, includeMethods);
+            if (!ReferencedTypes.TryGetValue(key, out results))
+            {
+                results = GetTypes(type, includeMethods, null).ToList();
+                ReferencedTypes.TryAdd(key, results);
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Returns the types referenced by the provided <paramref name="type"/>.
+        /// </summary>
+        /// <param name="type">
+        /// The type.
+        /// </param>
+        /// <param name="includeMethods">
+        /// Whether or not to include the types referenced in the methods of this type.
+        /// </param>
+        /// <returns>
+        /// The types referenced by the provided <paramref name="type"/>.
+        /// </returns>
+        private static IEnumerable<Type> GetTypes(
+            this Type type,
+            bool includeMethods,
+            HashSet<Type> exclude)
+        {
+            exclude = exclude ?? new HashSet<Type>();
+            if (!exclude.Add(type))
+            {
+                yield break;
+            }
+
+            yield return type;
+
+            if (type.IsArray)
+            {
+                foreach (var elementType in type.GetElementType().GetTypes(false, exclude: exclude))
+                {
+                    yield return elementType;
+                }
+            }
+
+            if (type.IsConstructedGenericType)
+            {
+                foreach (var genericTypeArgument in
+                    type.GetGenericArguments().SelectMany(_ => GetTypes(_, false, exclude: exclude)))
+                {
+                    yield return genericTypeArgument;
+                }
+            }
+
+            if (!includeMethods)
+            {
+                yield break;
+            }
+
+            foreach (var method in type.GetMethods())
+            {
+                foreach (var referencedType in GetTypes(method.ReturnType, false, exclude: exclude))
+                {
+                    yield return referencedType;
+                }
+
+                foreach (var parameter in method.GetParameters())
+                {
+                    foreach (var referencedType in GetTypes(parameter.ParameterType, false, exclude: exclude))
+                    {
+                        yield return referencedType;
+                    }
+                }
+            }
+        }
+
+        private static string EscapeIdentifier(string identifier)
+        {
+            switch (identifier)
+            {
+                case "abstract":
+                case "add":
+                case "base":
+                case "bool":
+                case "break":
+                case "byte":
+                case "case":
+                case "catch":
+                case "char":
+                case "checked":
+                case "class":
+                case "const":
+                case "continue":
+                case "decimal":
+                case "default":
+                case "delegate":
+                case "do":
+                case "double":
+                case "else":
+                case "enum":
+                case "event":
+                case "explicit":
+                case "extern":
+                case "false":
+                case "finally":
+                case "fixed":
+                case "float":
+                case "for":
+                case "foreach":
+                case "get":
+                case "goto":
+                case "if":
+                case "implicit":
+                case "in":
+                case "int":
+                case "interface":
+                case "internal":
+                case "lock":
+                case "long":
+                case "namespace":
+                case "new":
+                case "null":
+                case "object":
+                case "operator":
+                case "out":
+                case "override":
+                case "params":
+                case "partial":
+                case "private":
+                case "protected":
+                case "public":
+                case "readonly":
+                case "ref":
+                case "remove":
+                case "return":
+                case "sbyte":
+                case "sealed":
+                case "set":
+                case "short":
+                case "sizeof":
+                case "static":
+                case "string":
+                case "struct":
+                case "switch":
+                case "this":
+                case "throw":
+                case "true":
+                case "try":
+                case "typeof":
+                case "uint":
+                case "ulong":
+                case "unsafe":
+                case "ushort":
+                case "using":
+                case "virtual":
+                case "where":
+                case "while":
+                    return "@" + identifier;
+                default:
+                    return identifier;
+            }
         }
     }
 }

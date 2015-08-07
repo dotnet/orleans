@@ -27,6 +27,8 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    using System.Diagnostics.CodeAnalysis;
+
     /// <summary>
     /// Utility functions for dealing with Task's.
     /// </summary>
@@ -39,7 +41,7 @@ namespace Orleans
         /// This will prevent the escalation of this exception to the .NET finalizer thread.
         /// </summary>
         /// <param name="task">The task to be ignored.</param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "ignored")]
+        [SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "ignored")]
         public static async void Ignore(this Task task)
         {
             try
@@ -50,6 +52,67 @@ namespace Orleans
             {
                 var ignored = task.Exception; // Observe exception
             }
+        }
+
+        /// <summary>
+        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task"/>.
+        /// </summary>
+        /// <param name="task">
+        /// The task.
+        /// </param>
+        /// <returns>
+        /// The response.
+        /// </returns>
+        public static Task<object> Box(this Task task)
+        {
+            var completion = new TaskCompletionSource<object>();
+            task.ContinueWith(
+                antecedent =>
+                {
+                    if (antecedent.Exception != null)
+                    {
+                        antecedent.Exception.Flatten();
+                        completion.TrySetException(antecedent.Exception.InnerException);
+                    }
+                    else
+                    {
+                        completion.TrySetResult(null);
+                    }
+                },
+                TaskContinuationOptions.ExecuteSynchronously);
+            return completion.Task;
+        }
+
+        /// <summary>
+        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The underlying type of <paramref name="task"/>.
+        /// </typeparam>
+        /// <param name="task">
+        /// The task.
+        /// </param>
+        /// <returns>
+        /// The response.
+        /// </returns>
+        public static Task<object> Box<T>(this Task<T> task)
+        {
+            var completion = new TaskCompletionSource<object>();
+            task.ContinueWith(
+                antecedent =>
+                {
+                    if (antecedent.Exception != null)
+                    {
+                        antecedent.Exception.Flatten();
+                        completion.TrySetException(antecedent.Exception.InnerException);
+                    }
+                    else
+                    {
+                        completion.TrySetResult(antecedent.Result);
+                    }
+                },
+                TaskContinuationOptions.ExecuteSynchronously);
+            return completion.Task;
         }
     }
 

@@ -34,6 +34,9 @@ using Orleans.CodeGeneration;
 
 namespace Orleans.Runtime
 {
+    using Orleans.Serialization;
+
+    [NonSerializable]
     internal class SiloAssemblyLoader
     {
         private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoader.Silo");
@@ -86,7 +89,7 @@ namespace Orleans.Runtime
                     throw new InvalidOperationException(
                         string.Format("Precondition violated: GetLoadedGrainTypes should not return a duplicate type ({0})", className));
                 
-                var parameterizedName = grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType);
+                var parameterizedName = grainType.GetParseableName();
                 Type grainStateType;
                 grainStateTypes.TryGetValue(parameterizedName, out grainStateType);
 
@@ -152,9 +155,6 @@ namespace Orleans.Runtime
                 var attrib = (MethodInvokerAttribute)type.GetCustomAttributes(typeof(MethodInvokerAttribute), true).Single();
                 int ifaceId = attrib.InterfaceId;
 
-                if (result.ContainsKey(ifaceId))
-                    throw new InvalidOperationException(string.Format("Grain method invoker classes {0} and {1} use the same interface id {2}", result[ifaceId].FullName, type.FullName, ifaceId));
-                
                 result[ifaceId] = type;
             }
             return result;

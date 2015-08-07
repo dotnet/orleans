@@ -602,17 +602,6 @@ namespace UnitTests.General
             Assert.IsNull(v);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Generics"), TestCategory("Cast")]
-        public async Task Generic_CastToSelf()
-        {
-            var id = Guid.NewGuid();
-            var g = GrainFactory.GetGrain<IGeneric1Argument<string>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
-            var grain = Generic1ArgumentFactory<string>.Cast(g);
-            var s1 = Guid.NewGuid().ToString();
-            var s2 = await grain.Ping(s1);
-            Assert.AreEqual(s1, s2);
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Generics"), TestCategory("Echo")]
         public async Task Generic_PingSelf()
         {

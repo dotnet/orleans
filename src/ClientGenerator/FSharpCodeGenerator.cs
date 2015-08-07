@@ -130,7 +130,7 @@ namespace Orleans.CodeGeneration
             StartNewLine();
             generatedCode.AppendFormat(@"[<System.SerializableAttribute()>]");
             StartNewLine();
-            var grainName = grainInterfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type);
+            var grainName = TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type);
             generatedCode.AppendFormat(@"[<global.Orleans.CodeGeneration.GrainStateAttribute(""{0}"")>]", grainName);
             StartNewLine();
             generatedCode.AppendFormat(@"type {0} {1}", typeAccess, stateClassBaseName);

@@ -167,9 +167,17 @@ namespace Orleans.CodeGeneration
             var outputFileName = Path.Combine(options.SourcesDir, Path.GetFileNameWithoutExtension(options.InputLib.Name) + suffix);
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", outputFileName);
 
+            var codeGenerator = AssemblyLoader.TryLoadAndCreateInstance<ISourceCodeGenerator>(
+                "OrleansCodeGenerator",
+                TraceLogger.GetLogger("OrleansCodeGenerator"));
+
             using (var sourceWriter = new StreamWriter(outputFileName))
             {
-                if (options.TargetLanguage != Language.FSharp)
+                if (options.TargetLanguage == Language.CSharp && codeGenerator != null)
+                {
+                    sourceWriter.Write(codeGenerator.GenerateSourceForAssembly(grainAssembly));
+                }
+                else if (options.TargetLanguage != Language.FSharp)
                 {
                     var unit = new CodeCompileUnit();
 

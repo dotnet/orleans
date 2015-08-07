@@ -1,28 +1,28 @@
 ﻿<?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
-    <id>Microsoft.Orleans.OrleansRuntime</id>
+    <id>Microsoft.Orleans.OrleansCodeGenerator</id>
     <version>$version$</version>
-    <title>Microsoft Orleans Runtime</title>
+    <title>Microsoft Orleans Code Generation</title>
     <authors>Microsoft Research</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
     <summary>
-      Runtime of Microsoft Orleans - OrleansRuntime.dll
+      Runtime code generation support for Microsoft Orleans.
     </summary>
     <description>
-      Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.
+      Runtime and compile-time code generation support for Microsoft Orleans.
     </description>
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
-      <dependency id="Microsoft.Orleans.OrleansCodeGenerator" version="$version$" />
+      <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.0.0" />
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansRuntime.dll" target="lib\net45" />
+    <file src="OrleansCodeGenerator.dll" target="lib\net45" />
   </files>
 </package>
