@@ -42,9 +42,13 @@ namespace Orleans.TestingHost
         /// Get-Process | Format-Table Id, ProcessName -autosize. If there were multiple storage emulator
         /// processes running, they would named WASTOR~1, WASTOR~2, ... WASTOR~n.
         /// </summary>
-        private const string storageEmulatorProcessName = "WAStorageEmulator";
+        private const string storageEmulatorProcessName27OlderThan = "WAStorageEmulator";
+        private const string storageEmulatorProcessName27OrNewer = "Windows Azure Storage Emulator Service";
 
-
+        //The file names aren't the same as process names.
+        private const string storageEmulatorFilename27OlderThan = "WAStorageEmulator.exe";
+        private const string storageEmulatorFilename27OrNewer = "AzureStorageEmulator.exe";
+        
         /// <summary>
         /// Is the storage emulator already started.
         /// </summary>
@@ -186,7 +190,7 @@ namespace Orleans.TestingHost
         /// <returns></returns>
         private static Process GetStorageEmulatorProcess()
         {
-            return Process.GetProcessesByName(storageEmulatorProcessName).FirstOrDefault();
+            return Process.GetProcessesByName(storageEmulatorProcessName27OrNewer).Concat(Process.GetProcessesByName(storageEmulatorProcessName27OlderThan)).FirstOrDefault(p => p != null);
         }
         
                 
@@ -196,7 +200,16 @@ namespace Orleans.TestingHost
         /// <returns>A full path to the storage emulator executable.</returns>
         private static string GetStorageEmulatorPath()
         {
-            return Path.Combine(GetProgramFilesBasePath(), @"Microsoft SDKs\Azure\Storage Emulator\WAStorageEmulator.exe");
+            //Try to take the newest known emulator path. If it does not exist, try an older one.
+            //If neither exist, it doesn't matter which path is returned.
+            string exePathFileTemplate = Path.Combine(GetProgramFilesBasePath(), @"Microsoft SDKs\Azure\Storage Emulator\{0}");
+            var exePathAndFile = string.Format(exePathFileTemplate, storageEmulatorFilename27OrNewer);
+            if (!File.Exists(exePathAndFile))
+            {
+                exePathAndFile = string.Format(exePathFileTemplate, storageEmulatorFilename27OlderThan);
+            }
+
+            return exePathAndFile;
         }
 
 
@@ -207,6 +220,12 @@ namespace Orleans.TestingHost
         private static string GetProgramFilesBasePath()
         {
             return Environment.Is64BitOperatingSystem ? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        }
+
+
+        private static string EmulatorProcessName()
+        {
+            return Path.GetFileName(GetStorageEmulatorPath());
         }
     }
 }
