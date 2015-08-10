@@ -30,8 +30,6 @@ namespace Orleans.Runtime
     {
         private static int defaultMaxActivationBankSize = Environment.ProcessorCount;
 
-        public int MinAvailable { get; private set; }
-
         public int MaxLocal { get; private set; }
 
         internal static void InitializeClass(int defMaxActivationBankSize)
@@ -43,26 +41,25 @@ namespace Orleans.Runtime
             defaultMaxActivationBankSize = defMaxActivationBankSize;
         }
 
-        internal StatelessWorkerPlacement(int minAvailable, int defaultMaxLocal = -1)
+        internal StatelessWorkerPlacement(int defaultMaxLocal = -1)
         {
-            MinAvailable = minAvailable;
             MaxLocal = defaultMaxLocal > 0 ? defaultMaxLocal : defaultMaxActivationBankSize;
         }
 
         public override string ToString()
         {
-            return String.Format("StatelessWorkerPlacement(min={0}, max={1})", MinAvailable, MaxLocal);
+            return String.Format("StatelessWorkerPlacement(max={1})", MaxLocal);
         }
 
         public override bool Equals(object obj)
         {
             var other = obj as StatelessWorkerPlacement;
-            return other != null && MinAvailable == other.MinAvailable && MaxLocal == other.MaxLocal;
+            return other != null && MaxLocal == other.MaxLocal;
         }
 
         public override int GetHashCode()
         {
-            return GetType().GetHashCode() + MinAvailable.GetHashCode() + MaxLocal.GetHashCode();
+            return GetType().GetHashCode() ^ MaxLocal.GetHashCode();
         }
     }
 

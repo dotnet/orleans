@@ -38,11 +38,9 @@ namespace Orleans.Runtime.Placement
             if (target.IsClient)
                 throw new InvalidOperationException("Cannot use StatelessWorkerStrategy to route messages to client grains.");
 
-            // Returns an existing activation of the grain or requests creation of a new one.
-            // If there are available (not busy with a request) activations, it returns the first one
-            // that exceeds the MinAvailable limit. E.g. if MinAvailable=1, it returns the second available.
-            // If MinAvailable is less than 1, it returns the first available.
-            // If the number of local activations reached or exceeded MaxLocal, it randomly returns one of them.
+            // If there are available (not busy with a request) activations, it returns the first one.
+            // If all are busy and the number of local activations reached or exceeded MaxLocal, it randomly returns one of them.
+            // If all are busy but was told to returnAny, also randomly returns one of them.
             // Otherwise, it requests creation of a new activation.
             List<ActivationData> local;
 
@@ -50,7 +48,6 @@ namespace Orleans.Runtime.Placement
                 return Task.FromResult((PlacementResult)null);
 
             var placement = (StatelessWorkerPlacement)strategy;
-            List<ActivationId> available = null;
 
             foreach (var activation in local)
             {
@@ -58,12 +55,7 @@ namespace Orleans.Runtime.Placement
                 if (!context.TryGetActivationData(activation.ActivationId, out info) ||
                     info.State != ActivationState.Valid || !info.IsInactive) continue;
 
-                if (placement.MinAvailable < 1 || (available != null && available.Count >= placement.MinAvailable))
-                    return Task.FromResult(PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, activation.ActivationId)));
-
-                if (available == null)
-                    available = new List<ActivationId>();
-                available.Add(info.ActivationId);
+                return Task.FromResult(PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, activation.ActivationId)));
             }
 
             if (local.Count >= placement.MaxLocal)
