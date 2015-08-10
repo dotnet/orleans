@@ -1039,6 +1039,27 @@ namespace Orleans.Serialization
 
         #endregion
 
+        #region DateTimeOffset
+
+        internal static void SerializeDateTimeOffset(object obj, BinaryTokenStreamWriter stream, Type expected)
+        {
+            var dts = (DateTimeOffset)obj;
+            stream.Write(dts.DateTime.Ticks);
+            stream.Write(dts.Offset.Ticks);
+        }
+
+        internal static object DeserializeDateTimeOffset(Type expected, BinaryTokenStreamReader stream)
+        {
+            return new DateTimeOffset(stream.ReadLong(), new TimeSpan(stream.ReadLong()));
+        }
+
+        internal static object CopyDateTimeOffset(object obj)
+        {
+            return obj; // DateTimeOffset is a value type 
+        }
+
+        #endregion
+
         #region Type
 
         internal static void SerializeType(object obj, BinaryTokenStreamWriter stream, Type expected)
