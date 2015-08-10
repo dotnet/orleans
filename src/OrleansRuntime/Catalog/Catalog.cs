@@ -421,7 +421,7 @@ namespace Orleans.Runtime
             try
             {
                 initStage = 1;
-                await RegisterActivationInGrainDirectory(address, !activation.IsMultiActivationGrain);
+                await RegisterActivationInGrainDirectoryAndValidate(activation);
 
                 initStage = 2;
                 await SetupActivationState(activation, grainType);                
@@ -464,17 +464,18 @@ namespace Orleans.Runtime
                             activation.ForwardingAddress = target;
                             if (target != null)
                             {
+                                var primary = ((DuplicateActivationException)dupExc).PrimaryDirectoryForGrain;
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
                                 logger.Info(ErrorCode.Catalog_DuplicateActivation,
                                     "Tried to create a duplicate activation {0}, but we'll use {1} instead. " +
                                     "GrainInstanceType is {2}. " +
-                                    "Primary Directory partition for this grain is {3}, " +
-                                    "full activation address is {4}. We have {5} messages to forward.",
+                                    "{3}" +
+                                    "Full activation address is {4}. We have {5} messages to forward.",
                                     address,
                                     target,
                                     activation.GrainInstanceType,
-                                    ((DuplicateActivationException) dupExc).PrimaryDirectoryForGrain,
+                                    primary != null ? "Primary Directory partition for this grain is " + primary + ". " : String.Empty,
                                     address.ToFullString(),
                                     activation.WaitingCount);
 
@@ -1036,13 +1037,17 @@ namespace Orleans.Runtime
             return activation;
         }
 
-        private async Task RegisterActivationInGrainDirectory(ActivationAddress address, bool singleActivationMode)
+        private async Task RegisterActivationInGrainDirectoryAndValidate(ActivationData activation)
         {
+            PlacementStrategy placement = activation.PlacedUsing;
+            bool singleActivationMode = !(placement is StatelessWorkerPlacement);
+            ActivationAddress address = activation.Address;
+
             if (singleActivationMode)
             {
                 ActivationAddress returnedAddress = await scheduler.RunOrQueueTask(() => directory.RegisterSingleActivationAsync(address), this.SchedulingContext);
                 if (address.Equals(returnedAddress)) return;
-                
+
                 SiloAddress primaryDirectoryForGrain = directory.GetPrimaryForGrain(address.Grain);
                 var dae = new DuplicateActivationException
                 {
@@ -1052,8 +1057,26 @@ namespace Orleans.Runtime
 
                 throw dae;
             }
-            
-            await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address), this.SchedulingContext);
+            else
+            {
+                StatelessWorkerPlacement stPlacement = placement as StatelessWorkerPlacement;
+                int maxNumLocalActivations = stPlacement.MaxLocal;
+                lock (activations)
+                {
+                    List<ActivationData> local;
+                    if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
+                        return;
+
+                    var id = local[local.Count == 1 ? 0 : StatelessWorkerDirector.Random.Next(local.Count)].Address;
+                    var dae = new DuplicateActivationException
+                    {
+                        ActivationToUse = id,
+                    };
+                    throw dae;
+                }
+            }
+            // We currently don't have any other case for multiple activations except for StatelessWorker.
+            //await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address), this.SchedulingContext);
         }
 
         #endregion

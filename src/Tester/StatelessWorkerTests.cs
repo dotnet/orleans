@@ -39,8 +39,7 @@ namespace UnitTests.General
     [TestClass]
     public class StatelessWorkerTests : UnitTestSiloHost
     {
-        private const int maxLocalActivations = 10;
-        private readonly int ExpectedMaxLocalActivations = System.Environment.ProcessorCount;
+        private readonly int ExpectedMaxLocalActivations = 3;//System.Environment.ProcessorCount;
 
         public StatelessWorkerTests()
             : base(new TestingSiloOptions { StartFreshOrleans = true, StartSecondary = false })
@@ -59,7 +58,7 @@ namespace UnitTests.General
             IStatelessWorkerGrain grain = GrainClient.GrainFactory.GetGrain<IStatelessWorkerGrain>(0);
             List<Task> promises = new List<Task>();
 
-            for (int i = 0; i < maxLocalActivations; i++)
+            for (int i = 0; i < ExpectedMaxLocalActivations * 2; i++)
                 promises.Add(grain.LongCall()); // trigger activation of 10 local activations
             await Task.WhenAll(promises);
 
@@ -68,8 +67,8 @@ namespace UnitTests.General
             promises.Clear();
             var stopwatch = Stopwatch.StartNew();
 
-            for (int i = 0; i < 50; i++)
-                promises.Add(grain.LongCall()); // send 50 requests to 10 activations
+            for (int i = 0; i < ExpectedMaxLocalActivations * 3; i++)
+                promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
 
             stopwatch.Stop();
@@ -77,7 +76,7 @@ namespace UnitTests.General
             //Assert.IsTrue(stopwatch.Elapsed > TimeSpan.FromSeconds(19.5), "50 requests with a 2 second processing time shouldn't take less than 20 seconds on 10 activations. But it took " + stopwatch.Elapsed);
 
             promises.Clear();
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < ExpectedMaxLocalActivations * 3; i++)
                 promises.Add(grain.GetCallStats());  // gather stats
             await Task.WhenAll(promises);
 
@@ -97,7 +96,7 @@ namespace UnitTests.General
                     logger.Info("\t{0}: {1} - {2}", count++, TraceLogger.PrintDate(call.Item1), TraceLogger.PrintDate(call.Item2));
             }
 
-            //Assert.IsTrue(activations.Count < ExpectedMaxLocalActivations, "activations.Count = " + activations.Count + " but expected no more than " + ExpectedMaxLocalActivations);
+            Assert.IsTrue(activations.Count <= ExpectedMaxLocalActivations, "activations.Count = " + activations.Count + " but expected no more than " + ExpectedMaxLocalActivations);
         }
     }
 }

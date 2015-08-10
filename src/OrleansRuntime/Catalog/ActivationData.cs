@@ -395,9 +395,6 @@ namespace Orleans.Runtime
 
         public PlacementStrategy PlacedUsing { get; private set; }
 
-        // currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
-        internal bool IsMultiActivationGrain { get { return PlacedUsing is StatelessWorkerPlacement; } }
-
         public Message Running { get; private set; }
 
         // the number of requests that are currently executing on this activation.
@@ -822,9 +819,9 @@ namespace Orleans.Runtime
 
         private string GetActivationInfoString()
         {
-            var multi = IsMultiActivationGrain ? " MultiActivationGrain" : String.Empty;
-            return GrainInstanceType == null ? multi : 
-                String.Format(" #GrainType={0}{1}", GrainInstanceType.FullName, multi);
+            var placement = PlacedUsing != null ? PlacedUsing.GetType().Name : String.Empty;
+            return GrainInstanceType == null ? placement :
+                String.Format(" #GrainType={0} Placement={1}", GrainInstanceType.FullName, placement);
         }
 
         #endregion

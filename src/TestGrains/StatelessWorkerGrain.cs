@@ -36,7 +36,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [StatelessWorker(12)]
+    [StatelessWorker(1)]
     public class StatelessWorkerGrain : Grain, IStatelessWorkerGrain
     {
         private Guid activationGuid;

@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Placement
 {
     internal class StatelessWorkerDirector : PlacementDirector
     {
-        private readonly SafeRandom random = new SafeRandom();
+        internal static readonly SafeRandom Random = new SafeRandom();
 
         internal override Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementContext context)
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.Placement
 
             if (local.Count >= placement.MaxLocal)
             {
-                var id = local[local.Count == 1 ? 0 : random.Next(local.Count)].ActivationId;
+                var id = local[local.Count == 1 ? 0 : Random.Next(local.Count)].ActivationId;
                 return Task.FromResult(PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, id)));
             }
 
