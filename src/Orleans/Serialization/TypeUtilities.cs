@@ -222,11 +222,12 @@ namespace Orleans.Serialization
             if(t.GetCustomAttributes(typeof(SerializableAttribute), false).Length > 0)
                 return false;
 
-            if (t.IsNotPublic)
-            {
-                if (!t.Module.Equals(currentModule)) return true; // subtype is defined in a different assembly from the outer type
-                if (!t.Assembly.Equals(grainAssembly)) return true; // subtype defined in a different assembly from the one we are generating serializers for.
-            }
+            // No reason to skip serializer generation for non publci types, if we can generate them.
+            //if (t.IsNotPublic)
+            //{
+            //    if (!t.Module.Equals(currentModule)) return true; // subtype is defined in a different assembly from the outer type
+            //    if (!t.Assembly.Equals(grainAssembly)) return true; // subtype defined in a different assembly from the one we are generating serializers for.
+            //}
 
             return t.IsNestedPrivate || t.IsNestedFamily ||
                 (t.IsArray && IsTypeIsInaccessibleForSerialization(t.GetElementType(), currentModule, grainAssembly));

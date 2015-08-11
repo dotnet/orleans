@@ -317,10 +317,10 @@ namespace Orleans.CodeGeneration
             var processedGrainTypes = new List<string>();
             bool success = true;
 
-            ConsoleText.WriteStatus("Orleans-CodeGen - Adding grain namespaces ");
+            ConsoleText.WriteStatus("Orleans-CodeGen - Adding grain namespaces from input Assembly " + inputAssembly.GetName());
             foreach (var type in inputAssembly.GetTypes())
             {
-                if (!options.ServerGen && !type.IsNested && !type.IsGenericParameter && type.IsSerializable)
+                if (!type.IsNested && !type.IsGenericParameter && type.IsSerializable)
                     SerializerGenerationManager.RecordTypeToGenerate(type);
 
                 if (!options.ServerGen && GrainInterfaceData.IsGrainInterface(type))

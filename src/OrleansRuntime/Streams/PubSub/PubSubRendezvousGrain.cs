@@ -30,6 +30,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    [Serializable]
     internal class PubSubGrainState : GrainState
     {
         public HashSet<PubSubPublisherState> Producers { get; set; }

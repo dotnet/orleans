@@ -29,7 +29,7 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
-        private enum SubscriptionStates
+        internal enum SubscriptionStates
         {
             Active,
             Faulted,
