@@ -281,7 +281,7 @@ namespace Orleans
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
         internal string Namespace { get; private set; }
