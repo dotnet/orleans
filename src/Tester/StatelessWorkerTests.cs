@@ -39,7 +39,7 @@ namespace UnitTests.General
     [TestClass]
     public class StatelessWorkerTests : UnitTestSiloHost
     {
-        private readonly int ExpectedMaxLocalActivations = 3;//System.Environment.ProcessorCount;
+        private readonly int ExpectedMaxLocalActivations = 1; // System.Environment.ProcessorCount;
 
         public StatelessWorkerTests()
             : base(new TestingSiloOptions { StartFreshOrleans = true, StartSecondary = false })
@@ -58,8 +58,8 @@ namespace UnitTests.General
             IStatelessWorkerGrain grain = GrainClient.GrainFactory.GetGrain<IStatelessWorkerGrain>(0);
             List<Task> promises = new List<Task>();
 
-            for (int i = 0; i < ExpectedMaxLocalActivations * 2; i++)
-                promises.Add(grain.LongCall()); // trigger activation of 10 local activations
+            for (int i = 0; i < ExpectedMaxLocalActivations * 3; i++)
+                promises.Add(grain.LongCall()); // trigger activation of ExpectedMaxLocalActivations local activations
             await Task.WhenAll(promises);
 
             await Task.Delay(2000);

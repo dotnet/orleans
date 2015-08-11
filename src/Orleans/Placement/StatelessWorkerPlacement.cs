@@ -28,22 +28,24 @@ namespace Orleans.Runtime
     [Serializable]
     internal class StatelessWorkerPlacement : PlacementStrategy
     {
-        private static int defaultMaxActivationBankSize = Environment.ProcessorCount;
+        private static int defaultMaxStatelessWorkers = Environment.ProcessorCount;
 
         public int MaxLocal { get; private set; }
 
-        internal static void InitializeClass(int defMaxActivationBankSize)
+        internal static void InitializeClass(int defMaxStatelessWorkers)
         {
-            if (defMaxActivationBankSize < 1)
-                throw new ArgumentOutOfRangeException("defMaxActivationBankSize",
-                    "defMaxActivationBankSize must contain a value greater than zero.");
-            
-            defaultMaxActivationBankSize = defMaxActivationBankSize;
+            if (defMaxStatelessWorkers < 1)
+                throw new ArgumentOutOfRangeException("defMaxStatelessWorkers",
+                    "defMaxStatelessWorkers must contain a value greater than zero.");
+
+            defaultMaxStatelessWorkers = defMaxStatelessWorkers;
         }
 
-        internal StatelessWorkerPlacement(int defaultMaxLocal = -1)
+        internal StatelessWorkerPlacement(int maxLocal = -1)
         {
-            MaxLocal = defaultMaxLocal > 0 ? defaultMaxLocal : defaultMaxActivationBankSize;
+            // If maxLocal was not specified on the StatelessWorkerAttribute, 
+            // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
+            MaxLocal = maxLocal > 0 ? maxLocal : defaultMaxStatelessWorkers;
         }
 
         public override string ToString()

@@ -59,6 +59,8 @@ namespace Orleans.Runtime
             public NonExistentActivationException(string message) : base(message) { }
 
             public ActivationAddress NonExistentActivation { get; set; }
+
+            public bool IsStatelessWorker { get; set; }
         }
 
         
@@ -344,6 +346,8 @@ namespace Orleans.Runtime
         {
             ActivationData result;
             activatedPromise = TaskDone.Done;
+            PlacementStrategy placement;
+
             lock (activations)
             {
                 if (TryGetActivationData(address.Activation, out result))
@@ -351,19 +355,18 @@ namespace Orleans.Runtime
                     ActivationCollector.TryRescheduleCollection(result);
                     return result;
                 }
-                
+
+                int typeCode = address.Grain.GetTypeCode();
+                string actualGrainType = null;
+
+                if (typeCode != 0) // special case for Membership grain.
+                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement);
+                else
+                    placement = SystemPlacement.Singleton;
+
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     // create a dummy activation that will queue up messages until the real data arrives
-                    PlacementStrategy placement;
-                    int typeCode = address.Grain.GetTypeCode();
-                    string actualGrainType = null;
-
-                    if (typeCode != 0) // special case for Membership grain.
-                        GetGrainTypeInfo(typeCode, out actualGrainType, out placement);
-                    else
-                        placement = SystemPlacement.Singleton;
-
                     if (string.IsNullOrEmpty(grainType))
                     {
                         grainType = actualGrainType;
@@ -387,7 +390,7 @@ namespace Orleans.Runtime
                                            address.ToFullString(), grainType);
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.CatalogNonExistingActivation2, msg);
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
-                throw new NonExistentActivationException(msg) { NonExistentActivation = address };
+                throw new NonExistentActivationException(msg) { NonExistentActivation = address, IsStatelessWorker = placement is StatelessWorkerPlacement };
             }
    
             SetupActivationInstance(result, grainType, genericArguments);
@@ -467,18 +470,24 @@ namespace Orleans.Runtime
                                 var primary = ((DuplicateActivationException)dupExc).PrimaryDirectoryForGrain;
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
-                                logger.Info(ErrorCode.Catalog_DuplicateActivation,
-                                    "Tried to create a duplicate activation {0}, but we'll use {1} instead. " +
-                                    "GrainInstanceType is {2}. " +
-                                    "{3}" +
-                                    "Full activation address is {4}. We have {5} messages to forward.",
-                                    address,
-                                    target,
-                                    activation.GrainInstanceType,
-                                    primary != null ? "Primary Directory partition for this grain is " + primary + ". " : String.Empty,
-                                    address.ToFullString(),
-                                    activation.WaitingCount);
-
+                                string logMsg = String.Format("Tried to create a duplicate activation {0}, but we'll use {1} instead. " +
+                                                            "GrainInstanceType is {2}. " +
+                                                            "{3}" +
+                                                            "Full activation address is {4}. We have {5} messages to forward.",
+                                                address,
+                                                target,
+                                                activation.GrainInstanceType,
+                                                primary != null ? "Primary Directory partition for this grain is " + primary + ". " : String.Empty,
+                                                address.ToFullString(),
+                                                activation.WaitingCount);
+                                if (activation.IsStatelessWorker)
+                                {
+                                    if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                                }
+                                else
+                                {
+                                    logger.Info(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                                }
                                 RerouteAllQueuedMessages(activation, target, "Duplicate activation", ex);
                             }
                             else
@@ -1039,9 +1048,8 @@ namespace Orleans.Runtime
 
         private async Task RegisterActivationInGrainDirectoryAndValidate(ActivationData activation)
         {
-            PlacementStrategy placement = activation.PlacedUsing;
-            bool singleActivationMode = !(placement is StatelessWorkerPlacement);
             ActivationAddress address = activation.Address;
+            bool singleActivationMode = !activation.IsStatelessWorker;
 
             if (singleActivationMode)
             {
@@ -1059,7 +1067,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                StatelessWorkerPlacement stPlacement = placement as StatelessWorkerPlacement;
+                StatelessWorkerPlacement stPlacement = activation.PlacedUsing as StatelessWorkerPlacement;
                 int maxNumLocalActivations = stPlacement.MaxLocal;
                 lock (activations)
                 {
@@ -1067,7 +1075,7 @@ namespace Orleans.Runtime
                     if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
                         return;
 
-                    var id = local[local.Count == 1 ? 0 : StatelessWorkerDirector.Random.Next(local.Count)].Address;
+                    var id = StatelessWorkerDirector.PickRandom(local).Address;
                     var dae = new DuplicateActivationException
                     {
                         ActivationToUse = id,

@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Placement
 {
     internal class StatelessWorkerDirector : PlacementDirector
     {
-        internal static readonly SafeRandom Random = new SafeRandom();
+        private static readonly SafeRandom random = new SafeRandom();
 
         internal override Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementContext context)
@@ -40,7 +40,6 @@ namespace Orleans.Runtime.Placement
 
             // If there are available (not busy with a request) activations, it returns the first one.
             // If all are busy and the number of local activations reached or exceeded MaxLocal, it randomly returns one of them.
-            // If all are busy but was told to returnAny, also randomly returns one of them.
             // Otherwise, it requests creation of a new activation.
             List<ActivationData> local;
 
@@ -60,7 +59,7 @@ namespace Orleans.Runtime.Placement
 
             if (local.Count >= placement.MaxLocal)
             {
-                var id = local[local.Count == 1 ? 0 : Random.Next(local.Count)].ActivationId;
+                var id = local[local.Count == 1 ? 0 : random.Next(local.Count)].ActivationId;
                 return Task.FromResult(PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, id)));
             }
 
@@ -72,6 +71,11 @@ namespace Orleans.Runtime.Placement
             var grainType = context.GetGrainTypeName(grain);
             return Task.FromResult(
                 PlacementResult.SpecifyCreation(context.LocalSilo, strategy, grainType));
+        }
+
+        internal static ActivationData PickRandom(List<ActivationData> local)
+        {
+             return local[local.Count == 1 ? 0 : random.Next(local.Count)];
         }
     }
 }

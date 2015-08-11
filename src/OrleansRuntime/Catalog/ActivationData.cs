@@ -395,6 +395,10 @@ namespace Orleans.Runtime
 
         public PlacementStrategy PlacedUsing { get; private set; }
 
+        // currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
+        internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }
+
+
         public Message Running { get; private set; }
 
         // the number of requests that are currently executing on this activation.
