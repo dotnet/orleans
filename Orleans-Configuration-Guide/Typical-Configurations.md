@@ -38,8 +38,10 @@ For a reliable production deployment using Azure, you need to use the Azure Tabl
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
+    <SystemStore SystemStoreType="AzureTable" 
+         DeploymentId="<your deployment ID>" 
+         DataConnectionString="<<see comment above>>" />
     <Liveness LivenessType ="AzureTable" />
-    <Azure DeploymentId="<your deployment ID>" DataConnectionString="<<see comment above>>"/>
   </Globals>
   <Defaults>
     <Networking Address="" Port="11111" />
@@ -52,7 +54,7 @@ Clients need to be configured to use Azure Table for discovering the gateways, t
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
-  <Azure DeploymentId="target deployment ID" DataConnectionString="<<see comment above>>"/>
+  <SystemStore SystemStoreType="AzureTable" DeploymentId="target deployment ID" DataConnectionString="<<see comment above>>" />
 </ClientConfiguration>
 ```
 
