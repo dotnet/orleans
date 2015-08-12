@@ -164,6 +164,8 @@ namespace Orleans.Runtime
         public static readonly StatisticName RUNTIME_GC_LARGEOBJECTHEAPSIZEKB                           = new StatisticName("Runtime.GC.LargeObjectHeapSizeKb");
         public static readonly StatisticName RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB                        = new StatisticName("Runtime.GC.PromotedFinalizationMemoryFromGen0Kb");
         public static readonly StatisticName RUNTIME_GC_NUMBEROFINDUCEDGCS                              = new StatisticName("Runtime.GC.NumberOfInducedGCs");
+        public static readonly StatisticName RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB                       = new StatisticName("Runtime.Memory.TotalPhysicalMemoryMb");
+        public static readonly StatisticName RUNTIME_MEMORY_AVAILABLEMEMORYMB                           = new StatisticName("Runtime.Memory.AvailableMemoryMb");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS             = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.WorkerThreads");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS     = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.CompletionPortThreads");
         public static readonly StatisticName RUNTIME_IS_OVERLOADED                                      = new StatisticName("Runtime.IsOverloaded");
