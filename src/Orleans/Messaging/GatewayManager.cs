@@ -171,7 +171,7 @@ namespace Orleans.Messaging
         {
             // Never takes a lock and returns the cachedLiveGateways list quickly without any operation.
             // Asynchronously starts gateway refresh only when it is empty.
-            if (!cachedLiveGateways.Any())
+            if (cachedLiveGateways.Count == 0)
             {
                 ExpediteUpdateLiveGatewaysSnapshot();
             }

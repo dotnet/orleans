@@ -50,12 +50,8 @@ namespace Orleans.AzureUtils
         {
             lock (lockable)
             {
-                IEnumerable<Uri> gatewayEndpoints = siloInstanceManager.FindAllGatewayProxyEndpoints();
-                if (gatewayEndpoints != null && gatewayEndpoints.Any())
-                {
-                    return gatewayEndpoints.ToList();
-                }
-                return new List<Uri>();
+                // FindAllGatewayProxyEndpoints already returns a deep copied List<Uri>.
+                return siloInstanceManager.FindAllGatewayProxyEndpoints();
             }
         }
 
