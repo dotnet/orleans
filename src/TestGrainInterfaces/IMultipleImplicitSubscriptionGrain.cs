@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -23,36 +23,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Orleans.Core;
-using Orleans.Runtime.ReminderService;
-using Orleans.Runtime.Configuration;
+using Orleans;
 
-
-namespace Orleans.Runtime
+namespace UnitTests.GrainInterfaces
 {
-    internal class LocalReminderServiceFactory
+    public interface IMultipleImplicitSubscriptionGrain : IGrainWithGuidKey
     {
-        private readonly TraceLogger logger;
-
-        internal LocalReminderServiceFactory()
-        {
-            logger = TraceLogger.GetLogger("ReminderFactory", TraceLogger.LoggerType.Runtime);
-        }
-
-        internal IReminderService CreateReminderService(Silo silo, IGrainFactory grainFactory, TimeSpan iniTimeSpan)
-        {
-            var reminderServiceType = silo.GlobalConfig.ReminderServiceType;
-            logger.Info("Creating reminder system target for type={0}", Enum.GetName(typeof(GlobalConfiguration.ReminderServiceProviderType), reminderServiceType));
-
-            ReminderTable.Initialize(silo, grainFactory, silo.GlobalConfig.ReminderTableAssembly);
-            return new LocalReminderService(
-                silo.SiloAddress, 
-                Constants.ReminderServiceId, 
-                silo.RingProvider, 
-                silo.LocalScheduler, 
-                ReminderTable.Singleton, 
-                silo.GlobalConfig,
-                iniTimeSpan);
-        }
+        Task<Tuple<int, int>> GetCounters();
     }
 }

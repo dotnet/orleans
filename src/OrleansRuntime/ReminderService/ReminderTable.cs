@@ -23,9 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Runtime.Configuration;
-
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -33,7 +31,7 @@ namespace Orleans.Runtime.ReminderService
     {
         internal static IReminderTable Singleton { get; private set; }
 
-        public static void Initialize(Silo silo, IGrainFactory grainFactory)
+        public static void Initialize(Silo silo, IGrainFactory grainFactory, string reminderTableAssembly = null)
         {
             var config = silo.GlobalConfig;
             var serviceType = config.ReminderServiceType;
@@ -61,6 +59,10 @@ namespace Orleans.Runtime.ReminderService
 
                 case GlobalConfiguration.ReminderServiceProviderType.MockTable:
                     Singleton = new MockReminderTable(config.MockReminderTableTimeout);
+                    return;
+
+                case GlobalConfiguration.ReminderServiceProviderType.Custom:
+                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(reminderTableAssembly, logger);
                     return;
             }
         }

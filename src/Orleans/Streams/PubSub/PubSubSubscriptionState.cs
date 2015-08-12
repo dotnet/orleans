@@ -29,7 +29,7 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
-        private enum SubscriptionStates
+        internal enum SubscriptionStates
         {
             Active,
             Faulted,
@@ -39,10 +39,14 @@ namespace Orleans.Streams
         // Implement ISerializable if changing any of them to readonly
         public GuidId SubscriptionId;
         public StreamId Stream;
-        public IStreamConsumerExtension Consumer;
         public StreamSequenceToken StreamSequenceToken;
-        public IStreamFilterPredicateWrapper FilterWrapper; // Serialized func info
+
+        private GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        private object filterWrapper; // Serialized func info
         private SubscriptionStates state;
+
+        public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
+
 
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
@@ -55,30 +59,30 @@ namespace Orleans.Streams
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
-            Consumer = streamConsumer;
+            consumerReference = streamConsumer as GrainReference;
             StreamSequenceToken = token;
-            FilterWrapper = filterWrapper;
+            this.filterWrapper = filterWrapper;
             state = SubscriptionStates.Active;
         }
 
-        public IStreamFilterPredicateWrapper Filter { get { return FilterWrapper; } }
+        public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
 
         internal void AddFilter(IStreamFilterPredicateWrapper newFilter)
         {
-            if (FilterWrapper == null)
+            if (filterWrapper == null)
             {
                 // No existing filter - add single
-                FilterWrapper = newFilter;
+                filterWrapper = newFilter;
             }
-            else if (FilterWrapper is OrFilter)
+            else if (filterWrapper is OrFilter)
             {
                 // Existing multi-filter - add new filter to it
-                ((OrFilter) FilterWrapper).AddFilter(newFilter);
+                ((OrFilter)filterWrapper).AddFilter(newFilter);
             }
             else
             {
                 // Exsiting single filter - convert to multi-filter
-                FilterWrapper = new OrFilter(FilterWrapper, newFilter);
+                filterWrapper = new OrFilter(Filter, newFilter);
             }
         }
 

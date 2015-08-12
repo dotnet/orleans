@@ -71,6 +71,43 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void SerializationTests_DateTimeOffset()
+        {
+            // Local Kind
+            DateTime inputLocalDateTime = DateTime.Now;
+            DateTimeOffset inputLocal = new DateTimeOffset(inputLocalDateTime);
+
+            DateTimeOffset outputLocal = SerializationManager.RoundTripSerializationForTesting(inputLocal);
+            Assert.AreEqual(inputLocal, outputLocal, "Local time");
+            Assert.AreEqual(
+                inputLocal.ToString(CultureInfo.InvariantCulture),
+                outputLocal.ToString(CultureInfo.InvariantCulture));
+            Assert.AreEqual(inputLocal.DateTime.Kind, outputLocal.DateTime.Kind);
+
+            // UTC Kind
+            DateTime inputUtcDateTime = DateTime.UtcNow;
+            DateTimeOffset inputUtc = new DateTimeOffset(inputUtcDateTime);
+
+            DateTimeOffset outputUtc = SerializationManager.RoundTripSerializationForTesting(inputUtc);
+            Assert.AreEqual(inputUtc, outputUtc, "UTC time");
+            Assert.AreEqual(
+                inputUtc.ToString(CultureInfo.InvariantCulture),
+                outputUtc.ToString(CultureInfo.InvariantCulture));
+            Assert.AreEqual(inputUtc.DateTime.Kind, outputUtc.DateTime.Kind);
+
+            // Unspecified Kind
+            DateTime inputUnspecifiedDateTime = new DateTime(0x08d27e2c0cc7dfb9);
+            DateTimeOffset inputUnspecified = new DateTimeOffset(inputUnspecifiedDateTime);
+
+            DateTimeOffset outputUnspecified = SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
+            Assert.AreEqual(inputUnspecified, outputUnspecified, "Unspecified time");
+            Assert.AreEqual(
+                inputUnspecified.ToString(CultureInfo.InvariantCulture),
+                outputUnspecified.ToString(CultureInfo.InvariantCulture));
+            Assert.AreEqual(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_JObject_Example1()
         {
             const string json = @"{ 

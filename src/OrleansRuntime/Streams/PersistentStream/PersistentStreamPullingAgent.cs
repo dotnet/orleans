@@ -464,7 +464,7 @@ namespace Orleans.Streams
                 foreach (PubSubSubscriptionState item in streamData)
                 {
                     var token = item.StreamSequenceToken ?? streamStartToken;
-                    AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, token, item.FilterWrapper);
+                    AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, token, item.Filter);
                 }
             }
             catch (Exception exc)

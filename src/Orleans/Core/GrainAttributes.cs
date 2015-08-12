@@ -67,7 +67,21 @@ namespace Orleans
         /// </summary>
         [AttributeUsage(AttributeTargets.Class)]
         public sealed class StatelessWorkerAttribute : Attribute
-        {
+        {            
+            /// <summary>
+            /// Maximal number of local StatelessWorkers in a single silo.
+            /// </summary>
+            public int MaxLocalWorkers { get; private set; }
+
+            public StatelessWorkerAttribute(int maxLocalWorkers)
+            {
+                MaxLocalWorkers = maxLocalWorkers;
+            }
+
+            public StatelessWorkerAttribute()
+            {
+                MaxLocalWorkers = -1;
+            }
         }
 
         /// <summary>
@@ -281,7 +295,7 @@ namespace Orleans
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
         internal string Namespace { get; private set; }
