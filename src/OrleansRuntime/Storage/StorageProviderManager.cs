@@ -21,11 +21,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Providers;
@@ -37,16 +37,21 @@ namespace Orleans.Runtime.Storage
     {
         private ProviderLoader<IStorageProvider> storageProviderLoader;
         private IProviderRuntime providerRuntime;
-        
+
+        public StorageProviderManager(IGrainFactory grainFactory)
+        {
+            GrainFactory = grainFactory;
+        }
+
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
             storageProviderLoader = new ProviderLoader<IStorageProvider>();
             providerRuntime = SiloProviderRuntime.Instance;
-            
-            if(!configs.ContainsKey("Storage"))
+
+            if (!configs.ContainsKey(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
                 return TaskDone.Done;
 
-            storageProviderLoader.LoadProviders(configs["Storage"].Providers, this);
+            storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME].Providers, this);
             return storageProviderLoader.InitProviders(providerRuntime);
         }
 
@@ -75,6 +80,13 @@ namespace Orleans.Runtime.Storage
             get { return providerRuntime.ServiceId; }
         }
 
+        public string SiloIdentity
+        {
+            get { return providerRuntime.SiloIdentity; }
+        }
+
+        public IGrainFactory GrainFactory { get; private set; }
+
         /// <summary>
         /// Get list of providers loaded in this silo.
         /// </summary>
@@ -101,10 +113,10 @@ namespace Orleans.Runtime.Storage
         }
 
         // used only for testing
-        internal Task LoadEmptyStorageProviders()
+        internal Task LoadEmptyStorageProviders(IProviderRuntime providerRtm)
         {
             storageProviderLoader = new ProviderLoader<IStorageProvider>();
-            providerRuntime = ClientProviderRuntime.Instance;
+            providerRuntime = providerRtm;
 
             storageProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this);
             return storageProviderLoader.InitProviders(providerRuntime);
@@ -117,4 +129,4 @@ namespace Orleans.Runtime.Storage
             storageProviderLoader.AddProvider(name, provider, config);
         }
     }
-}
+}

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.CodeDom;
@@ -35,19 +35,28 @@ namespace Orleans.Runtime
     /// </summary>
     internal static class TypeUtils
     {
-        public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName=null)
+
+        private static string GetSimpleNameHandleArray(Type t, Language language)
+        {
+            if (t.IsArray && language == Language.VisualBasic)
+                return t.Name.Replace('[', '(').Replace(']', ')');
+
+            return t.Name;
+        }
+        
+        public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
         {
             if (t.IsNestedPublic || t.IsNestedPrivate)
             {
                 if (t.DeclaringType.IsGenericType)
-                    return GetTemplatedName(GetUntemplatedTypeName(t.DeclaringType.Name), t.DeclaringType, t.GetGenericArguments(), _ => true) + "." + GetUntemplatedTypeName(t.Name);
+                    return GetTemplatedName(GetUntemplatedTypeName(t.DeclaringType.Name), t.DeclaringType, t.GetGenericArguments(), _ => true, language) + "." + GetUntemplatedTypeName(t.Name);
                 
-                return GetTemplatedName(t.DeclaringType) + "." + GetUntemplatedTypeName(t.Name);
+                return GetTemplatedName(t.DeclaringType, language: language) + "." + GetUntemplatedTypeName(t.Name);
             }
 
-            if (t.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(t) ? GetFullName(t) : t.Name);
+            if (t.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language));
             
-            return fullName != null && fullName(t) ? GetFullName(t) : t.Name;
+            return fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language: language);
         }
 
         public static string GetUntemplatedTypeName(string typeName)
@@ -91,27 +100,35 @@ namespace Orleans.Runtime
             return t.IsArray && IsConcreteTemplateType(t.GetElementType());
         }
 
-        public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null)
+        public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
         {
-            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName), t, t.GetGenericArguments(), fullName);
+            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName, language), t, t.GetGenericArguments(), fullName, language);
 
-            return t.IsArray ? 
-                GetTemplatedName(t.GetElementType(), fullName) + "[" + new string(',', t.GetArrayRank() - 1) + "]" : 
-                GetSimpleTypeName(t, fullName);
+            if (t.IsArray)
+            {
+                bool isVB = language == Language.VisualBasic;
+
+                return GetTemplatedName(t.GetElementType(), fullName)
+                       + (isVB ? "(" : "[")
+                       + new string(',', t.GetArrayRank() - 1)
+                       + (isVB ? ")" : "]");
+            }
+            
+            return GetSimpleTypeName(t, fullName, language);
         }
 
-        public static string GetTemplatedName(string baseName, Type t, Type[] genericArguments, Func<Type, bool> fullName)
+        public static string GetTemplatedName(string baseName, Type t, Type[] genericArguments, Func<Type, bool> fullName, Language language = Language.CSharp)
         {
             if (!t.IsGenericType || (t.DeclaringType != null && t.DeclaringType.IsGenericType)) return baseName;
-
+            bool isVB = language == Language.VisualBasic;
             string s = baseName;
-            s += "<";
-            s += GetGenericTypeArgs(genericArguments, fullName);
-            s += ">";
+            s += isVB ? "(Of " : "<";
+            s += GetGenericTypeArgs(genericArguments, fullName, language);
+            s += isVB ? ")" : ">";
             return s;
         }
 
-        public static string GetGenericTypeArgs(Type[] args, Func<Type, bool> fullName)
+        public static string GetGenericTypeArgs(Type[] args, Func<Type, bool> fullName, Language language = Language.CSharp)
         {
             string s = String.Empty;
 
@@ -124,11 +141,11 @@ namespace Orleans.Runtime
                 }
                 if (!genericParameter.IsGenericType)
                 {
-                    s += GetSimpleTypeName(genericParameter, fullName);
+                    s += GetSimpleTypeName(genericParameter, fullName, language);
                 }
                 else
                 {
-                    s += GetTemplatedName(genericParameter, fullName);
+                    s += GetTemplatedName(genericParameter, fullName, language);
                 }
                 first = false;
             }
@@ -136,28 +153,40 @@ namespace Orleans.Runtime
             return s;
         }
 
-        public static string GetParameterizedTemplateName(Type t, bool applyRecursively = false, Func<Type, bool> fullName = null)
+        public static string GetParameterizedTemplateName(Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = tt => false;
 
-            return GetParameterizedTemplateName(t, fullName, applyRecursively);
+            return GetParameterizedTemplateName(t, fullName, applyRecursively, language);
         }
 
-        public static string GetParameterizedTemplateName(Type t, Func<Type,bool> fullName, bool applyRecursively = false)
+        public static string GetParameterizedTemplateName(Type t, Func<Type, bool> fullName, bool applyRecursively = false, Language language = Language.CSharp)
         {
-            return t.IsGenericType ? GetParameterizedTemplateName(GetSimpleTypeName(t, fullName), t, applyRecursively, fullName) : t.FullName;
+            if (t.IsGenericType)
+            {
+                return GetParameterizedTemplateName(GetSimpleTypeName(t, fullName), t, applyRecursively, fullName, language);
+            }
+            else
+            {
+                if(fullName != null && fullName(t)==true)
+                {
+                    return t.FullName;
+                }
+            }
+            return t.Name;
         }
 
-        public static string GetParameterizedTemplateName(string baseName, Type t, bool applyRecursively = false, Func<Type, bool> fullName = null)
+        public static string GetParameterizedTemplateName(string baseName, Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = tt => false;
 
             if (!t.IsGenericType) return baseName;
 
+            bool isVB = language == Language.VisualBasic;
             string s = baseName;
-            s += "<";
+            s += isVB ? "(Of " : "<";
             bool first = true;
             foreach (var genericParameter in t.GetGenericArguments())
             {
@@ -167,7 +196,7 @@ namespace Orleans.Runtime
                 }
                 if (applyRecursively && genericParameter.IsGenericType)
                 {
-                    s += GetParameterizedTemplateName(genericParameter, applyRecursively);
+                    s += GetParameterizedTemplateName(genericParameter, applyRecursively, language: language);
                 }
                 else
                 {
@@ -177,7 +206,7 @@ namespace Orleans.Runtime
                 }
                 first = false;
             }
-            s += ">";
+            s += isVB ? ")" : ">";
             return s;
         }
 
@@ -253,18 +282,22 @@ namespace Orleans.Runtime
             return name.Contains("`") || name.Contains("[");
         }
 
-        public static string GetFullName(Type t)
+        public static string GetFullName(Type t, Language language = Language.CSharp)
         {
             if (t == null) throw new ArgumentNullException("t");
             if (t.IsNested && !t.IsGenericParameter)
             {
-                return t.Namespace + "." + t.DeclaringType.Name + "." + t.Name;
+                return t.Namespace + "." + t.DeclaringType.Name + "." + GetSimpleNameHandleArray(t, language);
             }
             if (t.IsArray)
             {
-                return GetFullName(t.GetElementType()) + "[" + new string(',', t.GetArrayRank() - 1) + "]";
+                bool isVB = language == Language.VisualBasic;
+                return GetFullName(t.GetElementType(), language)
+                       + (isVB ? "(" : "[")
+                       + new string(',', t.GetArrayRank() - 1)
+                       + (isVB ? ")" : "]");
             }
-            return t.FullName ?? ( t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
+            return t.FullName ?? ( t.IsGenericParameter ? GetSimpleNameHandleArray(t, language) : t.Namespace + "." + GetSimpleNameHandleArray(t, language));
         }
 
         /// <summary>
@@ -291,7 +324,7 @@ namespace Orleans.Runtime
         public static bool IsSystemTargetClass(Type type)
         {
             Type systemTargetType;
-            if (!TryResolveType("Orleans.Runtime.SystemTarget", out systemTargetType)) return false; 
+            if (!TryResolveType("Orleans.Runtime.SystemTarget", out systemTargetType)) return false;
 
             var systemTargetInterfaceType = typeof(ISystemTarget);
             var systemTargetBaseInterfaceType = typeof(ISystemTargetBase);
@@ -302,8 +335,8 @@ namespace Orleans.Runtime
                 systemTargetBaseInterfaceType = ToReflectionOnlyType(systemTargetBaseInterfaceType);
             }
 
-            if (!systemTargetInterfaceType.IsAssignableFrom(type) || 
-                !systemTargetBaseInterfaceType.IsAssignableFrom(type) || 
+            if (!systemTargetInterfaceType.IsAssignableFrom(type) ||
+                !systemTargetBaseInterfaceType.IsAssignableFrom(type) ||
                 !systemTargetType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
@@ -316,7 +349,7 @@ namespace Orleans.Runtime
             if (!IsGrainClass(type)) return false;
             if (!type.IsAbstract) return true;
 
-            complaints = complain ? new [] { string.Format("Grain type {0} is abstract and cannot be instantiated.", type.FullName) } : null;
+            complaints = complain ? new[] { string.Format("Grain type {0} is abstract and cannot be instantiated.", type.FullName) } : null;
             return false;
         }
 
@@ -378,7 +411,7 @@ namespace Orleans.Runtime
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc)
         {
-            return assembly.IsDynamic ? null : assembly.GetTypes().Where(type => !type.IsNestedPrivate && whereFunc(type));
+            return assembly.IsDynamic ? Enumerable.Empty<Type>() : assembly.GetTypes().Where(type => !type.IsNestedPrivate && whereFunc(type));
         }
 
         public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc)
@@ -389,10 +422,20 @@ namespace Orleans.Runtime
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
                 var types = GetTypes(assembly, whereFunc);
-                if (null != types) 
-                {
-                    result.AddRange(types);
-                }
+                result.AddRange(types);
+            }
+            return result;
+        }
+
+        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc)
+        {
+            var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            var result = new List<Type>();
+            foreach (var assembly in currentAssemblies.Where(loaded => !loaded.IsDynamic && assemblies.Contains(loaded.Location)))
+            {
+                // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
+                var types = GetTypes(assembly, whereFunc);
+                result.AddRange(types);
             }
             return result;
         }
@@ -411,4 +454,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

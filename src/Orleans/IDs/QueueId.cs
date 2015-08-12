@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 
@@ -110,4 +110,4 @@ namespace Orleans.Streams
             return String.Format("{0}-0x{1, 8:X8}", this.ToString(), this.GetUniformHashCode());
         }
     }
-}
+}

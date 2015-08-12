@@ -21,11 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
-
 using Orleans.Storage;
 using Orleans.CodeGeneration;
 
@@ -36,6 +34,11 @@ namespace Orleans.Runtime
     /// </summary>
     internal interface IRuntimeClient
     {
+        /// <summary>
+        /// Grain Factory to get and cast grain references.
+        /// </summary>
+        GrainFactory InternalGrainFactory { get; }
+
         /// <summary>
         /// Provides client application code with access to an Orleans logger.
         /// </summary>
@@ -81,9 +84,9 @@ namespace Orleans.Runtime
 
         void Reset();
 
-        Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
+        GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 
-        Task DeleteObjectReference(IAddressable obj);
+        void DeleteObjectReference(IAddressable obj);
 
         IActivationData CurrentActivationData { get; }
 
@@ -95,6 +98,8 @@ namespace Orleans.Runtime
 
         Streams.IStreamProviderManager CurrentStreamProviderManager { get; }
 
+        Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
+
         IGrainTypeResolver GrainTypeResolver { get; }
 
         string CaptureRuntimeEnvironment();
@@ -104,4 +109,3 @@ namespace Orleans.Runtime
         SiloStatus GetSiloStatus(SiloAddress siloAddress);
     }
 }
-

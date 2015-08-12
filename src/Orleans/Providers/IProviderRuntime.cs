@@ -21,7 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using Orleans.Core;
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -52,6 +53,17 @@ namespace Orleans.Providers
         /// </summary>
         /// <returns>ServiceID Guid for this service.</returns>
         Guid ServiceId { get; }
+
+        /// <summary>
+        /// A unique identifier for the current silo.
+        /// There is no semantic content to this string, but it may be useful for logging.
+        /// </summary>
+        string SiloIdentity { get; }
+
+        /// <summary>
+        /// Factory for getting references to grains.
+        /// </summary>
+        IGrainFactory GrainFactory { get; }
     }
 
     /// <summary>
@@ -61,4 +73,4 @@ namespace Orleans.Providers
     {
         // for now empty, later can add storage specific runtime capabilities.
     }
-}
+}

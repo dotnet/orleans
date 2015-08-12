@@ -21,14 +21,14 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    public class SimpleMessageStreamProvider : IStreamProvider, IStreamProviderImpl
+    public class SimpleMessageStreamProvider : IInternalStreamProvider
     {
         public string                       Name { get; private set; }
 
@@ -36,11 +36,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IStreamProviderRuntime      providerRuntime;
         private bool                        fireAndForgetDelivery;
         internal const string               FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
-        internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = true;
-
-        public SimpleMessageStreamProvider()
-        {
-        }
+        internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = false;
 
         public bool IsRewindable { get { return false; } }
 
@@ -69,14 +65,19 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 () => new StreamImpl<T>(streamId, this, IsRewindable));
         }
 
-        public IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime, fireAndForgetDelivery, IsRewindable);
         }
 
-        public IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
+        {
+            return GetConsumerInterfaceImpl(streamId);
+        }
+
+        private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
         }
     }
-}
+}

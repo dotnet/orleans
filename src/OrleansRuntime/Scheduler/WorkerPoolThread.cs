@@ -37,7 +37,6 @@ namespace Orleans.Runtime.Scheduler
         private const int MAX_THREAD_COUNT_TO_REPLACE = 500;
         private const int MAX_CPU_USAGE_TO_REPLACE = 50;
 
-        private readonly AutoResetEvent e;
         private readonly WorkerPool pool;
         private readonly OrleansTaskScheduler scheduler;
         private readonly TimeSpan maxWorkQueueWait;
@@ -94,10 +93,9 @@ namespace Orleans.Runtime.Scheduler
 
         internal readonly int WorkerThreadStatisticsNumber;
 
-        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, bool system = false)
-            : base(system ? "System" : null)
+        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, int threadNumber, bool system = false)
+            : base((system ? "System." : "") + threadNumber)
         {
-            e = new AutoResetEvent(false);
             pool = gtp;
             scheduler = sched;
             ownsSemaphore = false;
@@ -359,4 +357,3 @@ namespace Orleans.Runtime.Scheduler
         }
     }
 }
-

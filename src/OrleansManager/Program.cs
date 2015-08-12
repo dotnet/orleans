@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -63,7 +63,7 @@ namespace OrleansManager
         {
             GrainClient.Initialize();
 
-            systemManagement = ManagementGrainFactory.GetGrain(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
             Dictionary<string, string> options = args.Skip(1)
                 .Where(s => s.StartsWith("-"))
                 .Select(s => s.Substring(1).Split('='))
@@ -166,7 +166,7 @@ namespace OrleansManager
                 WriteStatus(string.Format("**Calling GetDetailedGrainReport({0}, {1})", silo, grainId));
                 try
                 {
-                    ISiloControl siloControl = SiloControlFactory.GetSystemTarget(Constants.SiloControlId, silo);
+                    var siloControl = GrainClient.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
                     DetailedGrainReport grainReport = siloControl.GetDetailedGrainReport(grainId).Result;
                     reports.Add(grainReport);
                 }
@@ -187,8 +187,8 @@ namespace OrleansManager
 
             var silo = GetSiloAddress();
             if (silo == null) return;
-            
-            var directory = RemoteGrainDirectoryFactory.GetSystemTarget(Constants.DirectoryServiceId, silo);
+
+            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
 
             WriteStatus(string.Format("**Calling DeleteGrain({0}, {1}, {2})", silo, grainId, RETRIES));
             directory.DeleteGrain(grainId, RETRIES).Wait();
@@ -201,9 +201,9 @@ namespace OrleansManager
 
             var silo = GetSiloAddress();
             if (silo == null) return;
-            
-            var directory = RemoteGrainDirectoryFactory.GetSystemTarget(Constants.DirectoryServiceId, silo);
 
+            var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+  
             WriteStatus(string.Format("**Calling LookupGrain({0}, {1}, {2})", silo, grainId, RETRIES));
             Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.LookUp(grainId, RETRIES);
 
@@ -240,12 +240,12 @@ namespace OrleansManager
             if (Int32.TryParse(interfaceTypeCodeOrImplClassName, out interfaceTypeCodeDataLong))
             {
                 // parsed it as int, so it is an interface type code.
-                implementationTypeCode = TypeCodeMapper.GetImplementationTypeCode(interfaceTypeCodeDataLong);
+                implementationTypeCode = TypeCodeMapper.GetImplementation(interfaceTypeCodeDataLong).GrainTypeCode;
             }
             else
             {
                 // interfaceTypeCodeOrImplClassName is the implementation class name
-                implementationTypeCode = TypeCodeMapper.GetImplementationTypeCode(interfaceTypeCodeOrImplClassName);
+                implementationTypeCode = TypeCodeMapper.GetImplementation(interfaceTypeCodeOrImplClassName).GrainTypeCode;
             }
 
             var grainIdStr = args[1];
@@ -295,4 +295,4 @@ namespace OrleansManager
             Console.ResetColor();
         }
     }
-}
+}

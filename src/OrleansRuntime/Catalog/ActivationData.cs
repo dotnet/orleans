@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -150,6 +150,7 @@ namespace Orleans.Runtime
 
         // This is the maximum amount of time we expect a request to continue processing
         private static TimeSpan maxRequestProcessingTime;
+        private static NodeConfiguration nodeConfiguration;
         public readonly TimeSpan CollectionAgeLimit;
         private IGrainMethodInvoker lastInvoker;
 
@@ -158,10 +159,11 @@ namespace Orleans.Runtime
         private HashSet<GrainTimer> timers;
         private readonly TraceLogger logger;
 
-        public static void Init(ClusterConfiguration config)
+        public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
             // Consider adding a config parameter for this
             maxRequestProcessingTime = config.Globals.ResponseTimeout.Multiply(5);
+            nodeConfiguration = nodeConfig;
         }
 
         public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, IActivationCollector collector, TimeSpan ageLimit)
@@ -232,6 +234,18 @@ namespace Orleans.Runtime
 
         #endregion
 
+        public string GrainTypeName
+        {
+            get
+            {
+                if (GrainInstanceType == null)
+                {
+                    throw new ArgumentNullException("GrainInstanceType", "GrainInstanceType has not been set.");
+                }
+                return GrainInstanceType.FullName;
+            }
+        }
+
         internal Type GrainInstanceType { get; private set; }
 
         internal void SetGrainInstance(Grain grainInstance)
@@ -240,6 +254,13 @@ namespace Orleans.Runtime
             if (grainInstance != null)
             {
                 GrainInstanceType = grainInstance.GetType();
+
+                // Don't ever collect system grains or reminder table grain or memory store grains.
+                bool doNotCollect = typeof(IReminderTable).IsAssignableFrom(GrainInstanceType) || typeof(IMemoryStorageGrain).IsAssignableFrom(GrainInstanceType);
+                if (doNotCollect)
+                {
+                    this.collector = null;
+                }
             }
         }
 
@@ -267,7 +288,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            await streamDirectory.Cleanup();
+            await streamDirectory.Cleanup(true, false);
         }
 
         #region IActivationData
@@ -286,21 +307,6 @@ namespace Orleans.Runtime
         public ActivationId ActivationId { get { return Address.Activation; } }
 
         public ActivationAddress Address { get; private set; }
-        
-        public string IdentityString
-        {
-            get { return Grain.ToDetailedString(); }
-        }
-
-        public string RuntimeIdentity
-        {
-            get { return Silo.ToLongString(); }
-        }
-
-        public void DeactivateOnIdle()
-        {
-            RuntimeClient.Current.DeactivateOnIdle(ActivationId);
-        }
 
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
@@ -339,7 +345,7 @@ namespace Orleans.Runtime
         /// </summary>
         public ActivationAddress ForwardingAddress { get; set; }
 
-        private readonly IActivationCollector collector;
+        private IActivationCollector collector;
 
         internal bool IsExemptFromCollection
         {
@@ -434,14 +440,14 @@ namespace Orleans.Runtime
             currentRequestStartTime = DateTime.MinValue;
         }
 
-        private long currentlyExecutingCount;
+        private long inFlightCount;
         private long enqueuedOnDispatcherCount;
 
         /// <summary>
         /// Number of messages that are actively being processed [as opposed to being in the Waiting queue].
         /// In most cases this will be 0 or 1, but for Reentrant grains can be >1.
         /// </summary>
-        public long CurrentlyExecutingCount { get { return Interlocked.Read(ref currentlyExecutingCount); } }
+        public long InFlightCount { get { return Interlocked.Read(ref inFlightCount); } }
 
         /// <summary>
         /// Number of messages that are being received [as opposed to being in the scheduler queue or actively processed].
@@ -449,10 +455,10 @@ namespace Orleans.Runtime
         public long EnqueuedOnDispatcherCount { get { return Interlocked.Read(ref enqueuedOnDispatcherCount); } }
 
         /// <summary>Increment the number of in-flight messages currently being processed.</summary>
-        public void IncrementInFlightCount() { Interlocked.Increment(ref currentlyExecutingCount); }
+        public void IncrementInFlightCount() { Interlocked.Increment(ref inFlightCount); }
         
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
-        public void DecrementInFlightCount() { Interlocked.Decrement(ref currentlyExecutingCount); }
+        public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
         /// <summary>Increment the number of messages currently in the prcess of being received.</summary>
         public void IncrementEnqueuedOnDispatcherCount() { Interlocked.Increment(ref enqueuedOnDispatcherCount); }
@@ -470,18 +476,6 @@ namespace Orleans.Runtime
             get
             {
                 return waiting == null ? 0 : waiting.Count;
-            }
-        }
-
-        public bool IsUsable
-        {
-            get
-            {
-                if (State == ActivationState.Create) return false;
-                if (State == ActivationState.Activating) return false;
-                if (State == ActivationState.Deactivating) return false;
-                if (State == ActivationState.Invalid) return false;
-                return true;
             }
         }
 
@@ -559,7 +553,7 @@ namespace Orleans.Runtime
             lock (this)
             {
                 long numInDispatcher = EnqueuedOnDispatcherCount;
-                long numActive = CurrentlyExecutingCount;
+                long numActive = InFlightCount;
                 long numWaiting = WaitingCount;
                 return (int)(numInDispatcher + numActive + numWaiting);
             }
@@ -573,11 +567,11 @@ namespace Orleans.Runtime
                 string limitName = CodeGeneration.GrainInterfaceData.IsStatelessWorker(GrainInstanceType)
                     ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER
                     : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
-                maxEnqueuedRequestsLimit = LimitManager.GetLimit(limitName); // Cache for next time
+                maxEnqueuedRequestsLimit = nodeConfiguration.LimitManager.GetLimit(limitName); // Cache for next time
                 return maxEnqueuedRequestsLimit;
             }
-            
-            return LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
+
+            return nodeConfiguration.LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
         }
 
         public Message PeekNextWaitingMessage()
@@ -788,16 +782,20 @@ namespace Orleans.Runtime
 
         internal string ToDetailedString()
         {
-            return String.Format("[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} CurrentlyExecutingCount={7} NumRunning={8}]",
-                 Silo.ToLongString(),
-                 Grain.ToDetailedString(),
-                 ActivationId,
-                 GetActivationInfoString(),
-                 State,                         // 4
-                 WaitingCount,                  // 5 NonReentrancyQueueSize
-                 EnqueuedOnDispatcherCount,     // 6 EnqueuedOnDispatcher
-                 CurrentlyExecutingCount,       // 7 CurrentlyExecutingCount
-                 numRunning);                   // 8 NumRunning
+            return
+                String.Format(
+                    "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}]",
+                    Silo.ToLongString(),
+                    Grain.ToDetailedString(),
+                    ActivationId,
+                    GetActivationInfoString(),
+                    State,                          // 4
+                    WaitingCount,                   // 5 NonReentrancyQueueSize
+                    EnqueuedOnDispatcherCount,      // 6 EnqueuedOnDispatcher
+                    InFlightCount,                  // 7 InFlightCount
+                    numRunning,                     // 8 NumRunning
+                    GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
+                    CollectionAgeLimit);            // 10 CollectionAgeLimit
         }
 
         public string Name
@@ -837,4 +835,3 @@ namespace Orleans.Runtime
         internal static bool TestOnlySuppressStreamCleanupOnDeactivate;
     }
 }
-

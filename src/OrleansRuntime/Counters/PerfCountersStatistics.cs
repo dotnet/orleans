@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 
 namespace Orleans.Runtime.Counters
 {
@@ -37,7 +37,10 @@ namespace Orleans.Runtime.Counters
         private const int ERROR_THRESHOLD = 10; // A totally arbitrary value!
         private SafeTimer timer;
         private bool shouldWritePerfCounters = true;
-
+        
+        private const string CounterControlProgName = "OrleansCounterControl.exe";
+        private const string ExplainHowToCreateOrleansPerfCounters = "Run " + CounterControlProgName + " as Administrator to create perf counters for Orleans.";
+        
         public TimeSpan PerfCountersWriteInterval { get; private set; }
 
         
@@ -58,9 +61,16 @@ namespace Orleans.Runtime.Counters
         /// </summary>
         private void Prepare()
         {
+            if (Environment.OSVersion.ToString().StartsWith("unix", StringComparison.InvariantCultureIgnoreCase))
+            {
+                logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters are only available on Windows :) -- defaulting to in-memory counters.");
+                shouldWritePerfCounters = false;
+                return;
+            }
+
             if (!OrleansPerfCounterManager.AreWindowsPerfCountersAvailable())
             {
-                logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters not found -- defaulting to in-memory counters. Run CounterControl.exe as Administrator to create perf counters for Orleans.");
+                logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters not found -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters);
                 shouldWritePerfCounters = false;
                 return;
             }
@@ -71,7 +81,7 @@ namespace Orleans.Runtime.Counters
             }
             catch(Exception exc)
             {
-                logger.Warn(ErrorCode.PerfCounterFailedToInitialize, "Failed to initialize perf counters -- defaulting to in-memory counters. Run CounterControl.exe as Administrator to create perf counters for Orleans.", exc);
+                logger.Warn(ErrorCode.PerfCounterFailedToInitialize, "Failed to initialize perf counters -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters, exc);
                 shouldWritePerfCounters = false;
             }
         }
@@ -135,4 +145,3 @@ namespace Orleans.Runtime.Counters
         }
     }
 }
-

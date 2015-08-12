@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -29,21 +29,21 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 using Orleans.Messaging;
 using Orleans.Providers;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using Orleans.Storage;
-using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Collections.Concurrent;
+using Orleans.Streams;
 
 namespace Orleans
 {
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable
     {
+
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private readonly TraceLogger logger;
@@ -52,22 +52,32 @@ namespace Orleans
         private readonly ClientConfiguration config;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private readonly Dictionary<GrainId, LocalObjectData> localObjects;
+        private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
 
         private readonly ProxiedMessageCenter transport;
         private bool listenForMessages;
         private CancellationTokenSource listeningCts;
 
+        private readonly ClientProviderRuntime clientProviderRuntime;
         private readonly StatisticsProviderManager statisticsProviderManager;
 
         internal ClientStatisticsManager ClientStatistics;
-        private readonly Guid clientId;
+        private readonly GrainId clientId;
         private GrainInterfaceMap grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
-        private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+        // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
+        private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan resetTimeout = TimeSpan.FromMinutes(1);
 
         private const string BARS = "----------";
+
+        private readonly GrainFactory grainFactory;
+
+        public GrainFactory InternalGrainFactory
+        {
+            get { return grainFactory; }
+        }
 
         /// <summary>
         /// Response timeout.
@@ -120,13 +130,19 @@ namespace Orleans
             }
         }
 
-        public Streams.IStreamProviderManager CurrentStreamProviderManager { get; private set; }
+        public IStreamProviderManager CurrentStreamProviderManager { get; private set; }
+
+        public IStreamProviderRuntime CurrentStreamProviderRuntime
+        {
+            get { return clientProviderRuntime; }
+        }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
+        public OutsideRuntimeClient(ClientConfiguration cfg, GrainFactory grainFactory, bool secondary = false)
         {
-            this.clientId = Guid.NewGuid();
+            this.grainFactory = grainFactory;
+            this.clientId = GrainId.NewClientId();
 
             if (cfg == null)
             {
@@ -149,7 +165,7 @@ namespace Orleans
                 PlacementStrategy.Initialize();
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-                localObjects = new Dictionary<GrainId, LocalObjectData>();
+                localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
                 CallbackData.Config = config;
 
                 if (!secondary)
@@ -170,7 +186,8 @@ namespace Orleans
                     }
                 }
 
-                statisticsProviderManager = new StatisticsProviderManager("Statistics", ClientProviderRuntime.Instance);
+                clientProviderRuntime = new ClientProviderRuntime(grainFactory);
+                statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
                 var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
                     .WaitForResultWithThrow(initTimeout);
                 if (statsProviderName != null)
@@ -184,10 +201,10 @@ namespace Orleans
 
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
-                    "{0} Initializing OutsideRuntimeClient on {1} at {2} Client GUID Id = {3} {0}",
+                    "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
                     BARS, config.DNSHostName, localAddress, clientId));
                 string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}'", BARS, RuntimeVersion.Current);
-                startMsg = string.Format("{0} Config= \n {1}", startMsg, config);
+                startMsg = string.Format("{0} Config= "  + Environment.NewLine + " {1}", startMsg, config);
                 logger.Info(ErrorCode.ClientStarting, startMsg);
 
                 if (TestOnlyThrowExceptionDuringInit)
@@ -217,13 +234,13 @@ namespace Orleans
 
         private void StreamingInitialize()
         {
-            var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable().Result;
-            ClientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
+            var implicitSubscriberTable = transport.GetImplicitStreamSubscriberTable(grainFactory).Result;
+            clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
             var streamProviderManager = new Streams.StreamProviderManager();
             streamProviderManager
                 .LoadStreamProviders(
                     this.config.ProviderConfigurations,
-                    ClientProviderRuntime.Instance)
+                    clientProviderRuntime)
                 .Wait();
             CurrentStreamProviderManager = streamProviderManager;
         }
@@ -280,7 +297,7 @@ namespace Orleans
             }
             StartInternal();
 
-            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client Grain ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + clientId);
+            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + clientId);
               
         }
 
@@ -289,7 +306,7 @@ namespace Orleans
         {
             transport.Start();
             TraceLogger.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
-            CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, GrainId.NewClientGrainId());
+            CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, clientId);
 
             ClientStatistics = new ClientStatisticsManager(config);
             ClientStatistics.Start(config, statisticsProviderManager, transport, clientId)
@@ -312,7 +329,7 @@ namespace Orleans
                     }
                 }
             );
-            grainInterfaceMap = transport.GetTypeCodeMap().Result;
+            grainInterfaceMap = transport.GetTypeCodeMap(grainFactory).Result;
             StreamingInitialize();
         }
 
@@ -368,13 +385,16 @@ namespace Orleans
         private void DispatchToLocalObject(Message message)
         {
             LocalObjectData objectData;
-            bool found = false;
-            lock (localObjects)
-            {
-                found = localObjects.TryGetValue(message.TargetGrain, out objectData);
+            GuidId observerId = message.TargetObserverId;
+            if (observerId == null)
+            {                
+                logger.Error(
+                    ErrorCode.ProxyClient_OGC_TargetNotFound_2,
+                    String.Format("Did not find TargetObserverId header in the message = {0}. A request message to a client is expected to have an observerId.", message));
+                return;
             }
 
-            if (found)
+            if (localObjects.TryGetValue(observerId, out objectData))
                 this.InvokeLocalObjectAsync(objectData, message);
             else
             {
@@ -393,14 +413,12 @@ namespace Orleans
             if (obj == null)
             {
                 //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                logger.Warn(ErrorCode.Runtime_Error_100162, 
-                    String.Format("Object associated with Grain ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.Grain, message));
-                lock (localObjects)
-                {    
-                    // Try to remove. If it's not there, we don't care.
-                    localObjects.Remove(objectData.Grain);
-                }
-                UnregisterObjectReference(objectData.Grain).Ignore();
+                logger.Warn(ErrorCode.Runtime_Error_100162,
+                    String.Format("Object associated with Observer ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.ObserverId, message));
+
+                LocalObjectData ignore;
+                // Try to remove. If it's not there, we don't care.
+                localObjects.TryRemove(objectData.ObserverId, out ignore);
                 return;
             }
 
@@ -628,6 +646,11 @@ namespace Orleans
                     message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, target.SystemTargetSilo);
                 }
             }
+            // Client sending messages to another client (observer). Yes, we support that.
+            if (target.IsObserverReference)
+            {
+                message.TargetObserverId = target.ObserverId;
+            }
             
             if (debugContext != null)
             {
@@ -672,16 +695,6 @@ namespace Orleans
             return true;
         }
 
-        public bool ProcessOutgoingMessage(Message message)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool ProcessIncomingMessage(Message message)
-        {
-            throw new NotImplementedException();
-        }
-
         public void ReceiveResponse(Message response)
         {
             if (logger.IsVerbose2) logger.Verbose2("Received {0}", response);
@@ -714,10 +727,17 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.Reset(): client GUID Id " + clientId);
+                    logger.Info("OutsideRuntimeClient.Reset(): client Id " + clientId);
                 }
             });
 
+            Utils.SafeExecute(() =>
+            {
+                if (clientProviderRuntime != null)
+                {
+                    clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
+                }
+            }, logger, "Client.clientProviderRuntime.Reset");
             Utils.SafeExecute(() =>
             {
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -735,13 +755,13 @@ namespace Orleans
 
             listenForMessages = false;
             Utils.SafeExecute(() =>
+            {
+                if (listeningCts != null)
                 {
-                    if (listeningCts != null)
-                    {
-                        listeningCts.Cancel();
-                    }
-                }, logger, "Client.Stop-ListeningCTS");
-            Utils.SafeExecute(() =>
+                    listeningCts.Cancel();
+                }
+            }, logger, "Client.Stop-ListeningCTS");
+        Utils.SafeExecute(() =>
             {
                 if (transport != null)
                 {
@@ -764,13 +784,21 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client GUID Id " + clientId);
+                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
                 }
             });
             
             try
             {
                 UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
+            }
+            catch (Exception) { }
+            try
+            {
+                if (clientProviderRuntime != null)
+                {
+                    clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
+                }
             }
             catch (Exception) { }
             try
@@ -819,57 +847,28 @@ namespace Orleans
             await Task.Run(asyncFunction); // No grain context on client - run on .NET thread pool
         }
 
-        public async Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.");
 
-            GrainId target = GrainId.NewClientAddressableGrainId();
-            await transport.RegisterObserver(target);
-            lock (localObjects)
+            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId());
+            if (!localObjects.TryAdd(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker)))
             {
-                localObjects.Add(target, new LocalObjectData(obj, target, invoker));
+                throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
             }
-            return GrainReference.FromGrainId(target);
+            return gr;
         }
 
-        public Task DeleteObjectReference(IAddressable obj)
+        public void DeleteObjectReference(IAddressable obj)
         {
             if (!(obj is GrainReference))
                 throw new ArgumentException("Argument reference is not a grain reference.");
 
             var reference = (GrainReference) obj;
-
-            return DeleteResolvedObjectReference(reference);
-        }
-
-        private Task DeleteResolvedObjectReference(GrainReference reference)
-        {
-            LocalObjectData objData;
-
-            lock (localObjects)
-            {
-                if (localObjects.TryGetValue(reference.GrainId, out objData))
-                    localObjects.Remove(reference.GrainId);
-                else
-                    throw new ArgumentException("Reference is not associated with a local object.", "reference");
-            }
-            return UnregisterObjectReference(objData.Grain);
-        }
-
-        private async Task UnregisterObjectReference(GrainId grain)
-        {
-            try
-            {
-
-                await transport.UnregisterObserver(grain);
-                if (logger.IsVerbose) 
-                    logger.Verbose(ErrorCode.Runtime_Error_100315, "Successfully unregistered client target {0}", grain);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.Runtime_Error_100012, String.Format("Failed to unregister client target {0}.", grain), exc);
-            }
+            LocalObjectData ignore;
+            if (!localObjects.TryRemove(reference.ObserverId, out ignore))
+                throw new ArgumentException("Reference is not associated with a local object.", "reference");
         }
 
         public void DeactivateOnIdle(ActivationId id)
@@ -883,14 +882,14 @@ namespace Orleans
         {
             internal WeakReference LocalObject { get; private set; }
             internal IGrainMethodInvoker Invoker { get; private set; }
-            internal GrainId Grain { get; private set; }
+            internal GuidId ObserverId { get; private set; }
             internal Queue<Message> Messages { get; private set; }
             internal bool Running { get; set; }
 
-            internal LocalObjectData(IAddressable obj, GrainId grain, IGrainMethodInvoker invoker)
+            internal LocalObjectData(IAddressable obj, GuidId observerId, IGrainMethodInvoker invoker)
             {
                 LocalObject = new WeakReference(obj);
-                Grain = grain;
+                ObserverId = observerId;
                 Invoker = invoker;
                 Messages = new Queue<Message>();
                 Running = false;
@@ -925,4 +924,3 @@ namespace Orleans
         }
     }
 }
-

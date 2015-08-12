@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -44,9 +44,8 @@ namespace Orleans.Runtime
             SystemTarget = 1,
             SystemGrain = 2,
             Grain = 3,
-            ClientGrain = 4,
+            Client = 4,
             KeyExtGrain = 6,
-            ClientAddressableObject = 7,
         }
 
         public UInt64 N0 { get; private set; }
@@ -356,4 +355,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

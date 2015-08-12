@@ -21,13 +21,15 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
-using Orleans.Providers;
+using System;
 
 namespace Orleans.Streams
 {
-    public interface IStreamProvider : IProvider
+    public interface IStreamProvider
     {
+        /// <summary>Name of the stream provider.</summary>
+        string Name { get; }
+
         IAsyncStream<T> GetStream<T>(Guid streamId, string streamNamespace);
 
         /// <summary>
@@ -37,4 +39,4 @@ namespace Orleans.Streams
         /// <returns>True if this is a rewindable provider, false otherwise.</returns>
         bool IsRewindable { get; }
     }
-}
+}

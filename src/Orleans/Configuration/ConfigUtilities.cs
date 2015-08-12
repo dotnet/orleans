@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -161,7 +161,7 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal static void ParseLimitValues(ILimitsConfiguration config, XmlElement root, string nodeName)
+        internal static void ParseLimitValues(LimitManager limitManager, XmlElement root, string nodeName)
         {
             foreach (XmlNode node in root.ChildNodes)
             {
@@ -172,7 +172,7 @@ namespace Orleans.Runtime.Configuration
                     && (grandchild.HasAttribute("SoftLimit") || grandchild.HasAttribute("HardLimit")))
                 {
                     var limitName = grandchild.GetAttribute("Name");
-                    config.LimitValues.Add(limitName, new LimitValue
+                    limitManager.AddLimitValue(limitName, new LimitValue
                     {
                         Name = limitName,
                         SoftLimitThreshold = ParseInt(grandchild.GetAttribute("SoftLimit"),
@@ -203,19 +203,19 @@ namespace Orleans.Runtime.Configuration
             }
             else
             {
-                string traceFileDir = null;
-                string traceFileName = Path.GetFileName(config.TraceFilePattern);
-                string[] dirLocations = { Path.GetDirectoryName(config.TraceFilePattern), "appdir", "." };
-                foreach (var d in dirLocations)
+                string traceFileDir = Path.GetDirectoryName(config.TraceFilePattern);
+                if (!Directory.Exists(traceFileDir))
                 {
-                    if (!Directory.Exists(d)) continue;
-
-                    traceFileDir = d;
-                    break;
-                }
-                if (traceFileDir != null && !Directory.Exists(traceFileDir))
-                {
-                    config.TraceFilePattern = Path.Combine(traceFileDir, traceFileName);
+                    string traceFileName = Path.GetFileName(config.TraceFilePattern);
+                    string[] alternateDirLocations = { "appdir", "." };
+                    foreach (var d in alternateDirLocations)
+                    {
+                        if (Directory.Exists(d))
+                        {
+                            config.TraceFilePattern = Path.Combine(d, traceFileName);
+                            break;
+                        }
+                    }
                 }
                 config.TraceFileName = String.Format(config.TraceFilePattern, nodeName, timestamp.ToUniversalTime().ToString(dateFormat), Dns.GetHostName());
             }
@@ -457,15 +457,7 @@ namespace Orleans.Runtime.Configuration
                 throw new ArgumentException("The XML element must be a <Deactivate/> element.");
             if (!xmlElement.HasAttribute("AgeLimit"))
                 throw new ArgumentException("The AgeLimit attribute is required for a <Deactivate/> element.");
-            TimeSpan ageLimit = ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
-#if DEBUG
-            TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
-            if (ageLimit < minAgeLimit)
-            {
-                throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
-            }
-#endif
-            return ageLimit;
+            return ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
         }
 
         private static readonly string[] defaultClientConfigFileNames = { "ClientConfiguration.xml", "OrleansClientConfiguration.xml", "Client.config", "Client.xml" };
@@ -534,4 +526,3 @@ namespace Orleans.Runtime.Configuration
         }
     }
 }
-

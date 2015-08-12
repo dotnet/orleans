@@ -21,23 +21,23 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
-using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
+    //TODO: this interface should not meta-data for a grain activation. 
     internal interface IActivationData
     {
         GrainReference GrainReference { get; }
         GrainId Identity { get; }
+        string GrainTypeName { get; }
         Grain GrainInstance { get; }
         ActivationId ActivationId { get; }
         ActivationAddress Address { get; }
-        string IdentityString { get; }
-        string RuntimeIdentity { get;  }
-        void DeactivateOnIdle();
         void DelayDeactivation(TimeSpan timeSpan);
+        IStorageProvider StorageProvider { get; }
         IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
     }
-}
+}

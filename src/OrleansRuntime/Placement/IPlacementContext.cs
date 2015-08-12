@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Placement
 
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
 
-        List<SiloAddress> AllSilos { get; }
+        List<SiloAddress> AllActiveSilos { get; }
 
         SiloAddress LocalSilo { get; }
 
@@ -96,4 +96,4 @@ namespace Orleans.Runtime.Placement
             @this.GetGrainTypeInfo(grainId.GetTypeCode(), out grainClass, out placement, genericArguments);
         }
     }
-}
+}

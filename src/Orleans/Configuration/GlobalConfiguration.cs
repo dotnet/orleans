@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,14 +21,16 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Net;
 using System.Xml;
-using Orleans.AzureUtils;
+using Orleans.Providers;
+using Orleans.Streams;
+using Orleans.Storage;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -68,6 +70,9 @@ namespace Orleans.Runtime.Configuration
             /// <summary>SQL Server is used to store membership information. 
             /// This option can be used in production.</summary>
             SqlServer,
+            /// <summary>Apache ZooKeeper is used to store membership information. 
+            /// This option can be used in production.</summary>
+            ZooKeeper,
         }
 
         /// <summary>
@@ -88,6 +93,8 @@ namespace Orleans.Runtime.Configuration
             SqlServer,
             /// <summary>Used for benchmarking; it simply delays for a specified delay during each operation.</summary>
             MockTable,
+            /// <summary>Reminder Service is disabled.</summary>
+            Disabled,
         }
 
         /// <summary>
@@ -190,7 +197,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public string DeploymentId { get; set; }
         /// <summary>
-        /// Connection string for Azure Storage or SQL Server.
+        /// Connection string for Azure Storage or SQL Server or Apache ZooKeeper.
         /// </summary>
         public string DataConnectionString { get; set; }
 
@@ -212,6 +219,10 @@ namespace Orleans.Runtime.Configuration
         /// The TTLExtensionFactor attribute specifies the factor by which cache entry TTLs should be extended when they are found to be stable.
         /// </summary>
         public double CacheTTLExtensionFactor { get; set; }
+        /// <summary>
+        /// Retry count for Azure Table operations. 
+        /// </summary>
+        public int MaxStorageBusyRetries { get; private set; }
 
         /// <summary>
         /// The DirectoryCachingStrategy attribute specifies the caching strategy to use.
@@ -287,6 +298,8 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan DirectoryLazyDeregistrationDelay { get; set; }
 
+        public TimeSpan ClientRegistrationRefresh { get; set; }
+
         internal bool PerformDeadlockDetection { get; set; }
 
         public string DefaultPlacementStrategy { get; set; }
@@ -311,6 +324,19 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
+        /// Determines if ZooKeeper should be used for storage of Membership and Reminders info.
+        /// True if LivenessType is set to ZooKeeper, false otherwise.
+        /// </summary>
+        internal bool UseZooKeeperSystemStore
+        {
+            get
+            {
+                return !String.IsNullOrWhiteSpace(DataConnectionString) && (
+                    (LivenessEnabled && LivenessType == LivenessProviderType.ZooKeeper));
+            }
+        }
+
+        /// <summary>
         /// Determines if Azure Storage should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to AzureTable, false otherwise.
         /// </summary>
@@ -319,7 +345,7 @@ namespace Orleans.Runtime.Configuration
             get
             {
                 return !String.IsNullOrWhiteSpace(DataConnectionString)
-                    && !UseSqlSystemStore;
+                       && !UseSqlSystemStore && !UseZooKeeperSystemStore;
             }
         }
 
@@ -343,7 +369,9 @@ namespace Orleans.Runtime.Configuration
         private const DirectoryCachingStrategyType DEFAULT_DIRECTORY_CACHING_STRATEGY = DirectoryCachingStrategyType.Adaptive;
         internal static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromMinutes(1);
         internal static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = TimeSpan.FromHours(2);
+        public static bool ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = true;
         private static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
         public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
         public static readonly string DEFAULT_PLACEMENT_STRATEGY = typeof(RandomPlacement).Name;
         private static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
@@ -383,6 +411,7 @@ namespace Orleans.Runtime.Configuration
             CacheTTLExtensionFactor = DEFAULT_TTL_EXTENSION_FACTOR;
             DirectoryCachingStrategy = DEFAULT_DIRECTORY_CACHING_STRATEGY;
             DirectoryLazyDeregistrationDelay = DEFAULT_UNREGISTER_RACE_DELAY;
+            ClientRegistrationRefresh = DEFAULT_CLIENT_REGISTRATION_REFRESH;
 
             PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
             reminderServiceType = ReminderServiceProviderType.NotSpecified;
@@ -448,6 +477,7 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("      Directory Caching Strategy: {0}", DirectoryCachingStrategy).AppendLine();
             sb.AppendFormat("   Grain directory:").AppendLine();
             sb.AppendFormat("      Lazy deregistration delay: {0}", DirectoryLazyDeregistrationDelay).AppendLine();
+            sb.AppendFormat("      Client registration refresh: {0}", ClientRegistrationRefresh).AppendLine();
             sb.AppendFormat("   Reminder Service:").AppendLine();
             sb.AppendFormat("       ReminderServiceType: {0}", ReminderServiceType).AppendLine();
             if (ReminderServiceType == ReminderServiceProviderType.MockTable)
@@ -458,7 +488,7 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("       Use Virtual Buckets Consistent Ring: {0}", UseVirtualBucketsConsistentRing).AppendLine();
             sb.AppendFormat("       Num Virtual Buckets Consistent Ring: {0}", NumVirtualBucketsConsistentRing).AppendLine();
             sb.AppendFormat("   Providers:").AppendLine();
-            sb.Append(PrintProviderConfigurations(ProviderConfigurations));
+            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
 
             return sb.ToString();
         }
@@ -564,7 +594,10 @@ namespace Orleans.Runtime.Configuration
                             if (!"None".Equals(sst, StringComparison.InvariantCultureIgnoreCase))
                             {
                                 LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
-                                SetReminderServiceType((ReminderServiceProviderType)Enum.Parse(typeof(ReminderServiceProviderType), sst));
+                                ReminderServiceProviderType reminderServiceProviderType;
+                                SetReminderServiceType(Enum.TryParse(sst, out reminderServiceProviderType)
+                                    ? reminderServiceProviderType
+                                    : ReminderServiceProviderType.Disabled);
                             }
                         }
                         if (child.HasAttribute("ServiceId"))
@@ -586,9 +619,8 @@ namespace Orleans.Runtime.Configuration
                         }
                         if (child.HasAttribute("MaxStorageBusyRetries"))
                         {
-                            int maxBusyRetries = ConfigUtilities.ParseInt(child.GetAttribute("MaxStorageBusyRetries"),
+                            MaxStorageBusyRetries = ConfigUtilities.ParseInt(child.GetAttribute("MaxStorageBusyRetries"),
                                 "Invalid integer value for the MaxStorageBusyRetries attribute on the SystemStore element");
-                            AzureTableDefaultPolicies.MaxBusyRetries = maxBusyRetries;
                         }
                         if (child.HasAttribute("UseMockReminderTable"))
                         {
@@ -653,48 +685,136 @@ namespace Orleans.Runtime.Configuration
                             DirectoryLazyDeregistrationDelay = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DirectoryLazyDeregistrationDelay"),
                                 "Invalid time span value for Directory.DirectoryLazyDeregistrationDelay");
                         }
+                        if (child.HasAttribute("ClientRegistrationRefresh"))
+                        {
+                            ClientRegistrationRefresh = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ClientRegistrationRefresh"),
+                                "Invalid time span value for Directory.ClientRegistrationRefresh");
+                        }
                         break;
 
                     default:
                         if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                         {
-                            var providerConfig = new ProviderCategoryConfiguration();
-                            providerConfig.Load(child);
-                            ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                            var providerCategory = ProviderCategoryConfiguration.Load(child);
+
+                            if (ProviderConfigurations.ContainsKey(providerCategory.Name))
+                            {
+                                var existingCategory = ProviderConfigurations[providerCategory.Name];
+                                existingCategory.Merge(providerCategory);
+                            }
+                            else
+                            {
+                                ProviderConfigurations.Add(providerCategory.Name, providerCategory);
+                            }
                         }
                         break;
                 }
             }
         }
 
-        internal static void AdjustConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string deploymentId)
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is bootstrap provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</typeparam>
+        /// <param name="providerName">Name of the bootstrap provider</param>
+        /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
+        public void RegisterBootstrapProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
         {
-            if (String.IsNullOrEmpty(deploymentId)) return;
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(IBootstrapProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "typeof(T)");
 
-                foreach (ProviderCategoryConfiguration providerConfig in providerConfigurations.Where(kv => kv.Key.Equals("Stream")).Select(kv => kv.Value))
-                {
-                    providerConfig.AddToConfiguration("DeploymentId", deploymentId);
-                }
-            }
-
-        internal static string PrintProviderConfigurations(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations)
-        {
-            var sb = new StringBuilder();
-            if (providerConfigurations.Keys.Count > 0)
-            {
-                foreach (string provType in providerConfigurations.Keys)
-                {
-                    ProviderCategoryConfiguration provTypeConfigs = providerConfigurations[provType];
-                    sb.AppendFormat("       {0}Providers:\n{1}", provType, provTypeConfigs.ToString())
-                      .AppendLine();
-                }
-            }
-            else
-            {
-                sb.AppendLine("       No providers configured.");
-            }
-            return sb.ToString();
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
+
+        /// <summary>
+        /// Registers a given bootstrap provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the bootstrap provider type</param>
+        /// <param name="providerName">Name of the bootstrap provider</param>
+        /// <param name="properties">Properties that will be passed to the bootstrap provider upon initialization </param>
+        public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IStreamProvider"/> stream</typeparam>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
+        public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
+        {
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given stream provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
+        public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is storage provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IStorageProvider"/> storage</typeparam>
+        /// <param name="providerName">Name of the storage provider</param>
+        /// <param name="properties">Properties that will be passed to storage provider upon initialization</param>
+        public void RegisterStorageProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStorageProvider
+        {
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(IStorageProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given storage provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the storage provider type</param>
+        /// <param name="providerName">Name of the storage provider</param>
+        /// <param name="properties">Properties that will be passed to the storage provider upon initialization </param>
+        public void RegisterStorageProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Retrieves an existing provider configuration
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="config">The provider configuration, if exists</param>
+        /// <returns>True if a configuration for this provider already exists, false otherwise.</returns>
+        public bool TryGetProviderConfiguration(string providerTypeFullName, string providerName, out IProviderConfiguration config)
+        {
+            return ProviderConfigurationUtility.TryGetProviderConfiguration(ProviderConfigurations, providerTypeFullName, providerName, out config);
+        }
+
+        /// <summary>
+        /// Retrieves an enumeration of all currently configured provider configurations.
+        /// </summary>
+        /// <returns>An enumeration of all currently configured provider configurations.</returns>
+        public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
+        {
+            return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
+        } 
     }
 }
-

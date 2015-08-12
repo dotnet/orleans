@@ -21,11 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans;
+using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -40,18 +38,13 @@ namespace UnitTests.General
         private const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
         
         public SimpleGrainTests()
-            : base(new UnitTestSiloOptions { StartPrimary = true, StartSecondary = false })
+            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
         {
         }
 
-        public static ISimpleGrain GetSimpleGrain()
+        public ISimpleGrain GetSimpleGrain()
         {
-            return SimpleGrainFactory.GetGrain(GetRandomGrainId(), SimpleGrainNamePrefix);
-        }
-
-        public static ISimpleGrain GetSimpleGrain(long grainId)
-        {
-            return SimpleGrainFactory.GetGrain(grainId, SimpleGrainNamePrefix);
+            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
         }
 
         private static int GetRandomGrainId()
@@ -65,29 +58,29 @@ namespace UnitTests.General
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SimpleGrainGetGrain()
         {
             ISimpleGrain grain = GetSimpleGrain();
             int ignored = await grain.GetAxB();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
-        public void SimpleGrainControlFlow()
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task SimpleGrainControlFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
             
             Task setPromise = grain.SetA(2);
-            setPromise.Wait();
+            await setPromise;
 
             setPromise = grain.SetB(3);
-            setPromise.Wait();
+            await setPromise;
 
             Task<int> intPromise = grain.GetAxB();
-            Assert.AreEqual(6, intPromise.Result);
+            Assert.AreEqual(6, await intPromise);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SimpleGrainDataFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
@@ -101,4 +94,3 @@ namespace UnitTests.General
         }
     }
 }
-

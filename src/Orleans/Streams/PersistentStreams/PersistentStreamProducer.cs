@@ -21,13 +21,13 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
-    internal class PersistentStreamProducer<T> : IAsyncBatchObserver<T>
+    internal class PersistentStreamProducer<T> : IInternalAsyncBatchObserver<T>
     {
         private readonly StreamImpl<T> stream;
         private readonly IQueueAdapter queueAdapter;
@@ -73,5 +73,10 @@ namespace Orleans.Streams
             // Maybe send a close message to the rendezvous?
             throw new NotImplementedException("OnErrorAsync is not implemented for now.");
         }
+
+        public Task Cleanup()
+        {
+            return TaskDone.Done;
+        }
     }
-}
+}

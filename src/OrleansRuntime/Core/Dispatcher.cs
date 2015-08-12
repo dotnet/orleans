@@ -123,22 +123,9 @@ namespace Orleans.Runtime
                 }
                 else // Request or OneWay
                 {
-                    if (SiloCanAcceptRequest(message))
-                    {
-                        ReceiveRequest(message, target);
-                    }
-                    else if (message.MayResend(config.Globals))
-                    {
-                        // Record that this message is no longer flowing through the system
-                        MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Redirecting");
-                        throw new NotImplementedException("RedirectRequest() is believed to be no longer necessary; please contact the Orleans team if you see this error.");
-                    }
-                    else
-                    {
-                        // Record that this message is no longer flowing through the system
-                        MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Rejecting");
-                        RejectMessage(message, Message.RejectionTypes.Transient, null, "Shutting down");
-                    }
+                    // Silo is always capable to accept a new request. It's up to the activation to handle its internal state.
+                    // If activation is shutting down, it will queue and later forward this request.
+                    ReceiveRequest(message, target);
                 }
             }
             catch (Exception ex)
@@ -260,15 +247,6 @@ namespace Orleans.Runtime
             }
         }
 
-        // Check if it is OK to receive a message to its current target activation. 
-        private bool SiloCanAcceptRequest(Message message)
-        {
-            if (Message.WriteMessagingTraces)
-                message.AddTimestamp(Message.LifecycleTag.TaskIncoming);
-
-            return catalog.SiloStatusOracle.CurrentStatus != SiloStatus.ShuttingDown;
-        }
-
         /// <summary>
         /// Check if we can locally accept this message.
         /// Redirects if it can't be accepted.
@@ -328,7 +306,7 @@ namespace Orleans.Runtime
         /// <returns></returns>
         private bool ActivationMayAcceptRequest(ActivationData targetActivation, Message incoming)
         {
-            if (!targetActivation.IsUsable) return false;
+            if (!targetActivation.State.Equals(ActivationState.Valid)) return false;
             if (!targetActivation.IsCurrentlyExecuting) return true;
             return CanInterleave(targetActivation, incoming);
         }
@@ -357,8 +335,11 @@ namespace Orleans.Runtime
         /// <param name="message">Message to analyze</param>
         private void CheckDeadlock(Message message)
         {
-            object obj = message.GetApplicationHeader(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
-            if (obj == null) return; // first call in a chain
+            var requestContext = message.RequestContextData;
+            object obj;
+            if (requestContext == null ||
+                !requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out obj) ||
+                obj == null) return; // first call in a chain
 
             var prevChain = ((IList)obj);
             ActivationId nextActivationId = message.TargetActivation;
@@ -577,7 +558,7 @@ namespace Orleans.Runtime
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {
                 logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, String.Format("AddressMessage could not find target for client pseudo-grain {0}", message));
-                throw new KeyNotFoundException("Attempting to send a message to an unregistered client pseudo-grain");
+                throw new KeyNotFoundException(String.Format("Attempting to send a message {0} to an unregistered client pseudo-grain {1}", message, targetAddress.Grain));
             }
 
             message.SetTargetPlacement(placementResult);
@@ -654,12 +635,10 @@ namespace Orleans.Runtime
 #endif
                 activation.ResetRunning(message);
 
-                if (catalog.SiloStatusOracle.CurrentStatus == SiloStatus.ShuttingDown) return;
-
                 // ensure inactive callbacks get run even with transactions disabled
                 if (!activation.IsCurrentlyExecuting)
                     activation.RunOnInactive();
-                
+
                 // Run message pump to see if there is a new request arrived to be processed
                 RunMessagePump(activation);
             }
@@ -677,8 +656,8 @@ namespace Orleans.Runtime
                     "RunMessagePump {0}: Activation={1}", activation.ActivationId, activation.DumpStatus());
             }
 #endif
-            // don't run any messages until activation is ready
-            if (activation.State != ActivationState.Valid) return;
+            // don't run any messages if activation is not ready or deactivating
+            if (!activation.State.Equals(ActivationState.Valid)) return;
 
             bool runLoop;
             do
@@ -716,4 +695,3 @@ namespace Orleans.Runtime
         #endregion
     }
 }
-

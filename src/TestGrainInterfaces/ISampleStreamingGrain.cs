@@ -21,29 +21,36 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
-
-namespace UnitTests.SampleStreaming
+﻿
+namespace UnitTests.GrainInterfaces
 {
-    public interface ISampleStreaming_ProducerGrain : IGrain
+    public interface ISampleStreaming_ProducerGrain : IGrainWithGuidKey
     {
-        Task BecomeProducer(Guid streamId, string providerToUse);
+        Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
 
         Task StartPeriodicProducing();
 
         Task StopPeriodicProducing();
 
         Task<int> GetNumberProduced();
+
+        Task ClearNumberProduced();
+        Task Produce();
     }
 
-    public interface ISampleStreaming_ConsumerGrain : IGrain
+    public interface ISampleStreaming_ConsumerGrain : IGrainWithGuidKey
     {
-        Task BecomeConsumer(Guid streamId, string providerToUse);
+        Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
         Task StopConsuming();
 
         Task<int> GetNumberConsumed();
     }
-}
+
+    public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
+    {
+    }
+}

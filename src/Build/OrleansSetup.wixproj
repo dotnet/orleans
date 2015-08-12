@@ -11,7 +11,6 @@
         <Message Text="BuildUri = $(BuildUri)"/>
         <Message Text="Configuration = $(Configuration)"/>
         <Message Text="BuildRoot = $(BuildRoot)"/>
-        <Message Text="BinariesRoot = $(BinariesRoot)"/>
         <Message Text="BinariesDir = $(BinariesDir)"/>
         <Message Text="MSBuildThisFileDirectory = $(MSBuildThisFileDirectory)"/>
         <Message Text="OutDir.OutputName.msi = $(OutDir)$(OutputName).msi"/>
@@ -32,7 +31,8 @@
       <SDKDir>$(BuildRoot)\SDK</SDKDir>
       <DocsDir>$(BuildRoot)\Documentation</DocsDir>
       <OrleansDir>$(BuildRoot)</OrleansDir>
-      <ProductVersion>1.0</ProductVersion>
+      <ProductVersion>$(PRODUCT_VERSION)</ProductVersion>
+      <ProductVersion Condition="'$(ProductVersion)'==''">1.0</ProductVersion>
       <SchemaVersion>2.0</SchemaVersion>
       <OutputType>Package</OutputType>
       <DefineSolutionProperties>false</DefineSolutionProperties>

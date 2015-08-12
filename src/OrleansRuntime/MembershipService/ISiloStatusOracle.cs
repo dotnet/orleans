@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 
@@ -44,7 +44,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Start this oracle. Will register this silo in the SiloDirectory with SiloStatus.Starting status.
         /// </summary>
-        Task Start(bool waitForTableToInit);
+        Task Start();
 
         /// <summary>
         /// Turns this oracle into an Active state. Will update this silo in the SiloDirectory with SiloStatus.Active status.
@@ -97,7 +97,7 @@ namespace Orleans.Runtime
         /// Determine if the current silo is valid for creating new activations on or for directoy lookups.
         /// </summary>
         /// <returns>The silo so ask about.</returns>
-        bool IsValidSilo(SiloAddress siloAddress);
+        bool IsFunctionalDirectory(SiloAddress siloAddress);
 
         /// <summary>
         /// Determine if the current silo is dead.
@@ -118,4 +118,4 @@ namespace Orleans.Runtime
         /// <returns>bool value indicating that subscription succeeded or not.</returns>
         bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer);
     }
-}
+}

@@ -21,12 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 using System.Threading;
-using Orleans.Runtime;
 
 namespace Orleans.Runtime
 {
@@ -50,9 +46,6 @@ namespace Orleans.Runtime
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
-        static protected readonly Dictionary<Type, int> SequenceNumbers = new Dictionary<Type, int>();
-        static private readonly object classLockable = new object();
-
         public ThreadState State { get; private set; }
         internal string Name { get; private set; }
         internal int ManagedThreadId { get { return t==null ? -1 : t.ManagedThreadId;  } } 
@@ -61,14 +54,6 @@ namespace Orleans.Runtime
         {
             Cts = new CancellationTokenSource();
             var thisType = GetType();
-            int n = 0;
-
-            lock (classLockable)
-            {
-                SequenceNumbers.TryGetValue(thisType, out n);
-                n++;
-                SequenceNumbers[thisType] = n;
-            }
             
             type = thisType.Namespace + "." + thisType.Name;
             if (type.StartsWith("Orleans.", StringComparison.Ordinal))
@@ -77,11 +62,11 @@ namespace Orleans.Runtime
             }
             if (!string.IsNullOrEmpty(nameSuffix))
             {
-                Name = type + "." + nameSuffix + "/" + n;
+                Name = type + "/" + nameSuffix;
             }
             else
             {
-                Name = type + "/" + n;
+                Name = type;
             }
 
             Lockable = new object();
@@ -96,24 +81,12 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-
             t = new Thread(AgentThreadProc) { IsBackground = true, Name = this.Name };
         }
 
-        protected AsynchAgent() : this(null)
+        protected AsynchAgent()
+            : this(null)
         {
-        }
-
-        protected int GetThreadTypeSequenceNumber()
-        {
-            var thisType = GetType();
-            int n;
-
-            lock (classLockable)
-            {
-                SequenceNumbers.TryGetValue(thisType, out n);
-            }
-            return n;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -288,4 +261,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

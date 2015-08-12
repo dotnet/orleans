@@ -21,9 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
-using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using Orleans.Providers;
 
@@ -34,14 +33,16 @@ namespace Orleans.Runtime
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
+        private readonly TraceLogger logger ;
 
         internal ClientStatisticsManager(IStatisticsConfiguration config)
         {
             runtimeStats = new RuntimeStatisticsGroup();
             logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false);
+            logger = TraceLogger.GetLogger(GetType().Name);
         }
 
-        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, Guid clientId)
+        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
         {
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);
@@ -76,7 +77,8 @@ namespace Orleans.Runtime
             else if (config.UseAzureSystemStore)
             {
                 // Hook up to publish client metrics to Azure storage table
-                var publisher = await ClientMetricsTableDataManager.GetManager(config, transport.MyAddress.Endpoint.Address, clientId);
+                var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                await publisher.Init(config, transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
                 tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats)
                 {
                     MetricsTableWriteInterval = config.StatisticsMetricsTableWriteInterval
@@ -93,7 +95,9 @@ namespace Orleans.Runtime
                 }
                 else if (config.UseAzureSystemStore)
                 {
-                    var statsDataPublisher = await StatsTableDataManager.GetManager(false, config.DataConnectionString, config.DeploymentId, transport.MyAddress.Endpoint.ToString(), clientId.ToString(), config.DNSHostName);
+                    var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                    await statsDataPublisher.Init(false, config.DataConnectionString, config.DeploymentId,
+                        transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
                     logStatistics.StatsTablePublisher = statsDataPublisher;
                 }
             }
@@ -122,4 +126,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

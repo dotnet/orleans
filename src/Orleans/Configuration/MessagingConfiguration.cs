@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Text;
 using System.Xml;
 
@@ -149,7 +149,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
 
-        private const int DEFAULT_BUFFER_POOL_BUFFER_SIZE = 4*1024;
+        private const int DEFAULT_BUFFER_POOL_BUFFER_SIZE = 4 * 1024;
         private const int DEFAULT_BUFFER_POOL_MAX_SIZE = 10000;
         private const int DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE = 250;
         private const bool DEFAULT_DROP_EXPIRED_MESSAGES = true;
@@ -321,4 +321,3 @@ namespace Orleans.Runtime.Configuration
         }
     }
 }
-

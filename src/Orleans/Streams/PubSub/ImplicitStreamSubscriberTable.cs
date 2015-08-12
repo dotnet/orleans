@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
@@ -32,12 +32,10 @@ namespace Orleans.Streams
     internal class ImplicitStreamSubscriberTable
     {
         private readonly Dictionary<string, HashSet<int>> table;
-        private readonly Func<IAddressable, IStreamConsumerExtension> caster;
 
         internal ImplicitStreamSubscriberTable()
         {
             table = new Dictionary<string, HashSet<int>>();
-            caster = GrainFactory.Cast<IStreamConsumerExtension>;
         }
 
         /// <summary>
@@ -53,7 +51,7 @@ namespace Orleans.Streams
             {
                 if (!TypeUtils.IsGrainClass(grainClass))
                 {
-                    return;
+                    continue;
                 }
 
                 // we collect all namespaces that the specified grain class should implicitly subscribe to.
@@ -69,13 +67,13 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Retrieve a list of implicit subscribers, given a stream ID. This method throws an exception if there's no namespace associated with the stream ID. 
+        /// Retrieve a map of implicit subscriptionsIds to implicit subscribers, given a stream ID. This method throws an exception if there's no namespace associated with the stream ID. 
         /// </summary>
         /// <param name="streamId">A stream ID.</param>
         /// <returns>A set of references to implicitly subscribed grains. They are expected to support the streaming consumer extension.</returns>
         /// <exception cref="System.ArgumentException">The stream ID doesn't have an associated namespace.</exception>
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
-        internal ISet<IStreamConsumerExtension> GetImplicitSubscribers(StreamId streamId)
+        internal IDictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(StreamId streamId)
         {
             if (String.IsNullOrWhiteSpace(streamId.Namespace))
             {
@@ -83,16 +81,18 @@ namespace Orleans.Streams
             }
 
             HashSet<int> entry;
-            var result = new HashSet<IStreamConsumerExtension>();
+            var result = new Dictionary<Guid, IStreamConsumerExtension>();
             if (table.TryGetValue(streamId.Namespace, out entry))
             {
                 foreach (var i in entry)
                 {
                     IStreamConsumerExtension consumer = MakeConsumerReference(streamId.Guid, i);
-                    if (!result.Add(consumer))
+                    Guid subscriptionGuid = MakeSubscriptionGuid(i, streamId);
+                    if (result.ContainsKey(subscriptionGuid))
                     {
-                        throw new InvalidOperationException(string.Format("Internal invariant violation: generated duplicate subscriber reference: {0}", consumer));
+                        throw new InvalidOperationException(string.Format("Internal invariant violation: generated duplicate subscriber reference: {0}, subscriptionId: {1}", consumer, subscriptionGuid));
                     }
+                    result.Add(subscriptionGuid, consumer);
                 }                
                 return result;                
             }
@@ -108,13 +108,89 @@ namespace Orleans.Streams
         /// <returns>true if the grain id describes an implicit subscriber of the stream described by the stream id.</returns>
         internal bool IsImplicitSubscriber(GrainId grainId, StreamId streamId)
         {
-            if (String.IsNullOrWhiteSpace(streamId.Namespace))
+            return HasImplicitSubscription(streamId.Namespace, grainId.GetTypeCode());
+        }
+
+        /// <summary>
+        /// Try to get the implicit subscriptionId.
+        /// If an implicit subscription exists, return a subscription Id that is unique per grain type, grainId, namespace combination.
+        /// </summary>
+        /// <param name="grainId"></param>
+        /// <param name="streamId"></param>
+        /// <param name="subscriptionId"></param>
+        /// <returns></returns>
+        internal bool TryGetImplicitSubscriptionGuid(GrainId grainId, StreamId streamId, out Guid subscriptionId)
+        {
+            subscriptionId = Guid.Empty;
+
+            if (!HasImplicitSubscription(streamId.Namespace, grainId.GetTypeCode()))
+            {
+                return false;
+            }
+
+            // make subscriptionId
+            subscriptionId = MakeSubscriptionGuid(grainId, streamId);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Create a subscriptionId that is unique per grainId, grainType, namespace combination.
+        /// </summary>
+        /// <param name="grainId"></param>
+        /// <param name="streamId"></param>
+        /// <returns></returns>
+        private Guid MakeSubscriptionGuid(GrainId grainId, StreamId streamId)
+        {
+            // first int in guid is grain type code
+            int grainIdTypeCode = grainId.GetTypeCode();
+
+            return MakeSubscriptionGuid(grainIdTypeCode, streamId);
+        }
+
+        /// <summary>
+        /// Create a subscriptionId that is unique per grainId, grainType, namespace combination.
+        /// </summary>
+        /// <param name="grainIdTypeCode"></param>
+        /// <param name="streamId"></param>
+        /// <returns></returns>
+        private Guid MakeSubscriptionGuid(int grainIdTypeCode, StreamId streamId)
+        {
+            // next 2 shorts ing guid are from namespace hash
+            int namespaceHash = streamId.Namespace.GetHashCode();
+            byte[] namespaceHashByes = BitConverter.GetBytes(namespaceHash);
+            short s1 = BitConverter.ToInt16(namespaceHashByes, 0);
+            short s2 = BitConverter.ToInt16(namespaceHashByes, 2);
+
+            // Tailing 8 bytes of the guid are from the hash of the streamId Guid and a hash of the full streamId.
+
+            // get streamId guid hash code
+            int streamIdGuidHash = streamId.Guid.GetHashCode();
+            // get full streamId hash code
+            int streamIdHash = streamId.GetHashCode();
+
+            // build guid tailing 8 bytes from grainIdHash and the hash of the full streamId.
+            var tail = new List<byte>();
+            tail.AddRange(BitConverter.GetBytes(streamIdGuidHash));
+            tail.AddRange(BitConverter.GetBytes(streamIdHash));
+
+            // make guid.
+            // - First int is grain type
+            // - Two shorts from namespace hash
+            // - 8 byte tail from streamId Guid and full stream hash.
+            return SubscriptionMarker.MarkAsImplictSubscriptionId(new Guid(grainIdTypeCode, s1, s2, tail.ToArray()));
+        }
+
+        private bool HasImplicitSubscription(string streamNamespace, int grainIdTypeCode)
+        {
+            if (String.IsNullOrWhiteSpace(streamNamespace))
             {
                 return false;
             }
 
             HashSet<int> entry;
-            return table.TryGetValue(streamId.Namespace, out entry) && entry.Contains(grainId.GetTypeCode());
+            return (table.TryGetValue(streamNamespace, out entry) && // if we don't have implictit subscriptions for this namespace, fail out
+                    entry.Contains(grainIdTypeCode));                 // if we don't have an implicit subscription for this type of grain on this namespace, fail out
         }
 
         /// <summary>
@@ -169,14 +245,13 @@ namespace Orleans.Streams
         /// Create a reference to a grain that we expect to support the stream consumer extension.
         /// </summary>
         /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassName">The name of the grain class to instantiate.</param>
-        /// <param name="grainIfaceName">The name of the an IGrain-derived interface that `className` implements (required by MakeGrainReferenceInternal)</param>
+        /// <param name="implTypeCode">The type code of the grain interface.</param>
         /// <returns></returns>
         private IStreamConsumerExtension MakeConsumerReference(Guid primaryKey, int implTypeCode)
         {
-            var grainId = GrainId.GetGrainId(implTypeCode, primaryKey);
+            GrainId grainId = GrainId.GetGrainId(implTypeCode, primaryKey);
             IAddressable addressable = GrainReference.FromGrainId(grainId);
-            return caster(addressable);
+            return addressable.Cast<IStreamConsumerExtension>();
         }
 
         /// <summary>
@@ -215,4 +290,4 @@ namespace Orleans.Streams
             return result;
         }
     }
-}
+}

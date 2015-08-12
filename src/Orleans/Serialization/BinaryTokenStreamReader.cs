@@ -421,6 +421,12 @@ namespace Orleans.Serialization
             return UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
         }
 
+        internal Guid ReadGuid()
+        {
+            byte[] bytes = ReadBytes(16);
+            return new Guid(bytes);
+        }
+
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         internal ActivationAddress ReadActivationAddress()
@@ -533,7 +539,7 @@ namespace Orleans.Serialization
                     result = new Guid(bytes);
                     break;
                 case SerializationTokenType.Date:
-                    result = new DateTime(ReadLong());
+                    result = DateTime.FromBinary(ReadLong());
                     break;
                 case SerializationTokenType.TimeSpan:
                     result = new TimeSpan(ReadLong());
@@ -879,4 +885,4 @@ namespace Orleans.Serialization
             trace.Flush();
         }
     }
-}
+}

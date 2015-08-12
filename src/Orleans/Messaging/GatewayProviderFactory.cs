@@ -26,7 +26,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -35,6 +34,8 @@ namespace Orleans.Messaging
 {
     internal class GatewayProviderFactory
     {
+        private static readonly TraceLogger logger = TraceLogger.GetLogger(typeof(GatewayProviderFactory).Name, TraceLogger.LoggerType.Runtime);
+
         internal static async Task<IGatewayListProvider> CreateGatewayListProvider(ClientConfiguration cfg)
         {
             IGatewayListProvider listProvider = null;
@@ -43,17 +44,26 @@ namespace Orleans.Messaging
             switch (gatewayProviderToUse)
             {
                 case ClientConfiguration.GatewayProviderType.AzureTable:
-                    listProvider = await AzureGatewayListProvider.GetAzureGatewayListProvider(cfg);
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.SqlServer:
-                    listProvider = new SqlMembershipTable(cfg);
+                    listProvider = new SqlMembershipTable();
+                    break;
+
+                case ClientConfiguration.GatewayProviderType.ZooKeeper:
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Config:
-                    listProvider = new StaticGatewayListProvider(cfg);
+                    listProvider = new StaticGatewayListProvider();
                     break;
+
+                default:
+                    throw new NotImplementedException(gatewayProviderToUse.ToString());
             }
+
+            await listProvider.InitializeGatewayListProvider(cfg, TraceLogger.GetLogger(listProvider.GetType().Name));
             return listProvider;
         }
     }
@@ -61,14 +71,16 @@ namespace Orleans.Messaging
 
     internal class StaticGatewayListProvider : IGatewayListProvider
     {
-        private readonly List<Uri> knownGateways;
+        private List<Uri> knownGateways;
 
-        public StaticGatewayListProvider(ClientConfiguration cfg)
-        {
-            knownGateways = cfg.Gateways.Select(ep => ep.ToGatewayUri()).ToList();
-        }
 
         #region Implementation of IGatewayListProvider
+        
+        public Task InitializeGatewayListProvider(ClientConfiguration cfg, TraceLogger traceLogger)
+        {
+            knownGateways = cfg.Gateways.Select(ep => ep.ToGatewayUri()).ToList();
+            return TaskDone.Done; ;
+        }
 
         public IList<Uri> GetGateways()
         {
@@ -87,4 +99,4 @@ namespace Orleans.Messaging
 
         #endregion
     }
-}
+}

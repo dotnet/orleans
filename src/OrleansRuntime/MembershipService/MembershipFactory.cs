@@ -21,7 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
@@ -49,39 +51,84 @@ namespace Orleans.Runtime.MembershipService
             return TaskDone.Done;
         }
 
-        internal async Task<IMembershipOracle> CreateMembershipOracle(Silo silo)
+        internal IMembershipOracle CreateMembershipOracle(Silo silo, IMembershipTable membershipTable)
         {
             var livenessType = silo.GlobalConfig.LivenessType;
             logger.Info("Creating membership oracle for type={0}", Enum.GetName(typeof(GlobalConfiguration.LivenessProviderType), livenessType));
-
-            IMembershipTable membershipTable = await GetMembershipTable(silo);
-            return membershipTable == null ? null : new MembershipOracle(silo, membershipTable);
+            return new MembershipOracle(silo, membershipTable);
         }
 
-        internal async Task<IMembershipTable> GetMembershipTable(Silo silo)
+        internal IMembershipTable GetMembershipTable(GlobalConfiguration.LivenessProviderType livenessType)
         {
-            var config = silo.GlobalConfig;
-
             IMembershipTable membershipTable;
-            GlobalConfiguration.LivenessProviderType livenessType = config.LivenessType;
             if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
             {
-                membershipTable = MembershipTableFactory.Cast(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+                membershipTable =
+                    GrainReference.FromGrainId(Constants.SystemMembershipTableId).Cast<IMembershipTableGrain>();
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
             {
-                membershipTable = await SqlMembershipTable.GetMembershipTable(config, true);
+                membershipTable = new SqlMembershipTable();
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
             {
-                membershipTable = await AzureBasedMembershipTable.GetMembershipTable(config, true);
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+            }
+            else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.ZooKeeper))
+            {
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
             }
             else
             {
                 throw new NotImplementedException("No membership table provider found for LivenessType=" + livenessType);
             }
+
             return membershipTable;
+        }
+
+        // Only used with MembershipTableGrain to wiat for primary to start.
+        internal async Task WaitForTableToInit(IMembershipTable membershipTable)
+        {
+            var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
+            // This is a quick temporary solution to enable primary node to start fully before secondaries.
+            // Secondary silos waits untill GrainBasedMembershipTable is created. 
+            for (int i = 0; i < 100; i++)
+            {
+                bool needToWait = false;
+                try
+                {
+                    MembershipTableData table = await membershipTable.ReadAll().WithTimeout(timespan);
+                    if (table.Members.Any(tuple => tuple.Item1.IsPrimary))
+                    {
+                        logger.Info(ErrorCode.MembershipTableGrainInit1,
+                            "-Connected to membership table provider and also found primary silo registered in the table.");
+                        return;
+                    }
+
+                    logger.Info(ErrorCode.MembershipTableGrainInit2,
+                        "-Connected to membership table provider but did not find primary silo registered in the table. Going to try again for a {0}th time.", i);
+                }
+                catch (Exception exc)
+                {
+                    var type = exc.GetBaseException().GetType();
+                    if (type == typeof(TimeoutException) || type == typeof(OrleansException))
+                    {
+                        logger.Info(ErrorCode.MembershipTableGrainInit3,
+                            "-Waiting for membership table provider to initialize. Going to sleep for {0} and re-try to reconnect.", timespan);
+                        needToWait = true;
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.MembershipTableGrainInit4, "-Membership table provider failed to initialize. Giving up.");
+                        throw;
+                    }
+                }
+
+                if (needToWait)
+                {
+                    await Task.Delay(timespan);
+                }
+            }
         }
     }
 }
-

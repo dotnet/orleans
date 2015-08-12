@@ -6,6 +6,7 @@
     <DeploymentItem filename="TestInput\" />
   </Deployment>
   <NamingScheme baseName="BuildResults" appendTimeStamp="false" />
+  <Scripts setupScript=".\SetupTestScript.cmd" />
   <Execution hostProcessPlatform="MSIL">
     <Timeouts runTimeout="14400000" testTimeout="300000" />
     <TestTypeSpecific>

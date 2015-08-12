@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Runtime.Providers;
 using Orleans.Serialization;
 
@@ -34,6 +35,7 @@ namespace Orleans.Runtime
     internal class GrainTypeManager
     {
         private IDictionary<string, GrainTypeData> grainTypes;
+        private readonly IGrainFactory grainFactory;
         private readonly TraceLogger logger = TraceLogger.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
@@ -48,8 +50,9 @@ namespace Orleans.Runtime
             Instance = null;
         }
 
-        public GrainTypeManager(bool localTestMode)
+        public GrainTypeManager(bool localTestMode, IGrainFactory grainFactory)
         {
+            this.grainFactory = grainFactory;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode);
             lock (lockable)
             {
@@ -59,7 +62,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void Start()
+        public void Start(bool strict = true)
         {
             // loading application assemblies now occurs in four phases.
             // 1. We scan the file system for assemblies meeting pre-determined criteria, specified in SiloAssemblyLoader.LoadApplicationAssemblies (called by the constructor).
@@ -70,10 +73,10 @@ namespace Orleans.Runtime
             SerializationManager.LogRegisteredTypes();
 
             // 3. We scan types in memory for GrainTypeData objects that describe grain classes and their corresponding grain state classes.
-            InitializeGrainClassData(loader);
+            InitializeGrainClassData(loader, strict);
 
             // 4. We scan types in memory for grain method invoker objects.
-            InitializeInvokerMap(loader);
+            InitializeInvokerMap(loader, strict);
 
             InitializeInterfaceMap();
             StreamingInitialize();
@@ -118,7 +121,6 @@ namespace Orleans.Runtime
                                 // Add to lookup tables for next time
                                 var grainClassName = concreteTypeData.GrainClass;
                                 grainTypes.Add(grainClassName, concreteTypeData);
-                                AddToGrainInterfaceToClassMap(concreteTypeData.Type, concreteTypeData.RemoteInterfaceTypes, genericGrainTypeData.IsStatelessWorker);
 
                                 return concreteTypeData;
                             }
@@ -144,14 +146,14 @@ namespace Orleans.Runtime
                 throw new OrleansException(String.Format("Unexpected: Cannot find an implementation class for grain interface {0}", typeCode));
         }
 
-        private void InitializeGrainClassData(SiloAssemblyLoader loader)
+        private void InitializeGrainClassData(SiloAssemblyLoader loader, bool strict)
         {
-            grainTypes = loader.GrainClassTypeData;
+            grainTypes = loader.GetGrainClassTypes(strict);
         }
 
-        private void InitializeInvokerMap(SiloAssemblyLoader loader)
+        private void InitializeInvokerMap(SiloAssemblyLoader loader, bool strict)
         {
-            IEnumerable<KeyValuePair<int, Type>> types = loader.GrainMethodInvokerTypes;
+            IEnumerable<KeyValuePair<int, Type>> types = loader.GetGrainMethodInvokerTypes(strict);
             foreach (var i in types)
             {
                 int ifaceId = i.Key;
@@ -169,6 +171,7 @@ namespace Orleans.Runtime
         private void AddToGrainInterfaceToClassMap(Type grainClass, IEnumerable<Type> grainInterfaces, bool isUnordered)
         {
             var grainClassCompleteName = TypeUtils.GetFullName(grainClass);
+            var isGenericGrainClass = grainClass.ContainsGenericParameters;
             var grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainClass);
             var placement = GrainTypeData.GetPlacementStrategy(grainClass);
 
@@ -178,8 +181,8 @@ namespace Orleans.Runtime
                 var ifaceName = TypeUtils.GetRawClassName(ifaceCompleteName);
                 var isPrimaryImplementor = IsPrimaryImplementor(grainClass, iface);
                 var ifaceId = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface);
-                grainInterfaceMap.AddEntry(ifaceId, iface, grainClassTypeCode, ifaceName, grainClassCompleteName, grainClass.Assembly.CodeBase,
-                    placement, isPrimaryImplementor);
+                grainInterfaceMap.AddEntry(ifaceId, iface, grainClassTypeCode, ifaceName, grainClassCompleteName, 
+                    grainClass.Assembly.CodeBase, isGenericGrainClass, placement, isPrimaryImplementor);
             }
 
             if (isUnordered)
@@ -188,7 +191,7 @@ namespace Orleans.Runtime
 
         private void StreamingInitialize()
         {
-            SiloProviderRuntime.StreamingInitialize(new Streams.ImplicitStreamSubscriberTable());
+            SiloProviderRuntime.StreamingInitialize(grainFactory, new Streams.ImplicitStreamSubscriberTable());
             Type[] types = grainTypes.Values.Select(t => t.Type).ToArray();
             SiloProviderRuntime.Instance.ImplicitStreamSubscriberTable.InitImplicitStreamSubscribers(types);
         }
@@ -271,4 +274,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -46,7 +46,7 @@ namespace Orleans
             return new HashSet<T>(values);
         }
 
-        public static bool ListEquals<T>(this List<T> a, List<T> b)
+        public static bool ListEquals<T>(this IList<T> a, IList<T> b)
         {
             if (a.Count != b.Count) 
                 return false;
@@ -211,4 +211,3 @@ namespace Orleans
         }
     }
 }
-

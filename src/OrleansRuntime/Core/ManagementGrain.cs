@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -184,13 +184,18 @@ namespace Orleans.Runtime.Management
                     parent.AppendChild(child);
                 }
             }
-            var sw = new StringWriter();
-            document.WriteTo(new XmlTextWriter(sw));
-            var xml = sw.ToString();
-            // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
-            await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
-            await Task.WhenAll(silos.Skip(1).Select(s =>
-                GetSiloControlReference(s).UpdateConfiguration(xml)));
+            
+            using(var sw = new StringWriter())
+            { 
+                using(var xw = new XmlTextWriter(sw))
+                { 
+                    document.WriteTo(xw);
+                    var xml = sw.ToString();
+                    // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
+                    await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
+                    await Task.WhenAll(silos.Skip(1).Select(s => GetSiloControlReference(s).UpdateConfiguration(xml)));
+                }
+            }
         }
 
         public async Task<int> GetTotalActivationCount()
@@ -215,7 +220,10 @@ namespace Orleans.Runtime.Management
             if (membershipTable == null)
             {
                 var factory = new MembershipFactory();
-                membershipTable = await factory.GetMembershipTable(Silo.CurrentSilo);
+                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType);
+
+                await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
+                    TraceLogger.GetLogger(membershipTable.GetType().Name));
             }
             return membershipTable;
         }
@@ -269,6 +277,8 @@ namespace Orleans.Runtime.Management
 
         private static void AddXPathValue(XmlNode xml, IEnumerable<string> path, string value)
         {
+            if (path == null) return;
+
             var first = path.FirstOrDefault();
             if (first == null) return;
 
@@ -301,8 +311,7 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return SiloControlFactory.GetSystemTarget(Constants.SiloControlId, silo);
+            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
         }
     }
 }
-

@@ -21,9 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Configuration;
 
@@ -39,14 +39,20 @@ namespace Orleans.Runtime
             logger = TraceLogger.GetLogger("ReminderFactory", TraceLogger.LoggerType.Runtime);
         }
 
-        internal async Task<IReminderService> CreateReminderService(Silo silo)
+        internal IReminderService CreateReminderService(Silo silo, IGrainFactory grainFactory, TimeSpan iniTimeSpan)
         {
             var reminderServiceType = silo.GlobalConfig.ReminderServiceType;
             logger.Info("Creating reminder system target for type={0}", Enum.GetName(typeof(GlobalConfiguration.ReminderServiceProviderType), reminderServiceType));
 
-            await ReminderTable.Initialize(silo);
-            return new LocalReminderService(silo.SiloAddress, Constants.ReminderServiceId, silo.RingProvider, silo.LocalScheduler, ReminderTable.Singleton);
+            ReminderTable.Initialize(silo, grainFactory);
+            return new LocalReminderService(
+                silo.SiloAddress, 
+                Constants.ReminderServiceId, 
+                silo.RingProvider, 
+                silo.LocalScheduler, 
+                ReminderTable.Singleton, 
+                silo.GlobalConfig,
+                iniTimeSpan);
         }
     }
 }
-

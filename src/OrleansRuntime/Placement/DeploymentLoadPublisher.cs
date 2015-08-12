@@ -91,7 +91,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        tasks.Add(DeploymentLoadPublisherFactory.GetSystemTarget(
+                        tasks.Add(InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
                             Constants.DeploymentLoadPublisherSystemTargetId, siloAddress)
                             .UpdateRuntimeStatistics(silo.SiloAddress, myStats));
                     }
@@ -137,7 +137,7 @@ namespace Orleans.Runtime
                     foreach (var siloAddress in members)
                     {
                         var capture = siloAddress;
-                        Task task = SiloControlFactory.GetSystemTarget(Constants.SiloControlId, capture)
+                        Task task = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
                                 .GetRuntimeStatistics()
                                 .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
                                     {
@@ -201,8 +201,7 @@ namespace Orleans.Runtime
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (!status.Equals(SiloStatus.Stopping) && !status.Equals(SiloStatus.ShuttingDown) &&
-                !status.Equals(SiloStatus.Dead)) return;
+            if (!status.IsTerminating()) return;
 
             SiloRuntimeStatistics ignore;
             periodicStats.TryRemove(updatedSilo, out ignore);
@@ -210,4 +209,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

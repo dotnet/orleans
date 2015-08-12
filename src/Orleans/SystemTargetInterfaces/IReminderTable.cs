@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -34,11 +34,10 @@ namespace Orleans
     /// Interface for multiple implementations of the underlying storage for reminder data:
     /// Azure Table, SQL, development emulator grain, and a mock implementation.
     /// Defined as a grain interface for the development emulator grain case.
-    /// </summary>
-    [Unordered]
-    internal interface IReminderTable : IGrain
+    /// </summary>  
+    internal interface IReminderTable
     {
-        Task Init();
+        Task Init(Guid serviceId, string deploymentId, string connectionString);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 
@@ -55,7 +54,7 @@ namespace Orleans
         Task<string> UpsertRow(ReminderEntry entry);
 
         /// <summary>
-        /// Remove a row from the table
+        /// Remove a row from the table.
         /// </summary>
         /// <param name="grainRef"></param>
         /// <param name="reminderName"></param>
@@ -64,6 +63,15 @@ namespace Orleans
         Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag);
 
         Task TestOnlyClearTable();
+    }
+
+    /// <summary>
+    /// Reminder table interface for grain based implementation.
+    /// </summary>
+    [Unordered]
+    internal interface IReminderTableGrain : IGrainWithIntegerKey, IReminderTable
+    {
+        
     }
 
     internal class ReminderTableData
@@ -136,4 +144,3 @@ namespace Orleans
         }
     }
 }
-

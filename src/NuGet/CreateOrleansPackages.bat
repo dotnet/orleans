@@ -22,21 +22,30 @@ if "%BASE_PATH%" == "." (
 )
 @echo Using binary drop location directory %BASE_PATH%
 
-if EXIST "%VERSION%" (
-    @Echo Using version number from file %VERSION%
-    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type %VERSION%`) do set VERSION=%%i.%%j.0
+if "%PRODUCT_VERSION%" == "" (
+
+  if EXIST "%VERSION%" (
+      @Echo Using version number from file %VERSION%
+      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION%"`) do set VERSION=%%i.%%j.%%k
+  ) else (
+      @Echo ERROR: Unable to read version number from file %VERSION%
+      GOTO Usage
+  )
 ) else (
-    @Echo ERROR: Unable to read version number from file %VERSION%
-    GOTO Usage
+    set VERSION=%PRODUCT_VERSION%
+	@Echo Using version number %VERSION% from %%PRODUCT_VERSION%%
 )
 
 @echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%
 
-@set NUGET_PACK_OPTS= -NoPackageAnalysis
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
+@set NUGET_PACK_OPTS= -Version %VERSION% 
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%"
+@REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
-  "%NUGET_EXE%" pack "%%G" -Version %VERSION% -BasePath "%BASE_PATH%" %NUGET_PACK_OPTS%
+  "%NUGET_EXE%" pack "%%G" %NUGET_PACK_OPTS%
+  if ERRORLEVEL 1 EXIT /B 1
 )
 
 GOTO EOF
@@ -44,5 +53,6 @@ GOTO EOF
 :Usage
 @ECHO Usage:
 @ECHO    CreateOrleansPackages ^<Path to Orleans SDK folder^> ^<VersionFile^>
+EXIT /B -1
 
 :EOF

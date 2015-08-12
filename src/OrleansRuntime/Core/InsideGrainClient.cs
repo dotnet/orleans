@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -37,6 +37,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Streams;
 
 
 namespace Orleans.Runtime
@@ -68,7 +69,8 @@ namespace Orleans.Runtime
             SiloAddress silo,
             ClusterConfiguration config,
             IConsistentRingProvider ring,
-            GrainTypeManager typeManager)
+            GrainTypeManager typeManager,
+            GrainFactory grainFactory)
         {
             this.dispatcher = dispatcher;
             MySilo = silo;
@@ -82,11 +84,14 @@ namespace Orleans.Runtime
             CallbackData.Config = Config.Globals;
             RuntimeClient.Current = this;
             this.typeManager = typeManager;
+            this.InternalGrainFactory = grainFactory;
         }
 
         public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
 
-        public Streams.IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
+        public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
+
+        public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
         public Catalog Catalog { get; private set; }
 
@@ -97,6 +102,11 @@ namespace Orleans.Runtime
         public ClusterConfiguration Config { get; private set; }
 
         public OrleansTaskScheduler Scheduler { get { return Dispatcher.Scheduler; } }
+
+        public IGrainFactory GrainFactory { get { return InternalGrainFactory; } }
+
+        public GrainFactory InternalGrainFactory { get; private set; }
+
 
         #region Implementation of IRuntimeClient
 
@@ -168,6 +178,10 @@ namespace Orleans.Runtime
                 message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
                 message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ? 
                     Message.Categories.Ping : Message.Categories.System;
+            }
+            if (target.IsObserverReference)
+            {
+                message.TargetObserverId = target.ObserverId;
             }
 
             if (debugContext != null)
@@ -375,8 +389,8 @@ namespace Orleans.Runtime
                 {
                     if (invokeExceptionLogger.IsVerbose || message.Direction == Message.Directions.OneWay)
                     {
-                        invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException, 
-                            "Exception during Grain method call of message: {0}.", message, exc1);
+                        invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
+                            "Exception during Grain method call of message: " + message, exc1);
                     }
                     if (message.Direction != Message.Directions.OneWay)
                     {
@@ -391,7 +405,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc2)
             {
-                logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: {0}.", message, exc2);
+                logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
                 if (message.Direction != Message.Directions.OneWay)
                     SafeSendExceptionResponse(message, exc2);             
             }
@@ -406,7 +420,7 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 logger.Warn(ErrorCode.IGC_SendResponseFailed,
-                    "Exception trying to send a response: {0}", exc);
+                    "Exception trying to send a response: " + exc.Message, exc);
                 SendResponse(message, Response.ExceptionResponse(exc)); 
             }
         }
@@ -422,13 +436,13 @@ namespace Orleans.Runtime
                 try
                 {
                     logger.Warn(ErrorCode.IGC_SendExceptionResponseFailed,
-                        "Exception trying to send an exception response: {0}", exc1);
+                        "Exception trying to send an exception response: " + exc1.Message, exc1);
                     SendResponse(message, Response.ExceptionResponse(exc1));
                 }
                 catch (Exception exc2)
                 {
                     logger.Warn(ErrorCode.IGC_UnhandledExceptionInInvoke,
-                        "Exception trying to send an exception. Ignoring and not trying to send again. Exc: {0}", exc2);
+                        "Exception trying to send an exception. Ignoring and not trying to send again. Exc: " + exc2.Message, exc2);
                 }
             }
         }
@@ -615,7 +629,7 @@ namespace Orleans.Runtime
                     destination.GetConsistentHashCode(),
                     ConsistentRingProvider.ToString());
             }
-            return ReminderServiceFactory.GetSystemTarget(Constants.ReminderServiceId, destination);
+            return InternalGrainFactory.GetSystemTarget<IReminderService>(Constants.ReminderServiceId, destination);
         }
 
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context)
@@ -639,12 +653,12 @@ namespace Orleans.Runtime
             ResponseTimeout = timeout;
         }
 
-        public Task<GrainReference> CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             throw new InvalidOperationException("Cannot create a local object reference from a grain.");
         }
 
-        public Task DeleteObjectReference(IAddressable obj)
+        public void DeleteObjectReference(IAddressable obj)
         {
             throw new InvalidOperationException("Cannot delete a local object reference from a grain.");
         }
@@ -655,7 +669,7 @@ namespace Orleans.Runtime
             if (!Catalog.TryGetActivationData(id, out data)) return; // already gone
 
             data.ResetKeepAliveRequest(); // DeactivateOnIdle method would undo / override any current “keep alive” setting, making this grain immideately avaliable for deactivation.
-            Catalog.ShutdownActivationDeactivateOnIdle(data);
+            Catalog.DeactivateActivationOnIdle(data);
         }
 
         #endregion
@@ -690,11 +704,13 @@ namespace Orleans.Runtime
 
         private void CheckValidReminderServiceType(string doingWhat)
         {
-            if (Config.Globals.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.NotSpecified))
+            var remType = Config.Globals.ReminderServiceType;
+            if (remType.Equals(GlobalConfiguration.ReminderServiceProviderType.NotSpecified) ||
+                remType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
             {
                 throw new InvalidOperationException(
                     string.Format("Cannot {0} when ReminderServiceProviderType is {1}",
-                    doingWhat, GlobalConfiguration.ReminderServiceProviderType.NotSpecified));
+                    doingWhat, remType));
             }
         }
 
@@ -707,7 +723,14 @@ namespace Orleans.Runtime
         public string CaptureRuntimeEnvironment()
         {
             var callStack = new System.Diagnostics.StackTrace(1); // Don't include this method in stack trace
-            return String.Format("   TaskScheduler={0}\n   RuntimeContext={1}\n   WorkerPoolThread={2}\n   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}\n   Thread.CurrentThread.ManagedThreadId={4}\n   StackTrace=\n{5}",
+            return String.Format(
+                  "   TaskScheduler={0}" + Environment.NewLine 
+                + "   RuntimeContext={1}" + Environment.NewLine
+                + "   WorkerPoolThread={2}" + Environment.NewLine
+                + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
+                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
+                + "   StackTrace=" + Environment.NewLine 
+                + "   {5}",
                     TaskScheduler.Current,
                     RuntimeContext.Current,
                     WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,
@@ -728,4 +751,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

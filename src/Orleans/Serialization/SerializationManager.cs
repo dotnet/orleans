@@ -35,6 +35,7 @@ using System.Text;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
@@ -132,6 +133,16 @@ namespace Orleans.Serialization
         #endregion
 
         #region Static initialization
+
+        public static void InitializeForTesting()
+        {
+            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            // Load serialization info for currently-loaded assemblies
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                FindSerializationInfo(assembly);
+            }
+        }
 
         internal static void Initialize(bool useStandardSerializer)
         {
@@ -639,6 +650,10 @@ namespace Orleans.Serialization
                                     if (comparer && (type.GetFields().Length == 0))
                                         Register(type);
                                 }
+                                else
+                                {
+                                    Register(type);
+                                }
                             }
                         }
                         else
@@ -753,17 +768,16 @@ namespace Orleans.Serialization
 
         private static object DeepCopierHelper(Type t, object original)
         {
-            if (t.IsOrleansShallowCopyable())
-            {
-                // Simple value types and immutables have already been deep-copied sufficiently
-                return original;
-            }
-
             // Arrays are all that's left. 
             // Handling arbitrary-rank arrays is a bit complex, but why not?
             var originalArray = original as Array;
             if (originalArray != null)
             {
+                if (originalArray.Rank == 1 && originalArray.GetLength(0) == 0)
+                {
+                    // A common special case - empty one dimentional array
+                    return originalArray;
+                }
                 // A common special case
                 if ((original is byte[]) && (originalArray.Rank == 1))
                 {
@@ -841,7 +855,8 @@ namespace Orleans.Serialization
             if (t.IsSerializable)
                 return FallbackSerializationDeepCopy(original);
 
-            throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + ". Perhaps you need to mark it [Serializable]?");
+            throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + 
+                ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
         #endregion
@@ -982,7 +997,7 @@ namespace Orleans.Serialization
                 // Note that the "!t.IsSerializable" is redundant in this if, but it's there in case
                 // this code block moves.
                 var rawException = obj as Exception;
-                var foo = new Exception(String.Format("Non-serializable exception of type {0}: {1}\r\nat {2}",
+                var foo = new Exception(String.Format("Non-serializable exception of type {0}: {1}" + Environment.NewLine + "at {2}",
                                                       t.OrleansTypeName(), rawException.Message,
                                                       rawException.StackTrace));
                 FallbackSerializer(foo, stream);
@@ -990,7 +1005,7 @@ namespace Orleans.Serialization
             }
 
             throw new ArgumentException("No serializer found for object of type " + t.OrleansTypeName()
-                 + ". Perhaps you need to mark it [Serializable]?");
+                 + ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
         // We assume that all lower bounds are 0, since creating an array with lower bound !=0 is hard in .NET 4.0+
@@ -1294,7 +1309,8 @@ namespace Orleans.Serialization
                 return result;
             }
 
-            throw new SerializationException("Unsupported type '" + resultType.OrleansTypeName() + "' encountered. Perhaps you need to mark it [Serializable]?");
+            throw new SerializationException("Unsupported type '" + resultType.OrleansTypeName() + 
+                "' encountered. Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
         private static object DeserializeArray(Type resultType, BinaryTokenStreamReader stream)
@@ -1478,7 +1494,7 @@ namespace Orleans.Serialization
 
         #region Special case code for message headers
 
-        internal static void SerializeMessageHeaders(Dictionary<string, object> headers, BinaryTokenStreamWriter stream)
+        internal static void SerializeMessageHeaders(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1497,13 +1513,13 @@ namespace Orleans.Serialization
             }
         }
 
-        private static void SerializeMessageHeaderDictHelper(Dictionary<string, object> headers, BinaryTokenStreamWriter stream)
+        private static void SerializeMessageHeaderDictHelper(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
         {
             stream.Write(SerializationTokenType.StringObjDict);
             stream.Write(headers.Count);
             foreach (var header in headers)
             {
-                stream.Write(header.Key);
+                stream.Write((byte)header.Key);
                 SerializeMessageHeaderValueHelper(header.Value, stream);
             }
         }
@@ -1535,9 +1551,9 @@ namespace Orleans.Serialization
             if (stream.TryWriteSimpleObject(value))
                 return;
 
-            if (value is Dictionary<string, object>)
+            if (value is Dictionary<Message.Header, object>)
             {
-                SerializeMessageHeaderDictHelper((Dictionary<string, object>)value, stream);
+                SerializeMessageHeaderDictHelper((Dictionary<Message.Header, object>)value, stream);
                 return;
             }
 
@@ -1559,7 +1575,7 @@ namespace Orleans.Serialization
             throw new ArgumentException("Invalid message header passed to SerializeMessageHeaders; type is " + value.GetType().Name, "value");
         }
 
-        internal static Dictionary<string, object> DeserializeMessageHeaders(BinaryTokenStreamReader stream)
+        internal static Dictionary<Message.Header, object> DeserializeMessageHeaders(BinaryTokenStreamReader stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1596,14 +1612,14 @@ namespace Orleans.Serialization
             return result;
         }
 
-        private static Dictionary<string, object> DeserializeMessageHeaderDictHelper(BinaryTokenStreamReader stream)
+        private static Dictionary<Message.Header, object> DeserializeMessageHeaderDictHelper(BinaryTokenStreamReader stream)
         {
             var count = stream.ReadInt();
-            var result = new Dictionary<string, object>(count);
+            var result = new Dictionary<Message.Header, object>(count);
             for (var i = 0; i < count; i++)
             {
-                var key = stream.ReadString();
-                result.Add(key, DeserializeMessageHeaderHelper(stream));
+                var key = stream.ReadByte();
+                result.Add((Message.Header)key, DeserializeMessageHeaderHelper(stream));
             }
             return result;
         }
@@ -1838,10 +1854,10 @@ namespace Orleans.Serialization
         /// <summary>
         /// Internal test method to do a round-trip Serialize+Deserialize loop
         /// </summary>
-        internal static object RoundTripSerializationForTesting(object source)
+        public static T RoundTripSerializationForTesting<T>(T source)
         {
             byte[] data = SerializeToByteArray(source);
-            return DeserializeFromByteArray<object>(data);
+            return DeserializeFromByteArray<T>(data);
         }
 
         private static void InstallAssemblyLoadEventHandler()
@@ -1885,13 +1901,13 @@ namespace Orleans.Serialization
                 }
                 if (!discardLine)
                 {
-                    line.Append("\n");
+                    line.AppendLine();
                     lines.Append(line);
                     ++count;
                 }
             }
 
-            var report = string.Format("Registered artifacts for {0} types:\n{1}", count, lines);
+            var report = string.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
             logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
         }
 
@@ -1932,4 +1948,4 @@ namespace Orleans.Serialization
             }
         }
     }
-}
+}

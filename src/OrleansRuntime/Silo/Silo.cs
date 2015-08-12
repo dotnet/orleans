@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -30,7 +30,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -44,6 +44,8 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Storage;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Streams;
+using Orleans.Timers;
 
 
 namespace Orleans.Runtime
@@ -88,15 +90,19 @@ namespace Orleans.Runtime
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
         private IMembershipOracle membershipOracle;
+        private ClientObserverRegistrar clientRegistrar;
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
         private readonly List<IHealthCheckParticipant> healthCheckParticipants;
         private readonly object lockable = new object();
+        private readonly GrainFactory grainFactory;
+        private readonly IGrainRuntime grainRuntime;
         
         
         internal readonly string Name;
+        internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; private set; }
         internal GlobalConfiguration GlobalConfig { get { return globalConfig; } }
         internal NodeConfiguration LocalConfig { get { return nodeConfig; } }
@@ -165,8 +171,8 @@ namespace Orleans.Runtime
                 TraceLogger.Initialize(nodeConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
-            LimitManager.Initialize(nodeConfig);
-            ActivationData.Init(config);
+
+            ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
             SerializationManager.Initialize(globalConfig.UseStandardSerializer);
             initTimeout = globalConfig.MaxJoinAttemptTime;
@@ -186,7 +192,7 @@ namespace Orleans.Runtime
             TraceLogger.MyIPEndPoint = here;
             logger = TraceLogger.GetLogger("Silo", TraceLogger.LoggerType.Runtime);
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on {1} at {2}, gen {3} --------------", siloType, nodeConfig.DNSHostName, here, generation);
-            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with runtime Version='{1}' Config= \n{2}", name, RuntimeVersion.Current, config.ToString(name));
+            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with runtime Version='{1}' Config= " + Environment.NewLine + "{2}", name, RuntimeVersion.Current, config.ToString(name));
 
             if (keyStore != null)
             {
@@ -202,7 +208,8 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.UnhandledException +=
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
-            typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback));
+            grainFactory = new GrainFactory();
+            typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
 
             // Performance metrics
             siloStatistics = new SiloStatisticsManager(globalConfig, nodeConfig);
@@ -219,6 +226,18 @@ namespace Orleans.Runtime
             
             messageCenter = mc;
 
+            SiloIdentity = SiloAddress.ToLongString();
+
+            // GrainRuntime can be created only here, after messageCenter was created.
+            grainRuntime = new GrainRuntime(
+                globalConfig.ServiceId,
+                SiloIdentity, 
+                grainFactory,
+                new TimerRegistry(),
+                new ReminderRegistry(),
+                new StreamProviderManager());
+
+
             // Now the router/directory service
             // This has to come after the message center //; note that it then gets injected back into the message center.;
             localGrainDirectory = new LocalGrainDirectory(this); 
@@ -233,7 +252,7 @@ namespace Orleans.Runtime
                 : new ConsistentRingProvider(SiloAddress);
 
             Action<Dispatcher> setDispatcher;
-            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, out setDispatcher);
+            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainRuntime, out setDispatcher);
             var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
             setDispatcher(dispatcher);
 
@@ -244,20 +263,10 @@ namespace Orleans.Runtime
                 SiloAddress, 
                 config, 
                 RingProvider, 
-                typeManager);
+                typeManager,
+                grainFactory);
             messageCenter.RerouteHandler = InsideRuntimeClient.Current.RerouteMessage;
             messageCenter.SniffIncomingMessage = InsideRuntimeClient.Current.SniffIncomingMessage;
-            messageCenter.ClientDropHandler = grainIds =>
-            {
-                catalog.DeleteGrainsLocal(grainIds).Ignore();
-                scheduler.RunOrQueueAction(() =>
-                {
-                    // Consider: batch delete
-                    foreach (var id in grainIds)
-                        LocalGrainDirectory.DeleteGrain(id).Ignore();
-                    
-                }, catalog.SchedulingContext);
-            };
 
             siloStatistics.MetricsTable.Scheduler = scheduler;
             siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;
@@ -300,7 +309,8 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-            RegisterSystemTarget(new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory));
+            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
+            RegisterSystemTarget(clientRegistrar);
             RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
@@ -323,10 +333,13 @@ namespace Orleans.Runtime
 
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents(DeploymentLoadPublisher.Instance);
 
-            // start the reminder service system target
-            reminderService = reminderFactory.CreateReminderService(this).WithTimeout(initTimeout).Result;
-            RegisterSystemTarget((SystemTarget)reminderService);
-            
+            if (!globalConfig.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
+            {
+                // start the reminder service system target
+                reminderService = reminderFactory.CreateReminderService(this, grainFactory, initTimeout);
+                RegisterSystemTarget((SystemTarget) reminderService);
+            }
+
             RegisterSystemTarget(catalog);
             scheduler.QueueAction(catalog.Start, catalog.SchedulingContext)
                 .WaitWithThrow(initTimeout);
@@ -360,8 +373,8 @@ namespace Orleans.Runtime
         {
             lock (lockable)
             {
-                if (SystemStatus.Current != SystemStatus.Created)
-                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Start state. This silo is in the {0} state.", SystemStatus.Current));
+                if (!SystemStatus.Current.Equals(SystemStatus.Created))
+                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", SystemStatus.Current));
                 
                 SystemStatus.Current = SystemStatus.Starting;
             }
@@ -390,7 +403,8 @@ namespace Orleans.Runtime
             // Set up an execution context for this thread so that the target creation steps can use asynch values.
             RuntimeContext.InitializeMainThread();
 
-            SiloProviderRuntime.Initialize(GlobalConfig);
+            SiloProviderRuntime.Initialize(GlobalConfig, SiloIdentity, grainFactory);
+            InsideRuntimeClient.Current.CurrentStreamProviderRuntime = SiloProviderRuntime.Instance;
             statisticsProviderManager = new StatisticsProviderManager("Statistics", SiloProviderRuntime.Instance);
             string statsProviderName =  statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
                 .WaitForResultWithThrow(initTimeout);
@@ -401,59 +415,88 @@ namespace Orleans.Runtime
             siloStatistics.SetSiloStatsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
             siloStatistics.SetSiloMetricsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
 
-            membershipOracle = membershipFactory.CreateMembershipOracle(this).WaitForResultWithThrow(initTimeout);
+            IMembershipTable membershipTable = membershipFactory.GetMembershipTable(this.GlobalConfig.LivenessType);
+            membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
             
             // This has to follow the above steps that start the runtime components
             CreateSystemTargets();
 
             InjectDependencies();
 
+            // Validate the configuration.
+            GlobalConfig.Application.ValidateConfiguration(logger);
+
             // ensure this runs in the grain context, wait for it to complete
             scheduler.QueueTask(CreateSystemGrains, catalog.SchedulingContext)
                 .WaitWithThrow(initTimeout);
+            if (logger.IsVerbose) {  logger.Verbose("System grains created successfully."); }
 
             // Initialize storage providers once we have a basic silo runtime environment operating
-            storageProviderManager = new StorageProviderManager();
+            storageProviderManager = new StorageProviderManager(grainFactory);
             scheduler.QueueTask(
                 () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
             catalog.SetStorageManager(storageProviderManager);
+            if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
-            var siloStreamProviderManager = new Orleans.Streams.StreamProviderManager();
+            var siloStreamProviderManager = (StreamProviderManager) grainRuntime.StreamProviderManager;
             scheduler.QueueTask(
                 () => siloStreamProviderManager.LoadStreamProviders(this.GlobalConfig.ProviderConfigurations, SiloProviderRuntime.Instance),
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
             InsideRuntimeClient.Current.CurrentStreamProviderManager = siloStreamProviderManager;
+            if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
+
             bool waitForPrimaryToStart = globalConfig.PrimaryNodeIsRequired && siloType != SiloType.Primary;
-            scheduler.QueueTask(() => LocalSiloStatusOracle.Start(waitForPrimaryToStart), statusOracleContext)
+            if (waitForPrimaryToStart) // only in MembershipTableGrain case.
+            {
+                scheduler.QueueTask(() => membershipFactory.WaitForTableToInit(membershipTable), statusOracleContext)
+                        .WaitWithThrow(initTimeout);
+            }
+            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(this.GlobalConfig, true, TraceLogger.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
                 .WaitWithThrow(initTimeout);
+          
+            scheduler.QueueTask(() => LocalSiloStatusOracle.Start(), statusOracleContext)
+                .WaitWithThrow(initTimeout);
+            if (logger.IsVerbose) { logger.Verbose("Local silo status oracle created successfully."); }
             scheduler.QueueTask(LocalSiloStatusOracle.BecomeActive, statusOracleContext)
                 .WaitWithThrow(initTimeout);
+            if (logger.IsVerbose) { logger.Verbose("Local silo status oracle became active successfully."); }
 
             try
             {
                 siloStatistics.Start(LocalConfig);
+                if (logger.IsVerbose) { logger.Verbose("Silo statistics manager started successfully."); }
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement
                 scheduler.QueueTask(DeploymentLoadPublisher.Instance.Start, DeploymentLoadPublisher.Instance.SchedulingContext)
                     .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Silo deployment load publisher started successfully."); }
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 platformWatchdog = new Watchdog(nodeConfig.StatisticsLogWriteInterval, healthCheckParticipants);
                 platformWatchdog.Start();
+                if (logger.IsVerbose) { logger.Verbose("Silo platform watchdog started successfully."); }
 
-                // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                scheduler.QueueTask(reminderService.Start, ((SystemTarget)reminderService).SchedulingContext)
-                    .WaitWithThrow(initTimeout);
+                if (reminderService != null)
+                {
+                    // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
+                    scheduler.QueueTask(reminderService.Start, ((SystemTarget) reminderService).SchedulingContext)
+                        .WaitWithThrow(initTimeout);
+                    if (logger.IsVerbose)
+                    {
+                        logger.Verbose("Reminder service started successfully.");
+                    }
+                }
 
                 // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
                 scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 
                 var bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
@@ -461,12 +504,20 @@ namespace Orleans.Runtime
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
                 BootstrapProviders = bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
+                if (logger.IsVerbose) { logger.Verbose("App bootstrap calls done successfully."); }
 
                 // Now that we're active, we can start the gateway
                 var mc = messageCenter as MessageCenter;
                 if (mc != null)
-                    mc.StartGateway();
-                
+                {
+                    mc.StartGateway(clientRegistrar);
+                }
+                if (logger.IsVerbose) { logger.Verbose("Message gateway service started successfully."); }
+
+                scheduler.QueueTask(clientRegistrar.Start, clientRegistrar.SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
+
                 SystemStatus.Current = SystemStatus.Running;
             }
             catch (Exception exc)
@@ -475,6 +526,7 @@ namespace Orleans.Runtime
                 FastKill(); // if failed after Membership became active, mark itself as dead in Membership abale.
                 throw;
             }
+            if (logger.IsVerbose) { logger.Verbose("Silo.Start complete: System status = {0}", SystemStatus.Current); }
         }
 
         private void ConfigureThreadPoolAndServicePointSettings()
@@ -516,13 +568,33 @@ namespace Orleans.Runtime
             ServicePointManager.UseNagleAlgorithm = nodeConfig.UseNagleAlgorithm;
         }
 
+        /// <summary>
+        /// Gracefully stop the run time system only, but not the application. 
+        /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
+        /// Grains are not deactivated.
+        /// </summary>
+        public void Stop()
+        {
+            Terminate(false);
+        }
+
+        /// <summary>
+        /// Gracefully stop the run time system and the application. 
+        /// All grains will be properly deactivated.
+        /// All in-flight applications requests would be awaited and finished gracefully.
+        /// </summary>
+        public void Shutdown()
+        {
+            Terminate(true);
+        }
 
         /// <summary>
         /// Gracefully stop the run time system only, but not the application. 
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
-        public void Stop()
+        private void Terminate(bool gracefully)
         {
+            string operation = gracefully ? "Shutdown()" : "Stop()";
             bool stopAlreadyInProgress = false;
             lock (lockable)
             {
@@ -533,23 +605,26 @@ namespace Orleans.Runtime
                     stopAlreadyInProgress = true;
                     // Drop through to wait below
                 }
-                else if (SystemStatus.Current != SystemStatus.Running)
+                else if (!SystemStatus.Current.Equals(SystemStatus.Running))
                 {
-                    throw new InvalidOperationException(String.Format("Calling Silo.Stop() on a silo which is not in the Running state. This silo is in the {0} state.", SystemStatus.Current));
+                    throw new InvalidOperationException(String.Format("Calling Silo.{0} on a silo which is not in the Running state. This silo is in the {1} state.", operation, SystemStatus.Current));
                 }
                 else
                 {
-                    SystemStatus.Current = SystemStatus.Stopping;
+                    if (gracefully)
+                        SystemStatus.Current = SystemStatus.ShuttingDown;
+                    else
+                        SystemStatus.Current = SystemStatus.Stopping;
                 }
             }
 
             if (stopAlreadyInProgress)
             {
-                logger.Info(ErrorCode.SiloStopInProgress, "Silo stop is in progress - Will wait for stop to finish");
+                logger.Info(ErrorCode.SiloStopInProgress, "Silo termination is in progress - Will wait for it to finish");
                 var pause = TimeSpan.FromSeconds(1);
                 while (!SystemStatus.Current.Equals(SystemStatus.Terminated))
                 {
-                    logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for stop to complete", pause);
+                    logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
                     Thread.Sleep(pause);
                 }
                 return;
@@ -559,36 +634,57 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
-                    // 1: Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
-                    scheduler.QueueTask(LocalSiloStatusOracle.Stop, ((SystemTarget)LocalSiloStatusOracle).SchedulingContext)
-                        .WaitWithThrow(stopTimeout);
+                    if (gracefully)
+                    {
+                        logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
+                        // 1: Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
+                        scheduler.QueueTask(LocalSiloStatusOracle.ShutDown, ((SystemTarget)LocalSiloStatusOracle).SchedulingContext)
+                            .WaitWithThrow(stopTimeout);
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
+                        // 1: Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
+                        scheduler.QueueTask(LocalSiloStatusOracle.Stop, ((SystemTarget)LocalSiloStatusOracle).SchedulingContext)
+                            .WaitWithThrow(stopTimeout);
+                    }
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.SiloFailedToStopMembership, "Failed to Stop() LocalSiloStatusOracle. About to FastKill this silo.", exc);
+                    logger.Error(ErrorCode.SiloFailedToStopMembership, String.Format("Failed to {0} LocalSiloStatusOracle. About to FastKill this silo.", operation), exc);
                     return; // will go to finally
                 }
-            
-                // 2: Stop the gateway
+
+                if (reminderService != null)
+                {
+                    // 2: Stop reminder service
+                    scheduler.QueueTask(reminderService.Stop, ((SystemTarget) reminderService).SchedulingContext)
+                        .WaitWithThrow(stopTimeout);
+                }
+
+                if (gracefully)
+                {
+                    // 3: Deactivate all grains
+                    SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
+                }
+
+
+                // 3: Stop the gateway
                 SafeExecute(messageCenter.StopAcceptingClientMessages);
 
-                // 3: Start rejecting all silo to silo application messages
+                // 4: Start rejecting all silo to silo application messages
                 SafeExecute(messageCenter.BlockApplicationMessages);
 
-                // 4: Stop scheduling/executing application turns
+                // 5: Stop scheduling/executing application turns
                 SafeExecute(scheduler.StopApplicationTurns);
 
-                // 5: Directory: Speed up directory handoff
+                // 6: Directory: Speed up directory handoff
                 // will be started automatically when directory receives SiloStatusChangeNotification(Stopping)
 
-                // 6. Stop reminder service
-                scheduler.QueueTask(reminderService.Stop, ((SystemTarget)reminderService).SchedulingContext)
-                    .WaitWithThrow(stopTimeout);
-                
-                // 7
-                SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(TimeSpan.FromSeconds(5)));
+                // 7:
+                SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
+                // 8:
                 SafeExecute(storageProviderManager.UnloadStorageProviders);
             }
             finally
@@ -652,7 +748,7 @@ namespace Orleans.Runtime
             {
                 lock (lockable)
                 {
-                    if (SystemStatus.Current != SystemStatus.Running) return;
+                    if (!SystemStatus.Current.Equals(SystemStatus.Running)) return;
                     
                     SystemStatus.Current = SystemStatus.Stopping;
                 }
@@ -833,7 +929,7 @@ namespace Orleans.Runtime
                     continue;
                 }
 
-                if (all || activationData.IsUsable)
+                if (all || activationData.State.Equals(ActivationState.Valid))
                 {
                     sb.AppendLine(workItemGroup.DumpStatus());
                     sb.AppendLine(activationData.DumpStatus());
@@ -860,4 +956,3 @@ namespace Orleans.Runtime
     }
 }
 
-

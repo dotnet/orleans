@@ -21,7 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans
@@ -37,25 +38,6 @@ namespace Orleans
         string Etag { get; set; }
 
         /// <summary>
-        /// Async method to cause the current grain state data to be cleared and reset. 
-        /// This will usually mean the state record is deleted from backin store, but the specific behavior is defined by the storage provider instance configured for this grain.
-        /// If Etags do not match, then this operation will fail; Set Etag = <c>null</c> to indicate "always delete".
-        /// </summary>
-        Task ClearStateAsync();
-
-        /// <summary>
-        /// Async method to cause write of the current grain state data into backin store.
-        /// If Etags do not match, then this operation will fail; Set Etag = <c>null</c> to indicate "always overwrite".
-        /// </summary>
-        Task WriteStateAsync();
-
-        /// <summary>
-        /// Async method to cause refresh of the current grain state data from backin store.
-        /// Any previous contents of the grain state data will be overwritten.
-        /// </summary>
-        Task ReadStateAsync();
-
-        /// <summary>
         /// Return a snapshot of the current grain state data, as a Dictionary of Key-Value pairs.
         /// </summary>
         IDictionary<string, object> AsDictionary();
@@ -65,4 +47,4 @@ namespace Orleans
         /// </summary>
         void SetAll(IDictionary<string, object> values);
     }
-}
+}

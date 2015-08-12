@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 using Orleans.Runtime;
 using Orleans.Providers;
@@ -41,4 +41,4 @@ namespace Orleans.Storage
 
         bool TryGetProvider(string name, out IStorageProvider provider, bool caseInsensitive = false);
     }
-}
+}

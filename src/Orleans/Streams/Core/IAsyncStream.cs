@@ -21,7 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
@@ -41,5 +43,11 @@ namespace Orleans.Streams
 
         /// <summary> Stream Provider Name. </summary>
         string ProviderName { get; }
+
+        /// <summary>
+        /// Retrieves a list of all active subscriptions created by the caller for this stream.
+        /// </summary>
+        /// <returns></returns>
+        Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles();
     }
-}
+}

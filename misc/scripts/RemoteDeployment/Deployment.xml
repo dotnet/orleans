@@ -1,0 +1,21 @@
+<Deployment Name="Deployment1" DeploymentGroup="F219832A-1EE1-45DA-B35D-0BB3060C9FDA" xmlns="urn:xcg-deployment">
+  <TargetLocation Path="C:\Orleans" />
+  <Packages>
+    <Package Name="Orleans Runtime" Type="System" Path="..\Binaries\OrleansServer" />
+    <!-- Package Name="App" Type="Application" Path="App Folder" / -->
+  </Packages>
+  <Program ExeName="OrleansHost" />
+  <RuntimeConfiguration Path=".\OrleansConfiguration.xml" />
+  <Nodes>
+    <Node HostName="MACHINE1" NodeName="Primary" />
+    <Node HostName="MACHINE2" NodeName="Node2" />
+    <Node HostName="MACHINE3" NodeName="Node3" />
+    <Node HostName="MACHINE4" NodeName="Node4" />
+    <Node HostName="MACHINE5" NodeName="Node5" />
+    <Node HostName="MACHINE6" NodeName="Node6" />
+    <Node HostName="MACHINE7" NodeName="Node7" />
+    <Node HostName="MACHINE8" NodeName="Node8" />
+    <Node HostName="MACHINE9" NodeName="Node9" />
+    <Node HostName="MACHINE10" NodeName="Node10" />
+  </Nodes>
+</Deployment>

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -35,15 +35,9 @@ namespace Orleans.Runtime
     /// </summary>
     internal interface IClientObserverRegistrar : ISystemTarget
     {
-       /// <summary>
-        /// Registers a client observer object on this gateway.
-        /// </summary>
-        Task<ActivationAddress> RegisterClientObserver(GrainId grainId, Guid clientId);
-
         /// <summary>
-        /// Unregisters client observer object from all gateways.
+        /// Start this system target.
         /// </summary>
-        Task UnregisterClientObserver(GrainId target);
+        Task Start();
     }
 }
-

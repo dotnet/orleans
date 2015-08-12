@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System;
 
@@ -39,6 +39,9 @@ namespace Orleans.Runtime
         public const string MEMORY_STORAGE_PROVIDER_NAME = "MemoryStore";
         public const string DATA_CONNECTION_STRING_NAME = "DataConnectionString";
 
+        public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
+        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils";
+
         public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);
         public static readonly GrainId DirectoryCacheValidatorId = GrainId.GetSystemTargetGrainId(11);
         public static readonly GrainId SiloControlId = GrainId.GetSystemTargetGrainId(12);
@@ -54,6 +57,8 @@ namespace Orleans.Runtime
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 
         public static readonly GrainId SystemMembershipTableId = GrainId.GetSystemGrainId(new Guid("01145FEC-C21E-11E0-9105-D0FB4724019B"));
+        public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
+
         internal const long ReminderTableGrainId = 12345;
          
         /// <summary>
@@ -113,7 +118,8 @@ namespace Orleans.Runtime
 
         private static readonly Dictionary<GrainId, string> systemGrainNames = new Dictionary<GrainId, string>
         {
-            {SystemMembershipTableId, "MembershipTableGrain"}
+            {SystemMembershipTableId, "MembershipTableGrain"},
+            {SiloDirectConnectionId, "SiloDirectConnectionId"}
         };
 
         public static bool TryGetSystemGrainName(GrainId id, out string name)
@@ -127,4 +133,4 @@ namespace Orleans.Runtime
         }
     }
 }
- 
+ 

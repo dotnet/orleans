@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
@@ -32,7 +32,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Scheduler
 {
-    [DebuggerDisplay("WorkItemGroup State={state} PendingContinuations={pendingContinuationCount} Context={_schedulingContext.Name}")]
+    [DebuggerDisplay("WorkItemGroup State={state} WorkItemCount={WorkItemCount} Context={SchedulingContext.Name}")]
     internal class WorkItemGroup : IWorkItem
     {
         private enum WorkGroupStatus
@@ -146,8 +146,7 @@ namespace Orleans.Runtime.Scheduler
         // per ActivationWorker. An attempt to wait when there are already too many threads waiting
         // will result in a TooManyWaitersException being thrown.
         //private static readonly int MaxWaitingThreads = 500;
-        // This is the maximum number of pending work items for a single activation before we write a warning log.
-        private static LimitValue MaxPendingItemsLimit;
+
 
         internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext)
         {
@@ -161,7 +160,6 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskRunner = new ActivationTaskScheduler(this);
-            MaxPendingItemsLimit = LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS);
             log = IsSystem ? TraceLogger.GetLogger("Scheduler." + Name + ".WorkItemGroup", TraceLogger.LoggerType.Runtime) : appLogger;
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
@@ -204,8 +202,9 @@ namespace Orleans.Runtime.Scheduler
 
                 if (state == WorkGroupStatus.Shutdown)
                 {
-                    ReportWorkGroupProblemWithBacktrace(
-                        String.Format("Enqueuing task {0} to a stopped work item group. Going to ignore and not execute it.", task),
+                    ReportWorkGroupProblem(
+                        String.Format("Enqueuing task {0} to a stopped work item group. Going to ignore and not execute it. "
+                        + "The likely reason is that the task is not being 'awaited' properly.", task),
                         ErrorCode.SchedulerNotEnqueuWorkWhenShutdown);
                     return;
                 }
@@ -220,7 +219,7 @@ namespace Orleans.Runtime.Scheduler
                     SchedulerStatisticsGroup.OnWorkItemEnqueue();
 #endif
                 workItems.Enqueue(task);
-                int maxPendingItemsLimit = MaxPendingItemsLimit.SoftLimitThreshold;
+                int maxPendingItemsLimit = masterScheduler.MaxPendingItemsLimit.SoftLimitThreshold;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
                     log.Warn(ErrorCode.SchedulerTooManyPendingItems, String.Format("{0} pending work items for group {1}, exceeding the warning threshold of {2}",
@@ -246,8 +245,9 @@ namespace Orleans.Runtime.Scheduler
             {
                 if (IsActive)
                 {
-                    ReportWorkGroupProblemWithBacktrace(
-                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}", WorkItemCount),
+                    ReportWorkGroupProblem(
+                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}." 
+                        + "The likely reason is that the task is not being 'awaited' properly.", WorkItemCount),
                         ErrorCode.SchedulerWorkGroupStopping); // Throws InvalidOperationException
                 }
 
@@ -450,8 +450,13 @@ namespace Orleans.Runtime.Scheduler
         {
             var st = new StackTrace();
             var msg = string.Format("{0} {1}", what, DumpStatus());
-            log.Warn(errorCode, msg + " \nCalled from " + st);
+            log.Warn(errorCode, msg + Environment.NewLine + " Called from " + st);
+        }
+
+        private void ReportWorkGroupProblem(string what, ErrorCode errorCode)
+        {
+            var msg = string.Format("{0} {1}", what, DumpStatus());
+            log.Warn(errorCode, msg);
         }
     }
 }
-

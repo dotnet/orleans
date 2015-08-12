@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -108,7 +108,7 @@ namespace Orleans.Storage
             for (int i = 0; i < numStorageGrains; i++)
             {
                 int idx = i; // Capture variable to avoid modified closure error
-                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => MemoryStorageGrainFactory.GetGrain(idx));
+                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => providerRuntime.GrainFactory.GetGrain<IMemoryStorageGrain>(idx));
             }
             return TaskDone.Done;
         }
@@ -256,4 +256,4 @@ namespace Orleans.Storage
             return DateTime.UtcNow.ToString(CultureInfo.InvariantCulture);
         }
     }
-}
+}

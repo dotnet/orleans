@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading;
 
 using Orleans.Runtime.Scheduler;
@@ -150,7 +150,7 @@ namespace Orleans.Runtime.Messaging
                     lock (targetActivation)
                     {
                         var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
-                        if (target.IsUsable)
+                        if (target.State.Equals(ActivationState.Valid))
                         {
                             var overloadException = target.CheckOverloaded(Log);
                             if (overloadException != null)
@@ -202,4 +202,3 @@ namespace Orleans.Runtime.Messaging
         }
     }
 }
-

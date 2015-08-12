@@ -21,33 +21,36 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.TestingHost;
+using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
-namespace UnitTests.SampleStreaming
+namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForUnitTests.xml")]
+    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class SampleStreamingTests : UnitTestSiloHost
     {
         private const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
         private const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
+        private const string StreamNamespace = "SampleStreamNamespace";
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private Guid streamId;
         private string streamProvider;
 
         public SampleStreamingTests()
-            : base(new UnitTestSiloOptions
+            : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForUnitTests.xml"),
+                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
             })
         {
         }
@@ -64,70 +67,71 @@ namespace UnitTests.SampleStreaming
         {
             if (streamProvider != null && streamProvider.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                string dataConnectionString = "";
-                AzureQueueStreamProvider.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, UnitTestSiloHost.DeploymentId, dataConnectionString, logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_1()
         {
-            logger.Info("\n\n************************ SampleStreamingTests_1 ********************************* \n\n");
+            logger.Info("************************ SampleStreamingTests_1 *********************************");
             streamId = Guid.NewGuid();
             streamProvider = SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
         }
 
-        [TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SampleStreamingTests_2()
         {
-            logger.Info("\n\n************************ SampleStreamingTests_2 ********************************* \n\n");
+            logger.Info("************************ SampleStreamingTests_2 *********************************");
             streamId = Guid.NewGuid();
             streamProvider = SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
-        // To run the streaming test with Azure Queue adapter you need:
-        // 1) Uncomment the AzureQueueProvider element in StreamProviders section in the Config_StreamProvidersForUnitTests.xml.
-        // 1) Add DataConnectionString to AzureQueueProvider element.
-        // 2) Set the dataConnectionString variable in the TestCleanup method to this value as well.
-        // 3) Uncomment and run the below 2 tests.
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming" )]
+        public async Task SampleStreamingTests_3()
+        {
+            logger.Info("************************ SampleStreamingTests_3 *********************************" );
+            streamId = Guid.NewGuid();
+            streamProvider = SMS_STREAM_PROVIDER_NAME;
+            await StreamingTests_Producer_InlineConsumer(streamId, streamProvider );
+        }
 
-        //[TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
-        //public async Task SampleStreamingTests_3()
-        //{
-        //    logger.Info("\n\n************************ SampleStreamingTests_3 ********************************* \n\n");
-        //    streamId = Guid.NewGuid();
-        //    streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        //    await StreamingTests_Consumer_Producer(streamId, streamProvider);
-        //}
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task SampleStreamingTests_4()
+        {
+            logger.Info("************************ SampleStreamingTests_4 *********************************");
+            streamId = Guid.NewGuid();
+            streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
+            await StreamingTests_Consumer_Producer(streamId, streamProvider);
+        }
 
-        //[TestMethod, TestCategory("Nightly"), TestCategory("Streaming")]
-        //public async Task SampleStreamingTests_4()
-        //{
-        //    logger.Info("\n\n************************ SampleStreamingTests_4 ********************************* \n\n");
-        //    streamId = Guid.NewGuid();
-        //    streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        //    await StreamingTests_Producer_Consumer(streamId, streamProvider);
-        //}
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task SampleStreamingTests_5()
+        {
+            logger.Info("************************ SampleStreamingTests_5 *********************************");
+            streamId = Guid.NewGuid();
+            streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
+            await StreamingTests_Producer_Consumer(streamId, streamProvider);
+        }
 
         private async Task StreamingTests_Consumer_Producer(Guid streamId, string streamProvider)
         {
             // consumer joins first, producer later
-            ISampleStreaming_ConsumerGrain consumer = SampleStreaming_ConsumerGrainFactory.GetGrain(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, streamProvider);
+            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            await producer.BecomeProducer(streamId, streamProvider);
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
 
-            await UnitTestUtils.WaitUntilAsync(() => CheckCounters(producer, consumer, assertAreEqual: false), _timeout);
-            await CheckCounters(producer, consumer);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
             }
@@ -135,31 +139,51 @@ namespace UnitTests.SampleStreaming
         private async Task StreamingTests_Producer_Consumer(Guid streamId, string streamProvider)
         {
             // producer joins first, consumer later
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            await producer.BecomeProducer(streamId, streamProvider);
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
-            ISampleStreaming_ConsumerGrain consumer = SampleStreaming_ConsumerGrainFactory.GetGrain(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, streamProvider);
+            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
-            //int numProduced = producer.NumberProduced.Result;
+            //int numProduced = await producer.NumberProduced;
 
-            await UnitTestUtils.WaitUntilAsync(() => CheckCounters(producer, consumer, assertAreEqual: false), _timeout);
-            await CheckCounters(producer, consumer);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
 
-        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertAreEqual = true)
+        private async Task StreamingTests_Producer_InlineConsumer(Guid streamId, string streamProvider)
+        {
+            // producer joins first, consumer later
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
+
+            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_InlineConsumerGrain>(Guid.NewGuid());
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
+
+            await producer.StartPeriodicProducing();
+
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+
+            await producer.StopPeriodicProducing();
+            //int numProduced = await producer.NumberProduced;
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
+
+            await consumer.StopConsuming();
+        }
+
+        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
             logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
-            if (assertAreEqual)
+            if (assertIsTrue)
             {
                 Assert.AreEqual(numProduced, numConsumed, String.Format("numProduced = {0}, numConsumed = {1}", numProduced, numConsumed));
                 return true;
@@ -170,4 +194,4 @@ namespace UnitTests.SampleStreaming
             }
         }
     }
-}
+}

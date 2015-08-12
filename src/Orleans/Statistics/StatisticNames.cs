@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 
 namespace Orleans.Runtime
 {
@@ -204,7 +204,8 @@ namespace Orleans.Runtime
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_ALLOCATED_BUFFERS                         = new StatisticName("Serialization.BufferPool.AllocatedBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_OUT_BUFFERS                       = new StatisticName("Serialization.BufferPool.CheckedOutBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_IN_BUFFERS                        = new StatisticName("Serialization.BufferPool.CheckedInBuffers");
-        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_IN_DROPPED_BUFFERS                = new StatisticName("Serialization.BufferPool.CheckedInDroppedBuffers");
+        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_DROPPED_BUFFERS                           = new StatisticName("Serialization.BufferPool.DroppedBuffers");
+        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_DROPPED_TOO_LARGE_BUFFERS                 = new StatisticName("Serialization.BufferPool.DroppedTooLargeBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_INUSE_CHECKED_OUT_NOT_CHECKED_IN_BUFFERS  = new StatisticName("Serialization.BufferPool.InUse.CheckedOutAndNotCheckedIn_Buffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_INUSE_ALLOCATED_NOT_INPOOL_BUFFERS        = new StatisticName("Serialization.BufferPool.InUse.AllocatedAndNotInPool_Buffers");
         public static readonly StatisticName SERIALIZATION_BODY_DEEPCOPIES                      = new StatisticName("Serialization.Body.DeepCopies");
@@ -232,12 +233,13 @@ namespace Orleans.Runtime
         public static readonly StatisticName CATALOG_ACTIVATION_COUNT                                               = new StatisticName("Catalog.Activation.CurrentCount");
         public static readonly StatisticName CATALOG_ACTIVATION_CREATED                                             = new StatisticName("Catalog.Activation.Created");
         public static readonly StatisticName CATALOG_ACTIVATION_DESTROYED                                           = new StatisticName("Catalog.Activation.Destroyed");
+        public static readonly StatisticName CATALOG_ACTIVATION_FAILED_TO_ACTIVATE                                  = new StatisticName("Catalog.Activation.FailedToActivate");
         public static readonly StatisticName CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS                    = new StatisticName("Catalog.Activation.Collection.NumberOfCollections");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION                             = new StatisticName("Catalog.Activation.Shutdown.ViaCollection");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE                     = new StatisticName("Catalog.Activation.Shutdown.ViaDeactivateOnIdle");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DIRECT_SHUTDOWN                        = new StatisticName("Catalog.Activation.Shutdown.ViaDirectShutdown");
-        public static readonly StatisticName CATALOG_NON_EXISTING_ACTIVATIONS                                       = new StatisticName("Catalog.NonExistentActivations");
-        public static readonly StatisticName CATALOG_DUPLICATE_ACTIVATIONS                                          = new StatisticName("Catalog.DuplicateActivations");
+        public static readonly StatisticName CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS                            = new StatisticName("Catalog.Activation.NonExistentActivations");
+        public static readonly StatisticName CATALOG_ACTIVATION_DUPLICATE_ACTIVATIONS                               = new StatisticName("Catalog.Activation.DuplicateActivations");
 
         // Dispatcher
         public static readonly StatisticName DISPATCHER_NEW_PLACEMENT                                               = new StatisticName("Dispatcher.NewPlacement");
@@ -349,4 +351,4 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumSentMessages");
     }
 }
- 
+ 

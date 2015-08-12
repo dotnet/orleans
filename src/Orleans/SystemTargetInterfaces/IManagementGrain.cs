@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
@@ -33,7 +33,7 @@ namespace Orleans.Runtime
     /// Interface for system management functions of silos, 
     /// exposed as a grain for receiving remote requests / commands.
     /// </summary>
-    public interface IManagementGrain : IGrain
+    public interface IManagementGrain : IGrainWithIntegerKey
     {
         /// <summary>
         /// Get the list of silo hosts and statuses currently known about in this cluster.
@@ -139,4 +139,3 @@ namespace Orleans.Runtime
         Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
     }
 }
-

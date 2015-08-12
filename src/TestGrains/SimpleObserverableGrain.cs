@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -47,38 +47,47 @@ namespace UnitTests.Grains
         {
             EventDelay = 1000;
             Observers = new ObserverSubscriptionManager<ISimpleGrainObserver>();
-            logger = GetLogger(String.Format("{0}-{1}-{1}", typeof(SimpleObserverableGrain).Name, base.IdentityString, base.RuntimeIdentity));
+            logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleObserverableGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
             return TaskDone.Done;
         }
 
-        public Task SetA(int a)
+        public async Task SetA(int a)
         {
             logger.Info("SetA={0}", a);
             A = a;
-            Task.Factory.StartNew(() =>
+
+            //If this were run with Task.Run there were no need for the added Unwrap call.
+            //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
+            //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
+            //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
+            //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
+            await Task.Factory.StartNew(async () =>
             {
-                Thread.Sleep(EventDelay);
+                await Task.Delay(EventDelay);
                 RaiseStateUpdateEvent();
-            }).Ignore();
-            return TaskDone.Done;
+            }).Unwrap();            
         }
 
-        public Task SetB(int b)
+        public async Task SetB(int b)
         {
             this.B = b;
-            Task.Factory.StartNew(() =>
+
+            //If this were run with Task.Run there were no need for the added Unwrap call.
+            //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.
+            //See more at http://dotnet.github.io/orleans/Advanced-Concepts/External-Tasks-and-Grains.
+            //The extra task comes from the internal asynchronous lambda due to Task.Delay. For deeper
+            //insight, see at http://blogs.msdn.com/b/pfxteam/archive/2012/02/08/10265476.aspx.
+            await Task.Factory.StartNew(async () =>
             {
-                Thread.Sleep(EventDelay);
+                await Task.Delay(EventDelay);
                 RaiseStateUpdateEvent();
-            }).Ignore();
-            return TaskDone.Done;
+            }).Unwrap();            
         }
 
-        public Task IncrementA()
+        public async Task IncrementA()
         {
-            SetA(A + 1);
-            return TaskDone.Done;
+            await SetA(A + 1);            
         }
 
         public Task<int> GetAxB()
@@ -117,4 +126,3 @@ namespace UnitTests.Grains
         }
     }
 }
-

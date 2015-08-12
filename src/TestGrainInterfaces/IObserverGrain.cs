@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -32,9 +32,9 @@ using System.Collections;
 
 namespace UnitTests.GrainInterfaces
 {
-    public interface IObserverGrain : IGrain
+    public interface IObserverGrain : IGrainWithIntegerKey
     {
         Task SetTarget(ISimpleObserverableGrain target);
         Task Subscribe(ISimpleGrainObserver observer);
     }
-}
+}

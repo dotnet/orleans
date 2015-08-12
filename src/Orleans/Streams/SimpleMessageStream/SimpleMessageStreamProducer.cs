@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -30,7 +30,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    internal class SimpleMessageStreamProducer<T> : IAsyncBatchObserver<T>, IStreamControl
+    internal class SimpleMessageStreamProducer<T> : IInternalAsyncBatchObserver<T>
     {
         private readonly StreamImpl<T>                  stream;
         private readonly string                         streamProviderName;
@@ -169,4 +169,4 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 onDisposeTestHook();
         }
     }
-}
+}

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -244,14 +244,14 @@ namespace Orleans.Runtime.ConsistentRing
             // This silo's status has changed
             if (updatedSilo.Equals(myAddress))
             {
-                if (status == SiloStatus.Dead || status.Equals(SiloStatus.ShuttingDown) || status == SiloStatus.Stopping)
+                if (status.IsTerminating())
                 {
                     Stop();
                 }
             }
             else // Status change for some other silo
             {
-                if (status.Equals(SiloStatus.Dead) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping))
+                if (status.IsTerminating())
                 {
                     RemoveServer(updatedSilo);
                 }
@@ -315,4 +315,3 @@ namespace Orleans.Runtime.ConsistentRing
 }
 
 
-

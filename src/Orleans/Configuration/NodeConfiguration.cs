@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Configuration
     /// Individual node-specific silo configuration parameters.
     /// </summary>
     [Serializable]
-    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration, ILimitsConfiguration
+    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration
     {
         private readonly DateTime creationTimestamp;
         private string siloName;
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The values for various silo limits.
         /// </summary>
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        public LimitManager LimitManager { get; private set; }
 
         private string traceFilePattern;
         /// <summary>
@@ -246,7 +246,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_STATS_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
         internal static readonly StatisticsLevel DEFAULT_STATS_COLLECTION_LEVEL = StatisticsLevel.Info;
-        private static readonly int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(1, System.Environment.ProcessorCount);
+        private static readonly int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(4, System.Environment.ProcessorCount);
         internal static readonly int DEFAULT_MAX_LOCAL_ACTIVATIONS = System.Environment.ProcessorCount;
         private const int DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE = 200;
         private static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
@@ -289,7 +289,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = true;
             StatisticsCollectionLevel = DEFAULT_STATS_COLLECTION_LEVEL;
 
-            LimitValues = new Dictionary<string, LimitValue>();
+            LimitManager = new LimitManager();
 
             MinDotNetThreadPoolSize = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
 
@@ -337,7 +337,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = other.StatisticsWriteLogStatisticsToTable;
             StatisticsCollectionLevel = other.StatisticsCollectionLevel;
 
-            LimitValues = new Dictionary<string, LimitValue>(other.LimitValues); // Shallow copy
+            LimitManager = new LimitManager(other.LimitManager); // Shallow copy
 
             Subnet = other.Subnet;
 
@@ -387,27 +387,8 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Debug: ").AppendLine();
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-
-            if (LimitValues.Count > 0)
-            {
-                sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitValues.Values)
-                    sb.AppendFormat("       {0}", limit).AppendLine();
-            }
-
+            sb.Append(LimitManager);
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// Returns the value of silo limit.
-        /// </summary>
-        /// <param name="limitName">The name of the limit return.</param>
-        /// <returns>Limit value</returns>
-        public LimitValue GetLimit(string limitName)
-        {
-            LimitValue limit;
-            LimitValues.TryGetValue(limitName, out limit);
-            return limit;
         }
 
         internal void Load(XmlElement root)
@@ -514,7 +495,7 @@ namespace Orleans.Runtime.Configuration
                         ConfigUtilities.ParseStatistics(this, child, SiloName);
                         break;
                     case "Limits":
-                        ConfigUtilities.ParseLimitValues(this, child, SiloName);
+                        ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
                         break;
                 }
             }
@@ -527,4 +508,4 @@ namespace Orleans.Runtime.Configuration
             return cacheDirBase;
         }
     }
-}
+}

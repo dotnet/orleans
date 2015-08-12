@@ -16,32 +16,32 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <!-- Using Orleans NuGet packages -->
     <When Condition="Exists('$(MSBuildThisFileDirectory)..\tools')">
       <PropertyGroup>
-        <ClientGenExeDir>$(MSBuildThisFileDirectory)..\tools</ClientGenExeDir>
+        <CodeGenToolExeDir>$(MSBuildThisFileDirectory)..\tools</CodeGenToolExeDir>
       </PropertyGroup>
     </When>
     <!-- Internal build within Orleans.sln -->
     <When Condition="'$(OrleansReferencesBase)' != ''">
       <PropertyGroup>
-        <ClientGenExeDir>$(OrleansReferencesBase)</ClientGenExeDir>
+        <CodeGenToolExeDir>$(OrleansReferencesBase)</CodeGenToolExeDir>
       </PropertyGroup>
     </When>
     <!-- Legacy support for OrleansSDK -->
     <When Condition="'$(OrleansSDK)' != ''">
       <PropertyGroup>
-        <ClientGenExeDir>$(OrleansSDK)\Binaries\OrleansClient</ClientGenExeDir>
+        <CodeGenToolExeDir>$(OrleansSDK)\Binaries\OrleansClient</CodeGenToolExeDir>
       </PropertyGroup>
     </When>
   </Choose>
 
   <Choose>
-    <When Condition="HasTrailingSlash($(ClientGenExeDir))">
+    <When Condition="HasTrailingSlash('$(CodeGenToolExeDir)')">
       <PropertyGroup>
-        <ClientGenExe>$(ClientGenExeDir)ClientGenerator.exe</ClientGenExe>
+        <CodeGenToolExe>$(CodeGenToolExeDir)ClientGenerator.exe</CodeGenToolExe>
       </PropertyGroup>
     </When>
     <Otherwise>
       <PropertyGroup>
-        <ClientGenExe>$(ClientGenExeDir)\ClientGenerator.exe</ClientGenExe>
+        <CodeGenToolExe>$(CodeGenToolExeDir)\ClientGenerator.exe</CodeGenToolExe>
       </PropertyGroup>
     </Otherwise>
   </Choose>
@@ -50,6 +50,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
       <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Fsc.exe')">
         <FSharpCompilerPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\fsc.exe</FSharpCompilerPath>
+      </PropertyGroup>
+    </When>
+    <When Condition="'$(VisualStudioVersion)' == '14.0'">
+      <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\4.0\Framework\v4.0\Fsc.exe')">
+        <FSharpCompilerPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\4.0\Framework\v4.0\Fsc.exe</FSharpCompilerPath>
       </PropertyGroup>
     </When>
     <Otherwise>
@@ -61,19 +66,24 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="OrleansClientPreprocessing"
-          AfterTargets="BeforeCompile"
+          AfterTargets="BeforeCompile;ResolveReferences"
           BeforeTargets="CoreCompile"
           Condition="'$(OrleansProjectType)'=='Client'"
-          Inputs="@(Compile);@(ReferencePath);"
+          Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
     <Message Text="[OrleansClientPreprocessing] - Project=$(ProjectName)" Importance="high"/>
     <Message Text="[OrleansClientPreprocessing] 
-- ClientGenExeDir=$(ClientGenExeDir)
+- CodeGenToolExeDir=$(CodeGenToolExeDir)
 - OrleansReferencesBase=$(OrleansReferencesBase)
 - OrleansSDK=$(OrleansSDK)
-- Using ClientGenExe location=$(ClientGenExe)
+- Using CodeGenToolExe location=$(CodeGenToolExe)
 " />
-    <MakeDir Directories="$(IntermediateOutputPath)Generated;"/>
+    <MakeDir Directories="$(IntermediateOutputPath)Generated"/>
+    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs"
+      Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')"
+      ForceTouch="true"
+      AlwaysCreate="true"
+      ContinueOnError="true" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
     </PropertyGroup>
@@ -94,27 +104,33 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')"/>
-    <Exec Command='"$(ClientGenExe)" "@$(ArgsFile)"' />
+    <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"' />
   </Target>
 
   <!-- This target is run just after Compile for an Orleans Grain Implementation Project -->
   <Target Name="OrleansServerObjProcessing"
-          AfterTargets="BeforeCompile"
+          AfterTargets="BeforeCompile;ResolveReferences"
           BeforeTargets="CoreCompile"
           Condition="'$(OrleansProjectType)'=='Server'"
           Inputs="@(Compile);@(ReferencePath);$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)"
           Outputs="$(ProjectDir)$(IntermediateOutputPath)orleans.codegen.timpestamp">
     <Message Text="[OrleansServerObjProcessing] - Creating Server for Project=$(ProjectName)" Importance="high"/>
     <Message Text="[OrleansServerObjProcessing] 
-- ClientGenExeDir=$(ClientGenExeDir)
+- CodeGenToolExeDir=$(CodeGenToolExeDir)
 - OrleansReferencesBase=$(OrleansReferencesBase)
 - OrleansSDK=$(OrleansSDK)
-- Using ClientGenExe location=$(ClientGenExe)
+- Using CodeGenToolExe location=$(CodeGenToolExe)
 "/>
+    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs"
+      Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')"
+      ForceTouch="true"
+      AlwaysCreate="true"
+      ContinueOnError="true" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
     </PropertyGroup>
     <Message Text="[OrleansServerObjProcessing] - Code-gen args file=$(ArgsFile)"/>
+    <Message Text="[OrleansServerObjProcessing] - DefineConstants=$(DefineConstants)"/>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/svr"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(SnkFile)"/>
@@ -131,7 +147,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')"/>
-    <Exec Command='"$(ClientGenExe)" "@$(ArgsFile)"'
+    <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"'
           Outputs='$(IntermediateOutputPath)$(TargetName)$(TargetExt)' />
   </Target>
 

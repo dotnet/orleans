@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -97,6 +97,25 @@ namespace Orleans.Streams
         Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context);
 
         object GetCurrentSchedulingContext();
+
+        /// <summary>
+        /// Start the pulling agents for a given persistent stream provider.
+        /// </summary>
+        /// <param name="streamProviderName"></param>
+        /// <param name="balancerType"></param>
+        /// <param name="adapterFactory"></param>
+        /// <param name="queueAdapter"></param>
+        /// <param name="getQueueMsgsTimerPeriod"></param>
+        /// <param name="initQueueTimeout"></param>
+        /// <returns></returns>
+        Task StartPullingAgents(
+            string streamProviderName,
+            StreamQueueBalancerType balancerType,
+            IQueueAdapterFactory adapterFactory,
+            IQueueAdapter queueAdapter,
+            TimeSpan getQueueMsgsTimerPeriod,
+            TimeSpan initQueueTimeout,
+            TimeSpan maxEventDeliveryTime);
     }
 
     internal enum StreamPubSubType
@@ -110,12 +129,18 @@ namespace Orleans.Streams
 
         Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
-        Task RegisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
+        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
 
-        Task UnregisterConsumer(StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer);
+        Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider);
 
         Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace);
 
         Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
+
+        Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
+
+        GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId);
+
+        Task<bool> FaultSubscription(GuidId subscriptionId, StreamId streamId);
     }
-}
+}

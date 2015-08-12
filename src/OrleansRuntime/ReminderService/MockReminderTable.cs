@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.ReminderService
@@ -36,7 +36,7 @@ namespace Orleans.Runtime.ReminderService
             this.delay = delay;
         }
 
-        public Task Init()
+        public Task Init(Guid serviceId, string deploymentId, string connectionString)
         {
             return TaskDone.Done;
         }
@@ -77,4 +77,3 @@ namespace Orleans.Runtime.ReminderService
         }
     }
 }
-

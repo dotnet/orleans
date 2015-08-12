@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using Orleans.Runtime.Configuration;
@@ -33,8 +33,6 @@ namespace Orleans.Runtime
         private readonly LRU<IPEndPoint, Socket> cache;
 
         private const int MAX_SOCKETS = 200;
-
-        public static readonly Guid SiloDirectConnectionId = new Guid("11111111-1111-1111-1111-111111111111");
 
         internal SocketManager(IMessagingConfiguration config)
         {
@@ -88,7 +86,7 @@ namespace Orleans.Runtime
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
                 s.NoDelay = true;
-                s.Send(SiloDirectConnectionId.ToByteArray()); // Identifies this client as a direct silo-to-silo socket
+                WriteConnectionPreemble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
                 // Start an asynch receive off of the socket to detect closure
                 var foo = new byte[4];
                 s.BeginReceive(foo, 0, 1, SocketFlags.None, ReceiveCallback,
@@ -99,7 +97,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    s.Close();
+                    s.Dispose();
                 }
                 catch (Exception)
                 {
@@ -109,6 +107,30 @@ namespace Orleans.Runtime
             }
             return s;
         }
+
+        internal static void WriteConnectionPreemble(Socket socket, GrainId grainId)
+        {
+            int size = 0;
+            byte[] grainIdByteArray = null;
+            if (grainId != null)
+            {
+                grainIdByteArray = grainId.ToByteArray();
+                size += grainIdByteArray.Length;
+            }
+            ByteArrayBuilder sizeArray = new ByteArrayBuilder();
+            sizeArray.Append(size);
+            socket.Send(sizeArray.ToBytes());       // The size of the data that is coming next.
+            //socket.Send(guid.ToByteArray());        // The guid of client/silo id
+            if (grainId != null)
+            {
+                // No need to send in a loop.
+                // From MSDN: If you are using a connection-oriented protocol, Send will block until all of the bytes in the buffer are sent, 
+                // unless a time-out was set by using Socket.SendTimeout. 
+                // If the time-out value was exceeded, the Send call will throw a SocketException. 
+                socket.Send(grainIdByteArray);     // The grainId of the client
+            }
+        }
+
 
         // We start an asynch receive, with this callback, off of every send socket.
         // Since we should never see data coming in on these sockets, having the receive complete means that
@@ -208,7 +230,7 @@ namespace Orleans.Runtime
 
             try
             {
-                s.Close();
+                s.Dispose();
             }
             catch (Exception)
             {
@@ -217,4 +239,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

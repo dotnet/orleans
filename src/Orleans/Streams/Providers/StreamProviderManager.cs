@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
@@ -31,26 +31,26 @@ namespace Orleans.Streams
 {
     internal class StreamProviderManager : IStreamProviderManager
     {
-        private ProviderLoader<IStreamProvider> appStreamProviders;
+        private ProviderLoader<IStreamProviderImpl> appStreamProviders;
 
         internal async Task LoadStreamProviders(
             IDictionary<string, ProviderCategoryConfiguration> configs,
             IStreamProviderRuntime providerRuntime)
         {
-            appStreamProviders = new ProviderLoader<IStreamProvider>();
+            appStreamProviders = new ProviderLoader<IStreamProviderImpl>();
 
-            if (!configs.ContainsKey("Stream")) return;
+            if (!configs.ContainsKey(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)) return;
 
-            appStreamProviders.LoadProviders(configs["Stream"].Providers, this);
+            appStreamProviders.LoadProviders(configs[ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME].Providers, this);
             await appStreamProviders.InitProviders(providerRuntime);
         }
 
         internal async Task StartStreamProviders()
         {
             var providers = appStreamProviders.GetProviders();
-            foreach (IStreamProvider streamProvider in providers)
+            foreach (IStreamProviderImpl streamProvider in providers)
             {
-                var provider = (IStreamProviderImpl) streamProvider;
+                var provider = streamProvider;
                 await provider.Start();   
             }
         }
@@ -65,4 +65,4 @@ namespace Orleans.Streams
             return appStreamProviders.GetProvider(name);
         }
     }
-}
+}

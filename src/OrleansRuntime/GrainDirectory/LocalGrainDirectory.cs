@@ -148,7 +148,7 @@ namespace Orleans.Runtime.GrainDirectory
             cacheSuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_CACHE_SUCCESSES);
             StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_CACHE_HITRATIO, () =>
                 {
-                    long delta1 = 0, delta2 = 0;
+                    long delta1, delta2;
                     long curr1 = cacheSuccesses.GetCurrentValueAndDelta(out delta1);
                     long curr2 = cacheLookups.GetCurrentValueAndDelta(out delta2);
                     return String.Format("{0}, Delta={1}", 
@@ -414,7 +414,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else // Status change for some other silo
             {
-                if (status.Equals(SiloStatus.Dead) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping))
+                if (status.IsTerminating())
                 {
                     // QueueAction up the "Remove" to run on a system turn
                     Scheduler.QueueAction(() => RemoveServer(updatedSilo, status), CacheValidator.SchedulingContext).Ignore();
@@ -431,8 +431,8 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (Membership == null)
                 Membership = Silo.CurrentSilo.LocalSiloStatusOracle;
-            
-            return Membership.IsValidSilo(silo);
+
+            return Membership.IsFunctionalDirectory(silo);
         }
 
         #endregion
@@ -459,20 +459,20 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (Seed == null)
                 {
-                    var grainName = String.Empty;
+                    string grainName;
                     if (!Constants.TryGetSystemGrainName(grain, out grainName))
                         grainName = "MembershipTableGrain";
                     
                     var errorMsg = grainName + " cannot run without Seed node - please check your silo configuration file and make sure it specifies a SeedNode element. " +
                         " Alternatively, you may want to use AzureTable for LivenessType.";
-                    throw new ArgumentException(errorMsg, "grain = " + grain.ToString());
+                    throw new ArgumentException(errorMsg, "grain = " + grain);
                 }
                 // Directory info for the membership table grain has to be located on the primary (seed) node, for bootstrapping
                 if (log.IsVerbose2) log.Verbose2("Silo {0} looked for a special grain {1}, returned {2}", MyAddress, grain, Seed);
                 return Seed;
             }
 
-            SiloAddress s;
+            SiloAddress siloAddress;
             int hash = unchecked((int)grain.GetUniformHashCode());
 
             lock (membershipCache)
@@ -487,22 +487,22 @@ namespace Orleans.Runtime.GrainDirectory
                 bool excludeMySelf = !Running && excludeThisSiloIfStopping; 
 
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-                s = membershipRingList.FindLast(siloAddr => (siloAddr.GetConsistentHashCode() <= hash) &&
+                siloAddress = membershipRingList.FindLast(siloAddr => (siloAddr.GetConsistentHashCode() <= hash) &&
                                     (!siloAddr.Equals(MyAddress) || !excludeMySelf));
-                if (s == null)
+                if (siloAddress == null)
                 {
                     // If not found in the traversal, last silo will do (we are on a ring).
                     // We checked above to make sure that the list isn't empty, so this should always be safe.
-                    s = membershipRingList[membershipRingList.Count - 1];
+                    siloAddress = membershipRingList[membershipRingList.Count - 1];
                     // Make sure it's not us...
-                    if (s.Equals(MyAddress) && excludeMySelf)
+                    if (siloAddress.Equals(MyAddress) && excludeMySelf)
                     {
-                        s = membershipRingList.Count > 1 ? membershipRingList[membershipRingList.Count - 2] : null;
+                        siloAddress = membershipRingList.Count > 1 ? membershipRingList[membershipRingList.Count - 2] : null;
                     }
                 }
             }
-            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, s, grain, hash, s.GetConsistentHashCode());
-            return s;
+            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grain, hash, siloAddress.GetConsistentHashCode());
+            return siloAddress;
         }
 
         #region Implementation of ILocalGrainDirectory
@@ -577,7 +577,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // Caching optimization:
                     // cache the result of a successfull RegisterActivation call, only if it is not a duplicate activation.
                     // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
-                    List<Tuple<SiloAddress, ActivationId>> cached = null;
+                    List<Tuple<SiloAddress, ActivationId>> cached;
                     if (!DirectoryCache.LookUp(address.Grain, out cached))
                     {
                         cached = new List<Tuple<SiloAddress, ActivationId>>(1);
@@ -710,7 +710,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public List<ActivationAddress> GetLocalCacheData(GrainId grain)
         {
-            List<Tuple<SiloAddress, ActivationId>> cached = null;
+            List<Tuple<SiloAddress, ActivationId>> cached;
             return DirectoryCache.LookUp(grain, out cached) ? 
                 cached.Select(elem => ActivationAddress.GetAddress(elem.Item1, grain, elem.Item2)).Where(addr => IsValidSilo(addr.Silo)).ToList() : 
                 null;
@@ -953,8 +953,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
         {
-            return RemoteGrainDirectoryFactory.GetSystemTarget(Constants.DirectoryServiceId, silo);
+            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
         }
     }
 }
-

@@ -28,13 +28,14 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Xml;
+using Orleans.Providers;
 
 namespace Orleans.Runtime.Configuration
 {
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
-    public class ClientConfiguration : MessagingConfiguration, ITraceConfiguration, IStatisticsConfiguration, ILimitsConfiguration
+    public class ClientConfiguration : MessagingConfiguration, ITraceConfiguration, IStatisticsConfiguration
     {
         /// <summary>
         /// Specifies the type of the gateway provider.
@@ -44,6 +45,7 @@ namespace Orleans.Runtime.Configuration
             None,               // 
             AzureTable,         // use Azure, requires SystemStore element
             SqlServer,          // use SQL, requires SystemStore element
+            ZooKeeper,          // use ZooKeeper, requires SystemStore element
             Config              // use Config based static list, requires Config element(s)
         }
 
@@ -76,8 +78,8 @@ namespace Orleans.Runtime.Configuration
         /// Specifies a unique identifier of this deployment.
         /// If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime, 
         /// accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config. 
-        /// So if the silos are run as Azure roles this variable should not be specified in the OrleansConmfiguration.xml (it will be overwritten if specified).
-        /// If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConmfiguration.xml file.
+        /// So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
+        /// If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConfiguration.xml file.
         /// </summary>
         public string DeploymentId { get; set; }
         /// <summary>
@@ -85,8 +87,8 @@ namespace Orleans.Runtime.Configuration
         /// If the silos are deployed on Azure (run as workers roles), DataConnectionString may be specified via RoleEnvironment.GetConfigurationSettingValue("DataConnectionString");
         /// In such a case it is taken from there and passed to the silo automatically by the role via config.
         /// So if the silos are run as Azure roles and this config is specified via RoleEnvironment, 
-        /// this variable should not be specified in the OrleansConmfiguration.xml (it will be overwritten if specified).
-        /// If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConmfiguration.xml file.
+        /// this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
+        /// If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConfiguration.xml file.
         /// If not set at all, DevelopmentStorageAccount will be used.
         /// </summary>
         public string DataConnectionString { get; set; }
@@ -125,7 +127,7 @@ namespace Orleans.Runtime.Configuration
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        public LimitManager LimitManager { get; private set; }
 
         private static readonly TimeSpan DEFAULT_GATEWAY_LIST_REFRESH_PERIOD = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
@@ -204,26 +206,22 @@ namespace Orleans.Runtime.Configuration
             StatisticsLogWriteInterval = DEFAULT_STATS_LOG_WRITE_PERIOD;
             StatisticsWriteLogStatisticsToTable = true;
             StatisticsCollectionLevel = NodeConfiguration.DEFAULT_STATS_COLLECTION_LEVEL;
-            LimitValues = new Dictionary<string, LimitValue>();
+            LimitManager = new LimitManager();
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
         }
 
-        /// <summary>
-        /// </summary>
-        public LimitValue GetLimit(string name)
-        {
-            LimitValue limit;
-            LimitValues.TryGetValue(name, out limit);
-            return limit;
-        }
-
-        internal void Load(TextReader input)
+        public void Load(TextReader input)
         {
             var xml = new XmlDocument();
             var xmlReader = XmlReader.Create(input);
             xml.Load(xmlReader);
-            var root = xml.DocumentElement;
+            XmlElement root = xml.DocumentElement;
 
+            LoadFromXml(root);
+        }
+
+        internal void LoadFromXml(XmlElement root)
+        {
             foreach (XmlNode node in root.ChildNodes)
             {
                 var child = node as XmlElement;
@@ -273,7 +271,7 @@ namespace Orleans.Runtime.Configuration
                             ConfigUtilities.ParseStatistics(this, child, ClientName);
                             break;
                         case "Limits":
-                            ConfigUtilities.ParseLimitValues(this, child, ClientName);
+                            ConfigUtilities.ParseLimitValues(LimitManager, child, ClientName);
                             break;
                         case "Debug":
                             break;
@@ -303,9 +301,17 @@ namespace Orleans.Runtime.Configuration
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                             {
-                                var providerConfig = new ProviderCategoryConfiguration();
-                                providerConfig.Load(child);
-                                ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                                var providerCategory = ProviderCategoryConfiguration.Load(child);
+
+                                if (ProviderConfigurations.ContainsKey(providerCategory.Name))
+                                {
+                                    var existingCategory = ProviderConfigurations[providerCategory.Name];
+                                    existingCategory.Merge(providerCategory);
+                                }
+                                else
+                                {
+                                    ProviderConfigurations.Add(providerCategory.Name, providerCategory);
+                                }
                             }
                             break;
                     }
@@ -317,26 +323,66 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public static ClientConfiguration LoadFromFile(string fileName)
         {
-            if (fileName == null) return null;
+            if (fileName == null)
+            { return null; }
 
-            TextReader input = null;
-            try
+            using (TextReader input = File.OpenText(fileName))
             {
                 var config = new ClientConfiguration();
-                input = File.OpenText(fileName);
                 config.Load(input);
                 config.SourceFile = fileName;
                 return config;
             }
-            finally
-            {
-                if (input != null) input.Close();
-            }
+            
         }
 
-        internal void AdjustConfiguration()
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="Orleans.Streams.IStreamProvider"/> stream</typeparam>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
+        public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            GlobalConfiguration.AdjustConfiguration(ProviderConfigurations, DeploymentId);
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given stream provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
+        public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Retrieves an existing provider configuration
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="config">The provider configuration, if exists</param>
+        /// <returns>True if a configuration for this provider already exists, false otherwise.</returns>
+        public bool TryGetProviderConfiguration(string providerTypeFullName, string providerName, out IProviderConfiguration config)
+        {
+            return ProviderConfigurationUtility.TryGetProviderConfiguration(ProviderConfigurations, providerTypeFullName, providerName, out config);
+        }
+
+        /// <summary>
+        /// Retrieves an enumeration of all currently configured provider configurations.
+        /// </summary>
+        /// <returns>An enumeration of all currently configured provider configurations.</returns>
+        public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
+        {
+            return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
         }
 
         /// <summary>
@@ -404,17 +450,10 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Client Name: ").AppendLine(ClientName);
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-            if (LimitValues.Count > 0)
-            {
-                sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitValues.Values)
-                {
-                    sb.AppendFormat("       {0}", limit).AppendLine();
-                }
-            }
+            sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());
             sb.AppendFormat("   Providers:").AppendLine();
-            sb.Append(GlobalConfiguration.PrintProviderConfigurations(ProviderConfigurations));
+            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();
         }
 
@@ -448,4 +487,4 @@ namespace Orleans.Runtime.Configuration
             }
         }
     }
-}
+}

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
@@ -32,9 +32,9 @@ namespace Orleans.Streams
     internal interface IStreamControl
     {
         /// <summary>
-        /// Perform cleanup functiuons for this stream.
+        /// Perform cleanup functions for this stream.
         /// </summary>
         /// <returns>Completion promise for the cleanup operstions for this stream.</returns>
-        Task Cleanup();
+        Task Cleanup(bool cleanupProducers, bool cleanupConsumers);
     }
-}
+}

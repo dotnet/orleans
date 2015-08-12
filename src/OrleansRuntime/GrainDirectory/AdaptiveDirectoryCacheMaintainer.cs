@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -152,7 +152,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 router.CacheValidationsSent.Increment();
                 // Send all of the items in one large request
-                var validator = RemoteGrainDirectoryFactory.GetSystemTarget(Constants.DirectoryCacheValidatorId, capture);
+                var validator = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorId, capture);
                                 
                 router.Scheduler.QueueTask(async () =>
                 {
@@ -255,4 +255,3 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 }
-

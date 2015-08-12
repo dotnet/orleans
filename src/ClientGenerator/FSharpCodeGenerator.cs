@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Reflection;
@@ -44,14 +44,14 @@ namespace Orleans.CodeGeneration
 
         void StartNewLine()
         {
-            generatedCode.Append('\n');
+            generatedCode.Append(Environment.NewLine);
             generatedCode.Append(' ', indentLevel);
         }
 
         readonly StringBuilder generatedCode = new StringBuilder();
 
         public FSharpCodeGenerator(Assembly grainAssembly, string nameSpace)
-            : base(grainAssembly, nameSpace)
+            : base(grainAssembly, nameSpace, Language.FSharp)
         {
             indentLevel = 0;
             generatedCode.AppendFormat(@"namespace {0}", nameSpace);
@@ -70,7 +70,7 @@ namespace Orleans.CodeGeneration
                 noNamespace = t => true;
 
             referred(type);
-            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type);
+            var name = (noNamespace(type) && !type.IsNested) ? type.Name : TypeUtils.GetFullName(type, Language.FSharp);
 
             if (!type.IsGenericType)
             {
@@ -389,6 +389,17 @@ namespace Orleans.CodeGeneration
         {
             throw new NotImplementedException("GetGenericTypeName");
         }
+
+        /// <summary>
+        /// Returns the F# name for the provided <paramref name="parameter"/>.
+        /// </summary>
+        /// <param name="parameter">The parameter.</param>
+        /// <returns>The F# name for the provided <paramref name="parameter"/>.</returns>
+        protected override string GetParameterName(ParameterInfo parameter)
+        {
+            return string.Format("``{0}``", GrainInterfaceData.GetParameterName(parameter));
+        }
+
         #endregion
     }
-}
+}

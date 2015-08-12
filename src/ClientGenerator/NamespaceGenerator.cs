@@ -31,7 +31,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration.Serialization;
+using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.CodeGeneration
 {
@@ -50,13 +52,16 @@ namespace Orleans.CodeGeneration
 
         private readonly HashSet<int> methodIdCollisionDetection;
         private readonly Assembly grainAssembly;
+        private readonly Language language;
 
-        internal NamespaceGenerator(Assembly grainAssembly, string nameSpace)
+        internal NamespaceGenerator(Assembly grainAssembly, string nameSpace, Language language) 
+            : base(language)
         {
             methodIdCollisionDetection = new HashSet<int>();
             ReferencedNamespace = new CodeNamespace(nameSpace);
             CurrentNamespace = nameSpace;
             this.grainAssembly = grainAssembly;
+            this.language = language;
         }
 
         internal CodeNamespace ReferencedNamespace { get; private set; }
@@ -110,7 +115,7 @@ namespace Orleans.CodeGeneration
                 new CodeAttributeDeclaration(
                     new CodeTypeReference(typeof(GrainReferenceAttribute), CodeTypeReferenceOptions.GlobalReference),
                     new CodeAttributeArgument(
-                        new CodePrimitiveExpression(interfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName((interfaceData.Type))))));
+                        new CodePrimitiveExpression(interfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(interfaceData.Type, language: language)))));
 
             var baseReferenceConstructor2 = new CodeConstructor {Attributes = MemberAttributes.FamilyOrAssembly};
             baseReferenceConstructor2.Parameters.Add(new CodeParameterDeclarationExpression(
@@ -166,7 +171,7 @@ namespace Orleans.CodeGeneration
 
             var interfaceId = GrainInterfaceData.GetGrainInterfaceId(interfaceData.Type);
             var interfaceIdMethod = new CodeMemberProperty
-        {
+            {
                 Name = "InterfaceId",
                 Type = new CodeTypeReference(typeof (int)),
                 Attributes = MemberAttributes.Family | MemberAttributes.Override,
@@ -210,7 +215,7 @@ namespace Orleans.CodeGeneration
             {
                 Name = "InterfaceName",
                 Type = new CodeTypeReference(typeof (string)),
-                Attributes = MemberAttributes.Family | MemberAttributes.Override,
+                Attributes = MemberAttributes.Public | MemberAttributes.Override,
                 HasSet = false,
                 HasGet = true
             };
@@ -278,12 +283,28 @@ namespace Orleans.CodeGeneration
             out bool hasStateClass)
         {
             var sourceType = grainInterfaceData.Type;
+
             stateClassName = FixupTypeName(stateClassName);
             CodeTypeParameterCollection genericTypeParams = grainInterfaceData.GenericTypeParams;
 
             Func<Type, bool> nonamespace = t => CurrentNamespace == t.Namespace || ReferencedNamespaces.Contains(t.Namespace);
 
             Type persistentInterface = GetPersistentInterface(sourceType);
+
+            if (persistentInterface!=null)
+            {
+                if (!persistentInterface.IsInterface)
+                {
+                    hasStateClass = false;
+                    return null;
+                }
+                else
+                {
+                    ConsoleText.WriteError(String.Format("Warning: Usage of grain state interfaces as type arguments for Grain<T> has been deprecated. " +
+                        "Define an equivalent class with automatic properties instead of the state interface for {0}.", sourceType.FullName));
+                }
+            }
+
             Dictionary<string, PropertyInfo> asyncProperties = GrainInterfaceData.GetPersistentProperties(persistentInterface)
                 .ToDictionary(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1), p => p);
 
@@ -309,7 +330,7 @@ namespace Orleans.CodeGeneration
 
             stateClass.CustomAttributes.Add(new CodeAttributeDeclaration(typeof(SerializableAttribute).Name));
             stateClass.CustomAttributes.Add(new CodeAttributeDeclaration(new CodeTypeReference(typeof(GrainStateAttribute), CodeTypeReferenceOptions.GlobalReference),
-                new CodeAttributeArgument(new CodePrimitiveExpression(grainInterfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type)))));
+                new CodeAttributeArgument(new CodePrimitiveExpression(grainInterfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type, language: language)))));
 
             referred(typeof(SerializableAttribute));
             referred(typeof(OnDeserializedAttribute));
@@ -371,7 +392,7 @@ namespace Orleans.CodeGeneration
             var deserializer = SerializerGenerationUtilities.GenerateDeserializer("_Deserializer", stateClassName, genericTypeParams);
 
             var ctor = new CodeConstructor { Attributes = (copier.Attributes & ~MemberAttributes.AccessMask) | MemberAttributes.Public };
-            ctor.BaseConstructorArgs.Add(new CodePrimitiveExpression(TypeUtils.GetFullName(grainInterfaceData.Type)));
+            ctor.BaseConstructorArgs.Add(new CodePrimitiveExpression(TypeUtils.GetFullName(grainInterfaceData.Type, language)));
             ctor.Statements.Add(new CodeMethodInvokeExpression(
                 new CodeThisReferenceExpression(),
                 "InitStateFields"));
@@ -453,15 +474,15 @@ namespace Orleans.CodeGeneration
             CodeTypeReference returnType;
             if (!isObserver)
             {
-                // Method is expected to return either a Task or a grin reference
+                // Method is expected to return either a Task or a grain reference
                 if (!GrainInterfaceData.IsTaskType(methodInfo.ReturnType) &&
                     !typeof (IAddressable).IsAssignableFrom(methodInfo.ReturnType))
                     throw new InvalidOperationException(
                         string.Format("Unsupported return type {0}. Method Name={1} Declaring Type={2}",
                             methodInfo.ReturnType.FullName, methodInfo.Name,
-                            TypeUtils.GetFullName(methodInfo.DeclaringType)));
+                            TypeUtils.GetFullName(methodInfo.DeclaringType, language)));
 
-                returnType = CreateCodeTypeReference(methodInfo.ReturnType);
+                returnType = CreateCodeTypeReference(methodInfo.ReturnType, language);
             }
             else
                 returnType = new CodeTypeReference(typeof (void));
@@ -474,12 +495,13 @@ namespace Orleans.CodeGeneration
 
             foreach (var param in methodInfo.GetParameters())
             {
+                var paramName = GetParameterName(param);
                 CodeParameterDeclarationExpression p = param.ParameterType.IsGenericType
                     ? new CodeParameterDeclarationExpression(
                         TypeUtils.GetParameterizedTemplateName(param.ParameterType, true,
-                            tt => CurrentNamespace != tt.Namespace && !ReferencedNamespaces.Contains(tt.Namespace)),
-                        param.Name)
-                    : new CodeParameterDeclarationExpression(param.ParameterType, param.Name);
+                            tt => CurrentNamespace != tt.Namespace && !ReferencedNamespaces.Contains(tt.Namespace), language),
+                        paramName)
+                    : new CodeParameterDeclarationExpression(param.ParameterType, paramName);
 
                 p.Direction = FieldDirection.In;
                 referenceMethod.Parameters.Add(p);
@@ -515,7 +537,7 @@ namespace Orleans.CodeGeneration
                 // For any parameters of type IGrainObjerver, the object passed at runtime must also be a GrainReference
                 if (typeof (IGrainObserver).IsAssignableFrom(p.ParameterType))
                     paramGuardStatements.AppendLine(string.Format(@"GrainFactoryBase.CheckGrainObserverParamInternal({0});",
-                        GrainInterfaceData.GetParameterName(p)));
+                        GetParameterName(p)));
             }
             return paramGuardStatements.ToString();
         }
@@ -540,7 +562,7 @@ namespace Orleans.CodeGeneration
                     return GetGenericTypeName(genericArguments[0], flag);
 
                 var errorMsg = String.Format("Unexpected number of arguments {0} for generic type {1} used as a return type. Only Type<T> are supported as generic return types of grain methods.", genericArguments.Length, type);
-                ConsoleText.WriteError(errorMsg);
+                ReportError(errorMsg);
                 throw new ApplicationException(errorMsg);
             }
 
@@ -554,16 +576,16 @@ namespace Orleans.CodeGeneration
                 : new CodeTypeReference(GetGenericTypeName(type, flag));
         }
 
-        private static CodeTypeReference CreateCodeTypeReference(Type type)
+        private static CodeTypeReference CreateCodeTypeReference(Type type, Language language)
         {
-            var baseName = TypeUtils.GetSimpleTypeName(type);
+            var baseName = TypeUtils.GetSimpleTypeName(type, language: language);
             if (!type.IsGenericParameter) 
                 baseName = type.Namespace + "." + baseName;
 
             var codeRef = new CodeTypeReference(baseName);
             if ((type.IsGenericType || type.IsGenericTypeDefinition))
                 foreach (Type genericArg in type.GetGenericArguments())
-                    codeRef.TypeArguments.Add(CreateCodeTypeReference(genericArg));
+                    codeRef.TypeArguments.Add(CreateCodeTypeReference(genericArg, language));
 
             return codeRef;
         }
@@ -603,7 +625,7 @@ namespace Orleans.CodeGeneration
             GrainInterfaceInfo grainInterfaceInfo = GetInterfaceInfo(grainType);
             var interfaceId = grainInterfaceInfo.Interfaces.Keys.First();
             invokerClass.CustomAttributes.Add(new CodeAttributeDeclaration( new CodeTypeReference(typeof(MethodInvokerAttribute), CodeTypeReferenceOptions.GlobalReference),
-                new CodeAttributeArgument(new CodePrimitiveExpression(grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType))),
+                new CodeAttributeArgument(new CodePrimitiveExpression(grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType, language: language))),
                 new CodeAttributeArgument(new CodePrimitiveExpression(interfaceId))));
 
             var interfaceIdProperty = new CodeMemberProperty
@@ -616,7 +638,7 @@ namespace Orleans.CodeGeneration
             interfaceIdProperty.PrivateImplementationType = new CodeTypeReference(typeof(IGrainMethodInvoker), CodeTypeReferenceOptions.GlobalReference);
             invokerClass.Members.Add(interfaceIdProperty);
 
-            //Add invoke method for Orleans message 
+            // Add invoke method for Orleans message 
             var orleansInvoker = new CodeMemberMethod
             {
                 Attributes = MemberAttributes.Public | MemberAttributes.Final,
@@ -633,7 +655,7 @@ namespace Orleans.CodeGeneration
             orleansInvoker.Statements.Add(orleansInvokerImpl);
             invokerClass.Members.Add(orleansInvoker);
 
-            //Add TryInvoke method for Orleans message, if the type is an extension interface
+            // Add TryInvoke method for Orleans message, if the type is an extension interface
             if (si.IsExtension)
             {
                 var orleansTryInvoker = new CodeMemberMethod
@@ -653,7 +675,7 @@ namespace Orleans.CodeGeneration
                 invokerClass.Members.Add(orleansTryInvoker);
             }
 
-            //Add GetMethodName() method 
+            // Add GetMethodName() method 
             var getMethodName = new CodeMemberMethod
             {
                 Attributes = MemberAttributes.Public | MemberAttributes.Final | MemberAttributes.Static,
@@ -704,7 +726,7 @@ namespace Orleans.CodeGeneration
             int methodId = GrainInterfaceData.ComputeMethodId(methodInfo);
             if (methodIdCollisionDetection.Contains(methodId))
             {
-                ReportErrorAndThrow(string.Format("Collision detected for method {0}, declaring type {1}, consider renaming method name",
+                ReportError(string.Format("Collision detected for method {0}, declaring type {1}, consider renaming method name",
                     methodInfo.Name, methodInfo.DeclaringType.FullName));
             }
             else
@@ -720,11 +742,34 @@ namespace Orleans.CodeGeneration
 
         #region utility methods
 
-        private static void ReportErrorAndThrow(string errorMsg)
+        /// <summary>
+        /// Makes errors visible in VS and MSBuild by prefixing error message with "Error"
+        /// </summary>
+        /// <param name="errorMsg">Error message</param>
+        internal static void ReportError(string errorMsg)
         {
-            ConsoleText.WriteError("Orleans code generator found error: " + errorMsg);
-            throw new OrleansException(errorMsg);
+            ConsoleText.WriteError("Error: Orleans code generator found error: " + errorMsg);
         }
+
+        /// <summary>
+        /// Makes errors visible in VS and MSBuild by prefixing error message with "Error"
+        /// </summary>
+        /// <param name="errorMsg">Error message</param>
+        /// <param name="exc">Exception associated with the error</param>
+        internal static void ReportError(string errorMsg, Exception exc)
+        {
+            ConsoleText.WriteError("Error: Orleans code generator found error: " + errorMsg, exc);
+        }
+
+        /// <summary>
+        /// Makes warnings visible in VS and MSBuild by prefixing error message with "Warning"
+        /// </summary>
+        /// <param name="warning">Warning message</param>
+        internal static void ReportWarning(string warning)
+        {
+            ConsoleText.WriteWarning("Warning: " + warning);
+        }
+        
 
         private void AddFactoryMethods(GrainInterfaceData si, CodeTypeDeclaration factoryClass)
         {
@@ -780,4 +825,4 @@ namespace Orleans.CodeGeneration
 
         #endregion
     }
-}
+}

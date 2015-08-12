@@ -13,10 +13,6 @@
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <PlatformTarget>x86</PlatformTarget>
-    <SccProjectName></SccProjectName>
-    <SccLocalPath></SccLocalPath>
-    <SccAuxPath></SccAuxPath>
-    <SccProvider></SccProvider>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
@@ -36,7 +32,6 @@
     <BootstrapperEnabled>true</BootstrapperEnabled>
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -68,25 +63,10 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.WindowsAzure.Configuration, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.ServiceRuntime, Version=2.4.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <Private>True</Private>
-      <HintPath>..\packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.4.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.StorageClient, Version=1.7.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\WindowsAzure.Storage.1.7.0.0\lib\net35-full\Microsoft.WindowsAzure.StorageClient.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
-    <Reference Include="System.configuration" />
     <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data.Services.Client" />
-    <Reference Include="System.Web.Extensions" />
-    <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
@@ -100,6 +80,7 @@
     <Compile Include="Messaging\IOutboundMessageQueue.cs" />
     <Compile Include="Placement\ISiloStatisticsChangeListener.cs" />
     <Compile Include="Placement\PlacementDirectorsManager.cs" />
+    <Compile Include="Placement\ClientObserversPlacementDirector.cs" />
     <Compile Include="Placement\PreferLocalPlacementDirector.cs" />
     <Compile Include="Placement\StatelessWorkerDirector.cs" />
     <Compile Include="Placement\PlacementDirector.cs" />
@@ -135,12 +116,10 @@
     <Compile Include="ReminderService\SqlReminderTable.cs" />
     <Compile Include="Scheduler\TaskSchedulerUtils.cs" />
     <Compile Include="Silo\SiloProviderRuntime.cs" />
-    <Compile Include="ReminderService\AzureBasedReminderTable.cs" />
     <Compile Include="ReminderService\GrainBasedReminderTable.cs" />
     <Compile Include="ReminderService\InMemoryRemindersTable.cs" />
     <Compile Include="ReminderService\LocalReminderService.cs" />
     <Compile Include="ReminderService\LocalReminderServiceFactory.cs" />
-    <Compile Include="ReminderService\RemindersTableManager.cs" />
     <Compile Include="ReminderService\ReminderTable.cs" />
     <Compile Include="Placement\DeploymentLoadPublisher.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
@@ -167,7 +146,6 @@
     <Compile Include="GrainTypeManager\AssemblyLoaderUtils.cs" />
     <Compile Include="GrainDirectory\ClientObserverRegistrar.cs" />
     <Compile Include="GrainTypeManager\GrainTypeManager.cs" />
-    <Compile Include="MembershipService\AzureBasedMembershipTable.cs" />
     <Compile Include="MembershipService\GrainBasedMembershipTable.cs" />
     <Compile Include="MembershipService\MembershipFactory.cs" />
     <Compile Include="MembershipService\MembershipOracle.cs" />
@@ -189,11 +167,9 @@
     <Compile Include="Scheduler\WorkQueue.cs" />
     <Compile Include="Silo\SiloControl.cs" />
     <Compile Include="Storage\StorageProviderManager.cs" />
-    <Compile Include="Storage\StorageProviderUtils.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingManager.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingAgent.cs" />
     <Compile Include="Streams\PubSub\PubSubRendezvousGrain.cs" />
-    <Compile Include="Streams\PersistentStream\PersistentStreamProvider.cs" />
     <Compile Include="Core\SystemTarget.cs" />
     <Compile Include="Catalog\ActivationDirectory.cs" />
     <Compile Include="GrainTypeManager\SiloAssemblyLoader.cs" />
@@ -207,14 +183,14 @@
     <Compile Include="Core\InsideGrainClient.cs" />
     <Compile Include="GrainTypeManager\TypeManager.cs" />
     <Compile Include="Silo\Watchdog.cs" />
+    <Compile Include="Streams\QueueBalancer\BestFitBalancer.cs" />
+    <Compile Include="Streams\QueueBalancer\StaticClusterDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\ConsistentRingQueueBalancer.cs" />
+    <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
+    <Compile Include="Streams\QueueBalancer\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
-      <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
-      <Name>ClientGenerator</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
@@ -224,7 +200,6 @@
     <None Include="..\Orleans.snk">
       <Link>Orleans.snk</Link>
     </None>
-    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
@@ -234,24 +209,19 @@
   </PropertyGroup>
   <!-- Set path to ClientGenerator.exe -->
   <Choose>
-    <When Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <When Condition="'$(builduri)' != ''">
       <PropertyGroup>
-        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+        <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
       </PropertyGroup>
     </When>
     <Otherwise>
       <PropertyGroup>
-        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+        <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
       </PropertyGroup>
     </Otherwise>
   </Choose>
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
-  </Target>
   <!--End Orleans -->
 </Project>

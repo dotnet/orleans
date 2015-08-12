@@ -141,4 +141,4 @@ namespace Orleans.Runtime
             return (float)sum / (float)nItems;
         }
     }
-}
+}

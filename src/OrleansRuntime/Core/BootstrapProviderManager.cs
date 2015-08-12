@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         internal BootstrapProviderManager()
         {
             var logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
-            configCategoryName = BootstrapProviderConstants.CONFIG_CATEGORY_NAME;
+            configCategoryName = ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME;
             pluginManager = new PluginManager<IBootstrapProvider>(logger);
         }
 
@@ -95,4 +95,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

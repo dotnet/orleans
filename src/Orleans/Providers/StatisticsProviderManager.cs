@@ -21,11 +21,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -42,6 +42,8 @@ namespace Orleans.Providers
             providerKind = kind;
             this.runtime = runtime;
         }
+
+        public IGrainFactory GrainFactory { get { return runtime.GrainFactory; }}
         
         public async Task<string> LoadProvider(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
@@ -97,6 +99,10 @@ namespace Orleans.Providers
         {
             get { return runtime.ServiceId; }
         }
+
+        public string SiloIdentity
+        {
+            get { return runtime.SiloIdentity; }
+        }
     }
 }
-

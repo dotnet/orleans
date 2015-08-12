@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -37,8 +37,6 @@ namespace Orleans.Runtime.Placement
             List<ActivationAddress> places = await context.Lookup(target);
             if (places.Count <= 0)
             {
-                if (target.IsClient)
-                    throw new KeyNotFoundException("No client activation for " + target);
                 // we return null to indicate that we were unable to select a target from places activations.
                 return null;
             }
@@ -54,8 +52,6 @@ namespace Orleans.Runtime.Placement
                 return PlacementResult.IdentifySelection(local[random.Next(local.Count)]);
             if (places.Count > 0)
                 return PlacementResult.IdentifySelection(places[random.Next(places.Count)]);
-            if (target.IsClient)
-                throw new KeyNotFoundException("No client activation for grain " + target.ToString());
             // we return null to indicate that we were unable to select a target from places activations.
             return null;
         }
@@ -64,9 +60,9 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             var grainType = context.GetGrainTypeName(grain);
-            var allSilos = context.AllSilos;
+            var allSilos = context.AllActiveSilos;
             return Task.FromResult(
                 PlacementResult.SpecifyCreation(allSilos[random.Next(allSilos.Count)], strategy, grainType));
         }
     }
-}
+}

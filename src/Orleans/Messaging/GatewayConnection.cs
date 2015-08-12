@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Net.Sockets;
 using System.Threading;
 using Orleans.Runtime;
@@ -168,7 +168,7 @@ namespace Orleans.Messaging
                                 return;
 
                             MarkAsDisconnected(Socket); // clean up the socket before reconnecting.
-                            }
+                        }
                         if (lastConnect != new DateTime())
                         {
                             var millisecondsSinceLastAttempt = DateTime.UtcNow - lastConnect;
@@ -183,7 +183,7 @@ namespace Orleans.Messaging
                         Socket = new Socket(Silo.Endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                         Socket.Connect(Silo.Endpoint);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
-                        Socket.Send(MsgCenter.ClientId.ToByteArray()); // Identifies this client
+                        SocketManager.WriteConnectionPreemble(Socket, MsgCenter.ClientId);  // Identifies this client
                         Log.Info(ErrorCode.ProxyClient_Connected, "Connected to gateway at address {0} on trial {1}.", Address, i);
                         return;
                     }
@@ -248,6 +248,7 @@ namespace Orleans.Messaging
 
         protected override void OnGetSendingSocketFailure(Message msg, string error)
         {
+            msg.TargetSilo = null; // clear previous destination!
             MsgCenter.SendMessage(msg);
         }
 
@@ -313,4 +314,3 @@ namespace Orleans.Messaging
         }
     }
 }
-

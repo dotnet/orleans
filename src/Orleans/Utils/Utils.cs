@@ -21,20 +21,20 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿﻿using System;
-﻿using System.Collections;
-﻿using System.Collections.Generic;
-﻿using System.Linq;
-﻿using System.Reflection;
-﻿using System.Security.Cryptography;
-﻿using System.Text;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// The Utils class contains a variety of utility methods for use in application and grain code.
     /// </summary>
-    internal static class Utils
+    public static class Utils
     {
         /// <summary>
         /// Returns a human-readable text string that describes an IEnumerable collection of objects.
@@ -91,11 +91,15 @@ namespace Orleans.Runtime
         /// Each key-value pair is represented as the string description of the key followed by
         /// the string description of the value,
         /// separated by " -> ", and enclosed in curly brackets.</returns>
-        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string> toString = null, string separator = "\n")
+        public static string DictionaryToString<T1, T2>(ICollection<KeyValuePair<T1, T2>> dict, Func<T2, string> toString = null, string separator = null)
         {
             if (dict == null || dict.Count == 0)
             {
                 return "[]";
+            }
+            if (separator == null)
+            {
+                separator = Environment.NewLine;
             }
             var sb = new StringBuilder("[");
             var enumerator = dict.GetEnumerator();
@@ -188,20 +192,7 @@ namespace Orleans.Runtime
             return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", address.Endpoint.Address, address.Endpoint.Port, address.Generation));
         }
 
-        /// <summary>
-        /// Represent a silo instance entry in the gateway URI format.
-        /// </summary>
-        /// <param name="address">The input silo instance</param>
-        /// <returns></returns>
-        internal static Uri ToGatewayUri(this AzureUtils.SiloInstanceTableEntry gateway)
-        {
-            int proxyPort = 0;
-            if (!string.IsNullOrEmpty(gateway.ProxyPort))
-                int.TryParse(gateway.ProxyPort, out proxyPort);
-
-            return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", gateway.Address, proxyPort, gateway.Generation));
-        }
-
+        
         /// <summary>
         /// Calculates an integer hash value based on the consistent identity hash of a string.
         /// </summary>
@@ -209,7 +200,7 @@ namespace Orleans.Runtime
         /// <returns>An integer hash for the string.</returns>
         public static int CalculateIdHash(string text)
         {
-            SHA256 sha = new SHA256CryptoServiceProvider(); // This is one implementation of the abstract class SHA1.
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
             int hash = 0;
             try
             {
@@ -357,6 +348,64 @@ namespace Orleans.Runtime
             all.AddRange(rtle.LoaderExceptions);
             throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenence.", all);
         }
+
+        /// <summary>
+        /// </summary>
+        public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
+        {
+            var batch = new List<T>(batchSize);
+            foreach (var item in sequence)
+            {
+                batch.Add(item);
+                // when we've accumulated enough in the batch, send it out  
+                if (batch.Count >= batchSize)
+                {
+                    yield return batch; // batch.ToArray();
+                    batch = new List<T>(batchSize);
+                }
+            }
+            if (batch.Count > 0)
+            {
+                yield return batch; //batch.ToArray();
+            }
+        }
+
+        internal static MethodInfo GetStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes)
+        {
+            var asm = Assembly.Load(assemblyName);
+            if (asm == null)
+                throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
+
+            var cl = asm.GetType(className);
+            if (cl == null)
+                throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
+
+            MethodInfo method;
+            method = argumentTypes == null
+                ? cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                : cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, argumentTypes, null);
+
+            if (method == null)
+                throw new InvalidOperationException(string.Format("Cannot find static method {0} of class {1} in assembly {2}", methodName, className, assemblyName));
+
+            return method;
+        }
+
+        internal static object InvokeStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes, object[] arguments)
+        {
+            var method = GetStaticMethodThroughReflection(assemblyName, className, methodName, argumentTypes);
+            return method.Invoke(null, arguments);
+        }
+
+        internal static Type LoadTypeThroughReflection(string assemblyName, string className)
+        {
+            var asm = Assembly.Load(assemblyName);
+            if (asm == null) throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
+
+            var cl = asm.GetType(className);
+            if (cl == null) throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
+
+            return cl;
+        }
     }
 }
-

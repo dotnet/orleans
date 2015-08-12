@@ -163,7 +163,9 @@ namespace Orleans.Runtime
             }
         }
 
-        // Returns null if no activations exist for this grain ID, rather than an empty list
+        /// <summary>
+        /// Returns null if no activations exist for this grain ID, rather than an empty list
+        /// </summary>
         public List<ActivationData> FindTargets(GrainId key)
         {
             List<ActivationData> tmp;
@@ -188,10 +190,10 @@ namespace Orleans.Runtime
         {
             if (logger.IsInfo)
             {
-                string stats = Utils.EnumerableToString(activations.Values.OrderBy(act => act.Name), act => string.Format("++{0}", act.DumpStatus()), "\r\n");
+                string stats = Utils.EnumerableToString(activations.Values.OrderBy(act => act.Name), act => string.Format("++{0}", act.DumpStatus()), Environment.NewLine);
                 if (stats.Length > 0)
                 {
-                    logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.Catalog_ActivationDirectory_Statistics, String.Format("ActivationDirectory.PrintActivationDirectory(): Size = {0}, Directory:\n{1}",
+                    logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.Catalog_ActivationDirectory_Statistics, String.Format("ActivationDirectory.PrintActivationDirectory(): Size = {0}, Directory:" + Environment.NewLine + "{1}",
                         activations.Count, stats));
                 }
             }
@@ -212,4 +214,3 @@ namespace Orleans.Runtime
         #endregion
     }
 }
-

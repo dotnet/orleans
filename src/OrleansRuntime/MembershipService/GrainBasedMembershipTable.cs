@@ -21,13 +21,15 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Threading.Tasks;
+using System;
+using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
     [Reentrant]
-    internal class GrainBasedMembershipTable : Grain, IMembershipTable
+    internal class GrainBasedMembershipTable : Grain, IMembershipTableGrain
     {
         private InMemoryMembershipTable table;
         private TraceLogger logger;
@@ -37,6 +39,25 @@ namespace Orleans.Runtime.MembershipService
             logger = TraceLogger.GetLogger("GrainBasedMembershipTable", TraceLogger.LoggerType.Runtime);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
             table = new InMemoryMembershipTable();
+            return TaskDone.Done;
+        }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("GrainBasedMembershipTable Deactivated.");
+            return TaskDone.Done;
+        }
+
+        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
+        {
+            logger.Info("InitializeMembershipTable {0}.", tryInitTableVersion);
+            return TaskDone.Done;
+        }
+
+        public Task DeleteMembershipTableEntries(string deploymentId)
+        {
+            logger.Info("DeleteMembershipTableEntries {0}", deploymentId);
+            table = null;
             return TaskDone.Done;
         }
 
@@ -84,4 +105,3 @@ namespace Orleans.Runtime.MembershipService
     }
 }
 
-

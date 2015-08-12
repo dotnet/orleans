@@ -21,50 +21,42 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Threading.Tasks;
-
+using Orleans.Core;
 using Orleans.Streams;
 
 using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
-    internal class ClientProviderRuntime : IProviderRuntime, IStreamProviderRuntime
+    internal class ClientProviderRuntime : IStreamProviderRuntime
     { 
         private IStreamPubSub pubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
 
-        private ClientProviderRuntime() 
+        public ClientProviderRuntime(IGrainFactory grainFactory) 
         {
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
+            GrainFactory = grainFactory;
         }
 
-        public static ClientProviderRuntime Instance { get; private set; }
+        public IGrainFactory GrainFactory { get; private set; }
 
-        public static void InitializeSingleton() 
-        {
-            if (Instance != null)
-            {
-                UninitializeSingleton();
-            }
-            Instance = new ClientProviderRuntime();
-        }
-
-        public static void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
             if (null == implicitStreamSubscriberTable)
             {
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
-            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(), implicitStreamSubscriberTable);
-            Instance.streamDirectory = new StreamDirectory();
+            pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(GrainFactory), implicitStreamSubscriberTable);
+            streamDirectory = new StreamDirectory();
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -72,9 +64,14 @@ namespace Orleans.Providers
             return streamDirectory;
         }
 
-        public static void UninitializeSingleton()
+        public async Task Reset()
         {
-            Instance = null;
+            if (streamDirectory != null)
+            {
+                var tmp = streamDirectory;
+                streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
+                await tmp.Cleanup(true, true);
+            }
         }
 
         public Logger GetLogger(string loggerName)
@@ -92,6 +89,14 @@ namespace Orleans.Providers
                 // so we return default value here instead of throw exception.
                 //
                 return Guid.Empty;
+            }
+        }
+
+        public string SiloIdentity
+        {
+            get
+            {
+                throw new InvalidOperationException("Cannot access SiloIdentity from client.");
             }
         }
 
@@ -127,11 +132,6 @@ namespace Orleans.Providers
             IAddressable addressable;
             TExtension extension;
 
-            // until we have a means to get the factory related to a grain interface, we have to search linearly for the factory. 
-            var factoryName = String.Format("{0}.{1}Factory", typeof(TExtensionInterface).Namespace, typeof(TExtensionInterface).Name.Substring(1)); // skip the I
-            var factoryType = TypeUtils.ResolveType(factoryName);
-
-
             using (await lockable.LockAsync())
             {
                 Tuple<IGrainExtension, IAddressable> entry;
@@ -141,11 +141,10 @@ namespace Orleans.Providers
                     addressable = entry.Item2;
                 }
                 else
-                {
+                { 
                     extension = newExtensionFunc();
-                    var obj = factoryType.InvokeMember("CreateObjectReference", 
-                        BindingFlags.Default | BindingFlags.InvokeMethod, 
-                        null, null, new object[]{ extension }, CultureInfo.InvariantCulture);
+                    var obj = ((Orleans.GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
+
                     addressable = (IAddressable) await (Task<TExtensionInterface>) obj;
 
                     if (null == addressable)
@@ -157,12 +156,7 @@ namespace Orleans.Providers
                 }
             }
 
-            var typedAddressable = (TExtensionInterface) GrainClient.InvokeStaticMethodThroughReflection(
-                 typeof(TExtensionInterface).Assembly.FullName,
-                 factoryName,
-                 "Cast",
-                 new Type[] { typeof(IAddressable) },
-                 new object[] { addressable });
+            var typedAddressable = addressable.Cast<TExtensionInterface>();
             // we have to return the extension as well as the IAddressable because the caller needs to root the extension
             // to prevent it from being collected (the IAddressable uses a weak reference).
             return Tuple.Create(extension, typedAddressable);
@@ -191,5 +185,17 @@ namespace Orleans.Providers
         {
             return null;
         }
+
+        public Task StartPullingAgents(
+            string streamProviderName,
+            StreamQueueBalancerType balancerType,
+            IQueueAdapterFactory adapterFactory,
+            IQueueAdapter queueAdapter,
+            TimeSpan getQueueMsgsTimerPeriod,
+            TimeSpan initQueueTimeout,
+            TimeSpan maxEventDeliveryTime)
+        {        
+            return TaskDone.Done;
+        }
     }
-}
+}

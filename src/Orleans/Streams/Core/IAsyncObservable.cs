@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
@@ -65,25 +65,5 @@ namespace Orleans.Streams
         Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
             StreamFilterPredicate filterFunc = null,
             object filterData = null);
-
-        /// <summary>
-        /// Unsubscribe a stream consumer from this observable.
-        /// </summary>
-        /// <param name="handle">The stream handle to unsubscribe.</param>
-        /// <returns>A promise to unsubscription action.
-        /// </returns>
-        Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle);
-
-        /// <summary>
-        /// Unsubscribe all stream consumers from this observable.
-        /// <para>
-        /// Note that this unsubscribe call applies to all stream subscriptons done in a certain processing context, 
-        /// and not globally all subscriptons done in a whole distributed system.
-        /// In Orleans that means all subsriptions made by a grain.
-        /// </para>
-        /// </summary>
-        /// <returns>A promise to unsubscription action.
-        /// </returns>
-        Task UnsubscribeAllAsync();
     }
-}
+}

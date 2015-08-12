@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
@@ -34,6 +34,7 @@ namespace Orleans
     /// </summary>
     internal static class AsyncExecutorWithRetries
     {
+        public static readonly int INFINITE_RETRIES = -1;
         private static readonly Func<Exception, int, bool> retryAllExceptionsFilter = (Exception exc, int i) => true;
 
         /// <summary>
@@ -154,7 +155,7 @@ namespace Orleans
                 result = await function(counter);
 
                 bool retry = false;
-                if (callCounter < maxNumSuccessTries || maxNumSuccessTries == -1) // -1 for infinite retries
+                if (callCounter < maxNumSuccessTries || maxNumSuccessTries == INFINITE_RETRIES) // -1 for infinite retries
                 {
                     if (retryValueFilter != null)
                         retry = retryValueFilter(result, counter);
@@ -182,7 +183,7 @@ namespace Orleans
             if (exception != null)
             {
                 bool retry = false;
-                if (callCounter < maxNumErrorTries || maxNumErrorTries == -1)
+                if (callCounter < maxNumErrorTries || maxNumErrorTries == INFINITE_RETRIES)
                 {
                     if (retryExceptionFilter != null)
                         retry = retryExceptionFilter(exception, counter);
@@ -283,4 +284,3 @@ namespace Orleans
         }
     }
 }
-

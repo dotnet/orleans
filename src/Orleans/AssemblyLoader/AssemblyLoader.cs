@@ -73,8 +73,9 @@ namespace Orleans.Runtime
         ///     assemblies to be loaded based on examination of their ReflectionOnly type
         ///     information (e.g. AssemblyLoaderCriteria.LoadTypesAssignableFrom).</param>
         /// <param name="logger">A logger to provide feedback to.</param>
+        /// <returns>List of discovered assembly locations</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.Reflection.Assembly.LoadFrom")]
-        public static void LoadAssemblies(
+        public static List<string> LoadAssemblies(
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
@@ -88,7 +89,8 @@ namespace Orleans.Runtime
                     logger);
 
             int count = 0;
-            foreach (var pathName in loader.DiscoverAssemblies())
+            List<string> discoveredAssemblyLocations = loader.DiscoverAssemblies();
+            foreach (var pathName in discoveredAssemblyLocations)
             {
                 loader.logger.Info("Loading assembly {0}...", pathName);
                 // It is okay to use LoadFrom here because we are loading application assemblies deployed to the specific directory.
@@ -97,6 +99,23 @@ namespace Orleans.Runtime
                 ++count;
             }
             loader.logger.Info("{0} assemblies loaded.", count);
+            return discoveredAssemblyLocations;
+        }
+
+        public static T LoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        {
+            try
+            {
+                var assembly = Assembly.Load(assemblyName);
+                var foundType = TypeUtils.GetTypes(assembly, type => typeof (T).IsAssignableFrom(type)).First();
+
+                return (T) Activator.CreateInstance(foundType, true);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.Loader_LoadAndCreateInstance_Failure, exc.Message, exc);
+                throw;
+            }
         }
 
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
@@ -174,6 +193,27 @@ namespace Orleans.Runtime
                     .Select(Path.GetFullPath)
                     .Distinct()
                     .ToArray();
+
+                // This is a workaround for the behavior of ReflectionOnlyLoad/ReflectionOnlyLoadFrom
+                // that appear not to automatically resolve dependencies.
+                // We are trying to pre-load all dlls we find in the folder, so that if one of these
+                // assemblies happens to be a dependency of an assembly we later on call 
+                // Assembly.GetTypes() on, the dependency will be already loaded and will get
+                // automatically resolved. Ugly, but seems to solve the problem.
+
+                foreach (var j in candidates)
+                {
+                    try
+                    {
+                        if (logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.", j);
+                        Assembly.ReflectionOnlyLoadFrom(j);
+                    }
+                    catch (Exception)
+                    {
+                        if (logger.IsVerbose) logger.Verbose("Failed to pre-load assembly {0} in reflection-only context.", j);
+                    }
+                }
+
                 foreach (var j in candidates)
                 {
                     if (AssemblyPassesLoadCriteria(j))
@@ -312,7 +352,7 @@ namespace Orleans.Runtime
             var distinctComplaints = complaints.Distinct();
             // generate feedback so that the operator can determine why her DLL didn't load.
             var msg = new StringBuilder();
-            const string bullet = "\n\t* ";
+            string bullet = Environment.NewLine + "\t* ";
             msg.Append(String.Format("User assembly ignored: {0}", pathName));
             int count = 0;
             foreach (var i in distinctComplaints)
@@ -383,4 +423,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
@@ -63,44 +63,48 @@ namespace Orleans.CodeGeneration
         
         public string FactoryClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(FactoryClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(FactoryClassBaseName, Type, language: language); }
         }
 
         public string ReferenceClassBaseName { get; set; }
 
         public string ReferenceClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(ReferenceClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(ReferenceClassBaseName, Type, language: language); }
         }
 
         public string InterfaceTypeName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(Type, language: language); }
         }
 
         public string StateClassBaseName { get; internal set; }
 
         public string StateClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(StateClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(StateClassBaseName, Type, language: language); }
         }
 
         public string InvokerClassBaseName { get; internal set; }
 
         public string InvokerClassName
         {
-            get { return TypeUtils.GetParameterizedTemplateName(InvokerClassBaseName, Type); }
+            get { return TypeUtils.GetParameterizedTemplateName(InvokerClassBaseName, Type, language: language); }
         }
 
         public string TypeFullName
         {
-            get { return Namespace + "." + TypeUtils.GetParameterizedTemplateName(Type); }
+            get { return Namespace + "." + TypeUtils.GetParameterizedTemplateName(Type, language: language); }
         }
 
-        public GrainInterfaceData()
-        {}
+        private readonly Language language;
 
-        public GrainInterfaceData(Type type)
+        public GrainInterfaceData(Language language)
+        {
+            this.language = language;
+        }
+
+        public GrainInterfaceData(Language language, Type type) : this(language)
         {
             if (!IsGrainInterface(type))
                 throw new ArgumentException(String.Format("{0} is not a grain interface", type.FullName));
@@ -116,9 +120,16 @@ namespace Orleans.CodeGeneration
             DefineClassNames(true);
         }
 
-        public static GrainInterfaceData FromGrainClass(Type grainType)
+        public static GrainInterfaceData FromGrainClass(Type grainType, Language language)
         {
-            var gi = new GrainInterfaceData {Type = grainType};
+            if (!TypeUtils.IsConcreteGrainClass(grainType) &&
+                !TypeUtils.IsSystemTargetClass(grainType))
+            {
+                List<string> violations = new List<string> { String.Format("{0} implements IGrain but is not a concrete Grain Class (Hint: Extend the base Grain or Grain<T> class).", grainType.FullName) };
+                throw new RulesViolationException("Invalid Grain class.", violations);
+            }
+
+            var gi = new GrainInterfaceData(language) { Type = grainType };
             gi.DefineClassNames(false);
             return gi;
         }
@@ -127,9 +138,10 @@ namespace Orleans.CodeGeneration
         {
             if (t.IsClass)
                 return false;
-            if (t == typeof (IGrainObserver) || t == typeof (IAddressable))
+            if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
                 return false;
-            if (t == typeof (IGrain))
+            if (t == typeof(IGrain) || t == typeof(IGrainWithGuidKey) || t == typeof(IGrainWithIntegerKey)
+                || t == typeof(IGrainWithGuidCompoundKey) || t == typeof(IGrainWithIntegerCompoundKey))
                 return false;
             if (t == typeof (ISystemTarget))
                 return false;
@@ -137,12 +149,12 @@ namespace Orleans.CodeGeneration
             return typeof (IAddressable).IsAssignableFrom(t);
         }
 
-        public static bool IsGrainReference(Type t)
+        public static bool IsAddressable(Type t)
         {
             return typeof(IAddressable).IsAssignableFrom(t);
         }
         
-        public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = false)
+        public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = true)
         {
             var methodInfos = new List<MethodInfo>();
             GetMethodsImpl(grainType, grainType, methodInfos);
@@ -159,13 +171,13 @@ namespace Orleans.CodeGeneration
             return methodInfos.ToArray();
         }
 
-        public static string GetFactoryClassForInterface(Type referenceInterface)
+        public static string GetFactoryClassForInterface(Type referenceInterface, Language language)
         {
             // remove "Reference" from the end of the type name
             var name = referenceInterface.Name;
             if (name.EndsWith("Reference", StringComparison.Ordinal)) 
                 name = name.Substring(0, name.Length - 9);
-            return TypeUtils.GetParameterizedTemplateName(GetFactoryNameBase(name), referenceInterface);
+            return TypeUtils.GetParameterizedTemplateName(GetFactoryNameBase(name), referenceInterface, language: language);
         }
 
         public static string GetFactoryNameBase(string typeName)
@@ -263,7 +275,7 @@ namespace Orleans.CodeGeneration
                     methodInfo.DeclaringType.GetInterfaceMap(i).TargetMethods.Contains(methodInfo)));
         }
 
-        public static Dictionary<int, Type> GetRemoteInterfaces(Type type)
+        public static Dictionary<int, Type> GetRemoteInterfaces(Type type, bool checkIsGrainInterface = true)
         {
             var dict = new Dictionary<int, Type>();
 
@@ -271,7 +283,7 @@ namespace Orleans.CodeGeneration
                 dict.Add(ComputeInterfaceId(type), type);
 
             Type[] interfaces = type.GetInterfaces();
-            foreach (Type interfaceType in interfaces.Where(IsGrainInterface))
+            foreach (Type interfaceType in interfaces.Where(i => !checkIsGrainInterface || IsGrainInterface(i)))
                 dict.Add(ComputeInterfaceId(interfaceType), interfaceType);
 
             return dict;
@@ -298,11 +310,6 @@ namespace Orleans.CodeGeneration
             }
             strMethodId.Append(")");
             return Utils.CalculateIdHash(strMethodId.ToString());
-        }
-
-        public static bool UsesPrimaryKeyExtension(Type grainIfaceType)
-        {
-            return HasAttribute<ExtendedPrimaryKeyAttribute>(grainIfaceType, inherit: false);
         }
 
         public bool IsSystemTarget
@@ -342,7 +349,7 @@ namespace Orleans.CodeGeneration
         
         private void DefineClassNames(bool client)
         {
-            var typeNameBase = TypeUtils.GetSimpleTypeName(Type, t => false);
+            var typeNameBase = TypeUtils.GetSimpleTypeName(Type, t => false, language);
             if (Type.IsInterface && typeNameBase.Length > 1 && typeNameBase[0] == 'I' && Char.IsUpper(typeNameBase[1]))
                 typeNameBase = typeNameBase.Substring(1);
 
@@ -350,7 +357,7 @@ namespace Orleans.CodeGeneration
             IsGeneric = Type.IsGenericType;
             if (IsGeneric)
             {
-                Name = TypeUtils.GetParameterizedTemplateName(Type);
+                Name = TypeUtils.GetParameterizedTemplateName(Type, language: language);
                 GenericTypeParams = TypeUtils.GenericTypeParameters(Type);
             }
             else
@@ -358,7 +365,7 @@ namespace Orleans.CodeGeneration
                 Name = Type.Name;
             }
 
-            TypeName = client ? InterfaceTypeName : TypeUtils.GetParameterizedTemplateName(Type);
+            TypeName = client ? InterfaceTypeName : TypeUtils.GetParameterizedTemplateName(Type, language:language);
             FactoryClassBaseName = GetFactoryNameBase(typeNameBase);
             InvokerClassBaseName = typeNameBase + "MethodInvoker";
             StateClassBaseName = typeNameBase + "State";
@@ -519,7 +526,7 @@ namespace Orleans.CodeGeneration
         /// <param name="methodInfos">Accumulated </param>
         private static void GetMethodsImpl(Type grainType, Type serviceType, List<MethodInfo> methodInfos)
         {
-            Type[] iTypes = GetRemoteInterfaces(serviceType).Values.ToArray();
+            Type[] iTypes = GetRemoteInterfaces(serviceType, false).Values.ToArray();
             IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
 
             foreach (Type iType in iTypes)
@@ -551,27 +558,6 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        private static int CountAttributes<T>(Type grainIfaceType, bool inherit)
-        {
-            return grainIfaceType.GetCustomAttributes(typeof (T), inherit).Length;
-        }
-
-        private static bool HasAttribute<T>(Type grainIfaceType, bool inherit)
-        {
-            switch (CountAttributes<T>(grainIfaceType, inherit))
-            {
-                case 0:
-                    return false;
-                case 1:
-                    return true;
-                default:
-                    throw new InvalidOperationException(string.Format(
-                        "More than one {0} cannot be specified for grain interface {1}",
-                        typeof (T).Name,
-                        grainIfaceType.Name));
-            }
-        }
-        
         private static int GetTypeCode(Type grainInterfaceOrClass)
         {
             var attrs = grainInterfaceOrClass.GetCustomAttributes(typeof(TypeCodeOverrideAttribute), false);
@@ -585,4 +571,4 @@ namespace Orleans.CodeGeneration
             return typeCode;
         }
     }
-}
+}

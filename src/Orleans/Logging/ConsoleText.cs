@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 
 namespace Orleans.Runtime
 {
@@ -36,17 +36,25 @@ namespace Orleans.Runtime
 
         public static void WriteError(string msg, Exception exc)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
+            String logMsg = 
+                msg 
+                + Environment.NewLine
+                + "Exception = " + exc 
+                + Environment.NewLine;
+
+            WriteLine(ConsoleColor.Red, logMsg);
+        }
+
+        public static void WriteWarning(string msg)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine(msg);
-            Console.WriteLine("Exception = " + exc);
             Console.ResetColor();
         }
 
         public static void WriteStatus(string msg)
         {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine(msg);
-            Console.ResetColor();
+            WriteLine(ConsoleColor.Green, msg);
         }
 
         public static void WriteStatus(string format, params object[] args)
@@ -56,9 +64,7 @@ namespace Orleans.Runtime
 
         public static void WriteUsage(string msg)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine(msg);
-            Console.ResetColor();
+            WriteLine(ConsoleColor.Yellow, msg);
         }
 
         public static void WriteLine(string msg)
@@ -70,6 +76,38 @@ namespace Orleans.Runtime
         {
             Console.WriteLine(format,args);
         }
+
+        private static void WriteLine(ConsoleColor color, string msg)
+        {
+            bool doResetColor = false;
+            try
+            {
+                Console.ForegroundColor = color;
+                doResetColor = true;
+            }
+            catch (Exception errorIgnored)
+            {
+                Console.WriteLine("Ignoring error from Console.ForegroundColor : " + errorIgnored);
+            }
+
+            try
+            {
+                Console.WriteLine(msg);
+            }
+            finally
+            {
+                if (doResetColor)
+                {
+                    try
+                    {
+                        Console.ResetColor();
+                    }
+                    catch (Exception errorIgnored)
+                    {
+                        Console.WriteLine("Ignoring error from Console.ResetColor : " + errorIgnored);
+                    }
+                }
+            }
+        }
     }
 }
-

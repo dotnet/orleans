@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -42,20 +42,20 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="observer">An observer interface to receive range change notifications.</param>
         /// <returns>bool value indicating that subscription succeeded or not.</returns>
-        bool SubscribeToRangeChangeEvents(IGrainRingRangeListener observer);
+        bool SubscribeToRangeChangeEvents(IAsyncRingRangeListener observer);
 
         /// <summary>
         /// Unsubscribe from receiving range change notifications
         /// </summary>
         /// <param name="observer">An observer interface to receive range change notifications.</param>
         /// <returns>bool value indicating that unsubscription succeeded or not</returns>
-        bool UnSubscribeFromRangeChangeEvents(IGrainRingRangeListener observer);
+        bool UnSubscribeFromRangeChangeEvents(IAsyncRingRangeListener observer);
     }
 
     // This has to be a separate interface, not polymorphic with IRingRangeListener,
     // since IRingRangeListener is implemented by SystemTarget and thus if it becomes grain interface 
     // it would need to be system target interface (with SiloAddress as first argument).
-    internal interface IGrainRingRangeListener : IGrain
+    internal interface IAsyncRingRangeListener
     {
         Task RangeChangeNotification(IRingRange old, IRingRange now);
     }
@@ -407,4 +407,3 @@ namespace Orleans.Runtime
         }
     }
 }
-
