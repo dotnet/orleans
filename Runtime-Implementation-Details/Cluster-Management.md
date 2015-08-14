@@ -48,7 +48,7 @@ In addition to the `MembershipTable` each silo participates in fully distributed
 
 ### Properties of the Basic Membership Protocol and FAQ:
 
-1. **Can handle any number of failures ** – our algorithm can handle any number of failures (that is, f<=n), including full cluster restart. This is in contrast with “traditional” [Paxos](http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, which require quorum, which is usually a majority. We have seen in production situations when more than half of the silos were down. Our system stayed functional, while Paxos based membership would not be able to make progress.
+1. **Can handle any number of failures** – our algorithm can handle any number of failures (that is, f<=n), including full cluster restart. This is in contrast with “traditional” [Paxos](http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, which require quorum, which is usually a majority. We have seen in production situations when more than half of the silos were down. Our system stayed functional, while Paxos based membership would not be able to make progress.
 2. **Traffic to the table is very light** - The actual pings go directly between servers and not to the table. This would generate a lot of traffic plus would be less accurate from the failure detection perspective - if a silo could not reach the table, it would miss to write its I am alive heartbeat and others would kill him. 
 3. **Tunable accuracy vs. completeness** – [both perfect and accurate failure detection is not possible in general](http://www.cs.yale.edu/homes/aspnes/pinewiki/FailureDetectors.html). One usually wants an ability to tradeoff accuracy (don’t want to declare a silo that is really alive as dead) with completeness (want to declare dead a silo that is indeed dead as soon as possible). The configurable #votes to declare dead and  #missed pings allows to trade those two.
 
@@ -102,7 +102,7 @@ As already mentioned, `MembershipTable` is used as a rendezvous point for silos 
 
 3.  [Apache ZooKeeper](https://ZooKeeper.apache.org/) - in this implementation we use the configured deployment ID as a root node and the silo identity (`ip:port@epoch`) as its child node. Together they guarantee a unique path per silo. For concurrency control we use optimistic concurrency control based on the [node version](http://zookeeper.apache.org/doc/r3.4.6/zookeeperOver.html#Nodes+and+ephemeral+nodes). Every time we read from the deployment root node we store the version for every read child silo node and use that version when we try to write back. Each time a node's data changes, the version number increases atomically by the ZooKeeper service. For multi-row transactions we utilize the [multi method](http://zookeeper.apache.org/doc/r3.4.6/api/org/apache/zookeeper/ZooKeeper.html#multi(java.lang.Iterable)), which guarantees serializale transactions over silo nodes with the same parent deployment ID node.
 
-4. In-memory emulation for development setup. We use a special system grain, called `MembershipTableGrain`, for that implementation.
+4. In-memory emulation for development setup. We use a special system grain, called `MembershipTableGrain`, for that implementation. This grain lives on a designated primary silo, which is only used for a **development setup**. In any real production usage primary silo **is not required**.
 
 
 ### Configuration:
@@ -117,7 +117,7 @@ Sample config element:
 
 There are 4 types of liveness implemented. The type of the liveness protocol is configured via the `SystemStoreType` attribute of the `SystemStore` element in the `Globals` section in `OrleansConfiguration.xml` file.
 
-1. `MembershipTableGrain` - membership table is stored in a grain on primary silo. This is development setup.
+1. `MembershipTableGrain` - membership table is stored in a grain on primary silo. This is a **development setup only**.
 
 2. `AzureTable` - membership table is stored in Azure table.
 
