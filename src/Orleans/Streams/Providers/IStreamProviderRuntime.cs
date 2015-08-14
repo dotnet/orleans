@@ -97,7 +97,13 @@ namespace Orleans.Streams
         Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context);
 
         object GetCurrentSchedulingContext();
+    }
 
+        /// <summary>
+    /// Provider-facing interface for manager of streaming providers
+    /// </summary>
+    internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
+    {
         /// <summary>
         /// Start the pulling agents for a given persistent stream provider.
         /// </summary>
@@ -108,7 +114,7 @@ namespace Orleans.Streams
         /// <param name="getQueueMsgsTimerPeriod"></param>
         /// <param name="initQueueTimeout"></param>
         /// <returns></returns>
-        Task StartPullingAgents(
+        Task InitializePullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
             IQueueAdapterFactory adapterFactory,
@@ -116,6 +122,9 @@ namespace Orleans.Streams
             TimeSpan getQueueMsgsTimerPeriod,
             TimeSpan initQueueTimeout,
             TimeSpan maxEventDeliveryTime);
+
+        Task StartPullingAgents();
+        Task StopPullingAgents();
     }
 
     internal enum StreamPubSubType

@@ -34,13 +34,15 @@ using Orleans.Streams;
 
 namespace Orleans.Runtime.Providers
 {
-    internal class SiloProviderRuntime : IStreamProviderRuntime
+    internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
     { 
         private static volatile SiloProviderRuntime instance;
         private static readonly object syncRoot = new Object();
 
         private IStreamPubSub pubSub;
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
+        private IPersistentStreamPullingManager pullingAgentManager;
+
         public IGrainFactory GrainFactory { get; private set; }
         public Guid ServiceId { get; private set; }
         public string SiloIdentity { get; private set; }
@@ -231,7 +233,7 @@ namespace Orleans.Runtime.Providers
             return RuntimeContext.CurrentActivationContext;
         }
 
-        public async Task StartPullingAgents(
+        public Task InitializePullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
             IQueueAdapterFactory adapterFactory,
@@ -246,9 +248,19 @@ namespace Orleans.Runtime.Providers
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
-            var managerGrainRef = manager.AsReference<IPersistentStreamPullingManager>();
+            pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
             // Need to call it as a grain reference though.
-            await managerGrainRef.Initialize(queueAdapter.AsImmutable());
+            return pullingAgentManager.Initialize(queueAdapter.AsImmutable());
+        }
+
+        public Task StartPullingAgents()
+        {
+            return pullingAgentManager.StartAgents();
+        }
+
+        public Task StopPullingAgents()
+        {
+            return pullingAgentManager.StopAgents();
         }
     }
 }

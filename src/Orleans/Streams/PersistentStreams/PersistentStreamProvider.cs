@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
@@ -30,6 +31,13 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
 {
+    public enum StreamProviderStartupState
+    {
+        Started,
+        Stopped,
+        DeliveryDisabled,
+    }
+
     /// <summary>
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
@@ -57,6 +65,9 @@ namespace Orleans.Providers.Streams.Common
         private const string MAX_EVENT_DELIVERY_TIME = "MaxEventDeliveryTime";
         private readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
         private TimeSpan maxEventDeliveryTime;
+
+        private const string STARTUP_STATE = "StartupState";
+        private StreamProviderStartupState startupState;
 
         public string                   Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
@@ -99,19 +110,48 @@ namespace Orleans.Providers.Streams.Common
                 maxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
 
-            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5} and with Adapter {6}.",
+            string startup;
+            if (config.Properties.TryGetValue(STARTUP_STATE, out startup))
+            {
+                if(!Enum.TryParse(startup, true, out startupState))
+                    throw new ArgumentException(
+                        String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, STARTUP_STATE, config.Name));
+            }
+            else 
+                startupState = StreamProviderStartupState.Started;
+
+            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5}, {6} = {7} and with Adapter {8}.",
                 typeof(TAdapterFactory).Name, Name, 
                 GET_QUEUE_MESSAGES_TIMER_PERIOD, getQueueMsgsTimerPeriod,
-                INIT_QUEUE_TIMEOUT, this.initQueueTimeout, 
+                INIT_QUEUE_TIMEOUT, initQueueTimeout,
+                STARTUP_STATE, startupState,
                 queueAdapter.Name);
         }
 
         public async Task Start()
         {
-            if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
-                queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
+            if (providerRuntime.InSilo) 
             {
-                await providerRuntime.StartPullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
+
+                if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
+                    queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
+                {
+                    await siloRuntime.InitializePullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+
+                    // TODO: No support yet for DeliveryDisabled, only Stopped and Started
+                    if (startupState == StreamProviderStartupState.Started)
+                        await siloRuntime.StartPullingAgents();
+                }
+            }
+        }
+
+        public async Task Stop()
+        {
+            if (providerRuntime.InSilo)
+            {
+                var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
+                await siloRuntime.StopPullingAgents();
             }
         }
 
