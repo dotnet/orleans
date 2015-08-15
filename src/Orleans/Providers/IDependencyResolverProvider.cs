@@ -29,11 +29,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal class DependencyResolverProviderManager : IProviderManager
+    public interface IDependencyResolverProvider : IProviderManager
     {
-        public IProvider GetProvider(string name)
-        {
-            throw new System.NotImplementedException();
-        }
     }
 }
