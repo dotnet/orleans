@@ -28,41 +28,40 @@ namespace Orleans.Runtime
     [Serializable]
     internal class StatelessWorkerPlacement : PlacementStrategy
     {
-        private static int defaultMaxActivationBankSize = Environment.ProcessorCount;
-
-        public int MinAvailable { get; private set; }
+        private static int defaultMaxStatelessWorkers = Environment.ProcessorCount;
 
         public int MaxLocal { get; private set; }
 
-        internal static void InitializeClass(int defMaxActivationBankSize)
+        internal static void InitializeClass(int defMaxStatelessWorkers)
         {
-            if (defMaxActivationBankSize < 1)
-                throw new ArgumentOutOfRangeException("defMaxActivationBankSize",
-                    "defMaxActivationBankSize must contain a value greater than zero.");
-            
-            defaultMaxActivationBankSize = defMaxActivationBankSize;
+            if (defMaxStatelessWorkers < 1)
+                throw new ArgumentOutOfRangeException("defMaxStatelessWorkers",
+                    "defMaxStatelessWorkers must contain a value greater than zero.");
+
+            defaultMaxStatelessWorkers = defMaxStatelessWorkers;
         }
 
-        internal StatelessWorkerPlacement(int minAvailable, int defaultMaxLocal = -1)
+        internal StatelessWorkerPlacement(int maxLocal = -1)
         {
-            MinAvailable = minAvailable;
-            MaxLocal = defaultMaxLocal > 0 ? defaultMaxLocal : defaultMaxActivationBankSize;
+            // If maxLocal was not specified on the StatelessWorkerAttribute, 
+            // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
+            MaxLocal = maxLocal > 0 ? maxLocal : defaultMaxStatelessWorkers;
         }
 
         public override string ToString()
         {
-            return String.Format("StatelessWorkerPlacement(min={0}, max={1})", MinAvailable, MaxLocal);
+            return String.Format("StatelessWorkerPlacement(max={1})", MaxLocal);
         }
 
         public override bool Equals(object obj)
         {
             var other = obj as StatelessWorkerPlacement;
-            return other != null && MinAvailable == other.MinAvailable && MaxLocal == other.MaxLocal;
+            return other != null && MaxLocal == other.MaxLocal;
         }
 
         public override int GetHashCode()
         {
-            return GetType().GetHashCode() + MinAvailable.GetHashCode() + MaxLocal.GetHashCode();
+            return GetType().GetHashCode() ^ MaxLocal.GetHashCode();
         }
     }
 

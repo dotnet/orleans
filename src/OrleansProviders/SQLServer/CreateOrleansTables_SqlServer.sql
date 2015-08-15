@@ -1193,6 +1193,7 @@ VALUES
 	SELECT
 		[Address],
         [ProxyPort]
+		[Generation]
       FROM
 		[MembershipReadAll]
       WHERE

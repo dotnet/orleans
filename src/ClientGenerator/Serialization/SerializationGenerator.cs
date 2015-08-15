@@ -265,7 +265,7 @@ namespace Orleans.CodeGeneration.Serialization
                 var fldType = fld.FieldType;
                 if (TypeUtilities.IsTypeIsInaccessibleForSerialization(fldType, t.Module, grainAssembly))
                 {
-                    ConsoleText.WriteStatus("Skipping generation of serializer for {0} because one of it's field {1} is of a private/internal type.", t.FullName, fld.Name);
+                    ConsoleText.WriteStatus("Skipping generation of serializer for {0} because one of it's field {1} is of a private/internal type {2}.", t.FullName, fld.Name, fldType);
                     return; // We cannot deserialize a class with a field of non-public type. Need to add a proper reporting here.
                 }
 

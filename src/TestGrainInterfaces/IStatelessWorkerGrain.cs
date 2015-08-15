@@ -23,48 +23,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Messaging;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Orleans;
 
-
-namespace Orleans.AzureUtils
+namespace UnitTests.GrainInterfaces
 {
-    internal class AzureGatewayListProvider : IGatewayListProvider
+    public interface IStatelessWorkerGrain : IGrainWithIntegerKey
     {
-        private OrleansSiloInstanceManager siloInstanceManager;
-        private ClientConfiguration config;
-        private readonly object lockable = new object();
-
-        #region Implementation of IGatewayListProvider
-
-        public async Task InitializeGatewayListProvider(ClientConfiguration conf, TraceLogger traceLogger)
-        {
-            config = conf;
-            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString);
-        }
-        // no caching
-        public IList<Uri> GetGateways()
-        {
-            lock (lockable)
-            {
-                // FindAllGatewayProxyEndpoints already returns a deep copied List<Uri>.
-                return siloInstanceManager.FindAllGatewayProxyEndpoints();
-            }
-        }
-
-        public TimeSpan MaxStaleness 
-        {
-            get { return config.GatewayListRefreshPeriod; }
-        }
-
-        public bool IsUpdatable
-        {
-            get { return true; }
-        }
-
-        #endregion
+        Task LongCall();
+        Task<Tuple<Guid, List<Tuple<DateTime, DateTime>>>> GetCallStats();
     }
 }

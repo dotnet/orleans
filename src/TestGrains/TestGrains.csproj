@@ -51,10 +51,12 @@
   <ItemGroup>
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="GenericGrains.cs" />
+    <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
     <Compile Include="SampleStreamingGrain.cs" />
+    <Compile Include="StatelessWorkerGrain.cs" />
     <Compile Include="SimpleObserverableGrain.cs" />
     <Compile Include="ObserverGrain.cs" />
     <Compile Include="SimpleGrain.cs" />

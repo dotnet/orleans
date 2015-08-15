@@ -100,8 +100,9 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="config">If null, Config data will be read from silo config file as normal, otherwise use the specified config data.</param>
         /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
+		/// <param name="connectionString">Azure DataConnectionString. If null, defaults to the DataConnectionString setting from the Azure configuration for this role.</param>
         /// <returns><c>true</c> is the silo startup was successful</returns>
-        public bool Start(ClusterConfiguration config, string deploymentId = null)
+        public bool Start(ClusterConfiguration config, string deploymentId = null, string connectionString = null)
         {
             // Program ident
             Trace.TraceInformation("Starting {0} v{1}", this.GetType().FullName, RuntimeVersion.Current);
@@ -153,7 +154,9 @@ namespace Orleans.Runtime.Host
                 RowKey = myEndpoint.Address + "-" + myEndpoint.Port + "-" + generation
             };
 
-            var connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+			if (connectionString == null)
+				connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+
             try
             {
                 siloInstanceManager = OrleansSiloInstanceManager.GetManager(

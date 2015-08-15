@@ -43,6 +43,8 @@ namespace Orleans.Streams
         public GuidId SubscriptionId { get; protected set; }
         public bool IsValid { get; private set; }
 
+        public override Guid HandleId { get { return SubscriptionId.Guid; } }
+
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> stream)
             : this(subscriptionId, null, stream, null)
         {

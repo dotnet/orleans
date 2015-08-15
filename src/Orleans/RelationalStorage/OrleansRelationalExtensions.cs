@@ -497,8 +497,10 @@ namespace Orleans.Runtime.Storage.Relational
             {
                 var ip = selector.GetValue<string>("Address");
                 var port = selector.GetValue<int>("ProxyPort");
+                var gen = selector.GetValue<int>("Generation");
 
-                return new IPEndPoint(IPAddress.Parse(ip), port).ToGatewayUri();
+                return SiloAddress.New(new IPEndPoint(IPAddress.Parse(ip), port), gen).ToGatewayUri();
+
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.ToList();

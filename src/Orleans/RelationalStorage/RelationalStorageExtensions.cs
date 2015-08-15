@@ -76,7 +76,7 @@ namespace Orleans.Runtime.Storage.RelationalExtensions
             string columns = string.Empty;
             var values = new List<string>();
             var materializedParameters = parameters.ToList();
-            if(materializedParameters.Any())
+            if(materializedParameters.Count > 0)
             {
                 //Type and property information are the same for all of the objects.
                 //The following assumes the property names will be retrieved in the same
