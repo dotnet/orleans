@@ -24,8 +24,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
@@ -152,9 +154,8 @@ namespace Orleans.Runtime
         /// <param name="name">Name of this silo.</param>
         /// <param name="siloType">Type of this silo.</param>
         /// <param name="config">Silo config data to be used for this silo.</param>
-        /// <param name="dependencyResolver">Optional dependency resolver instance to support dependency injection within the system.</param>
-        public Silo(string name, SiloType siloType, ClusterConfiguration config, IDependencyResolver dependencyResolver = null)
-            : this(name, siloType, config, null, dependencyResolver)
+        public Silo(string name, SiloType siloType, ClusterConfiguration config)
+            : this(name, siloType, config, null)
         { }
 
         /// <summary>
@@ -164,10 +165,9 @@ namespace Orleans.Runtime
         /// <param name="siloType">Type of this silo.</param>
         /// <param name="config">Silo config data to be used for this silo.</param>
         /// <param name="keyStore">Local data store, mostly used for testing, shared between all silos running in same process.</param>
-        /// <param name="dependencyResolver">Optional dependency resolver instance to support dependency injection within the system.</param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
-        internal Silo(string name, SiloType siloType, ClusterConfiguration config, ILocalDataStore keyStore, IDependencyResolver dependencyResolver = null)
+        internal Silo(string name, SiloType siloType, ClusterConfiguration config, ILocalDataStore keyStore)
         {
             SystemStatus.Current = SystemStatus.Creating;
 
@@ -217,10 +217,7 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            if (dependencyResolver != null)
-            {
-                DependencyResolver = dependencyResolver;
-            }
+            InitializeDependencyResolver();
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
 
@@ -315,6 +312,49 @@ namespace Orleans.Runtime
             TestHookup = new TestHookups(this);
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
+        }
+
+        private void InitializeDependencyResolver()
+        {
+            if (String.IsNullOrWhiteSpace(nodeConfig.DependencyResolverProviderName))
+            {
+                return;
+            }
+
+            //
+            // Load the assemblies from the Silo's directory, since the dependency resolver's type is not directly referenced,
+            // so the ProviderLoader will not find it within the loaded assemblies.
+            //
+
+            var siloRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            var directories = new Dictionary<string, SearchOption>
+            {
+                {siloRoot, SearchOption.TopDirectoryOnly}
+            };
+
+            AssemblyLoaderReflectionCriterion[] loadCriteria =
+            {
+                AssemblyLoaderCriteria.LoadTypesAssignableFrom(
+                    typeof (IDependencyResolverProvider))
+            };
+
+            var discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, null, loadCriteria, logger);
+
+            var dependencyResolverProviderManager = new DependencyResolverProviderManager(ProviderCategoryConfiguration.DEPDENDENCY_RESOLVER_PROVIDER_CATEGORY_NAME);
+
+            dependencyResolverProviderManager.LoadProviders(GlobalConfig.ProviderConfigurations);
+
+            var dependencyResolverProvider = (IDependencyResolverProvider)dependencyResolverProviderManager.GetProvider(nodeConfig.DependencyResolverProviderName);
+
+            var dependencyResolver = dependencyResolverProvider.GetDependencyResolver(OrleansConfig, nodeConfig, logger);
+
+            if (dependencyResolver == null)
+            {
+                throw new InvalidOperationException(string.Format("The configured provider: {0} did not returned a configured IDependencyResolver instance.", nodeConfig.DependencyResolverProviderName));
+            }
+
+            DependencyResolver = dependencyResolver;
         }
 
         private void CreateSystemTargets()

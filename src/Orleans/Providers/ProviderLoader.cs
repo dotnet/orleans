@@ -67,7 +67,6 @@ namespace Orleans.Providers
 
         public void LoadProviders(IDictionary<string, IProviderConfiguration> configs, IProviderManager providerManager)
         {
-
             providerConfigs = configs ?? new Dictionary<string, IProviderConfiguration>();
 
             foreach (var provider in providerConfigs.Values)
@@ -77,8 +76,7 @@ namespace Orleans.Providers
             ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType);
             ValidateProviders();
         }
-
-
+              
         private void ValidateProviders()
         {
             foreach (var providerConfig in providerConfigs.Values)
