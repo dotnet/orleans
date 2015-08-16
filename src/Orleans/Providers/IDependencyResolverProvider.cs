@@ -21,15 +21,16 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-
-namespace Orleans.Runtime
+namespace Orleans.Providers
 {
-    public interface IDependencyResolverProvider : IProviderManager
+    /// <summary>
+    /// Interface to be implemented by any app dependency resolver classes that want to be loaded and initialized during silo startup
+    /// </summary>
+    public interface IDependencyResolverProvider : IProvider
     {
+        IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
     }
 }
