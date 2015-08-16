@@ -87,6 +87,7 @@
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
     <Compile Include="MembershipTests\MembershipTablePluginTests.cs" />
+    <Compile Include="StorageTests\MemoryStorageProviderTests.cs" />
     <Compile Include="StorageTests\UnitTestAzureTableDataManager.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerTests.cs" />
     <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
