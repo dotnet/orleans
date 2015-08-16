@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGenericInterfaces.cs" />
+    <Compile Include="IInitialStateGrain.cs" />
     <Compile Include="IMultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyIGrains.cs" />
