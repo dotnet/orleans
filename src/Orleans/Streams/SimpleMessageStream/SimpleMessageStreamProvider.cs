@@ -57,6 +57,11 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             return TaskDone.Done;
         }
 
+        public Task Stop()
+        {
+            return TaskDone.Done;
+        }
+
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
         {
             var streamId = StreamId.GetStreamId(id, Name, streamNamespace);

@@ -51,6 +51,7 @@
   <ItemGroup>
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="GenericGrains.cs" />
+    <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />

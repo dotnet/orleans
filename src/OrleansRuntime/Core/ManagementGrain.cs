@@ -214,7 +214,6 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
-
         private async Task<IMembershipTable> GetMembershipTable()
         {
             if (membershipTable == null)

@@ -97,25 +97,36 @@ namespace Orleans.Streams
         Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context);
 
         object GetCurrentSchedulingContext();
+    }
 
+        /// <summary>
+    /// Provider-facing interface for manager of streaming providers
+    /// </summary>
+    internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
+    {
         /// <summary>
         /// Start the pulling agents for a given persistent stream provider.
         /// </summary>
         /// <param name="streamProviderName"></param>
         /// <param name="balancerType"></param>
+        /// <param name="pubSubType"></param>
         /// <param name="adapterFactory"></param>
         /// <param name="queueAdapter"></param>
         /// <param name="getQueueMsgsTimerPeriod"></param>
         /// <param name="initQueueTimeout"></param>
         /// <returns></returns>
-        Task StartPullingAgents(
+        Task InitializePullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
             TimeSpan initQueueTimeout,
             TimeSpan maxEventDeliveryTime);
+
+        Task StartPullingAgents();
+        Task StopPullingAgents();
     }
 
     internal enum StreamPubSubType
@@ -129,7 +140,7 @@ namespace Orleans.Streams
 
         Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
+        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
 
         Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider);
 
