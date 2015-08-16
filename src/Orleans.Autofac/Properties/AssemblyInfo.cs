@@ -30,7 +30,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("Orleans.Autofac")]
-[assembly: AssemblyDescription("Orleans - Orleans API")]
+[assembly: AssemblyDescription("Orleans - Autofac API")]
 [assembly: AssemblyConfiguration("")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 
@@ -41,4 +41,4 @@ using System.Runtime.InteropServices;
 [assembly: CLSCompliant(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("c849bbea-5e7c-456f-9367-664ce98a3ab6")]
+[assembly: Guid("9a1d3da9-26d6-4d75-bc1f-3f9fce783b94")]
