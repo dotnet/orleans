@@ -66,6 +66,10 @@ namespace Orleans.Providers.Streams.Common
         private readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
         private TimeSpan maxEventDeliveryTime;
 
+        private const string STREAM_PUBSUB_TYPE = "PubSubType";
+        private const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
+        private StreamPubSubType pubSubType;
+
         private const string STARTUP_STATE = "StartupState";
         private StreamProviderStartupState startupState;
 
@@ -110,6 +114,11 @@ namespace Orleans.Providers.Streams.Common
                 maxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
 
+            string pubSubTypeString;
+            pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
+                ? DEFAULT_STREAM_PUBSUB_TYPE
+                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
+
             string startup;
             if (config.Properties.TryGetValue(STARTUP_STATE, out startup))
             {
@@ -136,7 +145,7 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    await siloRuntime.InitializePullingAgents(Name, balancerType, StreamPubSubType.GrainBased, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                    await siloRuntime.InitializePullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
                     if (startupState == StreamProviderStartupState.Started)
@@ -173,7 +182,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(pubSubType), IsRewindable);
         }
     }
 }
