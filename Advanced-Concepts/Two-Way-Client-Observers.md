@@ -4,14 +4,14 @@ title: Two Way Client Observers
 ---
 {% include JB/setup %}
 
-In addition to a regular, one way, [Client Observers](http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers), 
-Orleans also provides an advanced feature of two way (RPC) client observers. 
+In addition to regular, one-way [Client Observers](http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers), 
+Orleans also provides an advanced feature of two-way (RPC) client observers. 
 This feature allows a grain to make a call into a client observer and receive a response back.
 
 ## Programming Interface
 
 To enable this feature start with writing a regular client observer - a class that extends `IGrainObserver` interface.
-To make it two way you need to add the following:
+To make it two-way you need to add the following:
 
 1) Add a `[Factory(FactoryAttribute.FactoryTypes.ClientObject)]`  attribute on this class.
 
@@ -27,7 +27,7 @@ and not a virtual actor (grain), if the actual client is down, or the observer r
 ## Usage considerations and guidelines
 
 Please take into account that making RPC calls from actors (a server) to clients may sometimes be considered an **anti-pattern**.
-Traditional distributed system client server application usually do not allow such capability. The reason is that it can potentially create **too strong coupling 
+Traditional distributed system client server applications usually do not allow such capability. The reason is that it can potentially create **too strong coupling 
 between the client and the server**, making: (a) server logic relay too much on the client logic, (b) making server resources consumption be directly impacted and controlled by the client.
 In traditional synchronous RPC systems making an RPC call from a server to client would mean that the server thread is blocked until the client responds, potentially taking valuable resources.
 In the general case of uncontrolled (and maybe even malicious) clients, this is a realy bad pattern. Therefore, traditional distributed system avoided such capability.
@@ -47,7 +47,7 @@ it cannot guarantee that client responds in a timely manner to this RPC call.
 As such, even in Orleans, this feature creates a tighter coupling between the client and the server, which is generally undesired.
 
 Therefore, our recommendation is to use this feature sparsely, only if you fully control and trust the client code, and if all other alternative solutions 
-(regular [one way client side observers[(http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers)) and [client streams](http://dotnet.github.io/orleans/Orleans-Streams/)) do not work for your scenario.
+(regular [one way client side observers](http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers)) and [client streams](http://dotnet.github.io/orleans/Orleans-Streams/)) do not work for your scenario.
 
 
 
