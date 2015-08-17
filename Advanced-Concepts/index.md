@@ -30,3 +30,4 @@ This section covers a number of topics that are intended for the advanced user o
 
 [Interceptors](Interceptors)
 
+[Two Way Client Observers](Two-Way-Client-Observers)
