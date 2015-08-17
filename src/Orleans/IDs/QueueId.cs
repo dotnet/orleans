@@ -100,6 +100,11 @@ namespace Orleans.Streams
             return uniformHashCache;
         }
 
+        public uint GetNumericId()
+        {
+            return queueId;            
+        }
+
         public override string ToString()
         {
             return String.Format("{0}-{1}", queueNamePrefix.ToLower(), queueId.ToString());
