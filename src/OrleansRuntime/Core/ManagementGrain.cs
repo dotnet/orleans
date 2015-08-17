@@ -214,17 +214,6 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
-        private async Task ExecutePerSiloCall(string actionToLog, Func<ISiloControl, Task> action)
-        {
-            var silos = await GetHosts(true);
-            logger.Info("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
-
-            var actionPromises = PerformPerSiloAction(silos.Keys.ToArray(),
-                s => action(GetSiloControlReference(s)));
-
-            await Task.WhenAll(actionPromises);
-        }
-
         private async Task<IMembershipTable> GetMembershipTable()
         {
             if (membershipTable == null)

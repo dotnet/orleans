@@ -130,12 +130,11 @@ namespace Orleans.Providers.Streams.Common
 
         public async Task Start()
         {
-            if (providerRuntime.InSilo) 
+            if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
+                queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
-
-                if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
-                    queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
+                if (siloRuntime != null)
                 {
                     await siloRuntime.InitializePullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
 
