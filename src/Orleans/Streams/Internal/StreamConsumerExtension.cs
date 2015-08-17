@@ -24,7 +24,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
+using System.Security.Principal;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -43,8 +46,9 @@ namespace Orleans.Streams
     {
         private interface IStreamObservers
         {
-            Task DeliverItem(object item, StreamSequenceToken token);
-            Task DeliverBatch(IBatchContainer item);
+            Streams.StreamSequenceToken Token { get; }
+            Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token);
+            Task<StreamSequenceToken> DeliverBatch(IBatchContainer item);
             Task CompleteStream();
             Task ErrorInStream(Exception exc);
         }
@@ -53,15 +57,25 @@ namespace Orleans.Streams
         private class ObserversCollection<T> : IStreamObservers
         {
             private StreamSubscriptionHandleImpl<T> localObserver;
+            private bool dirty = false;
+            private StreamSequenceToken expectedToken;
 
-            internal void SetObserver(StreamSubscriptionHandleImpl<T> observer)
+            public StreamSequenceToken Token
+            {
+                get { return expectedToken; }
+            }
+
+            internal void SetObserver(StreamSubscriptionHandleImpl<T> observer, StreamSequenceToken token)
             {
                 localObserver = observer;
+                this.expectedToken = token;
+                dirty = true;
             }
 
             internal void RemoveObserver()
             {
                 localObserver = null;
+                dirty = false;
             }
 
             internal bool IsEmpty
@@ -69,8 +83,17 @@ namespace Orleans.Streams
                 get { return localObserver == null; }
             }
 
-            public Task DeliverItem(object item, StreamSequenceToken token)
+            public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token)
             {
+                if (dirty)
+                {
+                    dirty = false;
+                    if (expectedToken != null)
+                    {
+                        return expectedToken;
+                    }
+                }
+
                 T typedItem;
                 try
                 {
@@ -81,15 +104,40 @@ namespace Orleans.Streams
                     // We got an illegal item on the stream -- close it with a Cast exception
                     throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
                 }
-                return (localObserver == null)
-                    ? TaskDone.Done
-                    : localObserver.OnNextAsync(typedItem, token);
+
+                if (localObserver != null)
+                {
+                    await localObserver.OnNextAsync(typedItem, token);
+                }
+
+                if (dirty)
+                {
+                    dirty = false;
+                    if (expectedToken != null)
+                    {
+                        return expectedToken;
+                    }
+                }
+
+                if (token != null && token.Newer(expectedToken))
+                {
+                    expectedToken = token;
+                }
+
+                return default(StreamSequenceToken);
             }
 
-            public async Task DeliverBatch(IBatchContainer batch)
+            public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch)
             {
                 foreach (var itemTuple in batch.GetEvents<T>())
-                    await DeliverItem(itemTuple.Item1, itemTuple.Item2);
+                {
+                    var newToken = await DeliverItem(itemTuple.Item1, itemTuple.Item2);
+                    if (newToken != null)
+                    {
+                        return newToken;
+                    }
+                }
+                return default(StreamSequenceToken);
             }
 
             internal int GetObserverCountForStream(StreamId streamId)
@@ -129,7 +177,7 @@ namespace Orleans.Streams
             logger = providerRuntime.GetLogger(this.GetType().Name);
         }
 
-        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, IStreamFilterPredicateWrapper filter)
+        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
             if (null == stream) throw new ArgumentNullException("stream");
             if (null == observer) throw new ArgumentNullException("observer");
@@ -139,9 +187,9 @@ namespace Orleans.Streams
                 if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                IStreamObservers obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>());
+                var obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>()) as ObserversCollection<T>;
                 var wrapper = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter);
-                ((ObserversCollection<T>)obs).SetObserver(wrapper);
+                obs.SetObserver(wrapper, token);
                 return wrapper;
             }
             catch (Exception exc)
@@ -170,7 +218,7 @@ namespace Orleans.Streams
             return true;
         }
 
-        public Task DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token)
+        public Task<StreamSequenceToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token)
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for subscription {1}", item.Value, subscriptionId);
 
@@ -182,10 +230,10 @@ namespace Orleans.Streams
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return TaskDone.Done;
+            return Task.FromResult(default(StreamSequenceToken));
         }
 
-        public Task DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch)
+        public Task<StreamSequenceToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch)
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
@@ -198,7 +246,7 @@ namespace Orleans.Streams
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return TaskDone.Done;
+            return Task.FromResult(default(StreamSequenceToken));
         }
 
         public Task CompleteStream(GuidId subscriptionId)
@@ -229,6 +277,12 @@ namespace Orleans.Streams
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
+        }
+
+        public Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId)
+        {
+            IStreamObservers observers;
+            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observers) ? observers.Token : default(StreamSequenceToken));
         }
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)

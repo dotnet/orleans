@@ -36,6 +36,7 @@ namespace Orleans.Streams
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
         private readonly string streamProviderName;
         private readonly IStreamProviderRuntime providerRuntime;
+        private readonly IStreamPubSub pubSub;
 
         private readonly TimeSpan queueGetPeriod;
         private readonly TimeSpan initQueueTimeout;
@@ -54,6 +55,7 @@ namespace Orleans.Streams
             GrainId id, 
             string strProviderName, 
             IStreamProviderRuntime runtime,
+            IStreamPubSub streamPubSub,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             TimeSpan queueGetPeriod, 
@@ -69,6 +71,10 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("runtime", "IStreamProviderRuntime runtime reference should not be null");
             }
+            if (streamPubSub == null)
+            {
+                throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
+            }
             if (streamQueueBalancer == null)
             {
                 throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
@@ -77,6 +83,7 @@ namespace Orleans.Streams
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
             providerRuntime = runtime;
+            pubSub = streamPubSub;
             this.queueGetPeriod = queueGetPeriod;
             this.initQueueTimeout = initQueueTimeout;
             this.maxEvenDeliveryTime = maxEvenDeliveryTime;
@@ -213,7 +220,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, queueId, queueGetPeriod, initQueueTimeout, maxEvenDeliveryTime);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, pubSub, queueId, queueGetPeriod, initQueueTimeout, maxEvenDeliveryTime);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);
