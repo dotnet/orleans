@@ -47,7 +47,7 @@ it cannot guarantee that client responds in a timely manner to this RPC call.
 As such, even in Orleans, this feature creates a tighter coupling between the client and the server, which is generally undesired.
 
 Therefore, our recommendation is to use this feature sparsely, only if you fully control and trust the client code, and if all other alternative solutions 
-(regular [one way client side observers](http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers)) and [client streams](http://dotnet.github.io/orleans/Orleans-Streams/)) do not work for your scenario.
+(regular [one way client side observers](http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers) and [client streams](http://dotnet.github.io/orleans/Orleans-Streams/)) do not work for your scenario.
 
 
 
