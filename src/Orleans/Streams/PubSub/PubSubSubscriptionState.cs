@@ -39,8 +39,6 @@ namespace Orleans.Streams
         // Implement ISerializable if changing any of them to readonly
         public GuidId SubscriptionId;
         public StreamId Stream;
-        public StreamSequenceToken StreamSequenceToken;
-
         private GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
         private object filterWrapper; // Serialized func info
         private SubscriptionStates state;
@@ -54,13 +52,11 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
-            StreamSequenceToken token,
             IStreamFilterPredicateWrapper filterWrapper)
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
             consumerReference = streamConsumer as GrainReference;
-            StreamSequenceToken = token;
             this.filterWrapper = filterWrapper;
             state = SubscriptionStates.Active;
         }
@@ -128,8 +124,8 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return string.Format("PubSubSubscriptionState:SubscriptionId={0},StreamId={1},Consumer={2},SequenceToken={3}.",
-                SubscriptionId, Stream, Consumer, StreamSequenceToken);
+            return string.Format("PubSubSubscriptionState:SubscriptionId={0},StreamId={1},Consumer={2}.",
+                SubscriptionId, Stream, Consumer);
         }
 
         public void Fault()

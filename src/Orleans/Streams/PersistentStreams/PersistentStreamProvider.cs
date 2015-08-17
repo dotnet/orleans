@@ -136,7 +136,7 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    await siloRuntime.InitializePullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                    await siloRuntime.InitializePullingAgents(Name, balancerType, StreamPubSubType.GrainBased, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
                     if (startupState == StreamProviderStartupState.Started)

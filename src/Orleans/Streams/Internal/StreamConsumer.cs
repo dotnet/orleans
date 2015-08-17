@@ -88,9 +88,9 @@ namespace Orleans.Streams
                 pubSub, myGrainReference, token);
 
             GuidId subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId);
-            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
+            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
 
-            return myExtension.SetObserver(subscriptionId, stream, observer, filterWrapper);
+            return myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
         }
 
         public async Task<StreamSubscriptionHandle<T>> ResumeAsync(
@@ -109,35 +109,7 @@ namespace Orleans.Streams
             if (logger.IsVerbose) logger.Verbose("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
-            GuidId subscriptionId;
-            if (token != null)
-            {
-                subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId); // otherwise generate a new subscriptionId
-                await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, token, null);
-                try
-                {
-                    await UnsubscribeAsync(handle);
-                }
-                catch (Exception exc)
-                {
-                    // best effort cleanup of newly established subscription
-                    pubSub.UnregisterConsumer(subscriptionId, stream.StreamId, streamProviderName)
-                          .LogException(logger, ErrorCode.StreamProvider_FailedToUnsubscribeFromPubSub, 
-                                        String.Format("Stream consumer could not clean up subscription {0} while recovering from errors renewing subscription {1} on stream {2}.",
-                                        subscriptionId, oldHandleImpl.SubscriptionId, stream.StreamId))
-                          .Ignore();
-                    logger.Error(ErrorCode.StreamProvider_FailedToUnsubscribeFromPubSub,
-                                 String.Format("Stream consumer failed to unsubscrive from subscription {0} while renewing subscription on stream {1}.", oldHandleImpl.SubscriptionId, stream.StreamId),
-                                 exc);
-                    throw;
-                }
-            }
-            else
-            {
-                subscriptionId = oldHandleImpl.SubscriptionId;
-            }
-            
-            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(subscriptionId, stream, observer, null);
+            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, token, null);
 
             // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.  
             oldHandleImpl.Invalidate();

@@ -24,7 +24,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -50,10 +49,10 @@ namespace Orleans.Streams
             return streamRendezvous.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.RegisterConsumer(subscriptionId, streamId, streamConsumer, token, filter);
+            return streamRendezvous.RegisterConsumer(subscriptionId, streamId, streamConsumer, filter);
         }
 
         public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
@@ -133,7 +132,7 @@ namespace Orleans.Streams
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
                 // we ignore duplicate entries-- there's no way a programmer could prevent the duplicate entry from being added if we threw an exception to communicate the problem. 
-                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value, null, null));
+                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value, null));
             }
             return result;
         }
@@ -144,11 +143,11 @@ namespace Orleans.Streams
                 explicitPubSub.UnregisterProducer(streamId, streamProvider, streamProducer);
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
             return IsImplicitSubscriber(streamConsumer, streamId)
                 ? TaskDone.Done
-                : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamProvider, streamConsumer, token, filter);
+                : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamProvider, streamConsumer, filter);
         }
 
         public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)

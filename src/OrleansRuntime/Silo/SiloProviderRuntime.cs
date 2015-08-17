@@ -120,7 +120,13 @@ namespace Orleans.Runtime.Providers
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
-            return pubSubType == StreamPubSubType.GrainBased ? pubSub : null;
+            switch (pubSubType)
+            {
+                case StreamPubSubType.GrainBased:
+                    return pubSub;
+                default:
+                    return null;
+            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
@@ -236,6 +242,7 @@ namespace Orleans.Runtime.Providers
         public Task InitializePullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
@@ -245,7 +252,7 @@ namespace Orleans.Runtime.Providers
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
                 balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper());
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubSubType), adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
