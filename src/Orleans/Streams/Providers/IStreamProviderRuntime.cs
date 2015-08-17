@@ -131,7 +131,9 @@ namespace Orleans.Streams
 
     internal enum StreamPubSubType
     {
-        GrainBased
+        ExplicitGrainBasedAndImplicit,
+        ExplicitGrainBasedOnly,
+        ImplicitOnly,
     }
 
     internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
@@ -150,8 +152,8 @@ namespace Orleans.Streams
 
         Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
 
-        GuidId CreateSubscriptionId(IAddressable requesterAddress, StreamId streamId);
+        GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer);
 
-        Task<bool> FaultSubscription(GuidId subscriptionId, StreamId streamId);
+        Task<bool> FaultSubscription(StreamId streamId, GuidId subscriptionId);
     }
 }
