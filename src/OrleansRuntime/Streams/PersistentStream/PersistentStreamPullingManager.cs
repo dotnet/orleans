@@ -48,6 +48,7 @@ namespace Orleans.Streams
         private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IStreamQueueBalancer queueBalancer;
         private readonly IQueueAdapterFactory adapterFactory;
+        private bool agentsRunning;
 
         internal PersistentStreamPullingManager(
             GrainId id, 
@@ -106,10 +107,41 @@ namespace Orleans.Streams
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_03, PrintMyState(myQueues));
 
-            return AddNewQueues(myQueues, true);
+            return TaskDone.Done;
         }
 
-        #region chance to queue distribution
+        public async Task StartAgents()
+        {
+            if (agentsRunning)
+            {
+                logger.Warn((int)ErrorCode.PersistentStreamPullingManager_AlreadyStarted, "Start Agents called on already started manager. Ignoring.");
+                return;
+            }
+
+            List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
+
+            logger.Info((int)ErrorCode.PersistentStreamPullingManager_Starting, "Starting reading from {0} queues: {1}", myQueues.Count, PrintMyState(myQueues));
+            await AddNewQueues(myQueues, true);
+            agentsRunning = true;
+            logger.Info((int)ErrorCode.PersistentStreamPullingManager_Started, "Started reading");
+        }
+
+        public async Task StopAgents()
+        {
+            if (!agentsRunning)
+            {
+                logger.Warn((int)ErrorCode.PersistentStreamPullingManager_AlreadyStopped, "StopAgents called on stopped manager. Ignoring.");
+                return;
+            }
+
+            List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
+            logger.Info((int)ErrorCode.PersistentStreamPullingManager_Stopping, "Stopping reading from {0} queues: {1}", queuesToRemove.Count, PrintMyState(queuesToRemove));
+            await RemoveQueues(queuesToRemove);
+            agentsRunning = false;
+            logger.Info((int)ErrorCode.PersistentStreamPullingManager_Stopped, "Stopped reading");
+        }
+
+        #region Management of queues
 
         /// <summary>
         /// Actions to take when the queue distribution changes due to a failure or a join.
@@ -123,7 +155,12 @@ namespace Orleans.Streams
             latestRingNotificationSequenceNumber++;
             int notificationSeqNumber = latestRingNotificationSequenceNumber;
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_04,
-                "Got QueueChangeNotification number {0} from the queue balancer.", notificationSeqNumber);
+                "Got QueueChangeNotification number {0} from the queue balancer. agentsRunning = {1}", notificationSeqNumber, agentsRunning);
+
+            if (!agentsRunning)
+            {
+                return TaskDone.Done; // if agents not running, no need to rebalance the queues among them.
+            }
 
             return nonReentrancyGuarantor.SubmitNext(() =>
             {
@@ -148,7 +185,9 @@ namespace Orleans.Streams
                 notificationSeqNumber, PrintMyState(currentQueues));
 
             Task t1 = AddNewQueues(currentQueues, false);
-            Task t2 = RemoveQueues(currentQueues);
+
+            List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.Where(queueId => !currentQueues.Contains(queueId)).ToList();
+            Task t2 = RemoveQueues(queuesToRemove);
             await Task.WhenAll(t1, t2);
         }
 
@@ -217,10 +256,9 @@ namespace Orleans.Streams
             await task.LogException(logger, ErrorCode.PersistentStreamPullingManager_08, String.Format("PersistentStreamPullingAgent {0} failed to Initialize.", agent.QueueId));
         }
 
-        private async Task RemoveQueues(IEnumerable<QueueId> myQueues)
+        private async Task RemoveQueues(List<QueueId> queuesToRemove)
         {
             // Stop the agents that for queues that are not in my range anymore.
-            List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.Where(queueId => !myQueues.Contains(queueId)).ToList();
             var agents = new List<PersistentStreamPullingAgent>(queuesToRemove.Count);
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_10, "Removing {0} agents from my responsibility: {1}", queuesToRemove.Count, Utils.EnumerableToString(queuesToRemove, q => q.ToStringWithHashCode()));
             
