@@ -50,7 +50,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return String.Format("StatelessWorkerPlacement(max={1})", MaxLocal);
+            return String.Format("StatelessWorkerPlacement(max={0})", MaxLocal);
         }
 
         public override bool Equals(object obj)
