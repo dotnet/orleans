@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
@@ -58,6 +59,11 @@ namespace Orleans.Streams
         public IEnumerable<IStreamProvider> GetStreamProviders()
         {
             return appStreamProviders.GetProviders();
+        }
+
+        public IList<IProvider> GetProviders()
+        {
+            return appStreamProviders.GetProviders().Cast<IProvider>().ToList();
         }
 
         public IProvider GetProvider(string name)
