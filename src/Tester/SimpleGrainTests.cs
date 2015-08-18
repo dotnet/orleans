@@ -23,6 +23,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -36,7 +39,7 @@ namespace UnitTests.General
     public class SimpleGrainTests : UnitTestSiloHost
     {
         private const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
-        
+
         public SimpleGrainTests()
             : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
         {
@@ -69,7 +72,7 @@ namespace UnitTests.General
         public async Task SimpleGrainControlFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
-            
+
             Task setPromise = grain.SetA(2);
             await setPromise;
 
