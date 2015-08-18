@@ -65,6 +65,12 @@ Various community projects, including Orleans Monitoring, Design Patterns, Stora
 
 * **[Orleans Community - Twitter](https://twitter.com/projectorleans)**
 
+* **[Orleans on Codeplex](https://orleans.codeplex.com)** - 
+[Discussion forum and questions](https://orleans.codeplex.com/discussions).
+
+* **[Orleans on StackOverflow](http://stackoverflow.com/questions/tagged/orleans)** 
+More questions about Orleans. We generally prefer that people ask questions on [GitHub](https://github.com/dotnet/orleans/issues) or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
+
 * **[Who Is Using Orleans?](Who-Is-Using-Orleans)** 
 A partial list of companies, projects and applications which are using Orleans.
 
@@ -103,12 +109,6 @@ Where the journey began!
 * **[Orleans Technical Report - Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)**
 
 * **[Orleans Best Practices](http://research.microsoft.com/apps/pubs/default.aspx?id=244727)** A collection of tips and trick to help design, build, and run an Orleans-based application.
-
-* **[Original Orleans Codeplex site](https://orleans.codeplex.com)** 
-[Discussion forum and questions](https://orleans.codeplex.com/discussions).
-
-* **[Orleans on StackOverflow](http://stackoverflow.com/questions/tagged/orleans)** 
-More questions about Orleans. We generally prefer that people ask questions on [GitHub](https://github.com/dotnet/orleans/issues) or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
 
 * **[Links](Links)** 
 Blog posts, articles and other links about Orleans.
