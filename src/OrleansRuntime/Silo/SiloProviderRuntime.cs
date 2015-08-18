@@ -39,7 +39,10 @@ namespace Orleans.Runtime.Providers
         private static volatile SiloProviderRuntime instance;
         private static readonly object syncRoot = new Object();
 
-        private IStreamPubSub pubSub;
+        private IStreamPubSub grainBasedPubSub;
+        private IStreamPubSub implictPubSub;
+        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         private IPersistentStreamPullingManager pullingAgentManager;
 
@@ -79,7 +82,10 @@ namespace Orleans.Runtime.Providers
         public static void StreamingInitialize(IGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
             Instance.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
-            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(grainFactory), implicitStreamSubscriberTable);
+            Instance.grainBasedPubSub = new GrainBasedPubSubRuntime(grainFactory);
+            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
+            Instance.implictPubSub = tmp;
+            Instance.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(Instance.grainBasedPubSub, tmp);
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -117,13 +123,16 @@ namespace Orleans.Runtime.Providers
             timer.Start();
             return timer;
         }
-
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
             {
-                case StreamPubSubType.GrainBased:
-                    return pubSub;
+                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
+                    return combinedGrainBasedAndImplicitPubSub;
+                case StreamPubSubType.ExplicitGrainBasedOnly:
+                    return grainBasedPubSub;
+                case StreamPubSubType.ImplicitOnly:
+                    return implictPubSub;
                 default:
                     return null;
             }

@@ -87,7 +87,7 @@ namespace Orleans.Streams
             if (logger.IsVerbose) logger.Verbose("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
-            GuidId subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId);
+            GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.StreamId, myGrainReference);
             await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
 
             return myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);

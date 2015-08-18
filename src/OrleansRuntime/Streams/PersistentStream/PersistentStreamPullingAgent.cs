@@ -478,7 +478,7 @@ namespace Orleans.Streams
                                     new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId))
                                     .Ignore();
                                 // mark subscription as faulted.
-                                await pubSub.FaultSubscription(consumerData.SubscriptionId, consumerData.StreamId);
+                                await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
                             }
                             finally
                             {
