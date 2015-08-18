@@ -23,27 +23,16 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-<<<<<<< HEAD
 using Orleans.Runtime.MembershipService;
 using Orleans.Streams;
-=======
->>>>>>> adc2287... AspNet vNext baseline
 
 namespace Orleans.Providers
 {
     /// <summary>
     /// Interface to be implemented by any app dependency resolver classes that want to be loaded and initialized during silo startup
     /// </summary>
-<<<<<<< HEAD
     internal interface IDependencyResolverProvider : IProvider
     {
         IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
     }
-
-=======
-    public interface IDependencyResolverProvider : IProvider
-    {
-        IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
-    }
->>>>>>> adc2287... AspNet vNext baseline
 }

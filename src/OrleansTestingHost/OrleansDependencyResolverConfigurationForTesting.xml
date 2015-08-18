@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-﻿<?xml version="1.0" encoding="utf-8"?>
-=======
 <?xml version="1.0" encoding="utf-8"?>
->>>>>>> adc2287... AspNet vNext baseline
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
     <StorageProviders>
@@ -11,11 +7,7 @@
       <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" />-->
     </StorageProviders>
     <DependencyResolverProviders>
-<<<<<<< HEAD
       <Provider Type="UnitTests.General.AutofacDependencyResolverProvider" Name="Autofac" />
-=======
-      <Provider Type="UnitTests.General.AutofacDepdendencyResolverProvider" Name="Autofac" />
->>>>>>> adc2287... AspNet vNext baseline
     </DependencyResolverProviders>
     <SeedNode Address="localhost" Port="22222"/>
     <Messaging ResponseTimeout="30s"/>

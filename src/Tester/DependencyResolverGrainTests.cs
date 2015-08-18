@@ -29,6 +29,7 @@ using Autofac.Builder;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Autofac;
 using Orleans.Providers;
+using Orleans.Providers.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;

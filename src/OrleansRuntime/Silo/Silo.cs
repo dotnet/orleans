@@ -162,7 +162,7 @@ namespace Orleans.Runtime
         /// <param name="config">Silo config data to be used for this silo.</param>
         public Silo(string name, SiloType siloType, ClusterConfiguration config)
             : this(name, siloType, config, null)
-        { }
+        {}
 
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
@@ -334,6 +334,26 @@ namespace Orleans.Runtime
             {
                 return;
             }
+
+            //
+            // Load the assemblies from the Silo's directory, since the dependency resolver's type is not directly referenced,
+            // so the ProviderLoader will not find it within the loaded assemblies.
+            //
+
+            var siloRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            var directories = new Dictionary<string, SearchOption>
+            {
+                {siloRoot, SearchOption.TopDirectoryOnly}
+            };
+
+            AssemblyLoaderReflectionCriterion[] loadCriteria =
+            {
+                AssemblyLoaderCriteria.LoadTypesAssignableFrom(
+                    typeof (IDependencyResolverProvider))
+            };
+
+            var discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, null, loadCriteria, logger);
 
             var dependencyResolverProviderManager = new DependencyResolverProviderManager(ProviderCategoryConfiguration.DEPENDENCY_RESOLVER_PROVIDER_CATEGORY_NAME);
 
