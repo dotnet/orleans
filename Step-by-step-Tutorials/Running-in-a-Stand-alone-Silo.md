@@ -30,7 +30,7 @@ static void Main(string[] args)
     Console.WriteLine("Waiting for Orleans Silo to start. Press Enter to proceed...");
     Console.ReadLine();
 
-    Orleans.GrainsClient.Initialize("ClientConfiguration.xml");
+    Orleans.GrainClient.Initialize("ClientConfiguration.xml");
 }
 ```
 
