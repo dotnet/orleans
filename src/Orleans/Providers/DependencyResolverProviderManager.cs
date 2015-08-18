@@ -23,6 +23,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Providers
@@ -37,7 +40,7 @@ namespace Orleans.Providers
             providerKind = kind;
         }
 
-        public void LoadProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
+        public void LoadProviders(IDictionary<string, ProviderCategoryConfiguration> configs, TraceLogger logger)
         {
             dependencyResolverProviderLoader = new ProviderLoader<IDependencyResolverProvider>();
 
@@ -58,6 +61,26 @@ namespace Orleans.Providers
                 throw new ArgumentOutOfRangeException(providerKind + "Providers",
                     string.Format("Only a single {0} provider is supported.", providerKind));
             }
+
+            //
+            // Load the assemblies from the Silo's directory, since the dependency resolver's type is not directly referenced,
+            // so the ProviderLoader will not find it within the loaded assemblies.
+            //
+
+            var siloRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            var directories = new Dictionary<string, SearchOption>
+            {
+                {siloRoot, SearchOption.TopDirectoryOnly}
+            };
+
+            AssemblyLoaderReflectionCriterion[] loadCriteria =
+            {
+                AssemblyLoaderCriteria.LoadTypesAssignableFrom(
+                    typeof (IDependencyResolverProvider))
+            };
+
+            var discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, null, loadCriteria, logger);
 
             dependencyResolverProviderLoader.LoadProviders(dependencyResolverProviders, this);
         }

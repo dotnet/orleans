@@ -21,40 +21,13 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
+using System.Threading.Tasks;
+using Orleans;
 
-namespace Orleans.Runtime
+namespace UnitTests.GrainInterfaces
 {
-    internal class DefaultResolver : IDependencyResolver
+    public interface ISimpleDIGrain : IGrainWithIntegerKey
     {
-        private static readonly IDependencyResolver _instance = new DefaultResolver();
-
-        private DefaultResolver()
-        {
-        }
-
-        public static IDependencyResolver Instance
-        {
-            get { return _instance; }
-        }
-
-        public IDependencyScope BeginScope()
-        {
-            return this;
-        }
-
-        public void Dispose()
-        {
-        }
-
-        public object GetService(Type serviceType)
-        {
-            return Activator.CreateInstance(serviceType);
-        }
-
-        //public IEnumerable<object> GetServices(Type serviceType)
-        //{
-        //    return Enumerable.Empty<object>();
-        //}
+        Task<long> GetTicksFromService();
     }
 }

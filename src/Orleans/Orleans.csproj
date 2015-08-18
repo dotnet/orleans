@@ -96,9 +96,9 @@
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IGrainState.cs" />
     <Compile Include="Core\IStorage.cs" />
-    <Compile Include="Dependencies\DefaultResolver.cs" />
-    <Compile Include="Dependencies\IDependencyResolver.cs" />
-    <Compile Include="Dependencies\IDependencyScope.cs" />
+    <Compile Include="DependencyInjection\DefaultResolver.cs" />
+    <Compile Include="DependencyInjection\IDependencyResolver.cs" />
+    <Compile Include="DependencyInjection\IDependencyScope.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />

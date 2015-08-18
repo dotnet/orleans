@@ -51,6 +51,7 @@
     <Compile Include="AutofacOrleansDependencyResolver.cs" />
     <Compile Include="AutofacOrleansDependencyScope.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RegistrationExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

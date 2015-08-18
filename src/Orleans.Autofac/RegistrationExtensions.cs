@@ -21,19 +21,27 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
-using Orleans.Streams;
+using System;
+using System.Reflection;
+using Autofac;
+using Autofac.Builder;
+using Autofac.Features.Scanning;
 
-namespace Orleans.Providers
+namespace Orleans.Autofac
 {
-    /// <summary>
-    /// Interface to be implemented by any app dependency resolver classes that want to be loaded and initialized during silo startup
-    /// </summary>
-    internal interface IDependencyResolverProvider : IProvider
+    public static class RegistrationExtensions
     {
-        IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
+        /// <summary>
+        /// Register types that implement <see cref="IGrain"/> in the provided assemblies.
+        /// </summary>
+        /// <param name="builder">The container builder.</param>
+        /// <param name="grainAssemblies">Assemblies to scan for grains.</param>
+        /// <returns>Registration builder allowing the grain components to be customised.</returns>
+        public static IRegistrationBuilder<object, ScanningActivatorData, DynamicRegistrationStyle>
+            RegisterGrains(this ContainerBuilder builder, params Assembly[] grainAssemblies)
+        {
+            return builder.RegisterAssemblyTypes(grainAssemblies)
+                .Where(t => typeof(IGrain).IsAssignableFrom(t) && t.Name.EndsWith("Grain", StringComparison.Ordinal));
+        }
     }
-
 }

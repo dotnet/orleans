@@ -21,6 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using Autofac;
@@ -28,6 +29,7 @@ using Autofac.Builder;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Autofac;
 using Orleans.Providers;
+using Orleans.Providers.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -48,7 +50,7 @@ namespace UnitTests.General
     [TestClass]
     public class DependencyResolverGrainTests : UnitTestSiloHost
     {
-        private const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
+        private const string SimpleDIGrainNamePrefix = "UnitTests.Grains.SimpleDIG";
 
         public DependencyResolverGrainTests()
             : base(new TestingSiloOptions
@@ -60,9 +62,9 @@ namespace UnitTests.General
         {
         }
 
-        public ISimpleGrain GetSimpleGrain()
+        public ISimpleDIGrain GetSimpleDIGrain()
         {
-            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
+            return GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), SimpleDIGrainNamePrefix);
         }
 
         private static int GetRandomGrainId()
@@ -77,50 +79,39 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        public async Task DISimpleGrainGetGrain()
+        public async Task SimpleDIGrainGetGrain()
         {
-            ISimpleGrain grain = GetSimpleGrain();
-            int ignored = await grain.GetAxB();
+            ISimpleDIGrain grain = GetSimpleDIGrain();
+            long ignored = await grain.GetTicksFromService();
         }
     }
 
-    public class AutofacDepdendencyResolverProvider : IDependencyResolverProvider
+    public class AutofacDependencyResolverProvider : DependencyResolverProviderBase
     {
-        public string Name
-        {
-            get { return "Autofac DI"; }
-        }
-
-        public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            //
-            // This method will not be called by the DependenceResolverProviderManager, when loading the provider.
-            //
-
-            throw new System.NotSupportedException();
-        }
-
-        public IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger)
+        public override IDependencyResolver ConfigureResolver(System.Type[] systemTypesToRegister)
         {
             var builder = new ContainerBuilder();
 
-            builder.RegisterType(typeof(GrainBasedMembershipTable));
-            builder.RegisterType(typeof(GrainBasedReminderTable));
-            builder.RegisterType(typeof(GrainBasedPubSubRuntime));
+            builder.RegisterTypes(systemTypesToRegister);
 
             //
             // We've to register the concrete type and the interface of the grain too:
             // - the test code is retrieving grains based on the interface.
             // - Orleans messaging is retrieving grains by their type.
             //
-            // DI container grain registration helper functions can be written to make grain registration
-            // a no brainer. One thing to note: at this point the type manager did not load all the assemblies,
-            // so to support grain registration based on the loaded assemblies assembly loader should be invoked
-            // earlier in Silo startup.
+            // DI container grain registration helper method is used to make grain registration a no brainer.
+            // One thing to note: at this point the type manager did not load all the assemblies,
+            // so to support grain registration based on the loaded assemblies you have to make sure that the
+            // assembly of the given grain types are loaded like in the sample below.
             //
 
-            builder.RegisterType<SimpleGrain>();
-            builder.RegisterType<SimpleGrain>().AsImplementedInterfaces<ISimpleGrain, ConcreteReflectionActivatorData>();
+            builder.RegisterGrains(typeof(SimpleDIGrain).Assembly)
+                .AsSelf()
+                .AsImplementedInterfaces();
+
+            builder.RegisterType<InjectedService>()
+                .AsImplementedInterfaces()
+                .SingleInstance();
 
             var container = builder.Build();
 
