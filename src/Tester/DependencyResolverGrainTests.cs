@@ -99,6 +99,7 @@ namespace UnitTests.General
             // - the test code is retrieving grains based on the interface.
             // - Orleans messaging is retrieving grains by their type.
             //
+
             // DI container grain registration helper method is used to make grain registration a no brainer.
             // One thing to note: at this point the type manager did not load all the assemblies,
             // so to support grain registration based on the loaded assemblies you have to make sure that the

@@ -21,17 +21,24 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
+// Copyright (c) Microsoft Open Technologies, Inc. All rights reserved. See License.txt in the project root for license information.
 
-namespace Orleans.Providers
+namespace Orleans.Runtime
 {
     /// <summary>
-    /// Interface to be implemented by any app dependency resolver classes that want to be loaded and initialized during silo startup
+    /// Represents a dependency injection container.
     /// </summary>
-    internal interface IDependencyResolverProvider : IProvider
+    public interface IDependencyResolver : IDependencyScope
     {
-        IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
+        /// <summary>
+        /// Starts a resolution scope. Objects which are resolved in the given scope will belong to
+        /// that scope, and when the scope is disposed, those objects are returned to the container.
+        /// Implementers should return a new instance of <see cref="IDependencyScope"/> every time this
+        /// method is called, unless the container does not have any concept of scope or resource
+        /// release (in which case, it would be okay to return 'this', so long as the calls to
+        /// <see cref="IDisposable.Dispose"/> are effectively NOOPs).
+        /// </summary>
+        /// <returns>The dependency scope.</returns>
+        IDependencyScope BeginScope();
     }
 }

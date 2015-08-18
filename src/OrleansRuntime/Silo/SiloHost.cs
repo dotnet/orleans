@@ -533,6 +533,12 @@ namespace Orleans.Runtime.Host
                         startupEvent = null;
                     }
                     this.IsStarted = false;
+
+                    if (orleans != null && orleans.DependencyResolver != null)
+                    {
+                        orleans.DependencyResolver.Dispose();
+                        orleans.DependencyResolver = null;
+                    }
                 }
             }
             disposed = true;

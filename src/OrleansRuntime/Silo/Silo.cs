@@ -162,7 +162,7 @@ namespace Orleans.Runtime
         /// <param name="config">Silo config data to be used for this silo.</param>
         public Silo(string name, SiloType siloType, ClusterConfiguration config)
             : this(name, siloType, config, null)
-        {}
+        { }
 
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
