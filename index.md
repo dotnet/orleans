@@ -69,7 +69,7 @@ Various community projects, including Orleans Monitoring, Design Patterns, Stora
 [Discussion forum and questions](https://orleans.codeplex.com/discussions)
 
 * **[Orleans on StackOverflow](http://stackoverflow.com/questions/tagged/orleans)** - 
-More questions about Orleans. Weprefer that people ask questions on [GitHub](https://github.com/dotnet/orleans/issues) or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
+More questions about Orleans. We prefer that people ask questions on [GitHub](https://github.com/dotnet/orleans/issues) or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
 
 * **[Who Is Using Orleans?](Who-Is-Using-Orleans)** 
 A partial list of companies, projects and applications which are using Orleans.
