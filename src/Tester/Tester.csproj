@@ -90,6 +90,7 @@
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
+    <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
