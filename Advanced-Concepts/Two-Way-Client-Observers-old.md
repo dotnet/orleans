@@ -4,6 +4,8 @@ title: Two Way Client Observers
 ---
 {% include JB/setup %}
 
+**THE BELOW IS WRONG!!!!!!**
+
 In addition to regular, one-way [Client Observers](http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers), 
 Orleans also provides an advanced feature of two-way (RPC) client observers. 
 This feature allows a grain to make a call into a client observer and receive a response back.
