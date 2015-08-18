@@ -144,6 +144,13 @@ namespace Orleans.Runtime.Host
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
 
+                logger.Info(ErrorCode.SiloInitializing, "Initializing Silo {0} on host={1} CPU count={2} running .NET version='{3}' Is .NET 4.5={4} OS version='{5}'",
+                    Name, Environment.MachineName, Environment.ProcessorCount, Environment.Version, ConfigUtilities.IsNet45OrNewer(), Environment.OSVersion);
+
+                logger.Info(ErrorCode.SiloGcSetting, "Silo running with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
+                if (!GCSettings.IsServerGC)
+                    logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\"> and <configuration>-<runtime>-<gcConcurrent enabled=\"false\"/>");
+
                 orleans = new Silo(Name, Type, Config);
             }
             catch (Exception exc)
@@ -533,6 +540,12 @@ namespace Orleans.Runtime.Host
                         startupEvent = null;
                     }
                     this.IsStarted = false;
+
+                    if (orleans != null && orleans.DependencyResolver != null)
+                    {
+                        orleans.DependencyResolver.Dispose();
+                        orleans.DependencyResolver = null;
+                    }
                 }
             }
             disposed = true;

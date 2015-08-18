@@ -98,6 +98,7 @@
     <Compile Include="SerializationTests.cs" />
     <Compile Include="DependencyResolverGrainTests.cs" />
     <Compile Include="RelationalUtilities\SqlTestsEnvironment.cs" />
+    <Compile Include="DependencyResolverGrainTests.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
