@@ -35,4 +35,5 @@ namespace Orleans.Providers
     {
         IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
     }
+
 }

@@ -21,7 +21,6 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-<<<<<<< HEAD
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -100,14 +99,19 @@ namespace UnitTests.General
             // - the test code is retrieving grains based on the interface.
             // - Orleans messaging is retrieving grains by their type.
             //
-            // DI container grain registration helper functions can be written to make grain registration
-            // a no brainer. One thing to note: at this point the type manager did not load all the assemblies,
-            // so to support grain registration based on the loaded assemblies assembly loader should be invoked
-            // earlier in Silo startup.
+            // DI container grain registration helper method is used to make grain registration a no brainer.
+            // One thing to note: at this point the type manager did not load all the assemblies,
+            // so to support grain registration based on the loaded assemblies you have to make sure that the
+            // assembly of the given grain types are loaded like in the sample below.
             //
 
-            builder.RegisterType<SimpleGrain>();
-            builder.RegisterType<SimpleGrain>().AsImplementedInterfaces<ISimpleGrain, ConcreteReflectionActivatorData>();
+            builder.RegisterGrains(typeof(SimpleDIGrain).Assembly)
+                .AsSelf()
+                .AsImplementedInterfaces();
+
+            builder.RegisterType<InjectedService>()
+                .AsImplementedInterfaces()
+                .SingleInstance();
 
             var container = builder.Build();
 
