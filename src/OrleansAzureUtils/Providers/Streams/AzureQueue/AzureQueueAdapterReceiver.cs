@@ -37,6 +37,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     internal class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
         private readonly AzureQueueDataManager queue;
+        private long lastReadMessage;
         private Task outstandingTask;
 
         public QueueId Id { get; private set; }
@@ -84,7 +85,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 IEnumerable<CloudQueueMessage> messages = await task;
                 
                 List<IBatchContainer> azureQueueMessages = messages
-                    .Select(msg => (IBatchContainer)AzureQueueBatchContainer.FromCloudQueueMessage(msg)).ToList();
+                    .Select(msg => (IBatchContainer)AzureQueueBatchContainer.FromCloudQueueMessage(msg, lastReadMessage++)).ToList();
 
                 if (azureQueueMessages.Count == 0)
                     return azureQueueMessages;

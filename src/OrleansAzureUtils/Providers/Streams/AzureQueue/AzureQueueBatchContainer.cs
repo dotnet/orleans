@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.WindowsAzure.Storage.Queue;
+using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
 
@@ -33,7 +34,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     [Serializable]
     internal class AzureQueueBatchContainer : IBatchContainer
     {
-        private readonly StreamSequenceToken sequenceToken;
+        private EventSequenceToken sequenceToken;
         private readonly List<object> events;
         private readonly Dictionary<string, object> requestContext;
 
@@ -55,20 +56,19 @@ namespace Orleans.Providers.Streams.AzureQueue
             get { return requestContext; }
         }
 
-        private AzureQueueBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        private AzureQueueBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
         {
             if (events == null) throw new ArgumentNullException("events", "Message contains no events");
             
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;
             this.events = events;
-            sequenceToken = token;
             this.requestContext = requestContext;
         }
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return events.OfType<T>().Select((e, i) => Tuple.Create(e, SequenceToken));
+            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
         }
 
         public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
@@ -81,17 +81,18 @@ namespace Orleans.Providers.Streams.AzureQueue
             return false; // Consumer is not interested in any of these events, so don't send.
         }
 
-        internal static CloudQueueMessage ToCloudQueueMessage<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        internal static CloudQueueMessage ToCloudQueueMessage<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
-            var azureQueueBatchMessage = new AzureQueueBatchContainer(streamGuid, streamNamespace, events.Cast<object>().ToList(), token, requestContext);
+            var azureQueueBatchMessage = new AzureQueueBatchContainer(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
             var rawBytes = SerializationManager.SerializeToByteArray(azureQueueBatchMessage);
             return new CloudQueueMessage(rawBytes);
         }
 
-        internal static AzureQueueBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg)
+        internal static AzureQueueBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
         {
             var azureQueueBatch = SerializationManager.DeserializeFromByteArray<AzureQueueBatchContainer>(cloudMsg.AsBytes);
             azureQueueBatch.CloudQueueMessage = cloudMsg;
+            azureQueueBatch.sequenceToken = new EventSequenceToken(sequenceId);
             return azureQueueBatch;
         }
 
