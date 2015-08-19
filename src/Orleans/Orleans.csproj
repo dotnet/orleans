@@ -107,6 +107,7 @@
     <Compile Include="Messaging\Response.cs" />
     <Compile Include="Providers\DependencyResolverProviderManager.cs" />
     <Compile Include="Providers\IDependencyResolverProvider.cs" />
+    <Compile Include="Providers\IControllable.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
     <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
