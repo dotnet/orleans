@@ -38,5 +38,6 @@ namespace Orleans.Streams
         Task Initialize(Immutable<IQueueAdapter> queueAdapter);
         Task StartAgents();
         Task StopAgents();
+        Task<object> ExecuteCommand(int command, object arg);
     }
 }
