@@ -54,6 +54,11 @@ namespace Orleans.Streams
         StreamSequenceToken SequenceToken { get; }
 
         /// <summary>
+        /// The RequestContext that was set at the time event was generated and enqueued into the persistent provider.
+        /// </summary>
+        Dictionary<string, object> RequestContext { get; }
+
+        /// <summary>
         /// Decide whether this batch should be sent to the specified target.
         /// </summary>
         bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc);
