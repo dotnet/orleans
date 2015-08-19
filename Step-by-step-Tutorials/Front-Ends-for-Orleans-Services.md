@@ -18,7 +18,7 @@ First, you should add a new ASP.NET Web Application to your solution. Then, sele
 
 Next, add a reference to the _Orleans.dll_ file in the project references.
 
-Now add the _DevTestClientConfiguration.xml_ file used in the Orleans Host application to the root of the ASP.NET project.
+Now add the _ClientConfiguration.xml_ file used in the Orleans Host application to the root of the ASP.NET project.
 
 As with the Orleans host we created earlier, we need to initialize Orleans. 
 This is best done in the _Global.asax.cs_ file like this:
@@ -30,7 +30,7 @@ namespace WebApplication1
     {
         protected void Application_Start()
         {
-            OrleansClient.Initialize(Server.MapPath("~/DevTestClientConfiguration.xml"));
+            Orleans.GrainClient.Initialize(Server.MapPath("~/ClientConfiguration.xml"));
        	   ...
 ```
 

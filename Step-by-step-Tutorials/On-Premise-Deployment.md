@@ -76,7 +76,7 @@ static void Main(string[] args)
     //    AppDomainInitializerArguments = args,
     //});
 
-    Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+    Orleans.GrainClient.Initialize("ClientConfiguration.xml");
 
     var friend = GrainClient.GrainFactory.GetGrain<HelloWorldInterfaces.IHello>(0);
     Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
