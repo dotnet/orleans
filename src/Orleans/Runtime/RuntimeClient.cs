@@ -56,7 +56,11 @@ namespace Orleans.Runtime
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
                 message.IsAlwaysInterleave = true;
 
-            RequestContext.ExportToMessage(message);
+            var contextData = RequestContext.Export();
+            if (contextData != null)
+            {
+                message.RequestContextData = contextData;
+            }
             return message;
         }
     }

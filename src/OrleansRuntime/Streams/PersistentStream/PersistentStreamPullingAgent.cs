@@ -464,7 +464,7 @@ namespace Orleans.Streams
                     if (deliveryFailed && batch != null)
                     {
                         // notify consumer of delivery error, if we can.
-                        consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, new StreamEventDeliveryFailureException(consumerData.StreamId)).Ignore();
+                        DeliverErrorToConsumer(consumerData, new StreamEventDeliveryFailureException(consumerData.StreamId), batch).Ignore();
                         // record that there was a delivery failure
                         await streamFailureHandler.OnDeliveryFailure(consumerData.SubscriptionId, streamProviderName,
                             consumerData.StreamId, batch.SequenceToken);
@@ -474,8 +474,8 @@ namespace Orleans.Streams
                             try
                             {
                                 // notify consumer of faulted subscription, if we can.
-                                consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId,
-                                    new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId))
+                                DeliverErrorToConsumer(consumerData, 
+                                    new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId), batch)
                                     .Ignore();
                                 // mark subscription as faulted.
                                 await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
@@ -501,10 +501,44 @@ namespace Orleans.Streams
 
         private async Task DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
-            StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
-            if (newToken != null)
+            if (batch.RequestContext != null)
             {
-                consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, newToken);
+                RequestContext.Import(batch.RequestContext);
+            }
+            try
+            {
+                StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
+                if (newToken != null)
+                {
+                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
+                        consumerData.StreamId.Namespace, newToken);
+                }
+            }
+            finally
+            {
+                if (batch.RequestContext != null)
+                {
+                    RequestContext.Clear();
+                }
+            }
+        }
+
+        private async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
+        {
+            if (batch !=null && batch.RequestContext != null)
+            {
+                RequestContext.Import(batch.RequestContext);
+            }
+            try
+            {
+                await consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
+            }
+            finally
+            {
+                if (batch != null && batch.RequestContext != null)
+                {
+                    RequestContext.Clear();
+                }
             }
         }
 
