@@ -44,7 +44,6 @@ namespace Orleans.Runtime.Providers
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
 
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
-        private IPersistentStreamPullingManager pullingAgentManager;
 
         public IGrainFactory GrainFactory { get; private set; }
         public Guid ServiceId { get; private set; }
@@ -248,7 +247,7 @@ namespace Orleans.Runtime.Providers
             return RuntimeContext.CurrentActivationContext;
         }
 
-        public Task InitializePullingAgents(
+        public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
             StreamPubSubType pubSubType,
@@ -264,19 +263,10 @@ namespace Orleans.Runtime.Providers
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubSubType), adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
-            pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
+            var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
             // Need to call it as a grain reference though.
-            return pullingAgentManager.Initialize(queueAdapter.AsImmutable());
-        }
-
-        public Task StartPullingAgents()
-        {
-            return pullingAgentManager.StartAgents();
-        }
-
-        public Task StopPullingAgents()
-        {
-            return pullingAgentManager.StopAgents();
+            await pullingAgentManager.Initialize(queueAdapter.AsImmutable());
+            return pullingAgentManager;
         }
     }
 }
