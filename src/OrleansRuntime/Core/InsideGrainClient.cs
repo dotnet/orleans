@@ -349,7 +349,7 @@ namespace Orleans.Runtime
                 if (Message.WriteMessagingTraces)
                     message.AddTimestamp(Message.LifecycleTag.InvokeIncoming);
 
-                RequestContext.ImportFromMessage(message);
+                RequestContext.Import(message.RequestContextData);
                 if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message));
