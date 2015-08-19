@@ -42,7 +42,7 @@ namespace Orleans.Providers.Streams.Common
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
     /// <typeparam name="TAdapterFactory"></typeparam>
-    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider
+    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider, IControllable
         where TAdapterFactory : IQueueAdapterFactory, new()
     {
         private Logger                  logger;
@@ -156,9 +156,9 @@ namespace Orleans.Providers.Streams.Common
 
         public async Task Stop()
         {
-            if (providerRuntime.InSilo)
+            var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
+            if (siloRuntime != null)
             {
-                var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 await siloRuntime.StopPullingAgents();
             }
         }
@@ -183,6 +183,12 @@ namespace Orleans.Providers.Streams.Common
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(pubSubType), IsRewindable);
+        }
+
+        public Task<object> ExecuteCommand(int command, object arg)
+        {
+            logger.Info(0, String.Format("Got command {0} with arg {1}.", command, arg != null ? arg.ToString() : "null"));
+            return Task.FromResult((object)null);
         }
     }
 }

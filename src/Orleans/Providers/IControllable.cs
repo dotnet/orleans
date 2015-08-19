@@ -21,34 +21,21 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
+
 using System.Threading.Tasks;
-using Orleans.Runtime;
 
-namespace Orleans
+namespace Orleans.Providers
 {
-    internal interface ISiloControl : ISystemTarget
+    /// <summary>
+    /// A general interface for controllable components inside Orleans runtime.
+    /// </summary>
+    public interface IControllable
     {
-        Task Ping(string message);
-
-        Task SetSystemLogLevel(int traceLevel);
-        Task SetAppLogLevel(int traceLevel);
-        Task SetLogLevel(string logName, int traceLevel);
-
-        Task ForceGarbageCollection();
-        Task ForceActivationCollection(TimeSpan ageLimit);
-        Task ForceRuntimeStatisticsCollection();
-
-        Task<SiloRuntimeStatistics> GetRuntimeStatistics();
-        Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics();
-        Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
-        Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId);
-
-        Task UpdateConfiguration(string configuration);
-
-        Task<int> GetActivationCount();
-
-        Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg);
+        /// <summary>
+        /// A function to execute a control command.
+        /// </summary>
+        /// <param name="command">A serial number of the command.</param>
+        /// <param name="arg">An opaque command argument</param>
+        Task<object> ExecuteCommand(int command, object arg);
     }
 }

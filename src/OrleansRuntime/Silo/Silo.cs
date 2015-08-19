@@ -30,7 +30,6 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -99,6 +98,7 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
+        private readonly List<IProvider> allSiloProviders;
         
         
         internal readonly string Name;
@@ -117,6 +117,10 @@ namespace Orleans.Runtime
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal static Silo CurrentSilo { get; private set; }
+        internal IReadOnlyCollection<IProvider> AllSiloProviders 
+        {
+            get { return allSiloProviders.AsReadOnly();  }
+        }
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress { get { return messageCenter.MyAddress; } }
@@ -200,6 +204,7 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
             healthCheckParticipants = new List<IHealthCheckParticipant>();
+            allSiloProviders = new List<IProvider>();
 
             BufferPool.InitGlobalBufferPool(globalConfig);
             PlacementStrategy.Initialize(globalConfig);
@@ -410,7 +415,8 @@ namespace Orleans.Runtime
                 .WaitForResultWithThrow(initTimeout);
             if (statsProviderName != null)
                 LocalConfig.StatisticsProviderName = statsProviderName;
-            
+            allSiloProviders.AddRange(statisticsProviderManager.GetProviders());
+
             // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
             siloStatistics.SetSiloStatsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
             siloStatistics.SetSiloMetricsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
@@ -438,6 +444,7 @@ namespace Orleans.Runtime
                 providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
             catalog.SetStorageManager(storageProviderManager);
+            allSiloProviders.AddRange(storageProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
@@ -447,6 +454,7 @@ namespace Orleans.Runtime
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
             InsideRuntimeClient.Current.CurrentStreamProviderManager = siloStreamProviderManager;
+            allSiloProviders.AddRange(siloStreamProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
@@ -504,6 +512,8 @@ namespace Orleans.Runtime
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
                 BootstrapProviders = bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
+                allSiloProviders.AddRange(BootstrapProviders);
+
                 if (logger.IsVerbose) { logger.Verbose("App bootstrap calls done successfully."); }
 
                 // Now that we're active, we can start the gateway
