@@ -50,7 +50,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncBatchObserver.");
             }
-            return queueAdapter.QueueMessageAsync(stream.StreamId.Guid, stream.StreamId.Namespace, item);
+            return queueAdapter.QueueMessageAsync(stream.StreamId.Guid, stream.StreamId.Namespace, item, Runtime.RequestContext.Export());
         }
 
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
@@ -59,7 +59,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncBatchObserver.");
             }
-            return queueAdapter.QueueMessageBatchAsync(stream.StreamId.Guid, stream.StreamId.Namespace, batch);
+            return queueAdapter.QueueMessageBatchAsync(stream.StreamId.Guid, stream.StreamId.Namespace, batch, Runtime.RequestContext.Export());
         }
 
         public Task OnCompletedAsync()
