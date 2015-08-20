@@ -42,7 +42,7 @@ namespace PresenceGrains
         public Task Heartbeat(byte[] data)
         {
             HeartbeatData heartbeatData = HeartbeatDataDotNetSerializer.Deserialize(data);
-            IGameGrain game = GameGrainFactory.GetGrain(heartbeatData.Game);
+            IGameGrain game = GrainFactory.GetGrain<IGameGrain>(heartbeatData.Game);
             return game.UpdateGameStatus(heartbeatData.Status);
         }
     }
