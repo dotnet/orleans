@@ -70,7 +70,7 @@ namespace PresenceGrains
                     try
                     {
                         // Here we call player grains serially, which is less efficient than a fan-out but simpler to express.
-                        await PlayerGrainFactory.GetGrain(player).JoinGame(this);
+                        await GrainFactory.GetGrain<IPlayerGrain>(player).JoinGame(this);
                         players.Add(player);
                     }
                     catch (Exception)
@@ -89,7 +89,7 @@ namespace PresenceGrains
                     {
                         // Here we do a fan-out with multiple calls going out in parallel. We join the promisses later.
                         // More code to write but we get lower latency when calling multiple player grains.
-                        promises.Add(PlayerGrainFactory.GetGrain(player).LeaveGame(this));
+                        promises.Add(GrainFactory.GetGrain<IPlayerGrain>(player).LeaveGame(this));
                         players.Remove(player);
                     }
                     catch (Exception)
