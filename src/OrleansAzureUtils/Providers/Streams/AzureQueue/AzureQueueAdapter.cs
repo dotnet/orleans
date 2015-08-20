@@ -59,8 +59,12 @@ namespace Orleans.Providers.Streams.AzureQueue
             return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId);
         }
 
-        public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
+            if(token != null)
+            {
+                throw new ArgumentException("AzureQueue stream provider currebtly does not support non-null StreamSequenceToken.", "token");
+            }
             var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
             AzureQueueDataManager queue;
             if (!Queues.TryGetValue(queueId, out queue))
