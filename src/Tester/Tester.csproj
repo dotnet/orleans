@@ -81,6 +81,7 @@
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
+    <Compile Include="MemoryStorageProviderTests.cs" />
     <Compile Include="ObserverTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
@@ -90,6 +91,7 @@
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
+    <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />

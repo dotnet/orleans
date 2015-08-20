@@ -72,6 +72,11 @@ namespace Orleans.Providers
             return statisticsProviderLoader.GetProvider(name, true);
         }
 
+        public IList<IProvider> GetProviders()
+        {
+            return statisticsProviderLoader.GetProviders();
+        }
+
         // used only for testing
         internal async Task LoadEmptyProviders()
         {

@@ -38,7 +38,7 @@ namespace Orleans.Streams
             queueData = new Dictionary<GuidId, StreamConsumerData>();
         }
 
-        public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
             var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filter);
             queueData.Add(subscriptionId, consumerData);

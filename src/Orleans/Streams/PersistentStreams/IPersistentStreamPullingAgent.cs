@@ -36,5 +36,7 @@ namespace Orleans.Streams
     internal interface IPersistentStreamPullingManager : ISystemTarget
     {
         Task Initialize(Immutable<IQueueAdapter> queueAdapter);
+        Task StartAgents();
+        Task StopAgents();
     }
 }

@@ -101,6 +101,7 @@
     <Compile Include="Messaging\IncomingMessageBuffer.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
+    <Compile Include="Providers\IControllable.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
     <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
@@ -127,6 +128,8 @@
     <Compile Include="RelationalStorage\RelationalStorageExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorageUtilities.cs" />
     <Compile Include="RelationalStorage\SqlFormatProvider.cs" />
+    <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
+    <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />
@@ -181,7 +184,7 @@
     <Compile Include="Streams\Predicates\OrFilter.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamSubscriberTable.cs" />
     <Compile Include="Streams\PubSub\PubSubPublisherState.cs" />
-    <Compile Include="Streams\PubSub\PubSubRuntime.cs" />
+    <Compile Include="Streams\PubSub\GrainBasedPubSubRuntime.cs" />
     <Compile Include="Providers\IBootstrapProvider.cs" />
     <Compile Include="Providers\ClientProviderRuntime.cs" />
     <Compile Include="Providers\IOrleansProvider.cs" />

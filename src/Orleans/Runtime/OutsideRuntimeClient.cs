@@ -476,7 +476,7 @@ namespace Orleans
                     if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Invoke))
                         continue;
 
-                    RequestContext.ImportFromMessage(message);
+                    RequestContext.Import(message.RequestContextData);
                     var request = (InvokeMethodRequest)message.BodyObject;
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
