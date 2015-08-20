@@ -5,7 +5,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <Platform>AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</ProjectGuid>
@@ -15,7 +15,6 @@
     <AssemblyName>Orleans</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <PlatformTarget>x86</PlatformTarget>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
