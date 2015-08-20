@@ -50,15 +50,45 @@ namespace Orleans.Streams
             uniformHashCache = hash;
         }
 
-        public static QueueId GetQueueId(string queuePrefix, uint id, uint hash)
+        public static QueueId GetQueueId(string queueName)
         {
-            return FindOrCreateQueueId(queuePrefix, id, hash);
+            return FindOrCreateQueueId(queueName, 0, 0);
+        }
+
+        public static QueueId GetQueueId(uint queueId)
+        {
+            return FindOrCreateQueueId(null, queueId, 0);
+        }
+
+        public static QueueId GetQueueId(string queueName, uint queueId)
+        {
+            return FindOrCreateQueueId(queueName, queueId, 0);
+        }
+
+        public static QueueId GetQueueId(string queueName, uint queueId, uint hash)
+        {
+            return FindOrCreateQueueId(queueName, queueId, hash);
         }
 
         private static QueueId FindOrCreateQueueId(string queuePrefix, uint id, uint hash)
         {
             var key = new QueueId(queuePrefix, id, hash);
             return queueIdInternCache.Value.FindOrCreate(key, () => key);
+        }
+
+        public string GetStringNamePrefix()
+        {
+            return queueNamePrefix;
+        }
+
+        public uint GetNumericId()
+        {
+            return queueId;
+        }
+
+        public uint GetUniformHashCode()
+        {
+            return uniformHashCache;
         }
 
         #region IComparable<QueueId> Members
@@ -69,9 +99,9 @@ namespace Orleans.Streams
             if (cmp != 0) return cmp;
 
             cmp = String.Compare(queueNamePrefix, other.queueNamePrefix, StringComparison.Ordinal);
-            if (cmp == 0) cmp = uniformHashCache.CompareTo(other.uniformHashCache);
-            
-            return cmp;
+            if (cmp != 0) return cmp;
+                
+            return uniformHashCache.CompareTo(other.uniformHashCache);
         }
 
         #endregion
@@ -80,7 +110,10 @@ namespace Orleans.Streams
 
         public virtual bool Equals(QueueId other)
         {
-            return other != null && queueId == other.queueId && queueNamePrefix.Equals(other.queueNamePrefix) && uniformHashCache == other.uniformHashCache;
+            return other != null 
+                && queueId == other.queueId 
+                && String.Equals(queueNamePrefix, other.queueNamePrefix, StringComparison.Ordinal) 
+                && uniformHashCache == other.uniformHashCache;
         }
 
         #endregion
@@ -92,17 +125,12 @@ namespace Orleans.Streams
 
         public override int GetHashCode()
         {
-            return (int)queueId ^ queueNamePrefix.GetHashCode() ^ (int)uniformHashCache;
-        }
-
-        public uint GetUniformHashCode()
-        {
-            return uniformHashCache;
+            return (int)queueId ^ (queueNamePrefix !=null ? queueNamePrefix.GetHashCode() : 0) ^ (int)uniformHashCache;
         }
 
         public override string ToString()
         {
-            return String.Format("{0}-{1}", queueNamePrefix.ToLower(), queueId.ToString());
+            return String.Format("{0}-{1}", (queueNamePrefix !=null ? queueNamePrefix.ToLower() : String.Empty), queueId.ToString());
         }
 
         public string ToStringWithHashCode()

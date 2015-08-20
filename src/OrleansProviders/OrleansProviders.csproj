@@ -44,6 +44,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DependencyInjection\DependencyResolverProviderBase.cs" />
     <Compile Include="Streams\Common\SimpleQueueCache.cs" />
     <Compile Include="Streams\Common\SimpleQueueCacheCursor.cs" />
     <Compile Include="Streams\Common\SimpleQueueAdapterCache.cs" />
@@ -62,6 +63,10 @@
     <Compile Include="Storage\ShardedStorageProvider.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>

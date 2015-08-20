@@ -47,10 +47,12 @@
   <ItemGroup>
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGenericInterfaces.cs" />
+    <Compile Include="IInitialStateGrain.cs" />
     <Compile Include="IMultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyIGrains.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
+    <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="CodegenTestInterfaces.cs" />
     <Compile Include="IStatelessWorkerGrain.cs" />

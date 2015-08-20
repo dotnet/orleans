@@ -70,6 +70,11 @@ namespace Orleans.Runtime.Storage
             return storageProviderLoader.GetNumLoadedProviders();
         }
 
+        public IList<IStorageProvider> GetProviders()
+        {
+            return storageProviderLoader.GetProviders();
+        }
+
         public Logger GetLogger(string loggerName)
         {
             return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);

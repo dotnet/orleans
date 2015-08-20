@@ -30,6 +30,11 @@ namespace Orleans.Timers
                 string msg = string.Format("Cannot register reminder {0} as requested period ({1}) is less than minimum allowed reminder period ({2})", reminderName, period, Constants.MinReminderPeriod);
                 throw new ArgumentException(msg);
             }
+            if (String.IsNullOrEmpty(reminderName))
+            {
+                throw new ArgumentException("Cannot use null or empty name for the reminder", "reminderName");
+            }
+
             return RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, dueTime, period);
         }
 
@@ -40,6 +45,10 @@ namespace Orleans.Timers
 
         public Task<IGrainReminder> GetReminder(string reminderName)
         {
+            if (String.IsNullOrEmpty(reminderName))
+            {
+                throw new ArgumentException("Cannot use null or empty name for the reminder", "reminderName");
+            }
             return RuntimeClient.Current.GetReminder(reminderName);
         }
 

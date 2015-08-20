@@ -81,6 +81,11 @@ namespace UnitTests.Grains
                 (e, t) =>
                 {
                     logger.Info("Got next event {0}", e);
+                    string contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
+                    if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
+                    {
+                        throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
+                    }
                     count.Increment();
                     return TaskDone.Done;
                 });
@@ -106,7 +111,17 @@ namespace UnitTests.Grains
             }
 
             // subscribe
-            StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync((e, t) => count.Increment());
+            StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync((e, t) =>
+            {
+                logger.Info("Got next event {0}", e);
+                string contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
+                if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
+                {
+                    throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
+                }
+                count.Increment();
+                return TaskDone.Done;
+            });
 
             // track counter
             consumedMessageCounts[newhandle] = count;

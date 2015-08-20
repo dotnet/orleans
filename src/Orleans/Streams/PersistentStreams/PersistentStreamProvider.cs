@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
@@ -30,11 +31,18 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
 {
+    public enum StreamProviderStartupState
+    {
+        Started,
+        Stopped,
+        DeliveryDisabled,
+    }
+
     /// <summary>
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
     /// <typeparam name="TAdapterFactory"></typeparam>
-    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider
+    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider, IControllable
         where TAdapterFactory : IQueueAdapterFactory, new()
     {
         private Logger                  logger;
@@ -57,6 +65,13 @@ namespace Orleans.Providers.Streams.Common
         private const string MAX_EVENT_DELIVERY_TIME = "MaxEventDeliveryTime";
         private readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
         private TimeSpan maxEventDeliveryTime;
+
+        private const string STREAM_PUBSUB_TYPE = "PubSubType";
+        private const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
+        private StreamPubSubType pubSubType;
+
+        private const string STARTUP_STATE = "StartupState";
+        private StreamProviderStartupState startupState;
 
         public string                   Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
@@ -99,10 +114,26 @@ namespace Orleans.Providers.Streams.Common
                 maxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
 
-            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5} and with Adapter {6}.",
+            string pubSubTypeString;
+            pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
+                ? DEFAULT_STREAM_PUBSUB_TYPE
+                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
+
+            string startup;
+            if (config.Properties.TryGetValue(STARTUP_STATE, out startup))
+            {
+                if(!Enum.TryParse(startup, true, out startupState))
+                    throw new ArgumentException(
+                        String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, STARTUP_STATE, config.Name));
+            }
+            else 
+                startupState = StreamProviderStartupState.Started;
+
+            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5}, {6} = {7} and with Adapter {8}.",
                 typeof(TAdapterFactory).Name, Name, 
                 GET_QUEUE_MESSAGES_TIMER_PERIOD, getQueueMsgsTimerPeriod,
-                INIT_QUEUE_TIMEOUT, this.initQueueTimeout, 
+                INIT_QUEUE_TIMEOUT, initQueueTimeout,
+                STARTUP_STATE, startupState,
                 queueAdapter.Name);
         }
 
@@ -111,7 +142,24 @@ namespace Orleans.Providers.Streams.Common
             if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
                 queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
-                await providerRuntime.StartPullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
+                if (siloRuntime != null)
+                {
+                    await siloRuntime.InitializePullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+
+                    // TODO: No support yet for DeliveryDisabled, only Stopped and Started
+                    if (startupState == StreamProviderStartupState.Started)
+                        await siloRuntime.StartPullingAgents();
+                }
+            }
+        }
+
+        public async Task Stop()
+        {
+            var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
+            if (siloRuntime != null)
+            {
+                await siloRuntime.StopPullingAgents();
             }
         }
 
@@ -134,7 +182,13 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(pubSubType), IsRewindable);
+        }
+
+        public Task<object> ExecuteCommand(int command, object arg)
+        {
+            logger.Info(0, String.Format("Got command {0} with arg {1}.", command, arg != null ? arg.ToString() : "null"));
+            return Task.FromResult((object)null);
         }
     }
 }
