@@ -110,7 +110,7 @@ namespace Orleans.Runtime
         /// <returns>Completion promise for this operation.</returns>
         Task<int> GetGrainActivationCount(GrainReference grainReference);
         Task<int> GetTotalActivationCount();
-        Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg);
+        Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
         
         /// <summary>
         /// Update the configuration information dynamically. Only a subset of configuration information

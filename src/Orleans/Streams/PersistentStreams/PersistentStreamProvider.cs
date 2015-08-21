@@ -22,7 +22,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Globalization;
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
@@ -31,11 +30,23 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
 {
-    public enum StreamProviderStartupState
+    [Serializable]
+    public enum PersistentStreamProviderState
     {
-        Started,
-        Stopped,
-        DeliveryDisabled,
+        None,
+        Initialized,
+        AgentsStarted,
+        AgentsStopped,
+    }
+
+    [Serializable]
+    public enum PersistentStreamProviderCommand
+    {
+        None,
+        StartAgents,
+        StopAgents,
+        GetAgentsState,
+        GetNumberRunningAgents,
     }
 
     /// <summary>
@@ -49,6 +60,8 @@ namespace Orleans.Providers.Streams.Common
         private IQueueAdapterFactory    adapterFactory;
         private IStreamProviderRuntime  providerRuntime;
         private IQueueAdapter           queueAdapter;
+        private IPersistentStreamPullingManager pullingAgentManager;
+
 
         private const string GET_QUEUE_MESSAGES_TIMER_PERIOD = "GetQueueMessagesTimerPeriod";
         private readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
@@ -71,7 +84,7 @@ namespace Orleans.Providers.Streams.Common
         private StreamPubSubType pubSubType;
 
         private const string STARTUP_STATE = "StartupState";
-        private StreamProviderStartupState startupState;
+        private PersistentStreamProviderState startupState;
 
         public string                   Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
@@ -126,8 +139,8 @@ namespace Orleans.Providers.Streams.Common
                     throw new ArgumentException(
                         String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, STARTUP_STATE, config.Name));
             }
-            else 
-                startupState = StreamProviderStartupState.Started;
+            else
+                startupState = PersistentStreamProviderState.AgentsStarted;
 
             logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5}, {6} = {7} and with Adapter {8}.",
                 typeof(TAdapterFactory).Name, Name, 
@@ -145,11 +158,11 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    await siloRuntime.InitializePullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
-                    if (startupState == StreamProviderStartupState.Started)
-                        await siloRuntime.StartPullingAgents();
+                    if (startupState == PersistentStreamProviderState.AgentsStarted)
+                        await pullingAgentManager.StartAgents();
                 }
             }
         }
@@ -159,7 +172,7 @@ namespace Orleans.Providers.Streams.Common
             var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
             if (siloRuntime != null)
             {
-                await siloRuntime.StopPullingAgents();
+                await pullingAgentManager.StopAgents();
             }
         }
 
@@ -187,8 +200,13 @@ namespace Orleans.Providers.Streams.Common
 
         public Task<object> ExecuteCommand(int command, object arg)
         {
-            logger.Info(0, String.Format("Got command {0} with arg {1}.", command, arg != null ? arg.ToString() : "null"));
-            return Task.FromResult((object)null);
+            if (pullingAgentManager != null)
+            {
+                return pullingAgentManager.ExecuteCommand((PersistentStreamProviderCommand)command, arg);
+            }
+            logger.Warn(0, String.Format("Got command {0} with arg {1}, but PullingAgentManager is not initialized yet. Ignoring the command.", 
+                (PersistentStreamProviderCommand)command, arg != null ? arg.ToString() : "null"));
+            throw new ArgumentException("PullingAgentManager is not initialized yet.");
         }
     }
 }
