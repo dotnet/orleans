@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
 {
@@ -38,6 +39,6 @@ namespace Orleans.Streams
         Task Initialize(Immutable<IQueueAdapter> queueAdapter);
         Task StartAgents();
         Task StopAgents();
-        Task<object> ExecuteCommand(int command, object arg);
+        Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg);
     }
 }

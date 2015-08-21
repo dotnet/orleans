@@ -305,7 +305,7 @@ namespace Orleans.Streams
 
         #endregion
 
-        public async Task<object> ExecuteCommand(int command, object arg)
+        public async Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg)
         {
             latestCommandNumber++;
             int commandSeqNumber = latestCommandNumber;
@@ -314,32 +314,34 @@ namespace Orleans.Streams
             {
                 logger.Info((int) ErrorCode.PersistentStreamPullingManager_13,
                     String.Format("Got command {0}{1}: commandSeqNumber = {2}, managerState = {3}.",
-                    (PersistentStreamProviderCommand)command, arg != null ? " with arg " + arg : String.Empty, commandSeqNumber, managerState));
+                    command, arg != null ? " with arg " + arg : String.Empty, commandSeqNumber, managerState));
 
-                if (command == (int) PersistentStreamProviderCommand.StartAgents ||
-                    command == (int) PersistentStreamProviderCommand.StopAgents)
+                switch (command)
                 {
-                    await QueueCommandForExecution(command, commandSeqNumber);
-                    return null;
-                }
-                else if (command == (int) PersistentStreamProviderCommand.GetAgentsState)
-                {
-                    return managerState;
-                }
-                else
-                {
-                    throw new OrleansException(String.Format("PullingAgentManager does not support command {0}.", command));
+                    case PersistentStreamProviderCommand.StartAgents:
+                    case PersistentStreamProviderCommand.StopAgents:
+                        await QueueCommandForExecution((PersistentStreamProviderCommand)command, commandSeqNumber);
+                        return null;
+                    case PersistentStreamProviderCommand.GetAgentsState:
+                        return managerState;
+                    case PersistentStreamProviderCommand.GetNumberRunningAgents:
+                        return queuesToAgentsMap.Count;
+                    default:
+                        throw new OrleansException(String.Format("PullingAgentManager does not support command {0}.", command));
                 }
             }
             finally
             {
                 logger.Info((int)ErrorCode.PersistentStreamPullingManager_15,
                     String.Format("Done executing command {0}: commandSeqNumber = {1}, managerState = {2}.", 
-                    (PersistentStreamProviderCommand)command, commandSeqNumber, managerState));
+                    command, commandSeqNumber, managerState));
             }
         }
 
-        private Task QueueCommandForExecution(int command, int commandSeqNumber)
+        // Start and Stop commands are composite commands that take multiple turns. 
+        // Ee don't wnat them to interleave with other concurrent Start/Stop commands, as well as not with QueueDistributionChangeNotification.
+        // Therefore, we serialize them all via the same nonReentrancyGuarantor.
+        private Task QueueCommandForExecution(PersistentStreamProviderCommand command, int commandSeqNumber)
         {
             return nonReentrancyGuarantor.SubmitNext(() =>
             {
@@ -347,21 +349,19 @@ namespace Orleans.Streams
                 if (commandSeqNumber < latestCommandNumber)
                 {
                     logger.Info((int)ErrorCode.PersistentStreamPullingManager_15,
-                        "Skipping execution of command number {0} since already received a later command " +
-                        "(already have command number {1}).",
+                        "Skipping execution of command number {0} since already received a later command (already have command number {1}).",
                         commandSeqNumber, latestCommandNumber);
                     return TaskDone.Done;
                 }
-
-                if (command == (int)PersistentStreamProviderCommand.StartAgents)
+                switch (command)
                 {
-                    return StartAgents();
+                    case PersistentStreamProviderCommand.StartAgents:
+                        return StartAgents();
+                    case PersistentStreamProviderCommand.StopAgents:
+                        return StopAgents();
+                    default:
+                        throw new OrleansException(String.Format("PullingAgentManager got unsupported command {0}", command));
                 }
-                else if (command == (int)PersistentStreamProviderCommand.StopAgents)
-                {
-                    return StopAgents();
-                }
-                throw new OrleansException(String.Format("PullingAgentManager got unsupported command {0}", command));
             });
         }
 

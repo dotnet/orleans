@@ -91,11 +91,23 @@ namespace UnitTests.StreamingTests
             var adapterType = AZURE_QUEUE_STREAM_PROVIDER_TYPE;
             var adapterName = AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
-            var result = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
-            Assert.AreEqual(2, result.Length);
-            foreach (var state in result.Cast<PersistentStreamProviderState>())
+            var states = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
+            Assert.AreEqual(2, states.Length);
+            foreach (var state in states.Cast<PersistentStreamProviderState>())
             {
                 Assert.AreEqual(expectedState, state);
+            }
+
+            var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+            Assert.AreEqual(2, numAgents.Length);
+            int totalNumAgents = numAgents.Cast<int>().Sum();
+            if (expectedState == PersistentStreamProviderState.AgentsStarted)
+            {
+                Assert.AreEqual(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, totalNumAgents);
+            }
+            else
+            {
+                Assert.AreEqual(0, totalNumAgents);
             }
         }
     }
