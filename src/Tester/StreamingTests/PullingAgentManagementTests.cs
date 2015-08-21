@@ -22,10 +22,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.Tester;
@@ -63,11 +65,50 @@ namespace UnitTests.StreamingTests
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task PullingAgent_ControlCmd_1()
+        public async Task PullingAgents_ControlCmd_1()
         {
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            var adapterType = AZURE_QUEUE_STREAM_PROVIDER_TYPE;
+            var adapterName = AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
-            await mgmt.SendControlCommandToProvider(AZURE_QUEUE_STREAM_PROVIDER_TYPE, AZURE_QUEUE_STREAM_PROVIDER_NAME, 1, "CommandArgs");
+            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+
+            await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
+            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+
+            await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StopAgents);
+            await ValidateAgentsState(PersistentStreamProviderState.AgentsStopped);
+
+
+            await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
+            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+
+        }
+
+        private async Task ValidateAgentsState(PersistentStreamProviderState expectedState)
+        {
+            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            var adapterType = AZURE_QUEUE_STREAM_PROVIDER_TYPE;
+            var adapterName = AZURE_QUEUE_STREAM_PROVIDER_NAME;
+
+            var states = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
+            Assert.AreEqual(2, states.Length);
+            foreach (var state in states.Cast<PersistentStreamProviderState>())
+            {
+                Assert.AreEqual(expectedState, state);
+            }
+
+            var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+            Assert.AreEqual(2, numAgents.Length);
+            int totalNumAgents = numAgents.Cast<int>().Sum();
+            if (expectedState == PersistentStreamProviderState.AgentsStarted)
+            {
+                Assert.AreEqual(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, totalNumAgents);
+            }
+            else
+            {
+                Assert.AreEqual(0, totalNumAgents);
+            }
         }
     }
 }

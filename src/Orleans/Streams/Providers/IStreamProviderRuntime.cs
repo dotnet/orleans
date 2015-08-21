@@ -115,7 +115,7 @@ namespace Orleans.Streams
         /// <param name="getQueueMsgsTimerPeriod"></param>
         /// <param name="initQueueTimeout"></param>
         /// <returns></returns>
-        Task InitializePullingAgents(
+        Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
             StreamPubSubType pubSubType,
@@ -124,9 +124,6 @@ namespace Orleans.Streams
             TimeSpan getQueueMsgsTimerPeriod,
             TimeSpan initQueueTimeout,
             TimeSpan maxEventDeliveryTime);
-
-        Task StartPullingAgents();
-        Task StopPullingAgents();
     }
 
     internal enum StreamPubSubType
