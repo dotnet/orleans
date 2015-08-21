@@ -46,6 +46,7 @@ namespace Orleans.Providers.Streams.Common
         StartAgents,
         StopAgents,
         GetAgentsState,
+        GetNumberRunningAgents,
     }
 
     /// <summary>
@@ -201,7 +202,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (pullingAgentManager != null)
             {
-                return pullingAgentManager.ExecuteCommand(command, arg);
+                return pullingAgentManager.ExecuteCommand((PersistentStreamProviderCommand)command, arg);
             }
             logger.Warn(0, String.Format("Got command {0} with arg {1}, but PullingAgentManager is not initialized yet. Ignoring the command.", 
                 (PersistentStreamProviderCommand)command, arg != null ? arg.ToString() : "null"));
