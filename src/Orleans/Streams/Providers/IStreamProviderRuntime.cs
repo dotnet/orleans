@@ -126,7 +126,7 @@ namespace Orleans.Streams
             TimeSpan maxEventDeliveryTime);
     }
 
-    internal enum StreamPubSubType
+    public enum StreamPubSubType
     {
         ExplicitGrainBasedAndImplicit,
         ExplicitGrainBasedOnly,
