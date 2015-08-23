@@ -347,7 +347,7 @@ namespace Orleans.Runtime
             else
             {
                 throw new InvalidCastException(string.Format(
-                    "Connet convert type {0} to type List<{1}>", 
+                    "Cannot convert type {0} to type List<{1}>",
                     TypeUtils.GetFullName(data.GetType()),
                     TypeUtils.GetFullName(typeof(T))));
             }
@@ -372,7 +372,7 @@ namespace Orleans.Runtime
             // LoaderExceptions property in order to make it meaningful.
             var all = new List<Exception> { rtle };
             all.AddRange(rtle.LoaderExceptions);
-            throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenence.", all);
+            throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenience.", all);
         }
 
         /// <summary>
