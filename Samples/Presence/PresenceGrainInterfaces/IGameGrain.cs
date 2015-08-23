@@ -31,7 +31,7 @@ namespace Orleans.Samples.Presence.GrainInterfaces
     /// <summary>
     /// Interface to a specific instance of a game with its own status and list of players
     /// </summary>
-    public interface IGameGrain : IGrain
+    public interface IGameGrain : IGrainWithGuidKey
     {
         Task UpdateGameStatus(GameStatus status);
         Task SubscribeForGameUpdates(IGameObserver subscriber);
