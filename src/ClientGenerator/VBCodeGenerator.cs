@@ -1,25 +1,28 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+// Project Orleans Cloud Service SDK ver. 1.0
+//  
+// Copyright (c) .NET Foundation
+// 
+// All rights reserved.
+//  
+// MIT License
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 using System;
 using System.CodeDom;
@@ -27,7 +30,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration.Serialization;
 using Orleans.Runtime;
 
@@ -161,7 +163,7 @@ End If", pair.Key, pair.Value);
             var invokerField = new CodeSnippetTypeMember(fieldImpl);
             factoryClass.Members.Add(invokerField);
 
-            var methodImpl = String.Format(@"
+            var methodImpl = string.Format(@"
         Public Shared Async Function CreateObjectReference(obj As {0}) As System.Threading.Tasks.Task(Of {0})       
             If methodInvoker Is Nothing Then : methodInvoker = New {2}() : End If
             Return {1}.Cast(Await Global.Orleans.Runtime.GrainReference.CreateObjectReference(obj, methodInvoker))
@@ -172,7 +174,7 @@ End If", pair.Key, pair.Value);
             var createObjectReferenceMethod = new CodeSnippetTypeMember(methodImpl);
             factoryClass.Members.Add(createObjectReferenceMethod);
 
-            methodImpl = String.Format(@"
+            methodImpl = string.Format(@"
         Public Shared Function DeleteObjectReference(reference As {0}) As System.Threading.Tasks.Task
             Return Global.Orleans.Runtime.GrainReference.DeleteObjectReference(reference)
         End Function",
@@ -195,11 +197,11 @@ End If", pair.Key, pair.Value);
 
             var interfaces = new Dictionary<int, InterfaceInfo>(grainInterfaceInfo.Interfaces); // Copy, as we may alter the original collection in the loop below
 
-            var interfaceSwitchBody = String.Empty;
+            var interfaceSwitchBody = string.Empty;
 
             foreach (var kv in interfaces)
             {
-                var methodSwitchBody = String.Empty;
+                var methodSwitchBody = string.Empty;
                 int interfaceId = kv.Key;
                 InterfaceInfo interfaceInfo = kv.Value;
 
@@ -218,7 +220,7 @@ End If", pair.Key, pair.Value);
                     , methodId, invokeGrainMethod);
                 }
 
-                interfaceSwitchBody += String.Format(@"
+                interfaceSwitchBody += string.Format(@"
                 Case {0}  ' {1}
                     Select methodId
                         {2}
@@ -255,7 +257,7 @@ End If", pair.Key, pair.Value);
             builder.Append(@"            Try
             ");
 
-            var interfaceSwitchBody = String.Empty;
+            var interfaceSwitchBody = string.Empty;
             foreach (int interfaceId in grainInterfaceInfo.Interfaces.Keys)
             {
                 InterfaceInfo interfaceInfo = grainInterfaceInfo.Interfaces[interfaceId];
@@ -282,7 +284,7 @@ End If", pair.Key, pair.Value);
 
         private string GetMethodDispatchSwitchForInterface(int interfaceId, InterfaceInfo interfaceInfo)
         {
-            var methodSwitchBody = String.Empty;
+            var methodSwitchBody = string.Empty;
 
             foreach (int methodId in interfaceInfo.Methods.Keys)
             {
@@ -365,7 +367,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
             var defaultCase = @"                            Case Else 
                             Throw New NotImplementedException(""interfaceId=""+interfaceId+"",methodId=""+methodId)";
 
-            return String.Format(@"Case {0}  ' {1}
+            return string.Format(@"Case {0}  ' {1}
                         Select Case methodId
 {2}                            
 {3}
@@ -383,7 +385,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
 
             Action<string> add = codeFmt =>
                 factoryClass.Members.Add(new CodeSnippetTypeMember(
-                     String.Format(codeFmt, FixupTypeName(interfaceName))));
+                     string.Format(codeFmt, FixupTypeName(interfaceName))));
 
             bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
             bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
