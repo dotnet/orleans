@@ -56,8 +56,6 @@ namespace UnitTests.MembershipTests
             TraceLogger.Initialize(new NodeConfiguration());        
         }
 
-        // Use TestInitialize to run code before running each test 
-        [TestInitialize]
         private async Task Initialize()
         {
             deploymentId = "test-" + Guid.NewGuid();
