@@ -49,14 +49,20 @@ namespace TestGrains
         PartitionInfo PartitionConfig { get; set; }
 
         private Logger logger;
+        private Guid partitionId;
+        private string siloId;
+        private IPartitionGrain me;
+        private IPartitionManager partitionManager;
 
         public override async Task OnActivateAsync()
         {
-            Guid partitionId = this.GetPrimaryKey();
-            string siloId = RuntimeIdentity;
-
             logger = GetLogger(GetType().Name + "-" + partitionId);
             logger.Info("Activate");
+
+            partitionId = this.GetPrimaryKey();
+            siloId = RuntimeIdentity;
+            me = this.AsReference<IPartitionGrain>();
+            partitionManager = GrainFactory.GetGrain<IPartitionManager>(0);
 
             if (PartitionConfig == null)
             {
@@ -67,11 +73,16 @@ namespace TestGrains
                 };
             }
 
-            logger.Info("Registering partition grain {0} with partition manager", partitionId);
-            IPartitionManager partitionManager = GrainFactory.GetGrain<IPartitionManager>(0);
-            await partitionManager.RegisterPartition(PartitionConfig, this.AsReference<IPartitionGrain>());
-
+            logger.Info("Registering partition grain {0} on silo {1} with partition manager", partitionId, siloId);
+            await partitionManager.RegisterPartition(PartitionConfig, me);
             logger.Info("Partition grain {0} has been started on this silo", partitionId);
+        }
+
+        public override async Task OnDeactivateAsync()
+        {
+            logger.Info("Unregistering partition grain {0} on silo {1} with partition manager", partitionId, siloId);
+            await partitionManager.RemovePartition(PartitionConfig, me);
+            logger.Info("Partition grain {0} has been stopped on this silo", partitionId);
         }
 
         public Task<PartitionInfo> Start()
@@ -82,6 +93,7 @@ namespace TestGrains
 
         public Task<PartitionInfo> GetPartitionInfo()
         {
+            logger.Info("GetPartitionInfo");
             return Task.FromResult(PartitionConfig);
         }
     }
