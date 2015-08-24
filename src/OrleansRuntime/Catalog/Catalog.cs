@@ -496,9 +496,11 @@ namespace Orleans.Runtime
                                     String.Format("Failed to RegisterActivationInGrainDirectory for {0}.",
                                         activation), ex);
                                 // Need to undo the registration we just did earlier
-                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
-                                    SchedulingContext).Ignore();
-
+                                if (!activation.IsStatelessWorker)
+                                {
+                                    scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                        SchedulingContext).Ignore();
+                                }
                                 RerouteAllQueuedMessages(activation, null,
                                     "Failed RegisterActivationInGrainDirectory", ex);
                             }
@@ -509,8 +511,11 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_Failed_SetupActivationState,
                                 String.Format("Failed to SetupActivationState for {0}.", activation), ex);
                             // Need to undo the registration we just did earlier
-                            scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
-                                SchedulingContext).Ignore();
+                            if (!activation.IsStatelessWorker)
+                            {
+                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                    SchedulingContext).Ignore();
+                            }
 
                             RerouteAllQueuedMessages(activation, null, "Failed SetupActivationState", ex);
                             break;
@@ -520,8 +525,11 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_Failed_InvokeActivate,
                                 String.Format("Failed to InvokeActivate for {0}.", activation), ex);
                             // Need to undo the registration we just did earlier
-                            scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
-                                SchedulingContext).Ignore();
+                            if (!activation.IsStatelessWorker)
+                            {
+                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                    SchedulingContext).Ignore();
+                            }
 
                             RerouteAllQueuedMessages(activation, null, "Failed InvokeActivate", ex);
                             break;
@@ -896,10 +904,17 @@ namespace Orleans.Runtime
                 //logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Starting FinishDestroyActivations #{0} - with {1} Activations.", number, list.Count);
                 // step 3 - UnregisterManyAsync
                 try
-                {
-                    await scheduler.RunOrQueueTask(() =>
-                        directory.UnregisterManyAsync(list.Select(d => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList()),
-                        SchedulingContext);
+                {            
+                    List<ActivationAddress> activationsToDeactivate = list.
+                        Where((ActivationData d) => !d.IsStatelessWorker).
+                        Select((ActivationData d) => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList();
+
+                    if (activationsToDeactivate.Count > 0)
+                    {
+                        await scheduler.RunOrQueueTask(() =>
+                            directory.UnregisterManyAsync(activationsToDeactivate),
+                            SchedulingContext);
+                    }
                 }
                 catch (Exception exc)
                 {
