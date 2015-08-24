@@ -56,7 +56,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + partitionId);
+            logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKey());
             logger.Info("Activate");
 
             partitionId = this.GetPrimaryKey();
@@ -75,7 +75,7 @@ namespace TestGrains
 
             logger.Info("Registering partition grain {0} on silo {1} with partition manager", partitionId, siloId);
             await partitionManager.RegisterPartition(PartitionConfig, me);
-            logger.Info("Partition grain {0} has been started on this silo", partitionId);
+            logger.Info("Partition grain {0} has been activated on this silo", partitionId);
         }
 
         public override async Task OnDeactivateAsync()
@@ -87,7 +87,7 @@ namespace TestGrains
 
         public Task<PartitionInfo> Start()
         {
-            logger.Info("Start");
+            logger.Info("Partition grain {0} has been started on this silo", partitionId);
             return Task.FromResult(PartitionConfig);
         }
 
@@ -110,7 +110,7 @@ namespace TestGrains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name);
+            logger = GetLogger(GetType().Name + this.GetPrimaryKey());
             logger.Info("Activate");
 
             if (State.PartitionInfos == null)

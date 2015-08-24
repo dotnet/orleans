@@ -63,14 +63,14 @@ namespace Tester
             NumSilos = GetActiveSilos().Count();
         }
 
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestCleanup]
+        public void MyTestCleanup()
         {
             StopAllSilos();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PerSilo")]
-        public async Task PerSiloGrainExample_Init()
+        public async Task Init_PerSiloGrainExample()
         {
             // This tests just bootstraps the 2 default test silos, and checks that partition grains were created on each.
             
@@ -82,14 +82,15 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PerSilo")]
-        public async Task PerSiloGrainExample_SendMsg()
+        public async Task SendMsg_Client_PerSiloGrainExample()
         {
             IPartitionManager partitionManager = GrainClient.GrainFactory.GetGrain<IPartitionManager>(0);
-            IList<PartitionInfo> partitionInfosList = await partitionManager.GetPartitionInfos();
+            IList<PartitionInfo> partitionInfosList1 = await partitionManager.GetPartitionInfos();
 
-            Assert.AreEqual(NumSilos, partitionInfosList.Count, "Initial PartitionInfo list should return {0} values.", NumSilos);
+            Assert.AreEqual(NumSilos, partitionInfosList1.Count, "Initial: PartitionInfo list should return {0} values.", NumSilos);
+            Assert.AreNotEqual(partitionInfosList1[0].PartitionId, partitionInfosList1[1].PartitionId, "Initial: PartitionIds should be different.");
 
-            foreach (var partition in partitionInfosList)
+            foreach (var partition in partitionInfosList1)
             {
                 Guid partitionId = partition.PartitionId;
                 IPartitionGrain grain = GrainFactory.GetGrain<IPartitionGrain>(partitionId);
@@ -99,6 +100,11 @@ namespace Tester
             IList<PartitionInfo> partitionInfosList2 = await partitionManager.GetPartitionInfos();
 
             Assert.AreEqual(NumSilos, partitionInfosList2.Count, "After Send: PartitionInfo list should return {0} values.", NumSilos);
+            foreach (int i in new [] {0, 1})
+            {
+                Assert.AreEqual(partitionInfosList1[i].PartitionId, partitionInfosList2[i].PartitionId, "After Send: Same PartitionIds [{0}]", i);
+            }
+            Assert.AreNotEqual(partitionInfosList2[0].PartitionId, partitionInfosList2[1].PartitionId, "After Send: PartitionIds should be different.");
         }
     }
 }
