@@ -31,14 +31,12 @@ using Orleans;
 using Orleans.TestingHost;
 using TestGrainInterfaces;
 using UnitTests.Tester;
+using System;
 
 namespace Tester
 {
     [TestClass]
     [DeploymentItem("OrleansConfigurationForPerSiloGrainTesting.xml")]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [DeploymentItem("TestGrainInterfaces.dll")]
-    [DeploymentItem("TestGrains.dll")]
     public class PerSiloExampleGrainTests : UnitTestSiloHost
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
@@ -81,6 +79,26 @@ namespace Tester
 
             Assert.AreEqual(NumSilos, partitionInfos.Count, " PartitionInfo list should return {0} values.", NumSilos);
             Assert.AreNotEqual(partitionInfos[0].PartitionId, partitionInfos[1].PartitionId, "PartitionIds should be different.");
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PerSilo")]
+        public async Task PerSiloGrainExample_SendMsg()
+        {
+            IPartitionManager partitionManager = GrainClient.GrainFactory.GetGrain<IPartitionManager>(0);
+            IList<PartitionInfo> partitionInfosList = await partitionManager.GetPartitionInfos();
+
+            Assert.AreEqual(NumSilos, partitionInfosList.Count, "Initial PartitionInfo list should return {0} values.", NumSilos);
+
+            foreach (var partition in partitionInfosList)
+            {
+                Guid partitionId = partition.PartitionId;
+                IPartitionGrain grain = GrainFactory.GetGrain<IPartitionGrain>(partitionId);
+                PartitionInfo pi = await grain.GetPartitionInfo();
+            }
+
+            IList<PartitionInfo> partitionInfosList2 = await partitionManager.GetPartitionInfos();
+
+            Assert.AreEqual(NumSilos, partitionInfosList2.Count, "After Send: PartitionInfo list should return {0} values.", NumSilos);
         }
     }
 }
