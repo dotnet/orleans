@@ -50,23 +50,28 @@ namespace TestGrains
 
         private Logger logger;
 
-        public override Task OnActivateAsync()
+        public override async Task OnActivateAsync()
         {
-            Guid pk = this.GetPrimaryKey();
+            Guid partitionId = this.GetPrimaryKey();
             string siloId = RuntimeIdentity;
 
-            logger = GetLogger(GetType().Name + "-" + pk);
+            logger = GetLogger(GetType().Name + "-" + partitionId);
             logger.Info("Activate");
 
             if (PartitionConfig == null)
             {
                 PartitionConfig = new PartitionInfo
                 {
-                    PartitionId = pk,
+                    PartitionId = partitionId,
                     SiloId = siloId
                 };
             }
-            return TaskDone.Done;
+
+            logger.Info("Registering partition grain {0} with partition manager", partitionId);
+            IPartitionManager partitionManager = GrainFactory.GetGrain<IPartitionManager>(0);
+            await partitionManager.RegisterPartition(PartitionConfig, this.AsReference<IPartitionGrain>());
+
+            logger.Info("Partition grain {0} has been started on this silo", partitionId);
         }
 
         public Task<PartitionInfo> Start()
@@ -180,13 +185,7 @@ namespace TestGrains
             logger.Info("Creating partition grain id {0} on silo id {1}", partitionId, hostId);
             IPartitionGrain partitionGrain = GrainFactory.GetGrain<IPartitionGrain>(partitionId);
             PartitionInfo partitionInfo = await partitionGrain.Start();
-            logger.Info("Started partition grain {0} on this silo: {1}", partitionId, partitionInfo);
-
-            logger.Info("Registering partition grain {0} with partition manager", partitionId);
-            IPartitionManager partitionManager = GrainFactory.GetGrain<IPartitionManager>(0);
-            await partitionManager.RegisterPartition(partitionInfo, partitionGrain);
-
-            logger.Info("Partition grain {0} has been started on this silo", partitionId);
+            logger.Info("Partition grain {0} has been started on silo id {1}", partitionId, partitionInfo);
         }
     }
 }
