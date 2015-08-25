@@ -172,19 +172,8 @@
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup Condition=" '$(OS)' == 'Windows_NT' ">
     <!-- PostBuild.cmd script is platform specific, so for now we only want to run it on Windows -->
-    <PostBuildEvent>@echo Tester - Start Post-Build script
-
-set TEST_INPUT_DIR=$(TargetDir)TestInput
-if not exist "%25TEST_INPUT_DIR%25" ( mkdir "%25TEST_INPUT_DIR%25" )
-copy /y "$(ProjectDir)*.xml"  "%25TEST_INPUT_DIR%25\"
-
-if "$(BuildingInsideVisualStudio)" == "true" (
-  copy /y "$(SolutionDir)TestGrains\bin\$(ConfigurationName)\TestGrains.*"  "%25TEST_INPUT_DIR%25\"
-  copy /y "$(SolutionDir)TestGrainInterfaces\bin\$(ConfigurationName)\TestGrainInterfaces.*"  "%25TEST_INPUT_DIR%25\"
-) else (
-  copy /y "%25TargetDir%25TestGrains.*"  "%25TEST_INPUT_DIR%25\"
-  copy /y "%25TargetDir%25TestGrainInterfaces.*"  "%25TEST_INPUT_DIR%25\"
-)
+    <PostBuildEvent>
+@echo Tester - Start Post-Build script
 
 set SolutionDir=$(SolutionDir)
 set OutDir=$(OutDir)
