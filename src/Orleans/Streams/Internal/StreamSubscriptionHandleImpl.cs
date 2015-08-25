@@ -28,7 +28,7 @@ using Orleans.Runtime;
 namespace Orleans.Streams
 {
     [Serializable]
-    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IAsyncObserver<T>, IStreamFilterPredicateWrapper
+    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamFilterPredicateWrapper, IStreamSubscriptionHandle
     {
         [NonSerialized]
         private IAsyncObserver<T> observer;
@@ -44,12 +44,17 @@ namespace Orleans.Streams
 
         public override Guid HandleId { get { return SubscriptionId.Guid; } }
 
+        [NonSerialized]
+        private bool dirty;
+        [NonSerialized]
+        private StreamSequenceToken expectedToken;
+
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> stream)
-            : this(subscriptionId, null, stream, null)
+            : this(subscriptionId, null, stream, null, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
         {
             if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
             if (stream == null) throw new ArgumentNullException("stream");
@@ -59,6 +64,8 @@ namespace Orleans.Streams
             streamImpl = stream;
             this.SubscriptionId = subscriptionId;
             this.filterWrapper = filterWrapper;
+            expectedToken = token;
+            dirty = true;
         }
 
         public void Invalidate()
@@ -78,8 +85,67 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        #region IAsyncObserver methods
-        public Task OnNextAsync(T item, StreamSequenceToken token)
+        public StreamSequenceToken Token
+        {
+            get { return expectedToken; }
+        }
+
+        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch)
+        {
+            foreach (var itemTuple in batch.GetEvents<T>())
+            {
+                var newToken = await DeliverItem(itemTuple.Item1, itemTuple.Item2);
+                if (newToken != null)
+                {
+                    return newToken;
+                }
+            }
+            return default(StreamSequenceToken);
+        }
+
+        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token)
+        {
+            if (dirty)
+            {
+                dirty = false;
+                if (expectedToken != null)
+                {
+                    return expectedToken;
+                }
+            }
+
+            T typedItem;
+            try
+            {
+                typedItem = (T)item;
+            }
+            catch (InvalidCastException)
+            {
+                // We got an illegal item on the stream -- close it with a Cast exception
+                throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
+            }
+
+            await NextItem(typedItem, token);
+
+            if (dirty)
+            {
+                dirty = false;
+                if (expectedToken != null)
+                {
+                    return expectedToken;
+                }
+            }
+
+            if (token != null && token.Newer(expectedToken))
+            {
+                expectedToken = token;
+            }
+
+            return default(StreamSequenceToken);
+        }
+
+
+        private Task NextItem(T item, StreamSequenceToken token)
         {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
@@ -92,12 +158,12 @@ namespace Orleans.Streams
             return observer.OnNextAsync(item, token);
         }
 
-        public Task OnCompletedAsync()
+        public Task CompleteStream()
         {
             return observer == null ? TaskDone.Done : observer.OnCompletedAsync();
         }
 
-        public Task OnErrorAsync(Exception ex)
+        public Task ErrorInStream(Exception ex)
         {
             return observer == null ? TaskDone.Done : observer.OnErrorAsync(ex);
         }
@@ -105,8 +171,8 @@ namespace Orleans.Streams
         internal void Clear()
         {
             observer = null;
+            dirty = false;
         }
-        #endregion
 
         #region IStreamFilterPredicateWrapper methods
         public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
