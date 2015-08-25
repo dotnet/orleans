@@ -124,8 +124,9 @@ namespace Orleans.Streams
             StreamSubscriptionHandleImpl<T> handleImpl = CheckHandleValidity(handle);
 
             if (logger.IsVerbose) logger.Verbose("Unsubscribe StreamSubscriptionHandle={0}", handle);
-            bool shouldUnsubscribe = myExtension.RemoveObserver(handle);
-            if (!shouldUnsubscribe) return;
+
+            myExtension.RemoveObserver(handleImpl.SubscriptionId);
+            // UnregisterConsumer from pubsub even if does not have this handle localy, to allow UnsubscribeAsync retries.
 
             if (logger.IsVerbose) logger.Verbose("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
                 pubSub, myGrainReference);
@@ -154,7 +155,7 @@ namespace Orleans.Streams
             var tasks = new List<Task>();
             foreach (var handle in allHandles)
             {
-                myExtension.RemoveObserver(handle);
+                myExtension.RemoveObserver(handle.SubscriptionId);
                 tasks.Add(pubSub.UnregisterConsumer(handle.SubscriptionId, stream.StreamId, streamProviderName));
             }
             try
@@ -172,7 +173,7 @@ namespace Orleans.Streams
         // Used in test.
         internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle)
         {
-            return myExtension != null && myExtension.RemoveObserver(handle);
+            return myExtension != null && myExtension.RemoveObserver(((StreamSubscriptionHandleImpl<T>)handle).SubscriptionId);
         }
 
         internal Task<int> DiagGetConsumerObserversCount()

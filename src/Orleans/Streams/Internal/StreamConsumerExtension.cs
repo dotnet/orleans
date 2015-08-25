@@ -33,11 +33,11 @@ namespace Orleans.Streams
 {
     internal interface IStreamSubscriptionHandle
     {
-        StreamSequenceToken Token { get; }
         Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token);
         Task<StreamSequenceToken> DeliverBatch(IBatchContainer item);
         Task CompleteStream();
         Task ErrorInStream(Exception exc);
+        StreamSequenceToken GetSequenceToken();
     }
 
     /// <summary>
@@ -69,7 +69,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream);
+                if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.StreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter, token);
@@ -77,21 +77,16 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error((int)ErrorCode.StreamProvider_AddObserverException, String.Format("{0} StreamConsumerExtension.AddObserver({1}) caugth exception.", 
-                    providerRuntime.ExecutingEntityIdentity(), stream), exc);
+                logger.Error((int)ErrorCode.StreamProvider_AddObserverException, String.Format("{0} StreamConsumerExtension.AddObserver({1}) caugth exception.",
+                    providerRuntime.ExecutingEntityIdentity(), stream.StreamId), exc);
                 throw;
             }
         }
 
-        internal bool RemoveObserver<T>(StreamSubscriptionHandle<T> handle)
+        internal bool RemoveObserver(GuidId subscriptionId)
         {
-            var observerWrapper = (StreamSubscriptionHandleImpl<T>)handle;
-            observerWrapper.Clear();
-
             IStreamSubscriptionHandle ignore;
-            allStreamObservers.TryRemove(observerWrapper.SubscriptionId, out ignore);
-            // if we don't have any more subsribed streams, unsubscribe the extension.
-            return true;
+            return allStreamObservers.TryRemove(subscriptionId, out ignore);
         }
 
         public Task<StreamSequenceToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token)
@@ -157,14 +152,14 @@ namespace Orleans.Streams
         public Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId)
         {
             IStreamSubscriptionHandle observer;
-            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.Token : default(StreamSequenceToken));
+            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : default(StreamSequenceToken));
         }
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)
         {
             return allStreamObservers.Values
                                      .OfType<StreamSubscriptionHandleImpl<T>>()
-                                     .Aggregate(0, (count,o) => count + (o.StreamId.Equals(streamId) ? 1 : 0));
+                                     .Aggregate(0, (count, o) => count + (o.SameStreamId(streamId) ? 1 : 0));
         }
 
         internal IList<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
