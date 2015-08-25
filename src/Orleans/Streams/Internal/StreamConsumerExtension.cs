@@ -24,16 +24,22 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Remoting.Messaging;
-using System.Security.Principal;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    internal interface IStreamSubscriptionHandle
+    {
+        StreamSequenceToken Token { get; }
+        Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token);
+        Task<StreamSequenceToken> DeliverBatch(IBatchContainer item);
+        Task CompleteStream();
+        Task ErrorInStream(Exception exc);
+    }
+
     /// <summary>
     /// The extesion multiplexes all stream related messages to this grain between different streams and their stream observers.
     /// 
@@ -44,137 +50,16 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerExtension : IStreamConsumerExtension
     {
-        private interface IStreamObservers
-        {
-            Streams.StreamSequenceToken Token { get; }
-            Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token);
-            Task<StreamSequenceToken> DeliverBatch(IBatchContainer item);
-            Task CompleteStream();
-            Task ErrorInStream(Exception exc);
-        }
-
-        [Serializable]
-        private class ObserversCollection<T> : IStreamObservers
-        {
-            private StreamSubscriptionHandleImpl<T> localObserver;
-            private bool dirty = false;
-            private StreamSequenceToken expectedToken;
-
-            public StreamSequenceToken Token
-            {
-                get { return expectedToken; }
-            }
-
-            internal void SetObserver(StreamSubscriptionHandleImpl<T> observer, StreamSequenceToken token)
-            {
-                localObserver = observer;
-                this.expectedToken = token;
-                dirty = true;
-            }
-
-            internal void RemoveObserver()
-            {
-                localObserver = null;
-                dirty = false;
-            }
-
-            internal bool IsEmpty
-            {
-                get { return localObserver == null; }
-            }
-
-            public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token)
-            {
-                if (dirty)
-                {
-                    dirty = false;
-                    if (expectedToken != null)
-                    {
-                        return expectedToken;
-                    }
-                }
-
-                T typedItem;
-                try
-                {
-                    typedItem = (T)item;
-                }
-                catch (InvalidCastException)
-                {
-                    // We got an illegal item on the stream -- close it with a Cast exception
-                    throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
-                }
-
-                if (localObserver != null)
-                {
-                    await localObserver.OnNextAsync(typedItem, token);
-                }
-
-                if (dirty)
-                {
-                    dirty = false;
-                    if (expectedToken != null)
-                    {
-                        return expectedToken;
-                    }
-                }
-
-                if (token != null && token.Newer(expectedToken))
-                {
-                    expectedToken = token;
-                }
-
-                return default(StreamSequenceToken);
-            }
-
-            public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch)
-            {
-                foreach (var itemTuple in batch.GetEvents<T>())
-                {
-                    var newToken = await DeliverItem(itemTuple.Item1, itemTuple.Item2);
-                    if (newToken != null)
-                    {
-                        return newToken;
-                    }
-                }
-                return default(StreamSequenceToken);
-            }
-
-            internal int GetObserverCountForStream(StreamId streamId)
-            {
-                return localObserver != null && localObserver.StreamId.Equals(streamId) ? 1 : 0;
-            }
-
-            internal StreamSubscriptionHandleImpl<T> GetLocalObserver()
-            {
-                return localObserver;
-            }
-
-            public Task CompleteStream()
-            {
-                return (localObserver == null)
-                    ? TaskDone.Done
-                    : localObserver.OnCompletedAsync();
-            }
-
-            public Task ErrorInStream(Exception exc)
-            {
-                return (localObserver == null)
-                    ? TaskDone.Done
-                    : localObserver.OnErrorAsync(exc);
-            }
-        }
-
         private readonly IStreamProviderRuntime providerRuntime;
-        private readonly ConcurrentDictionary<GuidId, IStreamObservers> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
+        private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
         private readonly Logger logger;
 
 
         internal StreamConsumerExtension(IStreamProviderRuntime providerRt)
         {
             providerRuntime = providerRt;
-            allStreamObservers = new ConcurrentDictionary<GuidId, IStreamObservers>();
-            logger = providerRuntime.GetLogger(this.GetType().Name);
+            allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
+            logger = providerRuntime.GetLogger(GetType().Name);
         }
 
         internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
@@ -187,10 +72,8 @@ namespace Orleans.Streams
                 if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                var obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>()) as ObserversCollection<T>;
-                var wrapper = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter);
-                obs.SetObserver(wrapper, token);
-                return wrapper;
+                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter, token);
+                return allStreamObservers.AddOrUpdate(subscriptionId, handle, (key, old) => handle) as StreamSubscriptionHandleImpl<T>;
             }
             catch (Exception exc)
             {
@@ -203,16 +86,9 @@ namespace Orleans.Streams
         internal bool RemoveObserver<T>(StreamSubscriptionHandle<T> handle)
         {
             var observerWrapper = (StreamSubscriptionHandleImpl<T>)handle;
-            IStreamObservers obs;
-            // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-            if (!allStreamObservers.TryGetValue(observerWrapper.SubscriptionId, out obs)) return true;
-
-            var observersCollection = (ObserversCollection<T>)obs;
-            observersCollection.RemoveObserver();
             observerWrapper.Clear();
-            if (!observersCollection.IsEmpty) return false;
 
-            IStreamObservers ignore;
+            IStreamSubscriptionHandle ignore;
             allStreamObservers.TryRemove(observerWrapper.SubscriptionId, out ignore);
             // if we don't have any more subsribed streams, unsubscribe the extension.
             return true;
@@ -222,9 +98,9 @@ namespace Orleans.Streams
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for subscription {1}", item.Value, subscriptionId);
 
-            IStreamObservers observers;
-            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
-                return observers.DeliverItem(item.Value, token);
+            IStreamSubscriptionHandle observer;
+            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                return observer.DeliverItem(item.Value, token);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
@@ -237,10 +113,9 @@ namespace Orleans.Streams
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
-            IStreamObservers observers;
-
-            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
-                return observers.DeliverBatch(batch.Value);
+            IStreamSubscriptionHandle observer;
+            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                return observer.DeliverBatch(batch.Value);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
@@ -253,9 +128,9 @@ namespace Orleans.Streams
         {
             if (logger.IsVerbose3) logger.Verbose3("CompleteStream for subscription {0}", subscriptionId);
 
-            IStreamObservers observers;
-            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
-                return observers.CompleteStream();
+            IStreamSubscriptionHandle observer;
+            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                return observer.CompleteStream();
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got a Complete for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
@@ -268,9 +143,9 @@ namespace Orleans.Streams
         {
             if (logger.IsVerbose3) logger.Verbose3("ErrorInStream {0} for subscription {1}", exc, subscriptionId);
 
-            IStreamObservers observers;
-            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
-                return observers.ErrorInStream(exc);
+            IStreamSubscriptionHandle observer;
+            if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                return observer.ErrorInStream(exc);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an Error for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
@@ -281,22 +156,21 @@ namespace Orleans.Streams
 
         public Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId)
         {
-            IStreamObservers observers;
-            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observers) ? observers.Token : default(StreamSequenceToken));
+            IStreamSubscriptionHandle observer;
+            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.Token : default(StreamSequenceToken));
         }
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)
         {
             return allStreamObservers.Values
-                                     .OfType<ObserversCollection<T>>()
-                                     .Aggregate(0, (count,o) => count + o.GetObserverCountForStream(streamId));
+                                     .OfType<StreamSubscriptionHandleImpl<T>>()
+                                     .Aggregate(0, (count,o) => count + (o.StreamId.Equals(streamId) ? 1 : 0));
         }
 
         internal IList<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
         {
             return allStreamObservers.Values
-                .OfType<ObserversCollection<T>>()
-                .Select(o => o.GetLocalObserver())
+                .OfType<StreamSubscriptionHandleImpl<T>>()
                 .Where(o => o != null)
                 .ToList();
         }
