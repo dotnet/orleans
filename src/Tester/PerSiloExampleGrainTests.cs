@@ -116,6 +116,32 @@ namespace Tester
             await CountActivations("After checks");
         }
 
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PerSilo")]
+        public async Task SendMsg_Broadcast_PerSiloGrainExample()
+        {
+            IPartitionManager partitionManager = GrainClient.GrainFactory.GetGrain<IPartitionManager>(0);
+            IList<PartitionInfo> partitionInfosList1 = await partitionManager.GetPartitionInfos();
+
+            Assert.AreEqual(NumSilos, partitionInfosList1.Count, "Initial: PartitionInfo list should return {0} values.", NumSilos);
+            Assert.AreNotEqual(partitionInfosList1[0].PartitionId, partitionInfosList1[1].PartitionId, "Initial: PartitionIds should be different.");
+            await CountActivations("Initial");
+
+            await partitionManager.Broadcast(p => p.GetPartitionInfo());
+
+            await CountActivations("After Broadcast");
+
+            IList<PartitionInfo> partitionInfosList2 = await partitionManager.GetPartitionInfos();
+
+            Assert.AreEqual(NumSilos, partitionInfosList2.Count, "After Send: PartitionInfo list should return {0} values.", NumSilos);
+            foreach (int i in new[] { 0, 1 })
+            {
+                Assert.AreEqual(partitionInfosList1[i].PartitionId, partitionInfosList2[i].PartitionId, "After Send: Same PartitionIds [{0}]", i);
+            }
+            Assert.AreNotEqual(partitionInfosList2[0].PartitionId, partitionInfosList2[1].PartitionId, "After Send: PartitionIds should be different.");
+
+            await CountActivations("After checks");
+        }
+
         private async Task CountActivations(string when)
         {
             string grainType = typeof(PartitionGrain).FullName;

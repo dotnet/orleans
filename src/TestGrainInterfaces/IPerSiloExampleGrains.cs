@@ -51,6 +51,7 @@ namespace TestGrainInterfaces
         Task<IList<PartitionInfo>> GetPartitionInfos();
         Task RegisterPartition(PartitionInfo partitonInfo, IPartitionGrain partitionGrain);
         Task RemovePartition(PartitionInfo partitonInfo, IPartitionGrain partitionGrain);
+        Task Broadcast(Func<IPartitionGrain, Task> asyncAction);
     }
 
     [Serializable]

@@ -104,6 +104,7 @@ namespace TestGrains
     /// By convention, only Id=0 will be used.
     /// </summary>
     [StorageProvider(ProviderName = "PartitionManagerStore")] // Note: Using MemoryStore for testing only.
+    [Reentrant]
     public class PartitionManagerGrain : Grain<PartitionManagerConfig>, IPartitionManager
     {
         private Logger logger;
@@ -154,6 +155,24 @@ namespace TestGrains
             State.PartitionInfos.Remove(partitionId);
             await WriteStateAsync();
         }
+
+        public async Task Broadcast(Func<IPartitionGrain, Task> asyncAction)
+        {
+            IDictionary<Guid, IPartitionGrain> partitions = State.Partitions;
+            logger.Info("Broadcast: Send to {0} partitions", partitions.Count);
+            var tasks = new List<Task>();
+            foreach (var p in partitions)
+            {
+                Guid id = p.Key;
+                IPartitionGrain grain = p.Value;
+                logger.Info("Broadcast: Sending message to partition {0} on silo {1}", id, State.PartitionInfos[id].SiloId);
+                tasks.Add(asyncAction(grain));
+            }
+            // Await here so that tail async is contained and any errors show this method in stack trace.
+            logger.Info("Broadcast: Awaiting ack from {0} partitions", tasks.Count);
+            await Task.WhenAll(tasks);
+        }
+
     }
 
     /// <summary>
