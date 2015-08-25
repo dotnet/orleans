@@ -28,41 +28,39 @@ using Orleans.Runtime;
 namespace Orleans.Streams
 {
     [Serializable]
-    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamFilterPredicateWrapper, IStreamSubscriptionHandle
+    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
+        private StreamImpl<T> streamImpl;
+        private readonly IStreamFilterPredicateWrapper filterWrapper;
+        private readonly GuidId subscriptionId;
+
         [NonSerialized]
         private IAsyncObserver<T> observer;
-        private readonly StreamImpl<T> streamImpl;
-        private readonly IStreamFilterPredicateWrapper filterWrapper;
-
-        internal StreamId StreamId { get { return streamImpl.StreamId; } }
-        public object FilterData { get { return filterWrapper != null ? filterWrapper.FilterData : null; } }
-        public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
-
-        public GuidId SubscriptionId { get; protected set; }
-        public bool IsValid { get; private set; }
-
-        public override Guid HandleId { get { return SubscriptionId.Guid; } }
-
         [NonSerialized]
         private bool dirty;
         [NonSerialized]
         private StreamSequenceToken expectedToken;
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> stream)
-            : this(subscriptionId, null, stream, null, null)
+        internal bool IsValid { get { return streamImpl != null; } }
+        internal GuidId SubscriptionId { get { return subscriptionId; } }
+
+
+        public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
+        public override Guid HandleId { get { return subscriptionId.Guid; } }
+
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
+            : this(subscriptionId, null, streamImpl, null, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
         {
             if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
-            if (stream == null) throw new ArgumentNullException("stream");
+            if (streamImpl == null) throw new ArgumentNullException("streamImpl");
 
-            IsValid = true;
+            this.subscriptionId = subscriptionId;
             this.observer = observer;
-            streamImpl = stream;
-            this.SubscriptionId = subscriptionId;
+            this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
             expectedToken = token;
             dirty = true;
@@ -70,24 +68,26 @@ namespace Orleans.Streams
 
         public void Invalidate()
         {
-            IsValid = false;
+            streamImpl = null;
+            observer = null;
+            dirty = false;
+        }
+
+        public StreamSequenceToken GetSequenceToken()
+        {
+            return expectedToken;
         }
 
         public override Task UnsubscribeAsync()
         {
-            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid.  It has been used to unsubscribe or resume.");
+            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
             return streamImpl.UnsubscribeAsync(this);
         }
 
         public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> obs, StreamSequenceToken token = null)
         {
-            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid.  It has been used to unsubscribe or resume.");
+            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
             return streamImpl.ResumeAsync(this, obs, token);
-        }
-
-        public StreamSequenceToken Token
-        {
-            get { return expectedToken; }
         }
 
         public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch)
@@ -149,10 +149,10 @@ namespace Orleans.Streams
         {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
-            if (observer == null)
+            if (observer == null || !IsValid)
                 return TaskDone.Done;
 
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, FilterData, item))
+            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
                 return TaskDone.Done;
 
             return observer.OnNextAsync(item, token);
@@ -168,19 +168,10 @@ namespace Orleans.Streams
             return observer == null ? TaskDone.Done : observer.OnErrorAsync(ex);
         }
 
-        internal void Clear()
+        internal bool SameStreamId(StreamId streamId)
         {
-            observer = null;
-            dirty = false;
+            return IsValid && streamImpl.StreamId.Equals(streamId);
         }
-
-        #region IStreamFilterPredicateWrapper methods
-        public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
-        {
-            return filterWrapper == null || filterWrapper.ShouldReceive(stream, filterData, item);
-        }
-
-        #endregion
 
         #region IEquatable<StreamId> Members
 
@@ -204,7 +195,7 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return String.Format("StreamSubscriptionHandleImpl:Stream={0},Subscription={1}", StreamIdentity, SubscriptionId);
+            return String.Format("StreamSubscriptionHandleImpl:Stream={0},Subscription={1}", IsValid ? streamImpl.StreamId.ToString() : "null", SubscriptionId);
         }
     }
 }
