@@ -32,6 +32,8 @@ using Orleans.TestingHost;
 using TestGrainInterfaces;
 using UnitTests.Tester;
 using System;
+using Orleans.Runtime;
+using TestGrains;
 
 namespace Tester
 {
@@ -52,6 +54,7 @@ namespace Tester
         };
 
         private int NumSilos { get; set; }
+        private IManagementGrain mgmtGrain; 
 
         public PerSiloExampleGrainTests()
             : base(siloOptions, clientOptions)
@@ -61,6 +64,7 @@ namespace Tester
         public void TestInitialize()
         {
             NumSilos = GetActiveSilos().Count();
+            mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
         }
 
         [TestCleanup]
@@ -79,6 +83,7 @@ namespace Tester
 
             Assert.AreEqual(NumSilos, partitionInfos.Count, " PartitionInfo list should return {0} values.", NumSilos);
             Assert.AreNotEqual(partitionInfos[0].PartitionId, partitionInfos[1].PartitionId, "PartitionIds should be different.");
+            await CountActivations("Initial");
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PerSilo")]
@@ -89,6 +94,7 @@ namespace Tester
 
             Assert.AreEqual(NumSilos, partitionInfosList1.Count, "Initial: PartitionInfo list should return {0} values.", NumSilos);
             Assert.AreNotEqual(partitionInfosList1[0].PartitionId, partitionInfosList1[1].PartitionId, "Initial: PartitionIds should be different.");
+            await CountActivations("Initial");
 
             foreach (var partition in partitionInfosList1)
             {
@@ -96,6 +102,8 @@ namespace Tester
                 IPartitionGrain grain = GrainFactory.GetGrain<IPartitionGrain>(partitionId);
                 PartitionInfo pi = await grain.GetPartitionInfo();
             }
+
+            await CountActivations("After Send");
 
             IList<PartitionInfo> partitionInfosList2 = await partitionManager.GetPartitionInfos();
 
@@ -105,6 +113,24 @@ namespace Tester
                 Assert.AreEqual(partitionInfosList1[i].PartitionId, partitionInfosList2[i].PartitionId, "After Send: Same PartitionIds [{0}]", i);
             }
             Assert.AreNotEqual(partitionInfosList2[0].PartitionId, partitionInfosList2[1].PartitionId, "After Send: PartitionIds should be different.");
+            await CountActivations("After checks");
+        }
+
+        private async Task CountActivations(string when)
+        {
+            string grainType = typeof(PartitionGrain).FullName;
+            int siloCount = NumSilos;
+            int expectedGrainsPerSilo = 1;
+            var grainStats = (await mgmtGrain.GetSimpleGrainStatistics()).ToList();
+            Console.WriteLine("Got All Grain Stats: " + string.Join(" ", grainStats));
+            var partitionGrains = grainStats.Where(gs => gs.GrainType == grainType).ToList();
+            Console.WriteLine("Got PartitionGrain Stats: " + string.Join(" ", partitionGrains));
+            var wrongSilos = partitionGrains.Where(gs => gs.ActivationCount != expectedGrainsPerSilo).ToList();
+            Assert.AreEqual(0, wrongSilos.Count, when + ": Silos with wrong number of {0} grains: {1}",
+                grainType, string.Join(" ", wrongSilos));
+            int count = partitionGrains.Select(gs => { return gs.ActivationCount; }).Sum();
+            Assert.AreEqual(siloCount, count, when + ": Total count of {0} grains should be {1}. Got: {2}",
+                grainType, siloCount, string.Join(" ", grainStats));
         }
     }
 }
