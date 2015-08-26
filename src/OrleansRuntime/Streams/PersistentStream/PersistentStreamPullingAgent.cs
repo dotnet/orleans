@@ -230,20 +230,25 @@ namespace Orleans.Streams
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
+                DataNotAvailableException errorOccured = null;
                 try
                 {
                     requestedToken = await streamConsumer.GetSequenceToken(subscriptionId);
                     // Set cursor if not cursor is set, or if subscription provides new token
                     requestedToken = requestedToken ?? token;
-                    if (token != null)
+                    if (requestedToken != null)
                     {
                         cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, requestedToken);
                     }
                 }
                 catch (DataNotAvailableException dataNotAvailableException)
                 {
+                    errorOccured = dataNotAvailableException;
+                }
+                if (errorOccured != null)
+                {
                     // notify consumer that the data is not available, if we can.
-                    streamConsumer.ErrorInStream(subscriptionId, dataNotAvailableException).Ignore();
+                    await OrleansTaskExtentions.ExecuteAndIgnoreException(() => streamConsumer.ErrorInStream(subscriptionId, errorOccured));
                 }
             }
             AddSubscriberToSubscriptionCache(subscriptionId, streamId, streamConsumer, cursor, requestedToken, filter);
@@ -450,7 +455,7 @@ namespace Orleans.Streams
                                 consumerData.StreamId.Namespace, null);
                         }
                         // Notify client of error.
-                        deliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, ex);
+                        deliveryTask = DeliverErrorToConsumer(consumerData, ex, null);
                     }
 
                     try
@@ -468,7 +473,8 @@ namespace Orleans.Streams
                     if (deliveryFailed && batch != null)
                     {
                         // notify consumer of delivery error, if we can.
-                        DeliverErrorToConsumer(consumerData, new StreamEventDeliveryFailureException(consumerData.StreamId), batch).Ignore();
+                        await OrleansTaskExtentions.ExecuteAndIgnoreException(() => DeliverErrorToConsumer(consumerData, new StreamEventDeliveryFailureException(consumerData.StreamId), batch));
+
                         // record that there was a delivery failure
                         await streamFailureHandler.OnDeliveryFailure(consumerData.SubscriptionId, streamProviderName,
                             consumerData.StreamId, batch.SequenceToken);
