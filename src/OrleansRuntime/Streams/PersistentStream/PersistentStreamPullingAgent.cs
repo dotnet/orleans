@@ -226,17 +226,18 @@ namespace Orleans.Streams
             IStreamFilterPredicateWrapper filter)
         {
             IQueueCacheCursor cursor = null;
+            StreamSequenceToken requestedToken = null;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
                 try
                 {
-                    StreamSequenceToken consumerToken = await streamConsumer.GetSequenceToken(subscriptionId);
+                    requestedToken = await streamConsumer.GetSequenceToken(subscriptionId);
                     // Set cursor if not cursor is set, or if subscription provides new token
-                    consumerToken = consumerToken ?? token;
+                    requestedToken = requestedToken ?? token;
                     if (token != null)
                     {
-                        cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, consumerToken);
+                        cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, requestedToken);
                     }
                 }
                 catch (DataNotAvailableException dataNotAvailableException)
@@ -245,7 +246,7 @@ namespace Orleans.Streams
                     streamConsumer.ErrorInStream(subscriptionId, dataNotAvailableException).Ignore();
                 }
             }
-            AddSubscriberToSubscriptionCache(subscriptionId, streamId, streamConsumer, cursor, filter);
+            AddSubscriberToSubscriptionCache(subscriptionId, streamId, streamConsumer, cursor, requestedToken, filter);
         }
 
         // Called by rendezvous when new remote subscriber subscribes to this stream or when registering a new stream with the pubsub system.
@@ -254,6 +255,7 @@ namespace Orleans.Streams
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
             IQueueCacheCursor newCursor,
+            StreamSequenceToken requestedToken,
             IStreamFilterPredicateWrapper filter)
         {
             StreamConsumerCollection streamDataCollection;
@@ -266,6 +268,8 @@ namespace Orleans.Streams
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
                 data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter);
+
+            data.LastToken = requestedToken;
 
             // if we have a new cursor, use it
             if (newCursor != null)
@@ -507,11 +511,17 @@ namespace Orleans.Streams
             }
             try
             {
-                StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
+                StreamSequenceToken prevToken = consumerData.LastToken;
+                StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
                 if (newToken != null)
                 {
+                    consumerData.LastToken = newToken;
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
                         consumerData.StreamId.Namespace, newToken);
+                }
+                else
+                {
+                    consumerData.LastToken = batch.SequenceToken; // this is the currently delivered token
                 }
             }
             finally
