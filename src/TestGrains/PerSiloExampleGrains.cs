@@ -27,6 +27,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Placement;
 using Orleans.Providers;
 using Orleans.Runtime;
 using TestGrainInterfaces;
@@ -43,7 +44,7 @@ namespace TestGrains
     /// Grain implemention for Partition Grains.
     /// One partition grain is created per silo.
     /// </summary>
-    [StatelessWorker(1)]
+    [PreferLocalPlacement]
     public class PartitionGrain : Grain, IPartitionGrain
     {
         PartitionInfo PartitionConfig { get; set; }
