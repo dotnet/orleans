@@ -101,7 +101,7 @@ namespace Orleans.Streams
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return Task.FromResult(default(StreamSequenceToken));
+            return Task.FromResult<StreamSequenceToken>(null);
         }
 
         public Task<StreamSequenceToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch, StreamSequenceToken prevToken)
@@ -152,7 +152,7 @@ namespace Orleans.Streams
         public Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId)
         {
             IStreamSubscriptionHandle observer;
-            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : default(StreamSequenceToken));
+            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
         }
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)
