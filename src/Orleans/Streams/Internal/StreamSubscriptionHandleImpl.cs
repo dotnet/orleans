@@ -37,8 +37,6 @@ namespace Orleans.Streams
         [NonSerialized]
         private IAsyncObserver<T> observer;
         [NonSerialized]
-        private bool dirty;
-        [NonSerialized]
         private StreamSequenceToken expectedToken;
 
         internal bool IsValid { get { return streamImpl != null; } }
@@ -63,14 +61,12 @@ namespace Orleans.Streams
             this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
             expectedToken = token;
-            dirty = true;
         }
 
         public void Invalidate()
         {
             streamImpl = null;
             observer = null;
-            dirty = false;
         }
 
         public StreamSequenceToken GetSequenceToken()
@@ -90,11 +86,11 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch)
+        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch, StreamSequenceToken prevToken)
         {
             foreach (var itemTuple in batch.GetEvents<T>())
             {
-                var newToken = await DeliverItem(itemTuple.Item1, itemTuple.Item2);
+                var newToken = await DeliverItem(itemTuple.Item1, itemTuple.Item2, prevToken);
                 if (newToken != null)
                 {
                     return newToken;
@@ -103,15 +99,12 @@ namespace Orleans.Streams
             return default(StreamSequenceToken);
         }
 
-        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token)
+        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken prevToken)
         {
-            if (dirty)
+            if (expectedToken != null)
             {
-                dirty = false;
-                if (expectedToken != null)
-                {
+                if (!expectedToken.Equals(prevToken))
                     return expectedToken;
-                }
             }
 
             T typedItem;
@@ -125,21 +118,16 @@ namespace Orleans.Streams
                 throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
             }
 
-            await NextItem(typedItem, token);
+            await NextItem(typedItem, currentToken);
 
-            if (dirty)
+            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
+            if (expectedToken != null)
             {
-                dirty = false;
-                if (expectedToken != null)
-                {
+                if (!expectedToken.Equals(prevToken))
                     return expectedToken;
-                }
             }
 
-            if (token != null && token.Newer(expectedToken))
-            {
-                expectedToken = token;
-            }
+            expectedToken = currentToken;
 
             return default(StreamSequenceToken);
         }
