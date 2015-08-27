@@ -255,12 +255,14 @@ namespace Orleans.Runtime.Providers
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
             TimeSpan initQueueTimeout,
-            TimeSpan maxEventDeliveryTime)
+            TimeSpan maxEventDeliveryTime,
+            TimeSpan streamInactivityPeriod)
         {
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
                 balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper());
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubSubType), adapterFactory, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubSubType), adapterFactory, queueBalancer,
+                getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime, streamInactivityPeriod);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
