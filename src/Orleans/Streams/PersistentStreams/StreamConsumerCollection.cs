@@ -34,10 +34,10 @@ namespace Orleans.Streams
         private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
         private DateTime lastActivityTime;
 
-        public StreamConsumerCollection()
+        public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();
-            lastActivityTime = DateTime.UtcNow;
+            lastActivityTime = now;
         }
 
         public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
@@ -82,18 +82,17 @@ namespace Orleans.Streams
             get { return queueData.Count; }
         }
 
-        public void RefreshActivity()
+        public void RefreshActivity(DateTime now)
         {
-            lastActivityTime = DateTime.UtcNow;
+            lastActivityTime = now;
         }
 
-        public bool IsInactive(TimeSpan inactivityPeriod)
+        public bool IsInactive(DateTime now, TimeSpan inactivityPeriod)
         {
             // Consider stream inactive (with all its consumers) from the pulling agent perspective if:
             // 1) There were no new events received for that stream in the last inactivityPeriod
             // 2) All consumer for that stream are currently inactive (that is, all cursors are inactive) - 
             //    meaning there is nothing for those consumers in the adapter cache.
-            var now = DateTime.UtcNow;
             if (now - lastActivityTime < inactivityPeriod) return false;
             return !queueData.Values.Any(data => data.State.Equals(StreamConsumerDataState.Active));
         }
