@@ -79,6 +79,10 @@ namespace Orleans.Providers.Streams.Common
         private readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
         private TimeSpan maxEventDeliveryTime;
 
+        private const string STREAM_INACTIVITY_PERIOD = "StreamInactivityPeriod";
+        private readonly TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD = TimeSpan.FromMinutes(30);
+        private TimeSpan streamInactivityPeriod;
+
         private const string STREAM_PUBSUB_TYPE = "PubSubType";
         private const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
         private StreamPubSubType pubSubType;
@@ -127,6 +131,12 @@ namespace Orleans.Providers.Streams.Common
                 maxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
 
+            if (!config.Properties.TryGetValue(STREAM_INACTIVITY_PERIOD, out timeout))
+                streamInactivityPeriod = DEFAULT_STREAM_INACTIVITY_PERIOD;
+            else
+                streamInactivityPeriod = ConfigUtilities.ParseTimeSpan(timeout,
+                    "Invalid time value for the " + STREAM_INACTIVITY_PERIOD + " property in the provider config values.");
+
             string pubSubTypeString;
             pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
                 ? DEFAULT_STREAM_PUBSUB_TYPE
@@ -158,7 +168,8 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter,
+                        getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime, streamInactivityPeriod);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
                     if (startupState == PersistentStreamProviderState.AgentsStarted)

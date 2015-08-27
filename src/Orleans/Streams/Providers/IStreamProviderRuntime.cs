@@ -123,7 +123,8 @@ namespace Orleans.Streams
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
             TimeSpan initQueueTimeout,
-            TimeSpan maxEventDeliveryTime);
+            TimeSpan maxEventDeliveryTime,
+            TimeSpan streamInactivityPeriod);
     }
 
     public enum StreamPubSubType
