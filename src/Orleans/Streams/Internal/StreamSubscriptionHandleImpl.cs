@@ -37,8 +37,6 @@ namespace Orleans.Streams
         [NonSerialized]
         private IAsyncObserver<T> observer;
         [NonSerialized]
-        private bool dirty;
-        [NonSerialized]
         private StreamSequenceToken expectedToken;
 
         internal bool IsValid { get { return streamImpl != null; } }
@@ -63,14 +61,12 @@ namespace Orleans.Streams
             this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
             expectedToken = token;
-            dirty = true;
         }
 
         public void Invalidate()
         {
             streamImpl = null;
             observer = null;
-            dirty = false;
         }
 
         public StreamSequenceToken GetSequenceToken()
@@ -90,30 +86,56 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch)
+        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch, StreamSequenceToken prevToken)
         {
+            if (expectedToken != null)
+            {
+                if (!expectedToken.Equals(prevToken))
+                    return expectedToken;
+            }
+
             foreach (var itemTuple in batch.GetEvents<T>())
             {
-                var newToken = await DeliverItem(itemTuple.Item1, itemTuple.Item2);
-                if (newToken != null)
-                {
-                    return newToken;
-                }
+                await NextItem(itemTuple.Item1, itemTuple.Item2);
             }
-            return default(StreamSequenceToken);
+
+            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
+            if (expectedToken != null)
+            {
+                if (!expectedToken.Equals(prevToken))
+                    return expectedToken;
+            }
+
+            expectedToken = batch.SequenceToken;
+
+            return null;
         }
 
-        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token)
+        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken prevToken)
         {
-            if (dirty)
+            if (expectedToken != null)
             {
-                dirty = false;
-                if (expectedToken != null)
-                {
+                if (!expectedToken.Equals(prevToken))
                     return expectedToken;
-                }
             }
 
+            await NextItem(item, currentToken);
+
+            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
+            if (expectedToken != null)
+            {
+                if (!expectedToken.Equals(prevToken))
+                    return expectedToken;
+            }
+
+            expectedToken = currentToken;
+
+            return null;
+        }
+
+
+        private Task NextItem(object item, StreamSequenceToken token)
+        {
             T typedItem;
             try
             {
@@ -125,37 +147,15 @@ namespace Orleans.Streams
                 throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
             }
 
-            await NextItem(typedItem, token);
-
-            if (dirty)
-            {
-                dirty = false;
-                if (expectedToken != null)
-                {
-                    return expectedToken;
-                }
-            }
-
-            if (token != null && token.Newer(expectedToken))
-            {
-                expectedToken = token;
-            }
-
-            return default(StreamSequenceToken);
-        }
-
-
-        private Task NextItem(T item, StreamSequenceToken token)
-        {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (observer == null || !IsValid)
                 return TaskDone.Done;
 
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
+            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
                 return TaskDone.Done;
 
-            return observer.OnNextAsync(item, token);
+            return observer.OnNextAsync(typedItem, token);
         }
 
         public Task CompleteStream()

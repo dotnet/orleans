@@ -226,26 +226,32 @@ namespace Orleans.Streams
             IStreamFilterPredicateWrapper filter)
         {
             IQueueCacheCursor cursor = null;
+            StreamSequenceToken requestedToken = null;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
+                DataNotAvailableException errorOccured = null;
                 try
                 {
-                    StreamSequenceToken consumerToken = await streamConsumer.GetSequenceToken(subscriptionId);
+                    requestedToken = await streamConsumer.GetSequenceToken(subscriptionId);
                     // Set cursor if not cursor is set, or if subscription provides new token
-                    consumerToken = consumerToken ?? token;
-                    if (token != null)
+                    requestedToken = requestedToken ?? token;
+                    if (requestedToken != null)
                     {
-                        cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, consumerToken);
+                        cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, requestedToken);
                     }
                 }
                 catch (DataNotAvailableException dataNotAvailableException)
                 {
+                    errorOccured = dataNotAvailableException;
+                }
+                if (errorOccured != null)
+                {
                     // notify consumer that the data is not available, if we can.
-                    streamConsumer.ErrorInStream(subscriptionId, dataNotAvailableException).Ignore();
+                    await OrleansTaskExtentions.ExecuteAndIgnoreException(() => streamConsumer.ErrorInStream(subscriptionId, errorOccured));
                 }
             }
-            AddSubscriberToSubscriptionCache(subscriptionId, streamId, streamConsumer, cursor, filter);
+            AddSubscriberToSubscriptionCache(subscriptionId, streamId, streamConsumer, cursor, requestedToken, filter);
         }
 
         // Called by rendezvous when new remote subscriber subscribes to this stream or when registering a new stream with the pubsub system.
@@ -254,6 +260,7 @@ namespace Orleans.Streams
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
             IQueueCacheCursor newCursor,
+            StreamSequenceToken requestedToken,
             IStreamFilterPredicateWrapper filter)
         {
             StreamConsumerCollection streamDataCollection;
@@ -266,6 +273,8 @@ namespace Orleans.Streams
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
                 data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter);
+
+            data.LastToken = requestedToken;
 
             // if we have a new cursor, use it
             if (newCursor != null)
@@ -446,7 +455,7 @@ namespace Orleans.Streams
                                 consumerData.StreamId.Namespace, null);
                         }
                         // Notify client of error.
-                        deliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, ex);
+                        deliveryTask = DeliverErrorToConsumer(consumerData, ex, null);
                     }
 
                     try
@@ -464,7 +473,8 @@ namespace Orleans.Streams
                     if (deliveryFailed && batch != null)
                     {
                         // notify consumer of delivery error, if we can.
-                        DeliverErrorToConsumer(consumerData, new StreamEventDeliveryFailureException(consumerData.StreamId), batch).Ignore();
+                        await OrleansTaskExtentions.ExecuteAndIgnoreException(() => DeliverErrorToConsumer(consumerData, new StreamEventDeliveryFailureException(consumerData.StreamId), batch));
+
                         // record that there was a delivery failure
                         await streamFailureHandler.OnDeliveryFailure(consumerData.SubscriptionId, streamProviderName,
                             consumerData.StreamId, batch.SequenceToken);
@@ -507,11 +517,17 @@ namespace Orleans.Streams
             }
             try
             {
-                StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
+                StreamSequenceToken prevToken = consumerData.LastToken;
+                StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
                 if (newToken != null)
                 {
+                    consumerData.LastToken = newToken;
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
                         consumerData.StreamId.Namespace, newToken);
+                }
+                else
+                {
+                    consumerData.LastToken = batch.SequenceToken; // this is the currently delivered token
                 }
             }
             finally
