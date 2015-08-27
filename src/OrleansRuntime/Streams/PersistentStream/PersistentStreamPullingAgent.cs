@@ -34,7 +34,8 @@ namespace Orleans.Streams
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private static readonly IBackoffProvider DefaultBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
-       
+        private const int StreamInactivityCheckFrequency = 10;
+
         private readonly string streamProviderName;
         private readonly IStreamProviderRuntime providerRuntime;
         private readonly IStreamPubSub pubSub;
@@ -44,7 +45,6 @@ namespace Orleans.Streams
         private readonly TimeSpan initQueueTimeout;
         private readonly TimeSpan maxDeliveryTime;
         private readonly TimeSpan streamInactivityPeriod;
-        private readonly TimeSpan streamInactivityCheckFrequency;
         private readonly Logger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
@@ -85,7 +85,6 @@ namespace Orleans.Streams
             this.initQueueTimeout = initQueueTimeout;
             this.maxDeliveryTime = maxDeliveryTime;
             this.streamInactivityPeriod = streamInactivityPeriod;
-            streamInactivityCheckFrequency = streamInactivityPeriod.Divide(10);
             numMessages = 0;
 
             logger = providerRuntime.GetLogger(GrainId + "-" + streamProviderName);
@@ -331,10 +330,10 @@ namespace Orleans.Streams
                 {
                     var now = DateTime.UtcNow;
                     // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
-                    if ((now - lastTimeCleanedPubSubCache) >= streamInactivityCheckFrequency)
+                    if ((now - lastTimeCleanedPubSubCache) >= streamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
                     {
                         lastTimeCleanedPubSubCache = now;
-                        CleanupPubSubCache();
+                        CleanupPubSubCache(now);
                     }
 
                     if (queueCache != null && queueCache.IsUnderPressure())
@@ -367,12 +366,12 @@ namespace Orleans.Streams
                         StreamConsumerCollection streamData;
                         if (pubSubCache.TryGetValue(streamId, out streamData))
                         {
-                            streamData.RefreshActivity(DateTime.UtcNow);
+                            streamData.RefreshActivity(now);
                             StartInactiveCursors(streamId, streamData); // if this is an existing stream, start any inactive cursors
                         }
                         else
                         {
-                            RegisterStream(streamId, group.First().SequenceToken).Ignore(); // if this is a new stream register as producer of stream in pub sub system
+                            RegisterStream(streamId, group.First().SequenceToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
                         }
                     }
                 }
@@ -384,19 +383,18 @@ namespace Orleans.Streams
             }
         }
 
-        private void CleanupPubSubCache()
+        private void CleanupPubSubCache(DateTime now)
         {
             if (pubSubCache.Count == 0) return;
-            DateTime now = DateTime.UtcNow;
             var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, streamInactivityPeriod))
                          .Select(pair => pair.Key)
                          .ToList();
             toRemove.ForEach(key => pubSubCache.Remove(key));
         }
 
-        private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken)
+        private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
-            var streamData = new StreamConsumerCollection(DateTime.UtcNow);
+            var streamData = new StreamConsumerCollection(now);
             pubSubCache.Add(streamId, streamData);
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
