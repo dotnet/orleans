@@ -75,6 +75,18 @@ namespace Orleans
             await action();
         }
 
+        public static async Task ExecuteAndIgnoreException(Func<Task> action)
+        {
+            try
+            {
+                await action();
+            }
+            catch (Exception)
+            {
+                // dont re-throw, just eat it.
+            }
+        }
+
         internal static String ToString(this Task t)
         {
             return t == null ? "null" : string.Format("[Id={0}, Status={1}]", t.Id, Enum.GetName(typeof(TaskStatus), t.Status));

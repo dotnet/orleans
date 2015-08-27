@@ -33,8 +33,8 @@ namespace Orleans.Streams
 {
     internal interface IStreamSubscriptionHandle
     {
-        Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token);
-        Task<StreamSequenceToken> DeliverBatch(IBatchContainer item);
+        Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken prevToken);
+        Task<StreamSequenceToken> DeliverBatch(IBatchContainer item, StreamSequenceToken prevToken);
         Task CompleteStream();
         Task ErrorInStream(Exception exc);
         StreamSequenceToken GetSequenceToken();
@@ -89,28 +89,28 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out ignore);
         }
 
-        public Task<StreamSequenceToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token)
+        public Task<StreamSequenceToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamSequenceToken prevToken)
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for subscription {1}", item.Value, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
-                return observer.DeliverItem(item.Value, token);
+                return observer.DeliverItem(item.Value, currentToken, prevToken);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return Task.FromResult(default(StreamSequenceToken));
+            return Task.FromResult<StreamSequenceToken>(null);
         }
 
-        public Task<StreamSequenceToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch)
+        public Task<StreamSequenceToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch, StreamSequenceToken prevToken)
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
-                return observer.DeliverBatch(batch.Value);
+                return observer.DeliverBatch(batch.Value, prevToken);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForBatch), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
@@ -152,7 +152,7 @@ namespace Orleans.Streams
         public Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId)
         {
             IStreamSubscriptionHandle observer;
-            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : default(StreamSequenceToken));
+            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
         }
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)
