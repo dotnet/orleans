@@ -44,6 +44,7 @@ namespace Orleans.Streams
         private readonly TimeSpan initQueueTimeout;
         private readonly TimeSpan maxDeliveryTime;
         private readonly TimeSpan streamInactivityPeriod;
+        private readonly TimeSpan streamInactivityCheckFrequency;
         private readonly Logger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
@@ -53,6 +54,7 @@ namespace Orleans.Streams
         private IQueueCache queueCache;
         private IQueueAdapterReceiver receiver;
         private IStreamFailureHandler streamFailureHandler;
+        private DateTime lastTimeCleanedPubSubCache;
         private IDisposable timer;
 
         internal readonly QueueId QueueId;
@@ -83,6 +85,7 @@ namespace Orleans.Streams
             this.initQueueTimeout = initQueueTimeout;
             this.maxDeliveryTime = maxDeliveryTime;
             this.streamInactivityPeriod = streamInactivityPeriod;
+            streamInactivityCheckFrequency = streamInactivityPeriod.Divide(10);
             numMessages = 0;
 
             logger = providerRuntime.GetLogger(GrainId + "-" + streamProviderName);
@@ -119,6 +122,7 @@ namespace Orleans.Streams
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
             streamFailureHandler = failureHandler.Value;
+            lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
             try
             {
@@ -269,7 +273,7 @@ namespace Orleans.Streams
             StreamConsumerCollection streamDataCollection;
             if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
             {
-                streamDataCollection = new StreamConsumerCollection();
+                streamDataCollection = new StreamConsumerCollection(DateTime.UtcNow);
                 pubSubCache.Add(streamId, streamDataCollection);
             }
 
@@ -321,15 +325,15 @@ namespace Orleans.Streams
                 
                 IQueueAdapterReceiver rcvr = receiver;
                 int maxCacheAddCount = queueCache != null ? queueCache.MaxAddCount : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
-                DateTime lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
                 // loop through the queue until it is empty.
                 while (true)
                 {
+                    var now = DateTime.UtcNow;
                     // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
-                    if ((DateTime.UtcNow - lastTimeCleanedPubSubCache) >= streamInactivityPeriod.Divide(10))
+                    if ((now - lastTimeCleanedPubSubCache) >= streamInactivityCheckFrequency)
                     {
-                        lastTimeCleanedPubSubCache = DateTime.UtcNow;
+                        lastTimeCleanedPubSubCache = now;
                         CleanupPubSubCache();
                     }
 
@@ -363,7 +367,7 @@ namespace Orleans.Streams
                         StreamConsumerCollection streamData;
                         if (pubSubCache.TryGetValue(streamId, out streamData))
                         {
-                            streamData.RefreshActivity();
+                            streamData.RefreshActivity(DateTime.UtcNow);
                             StartInactiveCursors(streamId, streamData); // if this is an existing stream, start any inactive cursors
                         }
                         else
@@ -382,18 +386,17 @@ namespace Orleans.Streams
 
         private void CleanupPubSubCache()
         {
-            var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(streamInactivityPeriod))
+            if (pubSubCache.Count == 0) return;
+            DateTime now = DateTime.UtcNow;
+            var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, streamInactivityPeriod))
                          .Select(pair => pair.Key)
                          .ToList();
-            foreach (var key in toRemove)
-            {
-                pubSubCache.Remove(key);
-            }
+            toRemove.ForEach(key => pubSubCache.Remove(key));
         }
 
         private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken)
         {
-            var streamData = new StreamConsumerCollection();
+            var streamData = new StreamConsumerCollection(DateTime.UtcNow);
             pubSubCache.Add(streamId, streamData);
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
