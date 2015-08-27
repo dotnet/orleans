@@ -1232,10 +1232,11 @@ VALUES
 	FROM
 		[OrleansMembershipVersionTable] v
 		-- This ensures the version table will returned even if there is no matching membership row.
-		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.DeploymentId = m.DeploymentId AND @deploymentId IS NOT NULL	
+		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.[DeploymentId] = m.[DeploymentId]	
 		AND ([Address] = @address AND @address IS NOT NULL)
 		AND ([Port]    = @port AND @port IS NOT NULL)
-		AND ([Generation] = @generation AND @generation IS NOT NULL);',
+		AND ([Generation] = @generation AND @generation IS NOT NULL)
+		WHERE v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;',
 	N''
 );
 
