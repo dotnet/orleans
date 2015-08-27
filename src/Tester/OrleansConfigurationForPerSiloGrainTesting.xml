@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <BootstrapProviders>
+      <Provider Type="TestGrains.PartitionStartup" Name="PartitionGrainStartup" />
+    </BootstrapProviders>
+    <StorageProviders>
+      <Provider Type="Orleans.Storage.MemoryStorage" Name="PartitionManagerStore" />
+    </StorageProviders>
+    <SeedNode Address="localhost" Port="22222"/>
+  </Globals>
+  <Defaults>
+    <Networking Address="localhost" Port="22222"/>
+    <ProxyingGateway Address="localhost" Port="40000" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log">
+       <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+    </Tracing>
+  </Defaults>
+</OrleansConfiguration>
+
+
