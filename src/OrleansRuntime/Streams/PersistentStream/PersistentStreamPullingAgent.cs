@@ -34,6 +34,7 @@ namespace Orleans.Streams
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private static readonly IBackoffProvider DefaultBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+        private const int StreamInactivityCheckFrequency = 10;
 
         private readonly string streamProviderName;
         private readonly IStreamProviderRuntime providerRuntime;
@@ -43,6 +44,7 @@ namespace Orleans.Streams
         private readonly TimeSpan queueGetPeriod;
         private readonly TimeSpan initQueueTimeout;
         private readonly TimeSpan maxDeliveryTime;
+        private readonly TimeSpan streamInactivityPeriod;
         private readonly Logger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
@@ -52,6 +54,7 @@ namespace Orleans.Streams
         private IQueueCache queueCache;
         private IQueueAdapterReceiver receiver;
         private IStreamFailureHandler streamFailureHandler;
+        private DateTime lastTimeCleanedPubSubCache;
         private IDisposable timer;
 
         internal readonly QueueId QueueId;
@@ -65,7 +68,8 @@ namespace Orleans.Streams
             QueueId queueId, 
             TimeSpan queueGetPeriod,
             TimeSpan initQueueTimeout,
-            TimeSpan maxDeliveryTime)
+            TimeSpan maxDeliveryTime,
+            TimeSpan streamInactivityPeriod)
             : base(id, runtime.ExecutingSiloAddress, true)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
@@ -80,6 +84,7 @@ namespace Orleans.Streams
             this.queueGetPeriod = queueGetPeriod;
             this.initQueueTimeout = initQueueTimeout;
             this.maxDeliveryTime = maxDeliveryTime;
+            this.streamInactivityPeriod = streamInactivityPeriod;
             numMessages = 0;
 
             logger = providerRuntime.GetLogger(GrainId + "-" + streamProviderName);
@@ -116,6 +121,7 @@ namespace Orleans.Streams
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
             streamFailureHandler = failureHandler.Value;
+            lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
             try
             {
@@ -266,7 +272,7 @@ namespace Orleans.Streams
             StreamConsumerCollection streamDataCollection;
             if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
             {
-                streamDataCollection = new StreamConsumerCollection();
+                streamDataCollection = new StreamConsumerCollection(DateTime.UtcNow);
                 pubSubCache.Add(streamId, streamDataCollection);
             }
 
@@ -322,6 +328,14 @@ namespace Orleans.Streams
                 // loop through the queue until it is empty.
                 while (true)
                 {
+                    var now = DateTime.UtcNow;
+                    // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
+                    if ((now - lastTimeCleanedPubSubCache) >= streamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
+                    {
+                        lastTimeCleanedPubSubCache = now;
+                        CleanupPubSubCache(now);
+                    }
+
                     if (queueCache != null && queueCache.IsUnderPressure())
                     {
                         // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
@@ -343,15 +357,22 @@ namespace Orleans.Streams
                     if (logger.IsVerbose2) logger.Verbose2((int)ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
                         multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
                     
-                    foreach (var group in multiBatch.Where(m => m != null)
+                    foreach (var group in 
+                        multiBatch
+                        .Where(m => m != null)
                         .GroupBy(container => new Tuple<Guid, string>(container.StreamGuid, container.StreamNamespace)))
                     {
                         var streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
                         StreamConsumerCollection streamData;
                         if (pubSubCache.TryGetValue(streamId, out streamData))
+                        {
+                            streamData.RefreshActivity(now);
                             StartInactiveCursors(streamId, streamData); // if this is an existing stream, start any inactive cursors
+                        }
                         else
-                            RegisterStream(streamId, group.First().SequenceToken).Ignore(); ; // if this is a new stream register as producer of stream in pub sub system
+                        {
+                            RegisterStream(streamId, group.First().SequenceToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
+                        }
                     }
                 }
             }
@@ -362,9 +383,18 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken)
+        private void CleanupPubSubCache(DateTime now)
         {
-            var streamData = new StreamConsumerCollection();
+            if (pubSubCache.Count == 0) return;
+            var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, streamInactivityPeriod))
+                         .Select(pair => pair.Key)
+                         .ToList();
+            toRemove.ForEach(key => pubSubCache.Remove(key));
+        }
+
+        private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken, DateTime now)
+        {
+            var streamData = new StreamConsumerCollection(now);
             pubSubCache.Add(streamId, streamData);
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
@@ -386,7 +416,7 @@ namespace Orleans.Streams
         {
             // if stream is already registered, just wake inactive consumers
             // get list of inactive consumers
-            var inactiveStreamConsumers = streamData.AllConsumersForStream(streamId)
+            var inactiveStreamConsumers = streamData.AllConsumers()
                 .Where(consumer => consumer.State == StreamConsumerDataState.Inactive)
                 .ToList();
 
