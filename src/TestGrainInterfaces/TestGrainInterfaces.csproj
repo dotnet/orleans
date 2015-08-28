@@ -55,6 +55,7 @@
     <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="CodegenTestInterfaces.cs" />
+    <Compile Include="ISimpleRequestContextGrain.cs" />
     <Compile Include="IStatelessWorkerGrain.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />

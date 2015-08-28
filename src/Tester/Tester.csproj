@@ -91,6 +91,7 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="RequestContextTest.cs" />
     <Compile Include="SerializationTests.cs" />
     <Compile Include="DependencyResolverGrainTests.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
