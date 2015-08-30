@@ -105,11 +105,11 @@ GO
 -- These can be redefined (e.g. to provide non-destructive updates) provided the stated interface principles hold.
 CREATE TABLE [OrleansQuery]
 (	
-    [Key] VARCHAR(64) NOT NULL,
-    [Query] NVARCHAR(MAX) NOT NULL,
+    [QueryKey] VARCHAR(64) NOT NULL,
+    [QueryText] NVARCHAR(MAX) NOT NULL,
     [Description] NVARCHAR(MAX) NOT NULL
 
-	CONSTRAINT OrleansQuery_Key PRIMARY KEY([Key])
+	CONSTRAINT OrleansQuery_Key PRIMARY KEY([QueryKey])
 );
 
 
@@ -238,7 +238,7 @@ BEGIN
 	-- ROWVERSION is applied automatically whereas an etag mechanism of using UNIQUEIDENTIFIER in SQL Server is not.
 	-- Also some queries could be tuned better on SQL Server 2005 and later such as error handling or SQL Server 2008
 	-- and later using MERGE for UPSERT (reminders).
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateIAmAlivetimeKey',
@@ -259,7 +259,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		-- There should ever be only one version row. A new one is tried to insert only once when a silo starts.
@@ -297,7 +297,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(		
 		'InsertMembershipKey',
@@ -390,7 +390,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateMembershipKey',
@@ -454,7 +454,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReminderRowKey',
@@ -502,7 +502,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReportClientMetricsKey',
@@ -562,7 +562,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertSiloMetricsKey',
@@ -769,7 +769,7 @@ BEGIN
 		CONSTRAINT FK_OrleansSiloMetricsTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateIAmAlivetimeKey',
@@ -791,7 +791,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'InsertMembershipVersionKey',
@@ -829,7 +829,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'InsertMembershipKey',
@@ -925,7 +925,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateMembershipKey',
@@ -991,7 +991,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReminderRowKey',
@@ -1042,7 +1042,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReportClientMetricsKey',
@@ -1102,7 +1102,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertSiloMetricsKey',
@@ -1187,7 +1187,7 @@ BEGIN
 	);
 END
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ActiveGatewaysQueryKey',
@@ -1204,7 +1204,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'MembershipReadRowKey',
@@ -1240,7 +1240,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'MembershipReadAllKey',
@@ -1271,7 +1271,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'DeleteMembershipTableEntriesKey',
@@ -1286,7 +1286,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadReminderRowsKey',
@@ -1304,7 +1304,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadReminderRowKey',
@@ -1323,7 +1323,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadRangeRows1Key',
@@ -1342,7 +1342,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadRangeRows2Key',
@@ -1362,7 +1362,7 @@ VALUES
 );
 
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'InsertOrleansStatisticsKey',
@@ -1391,7 +1391,7 @@ VALUES
 );
 
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'DeleteReminderRowKey',
@@ -1409,7 +1409,7 @@ VALUES
 		SELECT CAST(@rowsDeleted AS BIT);',
 	N'');
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'DeleteReminderRowsKey',
