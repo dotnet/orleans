@@ -31,10 +31,8 @@ using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Storage.Relational;
-using Orleans.Runtime.Storage.Management;
-using System.IO;
-using Orleans.Runtime.Storage.RelationalExtensions;
 using UnitTests.StorageTests;
+using UnitTests.General;
 
 namespace UnitTests.MembershipTests
 {
