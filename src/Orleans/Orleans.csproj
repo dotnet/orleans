@@ -103,6 +103,9 @@
     <Compile Include="Messaging\Response.cs" />
     <Compile Include="Providers\IControllable.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
+    <Compile Include="RelationalStorage\AdoNetInvariants.cs" />
+    <Compile Include="RelationalStorage\QueryConstantsBag.cs" />
+    <Compile Include="RelationalStorage\RelationalVendorConstants.cs" />
     <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
@@ -121,9 +124,8 @@
     <Compile Include="RelationalStorage\DictionaryExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorage.cs" />
     <Compile Include="RelationalStorage\IRelationalStorage.cs" />
-    <Compile Include="RelationalStorage\OrleansRelationalConstants.cs" />
+    <Compile Include="RelationalStorage\QueryKeys.cs" />
     <Compile Include="RelationalStorage\OrleansRelationalExtensions.cs" />
-    <Compile Include="RelationalStorage\RelationalConstants.cs" />
     <Compile Include="RelationalStorage\RelationalManagementExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorageExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorageUtilities.cs" />
