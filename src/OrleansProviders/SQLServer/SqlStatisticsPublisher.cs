@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Storage.Relational.Management;
 using Orleans.Runtime.Storage.Relational;
 using System;
 using System.Collections.Generic;
@@ -45,6 +46,7 @@ namespace Orleans.Providers.SqlServer
         private bool isSilo;
         private long generation;                
         private IRelationalStorage database;
+        private QueryConstantsBag queryConstants;
         private Logger logger;
         
 
@@ -57,9 +59,8 @@ namespace Orleans.Providers.SqlServer
             logger = providerRuntime.GetLogger("SqlStatisticsPublisher");
 
             //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.            
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, config.Properties["ConnectionString"]);
-
-            await InitOrleansQueriesAsync();           
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.Properties["ConnectionString"]);
+            queryConstants = await database.InitializeOrleansQueriesAsync();           
         }
 
 
@@ -93,9 +94,8 @@ namespace Orleans.Providers.SqlServer
         async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
         {
             //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.            
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, config.DataConnectionString);
-            
-            await InitOrleansQueriesAsync();
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.DataConnectionString);            
+            queryConstants = await database.InitializeOrleansQueriesAsync();
         }
 
 
@@ -104,7 +104,8 @@ namespace Orleans.Providers.SqlServer
             if(logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
             try
             {
-                return database.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.UpsertReportClientMetricsKey);
+                return database.UpsertReportClientMetricsAsync(query, deploymentId, clientId, clientAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
@@ -115,8 +116,8 @@ namespace Orleans.Providers.SqlServer
 
 
         async Task ISiloMetricsDataPublisher.Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
-        {
-            await InitOrleansQueriesAsync();
+        {            
+            await database.InitializeOrleansQueriesAsync();
         }
 
 
@@ -125,7 +126,8 @@ namespace Orleans.Providers.SqlServer
             if (logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
             try
             {
-                return database.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.UpsertSiloMetricsKey);
+                return database.UpsertSiloMetricsAsync(query, deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
@@ -150,12 +152,14 @@ namespace Orleans.Providers.SqlServer
             {                                    
                 //This batching is done for two reasons:
                 //1) For not to introduce a query large enough to be rejected.
-                //2) Performance, though the right level granularity may not be a constant.
+                //2) Performance, though using a fixed constants likely will not give the optimal performance in every situation.
                 const int maxBatchSizeInclusive = 200;
                 var counterBatches = BatchCounters(statsCounters, maxBatchSizeInclusive);
                 foreach(var counterBatch in counterBatches)
-                {                    
-                    insertTasks.Add(database.InsertStatisticsCountersAsync(deploymentId, hostName, siloOrClientName, id, counterBatch));
+                {
+                    //The query template from which to retrieve the set of columns that are being inserted.
+                    var queryTemplate = queryConstants.GetConstant(database.InvariantName, QueryKeys.InsertOrleansStatisticsKey);
+                    insertTasks.Add(database.InsertStatisticsCountersAsync(queryTemplate, deploymentId, hostName, siloOrClientName, id, counterBatch));
                 }
                 
                 await Task.WhenAll(insertTasks);                
@@ -173,13 +177,7 @@ namespace Orleans.Providers.SqlServer
 
             if (logger != null && logger.IsVerbose) logger.Verbose("ReportStats SUCCESS");           
         }
-
-
-        private Task InitOrleansQueriesAsync()
-        {
-            return database.InitializeOrleansQueriesAsync();
-        }
-
+               
 
         /// <summary>
         /// Batches the counters list to batches of given maximum size.

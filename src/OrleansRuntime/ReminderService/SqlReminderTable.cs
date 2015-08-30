@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage.Relational;
+using Orleans.Runtime.Storage.Relational.Management;
 using System;
 using System.Threading.Tasks;
 
@@ -34,6 +35,7 @@ namespace Orleans.Runtime.ReminderService
         private string serviceId;
         private string deploymentId;
         private IRelationalStorage database;
+        private QueryConstantsBag queryConstants;
 
 
         public SqlReminderTable(GlobalConfiguration config)
@@ -42,7 +44,8 @@ namespace Orleans.Runtime.ReminderService
             deploymentId = config.DeploymentId;
             
             //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, config.DataConnectionString);
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.DataConnectionString);
+            queryConstants = database.InitializeOrleansQueriesAsync().Result;
         }
 
         public Task Init(Guid serviceId, string deploymentId, string connectionString)
@@ -50,7 +53,8 @@ namespace Orleans.Runtime.ReminderService
             this.serviceId = serviceId.ToString();
             this.deploymentId = deploymentId;
 
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, connectionString);
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, connectionString);
+            queryConstants = database.InitializeOrleansQueriesAsync().Result;
 
             return TaskDone.Done;
         }
@@ -58,37 +62,44 @@ namespace Orleans.Runtime.ReminderService
 
         public Task<ReminderTableData> ReadRows(GrainReference grainRef)
         {
-            return database.ReadReminderRowsAsync(serviceId, grainRef);
+            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.ReadReminderRowsKey);
+            return database.ReadReminderRowsAsync(query, serviceId, grainRef);
         }
 
 
         public Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
         {
-            return database.ReadReminderRowsAsync(serviceId, beginHash, endHash);
+            var queryKey = beginHash < endHash ? QueryKeys.ReadRangeRows1Key : QueryKeys.ReadRangeRows2Key;
+            var query = queryConstants.GetConstant(database.InvariantName, queryKey);
+            return database.ReadReminderRowsAsync(query, serviceId, beginHash, endHash);
         }
 
 
         public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
-            return database.ReadReminderRowAsync(serviceId, grainRef, reminderName);
+            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.ReadReminderRowKey);
+            return database.ReadReminderRowAsync(query, serviceId, grainRef, reminderName);
         }
               
         
         public Task<string> UpsertRow(ReminderEntry entry)
         {
-            return database.UpsertReminderRowAsync(serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period);            
+            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.UpsertReminderRowKey);
+            return database.UpsertReminderRowAsync(query, serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period);            
         }
 
 
         public Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
-            return database.DeleteReminderRowAsync(serviceId, grainRef, reminderName, eTag);            
+            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.DeleteReminderRowKey);
+            return database.DeleteReminderRowAsync(query, serviceId, grainRef, reminderName, eTag);            
         }
 
 
         public Task TestOnlyClearTable()
         {
-            return database.DeleteReminderRowsAsync(serviceId);
+            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.DeleteReminderRowsKey);
+            return database.DeleteReminderRowsAsync(query, serviceId);
         }
     }
 }

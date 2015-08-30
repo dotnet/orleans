@@ -74,6 +74,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
     <Reference Include="System.Data.Services.Client" />
     <Reference Include="System.Spatial">
       <HintPath>..\packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
@@ -87,6 +88,8 @@
     <Compile Include="MembershipTests\LivenessTests.cs" />
     <Compile Include="MemoryStorageProviderTests.cs" />
     <Compile Include="ObserverTests.cs" />
+    <Compile Include="RelationalUtilities\RelationalTestExtensions.cs" />
+    <Compile Include="RelationalUtilities\RelationalTestingConstants.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -94,6 +97,7 @@
     <Compile Include="RequestContextTest.cs" />
     <Compile Include="SerializationTests.cs" />
     <Compile Include="DependencyResolverGrainTests.cs" />
+    <Compile Include="RelationalUtilities\SqlTestsEnvironment.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />

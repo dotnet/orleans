@@ -31,6 +31,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Storage.Relational;
 using UnitTests.StorageTests;
+using UnitTests.General;
 
 namespace UnitTests.RemindersTest
 {
