@@ -36,15 +36,15 @@ namespace UnitTests.Grains
     {
         private readonly Dictionary<StreamSubscriptionHandle<int>, Counter> consumedMessageCounts;
         private Logger logger;
+        private int consumerCount = 0;
 
         private class Counter
         {
             public int Value { get; private set; }
 
-            public Task Increment()
+            public void Increment()
             {
                 Value++;
-                return TaskDone.Done;
             }
 
             public void Clear()
@@ -76,11 +76,13 @@ namespace UnitTests.Grains
             IStreamProvider streamProvider = GetStreamProvider(providerToUse);
             var stream = streamProvider.GetStream<int>(streamId, streamNamespace);
 
+            int countCapture = consumerCount;
+            consumerCount++;
             // subscribe
             StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync(
                 (e, t) =>
                 {
-                    logger.Info("Got next event {0}", e);
+                    logger.Info("Got next event {0} on handle {1}", e, countCapture);
                     string contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
                     if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
                     {
@@ -110,10 +112,12 @@ namespace UnitTests.Grains
                 count = new Counter();
             }
 
+            int countCapture = consumerCount;
+            consumerCount++;
             // subscribe
             StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync((e, t) =>
             {
-                logger.Info("Got next event {0}", e);
+                logger.Info("Got next event {0} on newhandle {1}", e, countCapture);
                 string contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
                 if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
                 {
@@ -155,6 +159,9 @@ namespace UnitTests.Grains
 
         public Task<Dictionary<StreamSubscriptionHandle<int>, int>> GetNumberConsumed()
         {
+            logger.Info(String.Format("ConsumedMessageCounts = \n{0}", 
+                Utils.EnumerableToString(consumedMessageCounts, kvp => String.Format("Consumer: {0} -> count: {1}", kvp.Key.HandleId.ToString(), kvp.Value.Value.ToString()))));
+
             return Task.FromResult(consumedMessageCounts.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Value));
         }
 
