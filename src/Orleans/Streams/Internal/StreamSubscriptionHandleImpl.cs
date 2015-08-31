@@ -195,7 +195,7 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return String.Format("StreamSubscriptionHandleImpl:Stream={0},Subscription={1}", IsValid ? streamImpl.StreamId.ToString() : "null", SubscriptionId);
+            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.StreamId.ToString() : "null", HandleId);
         }
     }
 }
