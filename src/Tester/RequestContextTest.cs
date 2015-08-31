@@ -23,34 +23,20 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using Orleans.Runtime;
+
 
 namespace UnitTests.General
 {
-    /// <summary>
-    /// Summary description for SimpleGrain
-    /// </summary>
     [TestClass]
     public class RequestContextTests : UnitTestSiloHost
     {
-        private const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleRequestContextG";
-        
         public RequestContextTests()
             : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
         {
-        }
-
-        public ISimpleRequestContextGrain GetSimpleRequestContextGrain()
-        {
-            return GrainFactory.GetGrain<ISimpleRequestContextGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
-        }
-
-        private static int GetRandomGrainId()
-        {
-            return random.Next();
         }
 
         [ClassCleanup]
@@ -60,27 +46,28 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("RequestContext"), TestCategory("Functional")]
-        public async Task CallerToCalleeflow()
+        public async Task RequestContextCallerToCalleeFlow()
         {
-            var grain = GetSimpleRequestContextGrain();
+            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
             // Set context to send to the grain
-            RequestContext.Set("GrainInfo", 10L);
+            RequestContext.Set("GrainInfo", 10);
             // This grain method reads the context and returns it
-            var infoFromGrain = await grain.ReadRequestContext();
+            var infoFromGrain = await grain.GetRequestContext();
             Assert.IsNotNull(infoFromGrain);
-            Assert.IsTrue((long)infoFromGrain == 10);
+            Assert.IsTrue((int)infoFromGrain == 10);
         }
 
         [TestMethod, TestCategory("RequestContext"), TestCategory("Functional")]
-        public async Task CalleeToCallerflow()
+        [ExpectedException(typeof(AssertFailedException))]
+        public async Task RequestContextCalleeToCallerFlow()
         {
-            var grain = GetSimpleRequestContextGrain();
+            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
             // This method in the grain does RequestContext.Set
-            await grain.GetRequestContext();
+            await grain.SetRequestContext(15);
             // Read the info set in the grain
             var infoFromGrain = RequestContext.Get("GrainInfo");
             Assert.IsNotNull(infoFromGrain);
-            Assert.IsTrue((long)infoFromGrain == 10);
+            Assert.IsTrue((int)infoFromGrain == 15);
         }
 
     }
