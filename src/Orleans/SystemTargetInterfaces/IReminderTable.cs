@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans
@@ -37,7 +38,7 @@ namespace Orleans
     /// </summary>  
     public interface IReminderTable
     {
-        Task Init(Guid serviceId, string deploymentId, string connectionString);
+        Task Init(GlobalConfiguration config, TraceLogger traceLogger);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 

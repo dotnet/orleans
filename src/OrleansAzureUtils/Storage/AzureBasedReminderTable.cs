@@ -24,23 +24,21 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime.ReminderService
 {
     internal class AzureBasedReminderTable : IReminderTable
     {
-        private readonly TraceLogger logger;
+        private TraceLogger logger;
         private RemindersTableManager remTableManager;
 
-        public AzureBasedReminderTable()
-        {
-            logger = TraceLogger.GetLogger("AzureReminderTable", TraceLogger.LoggerType.Runtime);
-        }
 
-        public async Task Init(Guid serviceId, string deploymentId, string connectionString)
+        public async Task Init(GlobalConfiguration config, TraceLogger logger)
         {
-            remTableManager = await RemindersTableManager.GetManager(serviceId, deploymentId, connectionString);
+            this.logger = logger;
+            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, config.DeploymentId, config.DataConnectionStringForReminders);
         }
 
         #region Utility methods
