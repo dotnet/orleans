@@ -58,9 +58,13 @@ namespace Orleans.Providers.SqlServer
             Name = name;
             logger = providerRuntime.GetLogger("SqlStatisticsPublisher");
 
-            //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.            
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.Properties["ConnectionString"]);
-            queryConstants = await database.InitializeOrleansQueriesAsync();           
+            string adoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+            if (config.Properties.ContainsKey("AdoInvariant"))
+                adoInvariant = config.Properties["AdoInvariant"];
+
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(adoInvariant, config.Properties["ConnectionString"]);
+
+            queryConstants = await database.InitializeOrleansQueriesAsync(); 
         }
 
 
@@ -92,9 +96,9 @@ namespace Orleans.Providers.SqlServer
 
 
         async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
-        {
-            //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.            
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.DataConnectionString);            
+        {          
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(config.AdoInvariant, config.DataConnectionString);
+            
             queryConstants = await database.InitializeOrleansQueriesAsync();
         }
 
