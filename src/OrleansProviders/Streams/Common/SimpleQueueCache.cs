@@ -60,6 +60,7 @@ namespace Orleans.Providers.Streams.Common
     public class SimpleQueueCache : IQueueCache
     {
         private readonly LinkedList<SimpleQueueCacheItem> cachedMessages;
+        private StreamSequenceToken lastSequenceTokenAddedToCache;
         private readonly int maxCacheSize;
         private readonly Logger logger;
         private readonly List<CacheBucket> cacheCursorHistogram; // for backpressure detection
@@ -107,6 +108,7 @@ namespace Orleans.Providers.Streams.Common
             foreach (var message in msgs)
             {
                 Add(message, message.SequenceToken);
+                lastSequenceTokenAddedToCache = message.SequenceToken;
             }
         }
 
@@ -129,15 +131,16 @@ namespace Orleans.Providers.Streams.Common
            
             if (cachedMessages.Count == 0) // nothing in cache
             {
-                ResetCursor(cursor, sequenceToken);
+                StreamSequenceToken tokenToReset = sequenceToken ?? (lastSequenceTokenAddedToCache != null ? ((EventSequenceToken)lastSequenceTokenAddedToCache).NextSequenceNumber() : null);
+                ResetCursor(cursor, tokenToReset);
                 return;
             }
 
             // if offset is not set, iterate from newest (first) message in cache, but not including the irst message itself
             if (sequenceToken == null)
             {
-                LinkedListNode<SimpleQueueCacheItem> firstMessage = cachedMessages.First;
-                ResetCursor(cursor, ((EventSequenceToken)firstMessage.Value.SequenceToken).NextSequenceNumber());
+                StreamSequenceToken tokenToReset = lastSequenceTokenAddedToCache != null ? ((EventSequenceToken)lastSequenceTokenAddedToCache).NextSequenceNumber() : null;
+                ResetCursor(cursor, tokenToReset);
                 return;
             }
 
