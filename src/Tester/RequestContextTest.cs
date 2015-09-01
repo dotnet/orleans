@@ -22,7 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -31,7 +31,7 @@ using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
+    [TestFixture]
     public class RequestContextTests : UnitTestSiloHost
     {
         public RequestContextTests()
@@ -39,13 +39,13 @@ namespace UnitTests.General
         {
         }
 
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestFixtureTearDown]
+        public void MyClassCleanup()
         {
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("RequestContext"), TestCategory("Functional")]
+        [Test, Category("RequestContext"), Category("Functional")]
         public async Task RequestContextCallerToCalleeFlow()
         {
             var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
@@ -57,8 +57,8 @@ namespace UnitTests.General
             Assert.IsTrue((int)infoFromGrain == 10);
         }
 
-        [TestMethod, TestCategory("RequestContext"), TestCategory("Functional")]
-        [ExpectedException(typeof(AssertFailedException))]
+        [Test, Category("RequestContext"), Category("Functional")]
+        [ExpectedException(typeof(AssertionException))]
         public async Task RequestContextCalleeToCallerFlow()
         {
             var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());

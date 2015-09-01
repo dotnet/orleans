@@ -1,6 +1,6 @@
 ﻿
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.TestingHost;
 using TestGrainInterfaces;
@@ -8,13 +8,19 @@ using UnitTests.Tester;
 
 namespace Tester
 {
-    [TestClass]
+    [TestFixture]
     public class GrainInterfaceHierarchyTests : UnitTestSiloHost
     {
 
         public GrainInterfaceHierarchyTests()
             : base(new TestingSiloOptions {StartPrimary = true, StartSecondary = false})
         {
+        }
+
+        [TestFixtureTearDown]
+        public void MyClassCleanup()
+        {
+            StopAllSilos();
         }
 
         private T GetHierarchyGrain<T>() where T : IDoSomething, IGrainWithIntegerKey
@@ -27,20 +33,14 @@ namespace Tester
             return random.Next();
         }
 
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task DoSomethingGrainEmptyTest()
         {
             IDoSomethingEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyGrain>();
             Assert.AreEqual(await doSomething.DoIt(), "DoSomethingEmptyGrain");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task DoSomethingGrainEmptyWithMoreTest()
         {
             IDoSomethingEmptyWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyWithMoreGrain>();
@@ -48,7 +48,7 @@ namespace Tester
             Assert.AreEqual(await doSomething.DoMore(), "DoSomethingEmptyWithMoreGrain");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task DoSomethingWithMoreEmptyGrainTest()
         {
             IDoSomethingWithMoreEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreEmptyGrain>();
@@ -56,7 +56,7 @@ namespace Tester
             Assert.AreEqual(await doSomething.DoMore(), "DoSomethingWithMoreEmptyGrain");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task DoSomethingWithMoreGrainTest()
         {
             IDoSomethingWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreGrain>();
@@ -64,7 +64,7 @@ namespace Tester
             Assert.AreEqual(await doSomething.DoThat(), "DoSomethingWithMoreGrain");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task DoSomethingCombinedGrainTest()
         {
             IDoSomethingCombinedGrain doSomething = GetHierarchyGrain<IDoSomethingCombinedGrain>();
@@ -73,7 +73,7 @@ namespace Tester
             Assert.AreEqual(await doSomething.DoThat(), "DoSomethingCombinedGrain");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [Test, Category("BVT"), Category("Functional")]
         public async Task DoSomethingValidateSingleGrainTest()
         {
             var doSomethingEmptyGrain = GetHierarchyGrain<IDoSomethingEmptyGrain>();
@@ -108,7 +108,6 @@ namespace Tester
             Assert.AreEqual(await doSomethingCombinedGrain.GetA(), 11);
             Assert.AreEqual(await doSomethingCombinedGrain.GetB(), 11);
             Assert.AreEqual(await doSomethingCombinedGrain.GetC(), 11);
-
         }
     }
 }

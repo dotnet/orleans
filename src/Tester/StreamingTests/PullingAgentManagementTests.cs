@@ -24,7 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
@@ -34,10 +34,7 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
-    [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
+    [TestFixture]
     public class PullingAgentManagementTests : UnitTestSiloHost
     {
         private const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
@@ -57,14 +54,14 @@ namespace UnitTests.StreamingTests
         {
         }
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestFixtureTearDown]
+        public void MyClassCleanup()
         {
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+
+        [Test, Category("Functional"), Category("Streaming")]
         public async Task PullingAgents_ControlCmd_1()
         {
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);

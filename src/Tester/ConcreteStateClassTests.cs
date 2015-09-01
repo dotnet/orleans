@@ -23,7 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -33,7 +33,7 @@ namespace UnitTests.General
     /// <summary>
     /// Summary description for SimpleGrain
     /// </summary>
-    [TestClass]
+    [TestFixture]
     public class StateClassTests : UnitTestSiloHost
     {
         private readonly Random rand = new Random();
@@ -43,7 +43,13 @@ namespace UnitTests.General
         {
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
+        [TestFixtureTearDown]
+        public void MyClassCleanup()
+        {
+            StopAllSilos();
+        }
+
+        [Test, Category("BVT"), Category("Functional")]
         public async Task StateClassTests_StateClass()
         {
             await StateClassTests_Test("UnitTests.Grains.SimplePersistentGrain");

@@ -21,11 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.IO;
 using System.Text;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.Runtime.Configuration;
+using NUnit.Framework;
 using Orleans.TestingHost;
 
 namespace UnitTests.Tester
@@ -36,10 +33,14 @@ namespace UnitTests.Tester
     /// deployment items required by tests 
     /// - such as the TestGrain assemblies, the client and server config files.
     /// </summary>
-    [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [DeploymentItem("TestGrainInterfaces.dll")]
-    [DeploymentItem("TestGrains.dll")]
+    //[DeploymentItem("OrleansConfigurationForTesting.xml")]
+    //[DeploymentItem("ClientConfigurationForTesting.xml")]
+    //[DeploymentItem("TestGrainInterfaces.dll")]
+    //[DeploymentItem("TestGrains.dll")]
+    //
+    // TODO: NUnit does not use / require [DeploymentItem] tags, 
+    //       so we can probably remove this class after completing the switch over to NUnit.
+    //
     public class UnitTestSiloHost : TestingSiloHost
     {
         public UnitTestSiloHost() // : base()
@@ -57,18 +58,15 @@ namespace UnitTests.Tester
         protected static string DumpTestContext(TestContext context)
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendFormat(@"TestName={0}", context.TestName).AppendLine();
-            sb.AppendFormat(@"FullyQualifiedTestClassName={0}", context.FullyQualifiedTestClassName).AppendLine();
-            sb.AppendFormat(@"CurrentTestOutcome={0}", context.CurrentTestOutcome).AppendLine();
-            sb.AppendFormat(@"DeploymentDirectory={0}", context.DeploymentDirectory).AppendLine();
-            sb.AppendFormat(@"TestRunDirectory={0}", context.TestRunDirectory).AppendLine();
-            sb.AppendFormat(@"TestResultsDirectory={0}", context.TestResultsDirectory).AppendLine();
-            sb.AppendFormat(@"ResultsDirectory={0}", context.ResultsDirectory).AppendLine();
-            sb.AppendFormat(@"TestRunResultsDirectory={0}", context.TestRunResultsDirectory).AppendLine();
-            sb.AppendFormat(@"Properties=[ ");
-            foreach (var key in context.Properties.Keys)
+            sb.AppendFormat(@"Test Name={0}", context.Test.Name).AppendLine();
+            sb.AppendFormat(@"Test FullyQualifiedClassName={0}", context.Test.FullName).AppendLine();
+            sb.AppendFormat(@"Test Outcome={0}", context.Result.Status).AppendLine();
+            sb.AppendFormat(@"Test Directory={0}", context.TestDirectory).AppendLine();
+            sb.AppendFormat(@"Test Working Directory={0}", context.WorkDirectory).AppendLine();
+            sb.AppendFormat(@"Test Properties=[ ");
+            foreach (var key in context.Test.Properties.Keys)
             {
-                sb.AppendFormat(@"{0}={1} ", key, context.Properties[key]);
+                sb.AppendFormat(@"{0}={1} ", key, context.Test.Properties[key]);
             }
             sb.AppendFormat(@" ]").AppendLine();
             return sb.ToString();

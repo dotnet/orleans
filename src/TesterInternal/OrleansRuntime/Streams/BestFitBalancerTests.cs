@@ -24,15 +24,15 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using Orleans.Streams;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
+    [TestFixture]
     public class BestFitBalancerTests
     {
-        [TestMethod, TestCategory("Functional")]
+        [Test, Category("Functional")]
         public void IdealCaseMoreResourcesThanBucketsTest()
         {
             const int resourceCount = 99;
@@ -45,7 +45,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Test, Category("Functional")]
         public void IdealCaseLessResourcesThanBucketsTest()
         {
             const int bucketCount = 99;
@@ -58,7 +58,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Test, Category("Functional")]
         public void HalfBucketsActiveTest()
         {
             const int resourceCount = 99;
@@ -73,7 +73,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(activeBuckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Test, Category("Functional")]
         public void OrderIrrelevantTest()
         {
             const int resourceCount = 99;
