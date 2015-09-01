@@ -46,9 +46,8 @@ namespace Orleans.Runtime.MembershipService
             deploymentId = config.DeploymentId;
 
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.InitializeMembershipTable called.");
-                                                
-            //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.DataConnectionString);
+
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(config.AdoInvariant, config.DataConnectionString);
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate defintions exists already.
@@ -75,9 +74,7 @@ namespace Orleans.Runtime.MembershipService
 
             deploymentId = config.DeploymentId;            
             maxStaleness = config.GatewayListRefreshPeriod;
-
-            //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.DataConnectionString);
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(config.AdoInvariant, config.DataConnectionString);
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate defintions exists already.

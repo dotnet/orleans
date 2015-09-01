@@ -46,7 +46,7 @@ namespace Orleans.Runtime.ReminderService
                             serviceType));
 
                 case GlobalConfiguration.ReminderServiceProviderType.SqlServer:
-                    Singleton = new SqlReminderTable(config);
+                    Singleton = new SqlReminderTable();
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.AzureTable:

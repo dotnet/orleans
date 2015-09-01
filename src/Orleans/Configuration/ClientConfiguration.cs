@@ -29,6 +29,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Xml;
 using Orleans.Providers;
+using Orleans.Runtime.Storage.Relational;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -84,7 +85,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public string DeploymentId { get; set; }
         /// <summary>
-        /// Specifies the connection string for azure storage account.
+        /// Specifies the connection string for the gateway provider.
         /// If the silos are deployed on Azure (run as workers roles), DataConnectionString may be specified via RoleEnvironment.GetConfigurationSettingValue("DataConnectionString");
         /// In such a case it is taken from there and passed to the silo automatically by the role via config.
         /// So if the silos are run as Azure roles and this config is specified via RoleEnvironment, 
@@ -93,6 +94,13 @@ namespace Orleans.Runtime.Configuration
         /// If not set at all, DevelopmentStorageAccount will be used.
         /// </summary>
         public string DataConnectionString { get; set; }
+
+        /// <summary>
+        /// When using ADO, identifies the underlying data provider for the gateway provider. This three-part naming syntax is also used when creating a new factory 
+        /// and for identifying the provider in an application configuration file so that the provider name, along with its associated 
+        /// connection string, can be retrieved at run time. https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx
+        /// </summary>
+        public string AdoInvariant { get; set; }
 
         public string CustomGatewayProviderAssemblyName { get; set; }
 
@@ -192,6 +200,8 @@ namespace Orleans.Runtime.Configuration
             DNSHostName = Dns.GetHostName();
             DeploymentId = Environment.UserName;
             DataConnectionString = "";
+            // Assume the ado invariant is for sql server storage if not explicitly specified
+            AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
 
             DefaultTraceLevel = Logger.Severity.Info;
             TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
@@ -272,6 +282,14 @@ namespace Orleans.Runtime.Configuration
                                 {
                                     // Assume the connection string is for Azure storage if not explicitly specified
                                     GatewayProvider = GatewayProviderType.AzureTable;
+                                }
+                            }
+                            if (child.HasAttribute(Constants.ADO_INVARIANT_NAME))
+                            {
+                                AdoInvariant = child.GetAttribute(Constants.ADO_INVARIANT_NAME);
+                                if (String.IsNullOrWhiteSpace(AdoInvariant))
+                                {
+                                    throw new FormatException("SystemStore.AdoInvariant cannot be blank");
                                 }
                             }
                             break;
