@@ -37,26 +37,13 @@ namespace Orleans.Runtime.ReminderService
         private IRelationalStorage database;
         private QueryConstantsBag queryConstants;
 
-
-        public SqlReminderTable(GlobalConfiguration config)
+        public async Task Init(GlobalConfiguration config, TraceLogger logger)
         {
             serviceId = config.ServiceId.ToString();
             deploymentId = config.DeploymentId;
-            
-            //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, config.DataConnectionString);
-            queryConstants = database.InitializeOrleansQueriesAsync().Result;
-        }
-
-        public Task Init(Guid serviceId, string deploymentId, string connectionString)
-        {
-            this.serviceId = serviceId.ToString();
-            this.deploymentId = deploymentId;
-
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(AdoNetInvariants.InvariantNameSqlServer, connectionString);
-            queryConstants = database.InitializeOrleansQueriesAsync().Result;
-
-            return TaskDone.Done;
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(config.AdoInvariantForReminders,
+                config.DataConnectionStringForReminders);
+            queryConstants = await database.InitializeOrleansQueriesAsync();
         }
 
 

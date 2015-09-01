@@ -264,7 +264,7 @@ namespace Orleans.Runtime.Host
 
         /// <summary>
         /// Set the DeploymentId for this silo, 
-        /// as well as the Azure connection string to use the silo system data, 
+        /// as well as the connection string to use the silo system data, 
         /// such as the cluster membership table..
         /// </summary>
         /// <param name="deploymentId">DeploymentId this silo is part of.</param>
