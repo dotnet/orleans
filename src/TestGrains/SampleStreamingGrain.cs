@@ -102,7 +102,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberProduced()
         {
-            logger.Info("GetNumberProduced");
+            logger.Info("GetNumberProduced {0}", numProducedItems);
             return Task.FromResult(numProducedItems);
         }
 
