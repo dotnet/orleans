@@ -35,13 +35,14 @@ namespace Orleans.Streams
             Faulted,
         }
 
+        // IMPORTANT!!!!!
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         public GuidId SubscriptionId;
         public StreamId Stream;
-        private GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
-        private object filterWrapper; // Serialized func info
-        private SubscriptionStates state;
+        public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public object filterWrapper; // Serialized func info
+        public SubscriptionStates state;
 
         public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
 
