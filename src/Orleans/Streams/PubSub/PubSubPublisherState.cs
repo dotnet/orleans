@@ -29,10 +29,11 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubPublisherState : IEquatable<PubSubPublisherState>
     {
+        // IMPORTANT!!!!!
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         public StreamId Stream;
-        private GrainReference producerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public GrainReference producerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
         public IStreamProducerExtension Producer { get { return producerReference as IStreamProducerExtension; } }
 
         // This constructor has to be public for JSonSerialization to work!
