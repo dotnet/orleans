@@ -49,5 +49,11 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns></returns>
         bool MoveNext();
+
+        /// <summary>
+        /// Whether this cursor is currently set and points to a valid next data in the cache (meaning the cursor is Active).
+        /// </summary>
+        /// <returns></returns>
+        bool IsSet { get; }
     }
 }
