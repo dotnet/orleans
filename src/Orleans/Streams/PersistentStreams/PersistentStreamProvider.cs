@@ -61,32 +61,7 @@ namespace Orleans.Providers.Streams.Common
         private IStreamProviderRuntime  providerRuntime;
         private IQueueAdapter           queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;
-
-
-        private const string GET_QUEUE_MESSAGES_TIMER_PERIOD = "GetQueueMessagesTimerPeriod";
-        private readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
-        private TimeSpan getQueueMsgsTimerPeriod;
-
-        private const string INIT_QUEUE_TIMEOUT = "InitQueueTimeout";
-        private readonly TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT = TimeSpan.FromSeconds(5);
-        private TimeSpan initQueueTimeout;
-
-        private const string QUEUE_BALANCER_TYPE = "QueueBalancerType";
-        private const StreamQueueBalancerType DEFAULT_STREAM_QUEUE_BALANCER_TYPE = StreamQueueBalancerType.ConsistentRingBalancer;
-        private StreamQueueBalancerType balancerType;
-
-        private const string MAX_EVENT_DELIVERY_TIME = "MaxEventDeliveryTime";
-        private readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
-        private TimeSpan maxEventDeliveryTime;
-
-        private const string STREAM_INACTIVITY_PERIOD = "StreamInactivityPeriod";
-        private readonly TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD = TimeSpan.FromMinutes(30);
-        private TimeSpan streamInactivityPeriod;
-
-        private const string STREAM_PUBSUB_TYPE = "PubSubType";
-        private const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
-        private StreamPubSubType pubSubType;
-
+        private PersistentStreamProviderConfig myConfig;
         private const string STARTUP_STATE = "StartupState";
         private PersistentStreamProviderState startupState;
 
@@ -105,43 +80,7 @@ namespace Orleans.Providers.Streams.Common
             adapterFactory = new TAdapterFactory();
             adapterFactory.Init(config, Name, logger);
             queueAdapter = await adapterFactory.CreateAdapter();
-
-            string timePeriod;
-            if (!config.Properties.TryGetValue(GET_QUEUE_MESSAGES_TIMER_PERIOD, out timePeriod))
-                getQueueMsgsTimerPeriod = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
-            else
-                getQueueMsgsTimerPeriod = ConfigUtilities.ParseTimeSpan(timePeriod, 
-                    "Invalid time value for the " + GET_QUEUE_MESSAGES_TIMER_PERIOD + " property in the provider config values.");
-            
-            string timeout;
-            if (!config.Properties.TryGetValue(INIT_QUEUE_TIMEOUT, out timeout))
-                initQueueTimeout = DEFAULT_INIT_QUEUE_TIMEOUT;
-            else
-                initQueueTimeout = ConfigUtilities.ParseTimeSpan(timeout,
-                    "Invalid time value for the " + INIT_QUEUE_TIMEOUT + " property in the provider config values.");
-            
-            string balanceTypeString;
-            balancerType = !config.Properties.TryGetValue(QUEUE_BALANCER_TYPE, out balanceTypeString)
-                ? DEFAULT_STREAM_QUEUE_BALANCER_TYPE
-                : (StreamQueueBalancerType)Enum.Parse(typeof(StreamQueueBalancerType), balanceTypeString);
-
-            if (!config.Properties.TryGetValue(MAX_EVENT_DELIVERY_TIME, out timeout))
-                maxEventDeliveryTime = DEFAULT_MAX_EVENT_DELIVERY_TIME;
-            else
-                maxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
-                    "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
-
-            if (!config.Properties.TryGetValue(STREAM_INACTIVITY_PERIOD, out timeout))
-                streamInactivityPeriod = DEFAULT_STREAM_INACTIVITY_PERIOD;
-            else
-                streamInactivityPeriod = ConfigUtilities.ParseTimeSpan(timeout,
-                    "Invalid time value for the " + STREAM_INACTIVITY_PERIOD + " property in the provider config values.");
-
-            string pubSubTypeString;
-            pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
-                ? DEFAULT_STREAM_PUBSUB_TYPE
-                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
-
+            myConfig = new PersistentStreamProviderConfig(config);
             string startup;
             if (config.Properties.TryGetValue(STARTUP_STATE, out startup))
             {
@@ -152,12 +91,12 @@ namespace Orleans.Providers.Streams.Common
             else
                 startupState = PersistentStreamProviderState.AgentsStarted;
 
-            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, {2} = {3}, {4} = {5}, {6} = {7} and with Adapter {8}.",
-                typeof(TAdapterFactory).Name, Name, 
-                GET_QUEUE_MESSAGES_TIMER_PERIOD, getQueueMsgsTimerPeriod,
-                INIT_QUEUE_TIMEOUT, initQueueTimeout,
-                STARTUP_STATE, startupState,
-                queueAdapter.Name);
+            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, Adapter {2} and config {3}, {4} = {5}.",
+                typeof(TAdapterFactory).Name, 
+                Name, 
+                queueAdapter.Name,
+                myConfig,
+                STARTUP_STATE, startupState);
         }
 
         public async Task Start()
@@ -168,8 +107,7 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter,
-                        getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime, streamInactivityPeriod);
+                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, adapterFactory, queueAdapter, myConfig);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
                     if (startupState == PersistentStreamProviderState.AgentsStarted)
@@ -206,7 +144,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(pubSubType), IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(myConfig.PubSubType), IsRewindable);
         }
 
         public Task<object> ExecuteCommand(int command, object arg)

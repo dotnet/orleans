@@ -39,10 +39,7 @@ namespace Orleans.Streams
         private readonly IStreamProviderRuntime providerRuntime;
         private readonly IStreamPubSub pubSub;
 
-        private readonly TimeSpan queueGetPeriod;
-        private readonly TimeSpan initQueueTimeout;
-        private readonly TimeSpan maxEvenDeliveryTime;
-        private readonly TimeSpan streamInactivityPeriod;
+        private readonly PersistentStreamProviderConfig config;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
         private readonly Logger logger;
 
@@ -61,10 +58,7 @@ namespace Orleans.Streams
             IStreamPubSub streamPubSub,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
-            TimeSpan queueGetPeriod, 
-            TimeSpan initQueueTimeout,
-            TimeSpan maxEvenDeliveryTime,
-            TimeSpan streamInactivityPeriod)
+            PersistentStreamProviderConfig config)
             : base(id, runtime.ExecutingSiloAddress)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
@@ -88,10 +82,7 @@ namespace Orleans.Streams
             streamProviderName = strProviderName;
             providerRuntime = runtime;
             pubSub = streamPubSub;
-            this.queueGetPeriod = queueGetPeriod;
-            this.initQueueTimeout = initQueueTimeout;
-            this.maxEvenDeliveryTime = maxEvenDeliveryTime;
-            this.streamInactivityPeriod = streamInactivityPeriod;
+            this.config = config;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
             latestRingNotificationSequenceNumber = 0;
             latestCommandNumber = 0;
@@ -219,8 +210,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, pubSub, queueId,
-                        queueGetPeriod, initQueueTimeout, maxEvenDeliveryTime, streamInactivityPeriod);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, pubSub, queueId, config);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);
