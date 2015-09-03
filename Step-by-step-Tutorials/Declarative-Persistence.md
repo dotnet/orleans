@@ -211,7 +211,7 @@ It should look something like this (you have to hit 'Query' in ASE):
 
 ![](../Images/Persistence 4.PNG)
 
-If everything is working correctly, the GUIDs should appear in the `PartitionKey` column, and the qualified class name of the grains should appear in the `RowKey` column.
+If everything is working correctly, the grain keys should appear in the `PartitionKey` column, and the qualified class name of the grains should appear in the `RowKey` column.
 
 ## Mixing Things
 
