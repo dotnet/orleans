@@ -351,6 +351,8 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS = new StatisticNameFormat("Streams.PersistentStream.{0}.NumPullingAgents");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumReadMessages");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumSentMessages");
+        public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.PubSubCacheSize");
+        public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.QueueCacheSize");
     }
 }
  

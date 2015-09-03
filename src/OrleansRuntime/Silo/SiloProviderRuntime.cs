@@ -249,20 +249,14 @@ namespace Orleans.Runtime.Providers
 
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
-            StreamQueueBalancerType balancerType,
-            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
-            TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout,
-            TimeSpan maxEventDeliveryTime,
-            TimeSpan streamInactivityPeriod)
+            PersistentStreamProviderConfig config)
         {
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
-                balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper());
+                config.BalancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper());
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubSubType), adapterFactory, queueBalancer,
-                getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime, streamInactivityPeriod);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
