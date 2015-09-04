@@ -34,6 +34,8 @@ namespace Orleans.Streams
 {
     internal class PersistentStreamPullingManager : SystemTarget, IPersistentStreamPullingManager, IStreamQueueBalanceListener
     {
+        private static readonly TimeSpan QUEUES_PRINT_PERIOD = TimeSpan.FromMinutes(5);
+
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
         private readonly string streamProviderName;
         private readonly IStreamProviderRuntime providerRuntime;
@@ -50,6 +52,7 @@ namespace Orleans.Streams
         private readonly IStreamQueueBalancer queueBalancer;
         private readonly IQueueAdapterFactory adapterFactory;
         private PersistentStreamProviderState managerState;
+        private readonly IDisposable queuePrintTimer;
 
         internal PersistentStreamPullingManager(
             GrainId id, 
@@ -94,6 +97,7 @@ namespace Orleans.Streams
             logger.Info((int)ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
+            queuePrintTimer = providerRuntime.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
         }
 
         public Task Initialize(Immutable<IQueueAdapter> qAdapter)
@@ -217,7 +221,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception exc)
                 {
-                    logger.Error((int)ErrorCode.PersistentStreamPullingManager_07, String.Format("Exception while creating PersistentStreamPullingAgent."), exc);
+                    logger.Error((int)ErrorCode.PersistentStreamPullingManager_07, "Exception while creating PersistentStreamPullingAgent.", exc);
                     // What should we do? This error is not recoverable and considered a bug. But we don't want to bring the silo down.
                     // If this is when silo is starting and agent is initializing, fail the silo startup. Otherwise, just swallow to limit impact on other receivers.
                     if (failOnInit) throw;
@@ -314,7 +318,7 @@ namespace Orleans.Streams
                 {
                     case PersistentStreamProviderCommand.StartAgents:
                     case PersistentStreamProviderCommand.StopAgents:
-                        await QueueCommandForExecution((PersistentStreamProviderCommand)command, commandSeqNumber);
+                        await QueueCommandForExecution(command, commandSeqNumber);
                         return null;
                     case PersistentStreamProviderCommand.GetAgentsState:
                         return managerState;
@@ -362,6 +366,26 @@ namespace Orleans.Streams
         private static string PrintQueues(IReadOnlyCollection<QueueId> myQueues)
         {
             return Utils.EnumerableToString(myQueues, q => q.ToStringWithHashCode());
+        }
+
+        // Just print our queue assignment periodicaly, for easy monitoring.
+        private Task AsyncTimerCallback(object state)
+        {
+            if (queuesToAgentsMap.Count > 0)
+            {
+                foreach (var queueId in queuesToAgentsMap.Keys)
+                {
+                    logger.Info((int) ErrorCode.PersistentStreamPullingManager_PeriodicPrint,
+                        "I am responsible for queue {0} on stream provider {1}. Totally responsible for {0} queues.",
+                        queueId, streamProviderName, queuesToAgentsMap.Count);
+                }
+            }
+            else
+            {
+                logger.Info((int)ErrorCode.PersistentStreamPullingManager_PeriodicPrint,
+                  "I am responsible for 0 queues on stream provider {0}.", streamProviderName);
+            }
+            return TaskDone.Done;
         }
     }
 }
