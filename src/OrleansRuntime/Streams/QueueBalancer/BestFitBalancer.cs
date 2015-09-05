@@ -57,6 +57,8 @@ namespace Orleans.Streams
     {
         private readonly Dictionary<TBucket, List<TResource>> idealDistribution;
 
+        public Dictionary<TBucket, List<TResource>> IdealDistribution { get { return idealDistribution; } }
+
         /// <summary>
         /// Constructor.
         /// Initializes an ideal distribution to be used to aid in resource to bucket affinity.
