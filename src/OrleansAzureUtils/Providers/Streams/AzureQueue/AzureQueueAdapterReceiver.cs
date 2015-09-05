@@ -36,7 +36,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// </summary>
     internal class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
-        private readonly AzureQueueDataManager queue;
+        private AzureQueueDataManager queue;
         private long lastReadMessage;
         private Task outstandingTask;
 
@@ -63,24 +63,38 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public Task Initialize(TimeSpan timeout)
         {
-            return queue.InitQueueAsync();
+            if (queue != null) // check in case we already shut it down.
+            {
+                return queue.InitQueueAsync();
+            }
+            return TaskDone.Done;
         }
 
         public async Task Shutdown(TimeSpan timeout)
         {
-            // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
-            if (outstandingTask != null)
-                await outstandingTask;
+            try
+            {
+                // await the last storage operation, so after we shutdown and stop this receiver we don't get async operation completions from pending storage operations.
+                if (outstandingTask != null)
+                    await outstandingTask;
+            }
+            finally
+            {
+                // remember that we shut down so we never try to read from the queue again.
+                queue = null;
+            }
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
+            var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
+            if (queueRef == null) return new List<IBatchContainer>();
             try
             {
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ? 
                     CloudQueueMessage.MaxNumberOfMessagesToPeek : Math.Min(maxCount, CloudQueueMessage.MaxNumberOfMessagesToPeek);
 
-                var task = queue.GetQueueMessages(count);
+                var task = queueRef.GetQueueMessages(count);
                 outstandingTask = task;
                 IEnumerable<CloudQueueMessage> messages = await task;
                 
@@ -90,7 +104,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 if (azureQueueMessages.Count == 0)
                     return azureQueueMessages;
 
-                outstandingTask = Task.WhenAll(messages.Select(queue.DeleteQueueMessage));
+                outstandingTask = Task.WhenAll(messages.Select(queueRef.DeleteQueueMessage));
                 await outstandingTask;
 
                 return azureQueueMessages;
