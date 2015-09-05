@@ -202,13 +202,13 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public string DeploymentId { get; set; }
         /// <summary>
-        /// Connection string for the underlying data provider for liveness & reminders. eg. Azure Storage, ZooKeeper, SQL Server, ect.
+        /// Connection string for the underlying data provider for liveness and reminders. eg. Azure Storage, ZooKeeper, SQL Server, ect.
         /// In order to override this value for reminders set <see cref="DataConnectionStringForReminders"/>
         /// </summary>
         public string DataConnectionString { get; set; }
 
         /// <summary>
-        /// When using ADO, identifies the underlying data provider for liveness & reminders. This three-part naming syntax is also used 
+        /// When using ADO, identifies the underlying data provider for liveness and reminders. This three-part naming syntax is also used 
         /// when creating a new factory and for identifying the provider in an application configuration file so that the provider name, 
         /// along with its associated connection string, can be retrieved at run time. https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx
         /// In order to override this value for reminders set <see cref="AdoInvariantForReminders"/> 
