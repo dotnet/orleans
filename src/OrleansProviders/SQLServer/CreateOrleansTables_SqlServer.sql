@@ -124,11 +124,11 @@ IF(NOT EXISTS(SELECT [Value] FROM [OrleansDatabaseInfo] WHERE Id = N'ProductName
 BEGIN
 	-- These table definitions are SQL Server 2005 and later. The differences are
 	-- the ETag is ROWVersion in SQL Server 2005 and later whereas in SQL Server 2000 UNIQUEIDENTIFIER is used
-	-- and SQL Server 2005 and later use DATETIME2(7) and associated functions whereas SQL Server uses DATETIME.
+	-- and SQL Server 2005 and later use DATETIME2 and associated functions whereas SQL Server uses DATETIME.
 	CREATE TABLE [OrleansMembershipVersionTable]
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME2(7) NOT NULL, 
+		[Timestamp] DATETIME2(3) NOT NULL, 
 		[Version] BIGINT NOT NULL,		
 		[ETag] ROWVERSION NOT NULL,
     
@@ -151,8 +151,8 @@ BEGIN
 		[FaultZone] INT NULL,		
 		[SuspectingSilos] NVARCHAR(MAX) NULL, 
 		[SuspectingTimes] NVARCHAR(MAX) NULL, 
-		[StartTime] DATETIME2(7) NOT NULL, 
-		[IAmAliveTime] DATETIME2(7) NOT NULL,			
+		[StartTime] DATETIME2(3) NOT NULL, 
+		[IAmAliveTime] DATETIME2(3) NOT NULL,			
 		[ETag] ROWVERSION NOT NULL,
     
 		-- A refactoring note: This combination needs to be unique, currently enforced by making it a primary key.
@@ -166,7 +166,7 @@ BEGIN
 		[ServiceId] NVARCHAR(150) NOT NULL, 
 		[GrainId] NVARCHAR(150) NOT NULL, 
 		[ReminderName] NVARCHAR(150) NOT NULL,
-		[StartTime] DATETIME2(7) NOT NULL, 
+		[StartTime] DATETIME2(3) NOT NULL, 
 		[Period] INT NOT NULL,
 		[GrainIdConsistentHash] INT NOT NULL,
 		[ETag] ROWVERSION NOT NULL,
@@ -193,7 +193,7 @@ BEGIN
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
 		[ClientId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME2(7) NOT NULL, 
+		[Timestamp] DATETIME2(3) NOT NULL, 
 		[Address] VARCHAR(45) NOT NULL, 
 		[HostName] NVARCHAR(150) NOT NULL, 
 		[CPU] FLOAT NOT NULL,
@@ -211,7 +211,7 @@ BEGIN
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
 		[SiloId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME2(7) NOT NULL, 
+		[Timestamp] DATETIME2(3) NOT NULL, 
 		[Address] VARCHAR(45) NOT NULL, 
 		[Port] INT NOT NULL, 
 		[Generation] INT NOT NULL, 
