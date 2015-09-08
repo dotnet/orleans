@@ -47,6 +47,12 @@ namespace Orleans.Streams
         Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
 
         /// <summary>
+        /// Release messages from a message queue.
+        /// </summary>
+        /// <returns></returns>
+        Task ReleaseMessagesAsync(IList<IBatchContainer> messages);
+
+        /// <summary>
         /// Receiver is no longer used.  Shutdown and clean up.
         /// </summary>
         /// <returns></returns>
