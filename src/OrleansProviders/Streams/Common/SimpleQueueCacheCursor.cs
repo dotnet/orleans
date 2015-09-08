@@ -82,7 +82,7 @@ namespace Orleans.Providers.Streams.Common
             return current;
         }
 
-        public bool MoveNext()
+        public virtual bool MoveNext()
         {
             IBatchContainer next;
             while (cache.TryGetNextMessage(this, out next))
@@ -95,6 +95,14 @@ namespace Orleans.Providers.Streams.Common
 
             current = next;
             return true;
+        }
+
+        public virtual void Refresh()
+        {
+            if (!IsSet)
+            {
+                cache.InitializeCursor(this, SequenceToken);
+            }
         }
 
         private bool IsInStream(IBatchContainer batchContainer)

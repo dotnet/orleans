@@ -49,5 +49,11 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns></returns>
         bool MoveNext();
+
+        /// <summary>
+        /// Refresh that cache cursor. Called when new data is added into a cache.
+        /// </summary>
+        /// <returns></returns>
+        void Refresh();
     }
 }
