@@ -59,8 +59,8 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Xml" />
-    <Reference Include="ZooKeeperNetEx, Version=3.4.6.1005, Culture=neutral, PublicKeyToken=42cd15de36f9b993, processorArchitecture=MSIL">
-      <HintPath>..\packages\ZooKeeperNetEx.3.4.6.1005\lib\net45\ZooKeeperNetEx.dll</HintPath>
+    <Reference Include="ZooKeeperNetEx, Version=3.4.6.1006, Culture=neutral, PublicKeyToken=42cd15de36f9b993, processorArchitecture=MSIL">
+      <HintPath>..\packages\ZooKeeperNetEx.3.4.6.1006\lib\net45\ZooKeeperNetEx.dll</HintPath>
       <Private>True</Private>
     </Reference>
   </ItemGroup>
