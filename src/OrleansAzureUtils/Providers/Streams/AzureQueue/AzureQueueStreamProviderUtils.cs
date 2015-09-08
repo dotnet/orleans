@@ -21,12 +21,12 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 using Orleans.AzureUtils;
-using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -53,6 +53,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 if (logger != null) logger.Info("About to delete all {0} Stream Queues\n", allQueues.Count);
+                else Console.WriteLine("About to delete all {0} Stream Queues\n", allQueues.Count);
                 foreach (var queueId in allQueues)
                 {
                     var manager = new AzureQueueDataManager(queueId.ToString(), deploymentId, storageConnectionString);

@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 
@@ -98,8 +99,9 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public override string ToString()
         {
-            return string.Format("[AzureQueueBatchContainer:Stream={0},#Items={1}]", StreamGuid, events.Count);
-            //return string.Format("[AzureBatch:#Items={0},Items{1}]", events.Count, Utils.EnumerableToString(events.Select((e, i) => String.Format("{0}-{1}", e, sequenceToken.CreateSequenceTokenForEvent(i)))));
+            //return string.Format("[AzureQueueBatchContainer:Stream={0},#Items={1}]", StreamGuid, events.Count);
+            return string.Format("[AzureBatch:#Items={0},SequenceToken={1},Items:{2}]", 
+                events.Count, SequenceToken, Utils.EnumerableToString(events.Select((e, i) => String.Format("{0}", e))));
         }
     }
 }

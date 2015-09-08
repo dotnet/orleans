@@ -94,7 +94,7 @@ namespace Orleans.Streams
             // 2) All consumer for that stream are currently inactive (that is, all cursors are inactive) - 
             //    meaning there is nothing for those consumers in the adapter cache.
             if (now - lastActivityTime < inactivityPeriod) return false;
-            return !queueData.Values.Any(data => data.State.Equals(StreamConsumerDataState.Active));
+            return !queueData.Values.Any(data => data.IsActive);
         }
     }
 }

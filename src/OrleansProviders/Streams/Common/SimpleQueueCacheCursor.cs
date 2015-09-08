@@ -43,7 +43,7 @@ namespace Orleans.Providers.Streams.Common
         internal LinkedListNode<SimpleQueueCacheItem> Element { get; private set; }
         internal StreamSequenceToken SequenceToken { get; private set; }
 
-        internal bool IsSet
+        public bool IsSet
         {
             get { return Element != null; }
         }

@@ -276,17 +276,20 @@ namespace Orleans.Streams
 
             data.LastToken = requestedToken;
 
+            bool startCursor = false;
             // if we have a new cursor, use it
             if (newCursor != null)
             {
                 data.Cursor = newCursor;
+                startCursor = true;
             } // else if we don't yet have a cursor, get a cursor at the end of the cash (null sequence token).
             else if (data.Cursor == null && queueCache != null)
             {
                 data.Cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, null);
+                startCursor = true;
             }
 
-            if (data.State == StreamConsumerDataState.Inactive)
+            if (startCursor)
                 RunConsumerCursor(data, filter).Ignore(); // Start delivering events if not actively doing so
         }
 
@@ -383,6 +386,7 @@ namespace Orleans.Streams
             var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, config.StreamInactivityPeriod))
                          .Select(pair => pair.Key)
                          .ToList();
+            if (logger.IsVerbose) logger.Verbose("CleanupPubSubCache: about to cleanup {0} entries", toRemove.Count);
             toRemove.ForEach(key => pubSubCache.Remove(key));
         }
 
@@ -411,7 +415,7 @@ namespace Orleans.Streams
             // if stream is already registered, just wake inactive consumers
             // get list of inactive consumers
             var inactiveStreamConsumers = streamData.AllConsumers()
-                .Where(consumer => consumer.State == StreamConsumerDataState.Inactive)
+                .Where(consumer => !consumer.IsActive)
                 .ToList();
 
             // for each inactive stream
@@ -423,11 +427,7 @@ namespace Orleans.Streams
         {
             try
             {
-                // double check in case of interleaving
-                if (consumerData.State == StreamConsumerDataState.Active ||
-                    consumerData.Cursor == null) return;
-                
-                consumerData.State = StreamConsumerDataState.Active;
+                if (logger.IsVerbose) logger.Verbose("RunConsumerCursor: consumerData={0}.", consumerData);
                 while (consumerData.Cursor != null && consumerData.Cursor.MoveNext())
                 {
                     IBatchContainer batch = null;
@@ -523,7 +523,7 @@ namespace Orleans.Streams
                         }
                     }
                 }
-                consumerData.State = StreamConsumerDataState.Inactive;
+                if (logger.IsVerbose) logger.Verbose("Ended RunConsumerCursor: consumerData={0}. Setting StreamConsumerDataState to Inactive.", consumerData);
             }
             catch (Exception exc)
             {
