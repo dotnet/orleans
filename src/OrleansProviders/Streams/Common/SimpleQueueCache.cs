@@ -99,6 +99,48 @@ namespace Orleans.Providers.Streams.Common
             return numCursorsInLastBucket > 0;
         }
 
+
+        public virtual bool TryRelease(out IList<IBatchContainer> itemsToRelease)
+        {
+            itemsToRelease = null;
+            if (cachedMessages.Count == 0) return false; // empty cache
+            if (cacheCursorHistogram.Count == 0) return false;  // no cursors yet - zero consumers basically yet.
+            if (cacheCursorHistogram[0].NumCurrentCursors > 0) return false; // consumers are still active in the oldest bucket - fast path
+
+            var allItems = new List<IBatchContainer>();
+            while (cacheCursorHistogram.Count > 0 && cacheCursorHistogram[0].NumCurrentCursors == 0)
+            {
+                List<IBatchContainer> items = DrainBucket(cacheCursorHistogram[0]);
+                allItems.AddRange(items);
+                cacheCursorHistogram.RemoveAt(0); // remove the last bucket
+            }
+            itemsToRelease = allItems;
+            return true;
+        }
+
+        private List<IBatchContainer> DrainBucket(CacheBucket bucket)
+        {
+            var itemsToRelease = new List<IBatchContainer>(bucket.NumCurrentItems);
+            // walk all items in the cache starting from last
+            // and remove from the cache the oness that reside in the given bucket until we jump to a next bucket
+            while (bucket.NumCurrentItems > 0)
+            {
+                SimpleQueueCacheItem item = cachedMessages.Last.Value;
+                if (item.CacheBucket.Equals(bucket))
+                {
+                    itemsToRelease.Add(item.Batch);
+                    bucket.UpdateNumItems(-1);
+                    cachedMessages.RemoveLast();
+                }
+                else
+                {
+                    // this item already points into the next bucket, so stop.
+                    break;
+                }
+            }
+            return itemsToRelease;
+        }
+
         public virtual void AddToCache(IList<IBatchContainer> msgs)
         {
             if (msgs == null) throw new ArgumentNullException("msgs");

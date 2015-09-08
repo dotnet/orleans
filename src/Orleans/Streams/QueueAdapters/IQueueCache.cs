@@ -50,6 +50,12 @@ namespace Orleans.Streams
         void AddToCache(IList<IBatchContainer> messages);
 
         /// <summary>
+        /// Ask the cache if it has items that can be release from them underlying queue.
+        /// </summary>
+        /// <param name="messages"></param>
+        bool TryRelease(out IList<IBatchContainer> itemsToRelease);
+
+        /// <summary>
         /// Acquire a stream message cursor.  This can be used to retreave messages from the
         ///   cache starting at the location indicated by the provided token.
         /// </summary>

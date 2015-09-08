@@ -330,6 +330,15 @@ namespace Orleans.Streams
                         CleanupPubSubCache(now);
                     }
 
+                    if (queueCache != null)
+                    {
+                        IList<IBatchContainer> itemsToRelease;
+                        if (queueCache.TryRelease(out itemsToRelease))
+                        {
+                            await rcvr.ReleaseMessagesAsync(itemsToRelease);
+                        }
+                    }
+
                     if (queueCache != null && queueCache.IsUnderPressure())
                     {
                         // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
