@@ -46,12 +46,17 @@ namespace Orleans.Runtime.Storage.Relational
             const string OrleansQueries = @"SELECT QueryKey, QueryText FROM OrleansQuery;";
             AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameSqlServer, QueryKeys.OrleansQueriesKey, OrleansQueries);
             AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameOracleDatabase, QueryKeys.OrleansQueriesKey, OrleansQueries);
+            AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameMySql, QueryKeys.OrleansQueriesKey, OrleansQueries);
 
             //These are vendor specific constants that are likely never to change. This is the place to add them so that
             //they are readily available when needed.
             AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameSqlServer, RelationalVendorConstants.StartEscapeIndicatorKey, "[");
             AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameSqlServer, RelationalVendorConstants.StartEscapeIndicatorKey, "]");
             AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameSqlServer, RelationalVendorConstants.ParameterIndicatorKey, "@");
+
+            AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameMySql, RelationalVendorConstants.StartEscapeIndicatorKey, "`");
+            AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameMySql, RelationalVendorConstants.StartEscapeIndicatorKey, "`");
+            AddOrModifyQueryConstant(AdoNetInvariants.InvariantNameMySql, RelationalVendorConstants.ParameterIndicatorKey, "@");
         }
 
 
