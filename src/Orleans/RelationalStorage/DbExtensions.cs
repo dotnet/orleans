@@ -72,10 +72,9 @@ namespace Orleans.Runtime.Storage.Relational
             { typeof(char?),    DbType.StringFixedLength },
             { typeof(Guid),     DbType.Guid },
             { typeof(Guid?),    DbType.Guid },
-            //It looks like DbType.DateTime2 works to both DATETIME and DATETIME2(7).
-            //Though there might be a hitch here, see at http://stackoverflow.com/questions/27596899/ado-net-datetime-sql-parameter-lose-accuracy.
-            { typeof(DateTime),     DbType.DateTime2 },
-            { typeof(DateTime?),    DbType.DateTime2 },
+            //Using DateTime for cross DB compatibility. The underlying DB table column type can be DateTime or DateTime2
+            { typeof(DateTime),     DbType.DateTime },
+            { typeof(DateTime?),    DbType.DateTime },
             { typeof(TimeSpan),     DbType.Time },
             { typeof(byte[]),       DbType.Binary },
             { typeof(TimeSpan?),        DbType.Time },

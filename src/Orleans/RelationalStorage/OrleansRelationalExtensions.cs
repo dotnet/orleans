@@ -1225,7 +1225,7 @@ namespace Orleans.Runtime.Storage.Relational
             var parameter = command.CreateParameter();
             parameter.ParameterName = "startTime";
             parameter.Value = EnsureSqlMinValue(startTime);
-            parameter.DbType = DbType.DateTime2;
+            parameter.DbType = DbType.DateTime;//Using DateTime for cross DB compatibility. The underlying DB table column type can be DateTime or DateTime2
             parameter.Direction = direction;
 
             return parameter;
@@ -1261,7 +1261,7 @@ namespace Orleans.Runtime.Storage.Relational
             var parameter = command.CreateParameter();
             parameter.ParameterName = "iAmAliveTime";
             parameter.Value = EnsureSqlMinValue(iAmAlive);
-            parameter.DbType = DbType.DateTime2;
+            parameter.DbType = DbType.DateTime;//Using DateTime for cross DB compatibility. The underlying DB table column type can be DateTime or DateTime2
             parameter.Direction = direction;
 
             return parameter;
