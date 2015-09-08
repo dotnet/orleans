@@ -39,7 +39,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private IInternalStreamProvider                         provider;
         [NonSerialized]
-        private volatile IAsyncBatchObserver<T>                 producerInterface;
+        private volatile IInternalAsyncBatchObserver<T>         producerInterface;
         [NonSerialized]
         private IInternalAsyncObservable<T>                     consumerInterface;
         [NonSerialized]
@@ -85,16 +85,20 @@ namespace Orleans.Streams
             return GetConsumerInterface().SubscribeAsync(observer, token, filterFunc, filterData);
         }
 
-        public async Task Cleanup()
+        public async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
         {
             // Cleanup producers
-            if (producerInterface != null)
+            if (cleanupProducers && producerInterface != null)
             {
-                var producer = producerInterface as IStreamControl;
-                if (producer != null)
-                    await producer.Cleanup();
-                
+                await producerInterface.Cleanup();
                 producerInterface = null;
+            }
+
+            // Cleanup consumers
+            if (cleanupConsumers && consumerInterface != null)
+            {
+                await consumerInterface.Cleanup();
+                consumerInterface = null;
             }
         }
 

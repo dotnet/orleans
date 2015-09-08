@@ -142,8 +142,16 @@ namespace Orleans.Runtime
                         throw new OrleansException(str, ex);
                     }
 
-                    logger.Warn(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                        String.Format("Intermediate warning for NonExistentActivation from Catalog.GetOrCreateActivation for message {0}", message), ex);
+                    if (nea.IsStatelessWorker)
+                    {
+                        if (logger.IsVerbose) logger.Verbose(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                           String.Format("Intermediate warning for StatelessWorker NonExistentActivation from Catalog.GetOrCreateActivation for message {0}", message), ex);
+                    }
+                    else
+                    {
+                        logger.Warn(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                            String.Format("Intermediate warning for NonExistentActivation from Catalog.GetOrCreateActivation for message {0}", message), ex);
+                    }
 
                     ActivationAddress nonExistentActivation = nea.NonExistentActivation;
 

@@ -66,6 +66,8 @@ namespace UnitTests.Grains
         private int numProducedItems;
         private IDisposable producerTimer;
         internal Logger logger;
+        internal readonly static string RequestContextKey = "RequestContextField";
+        internal readonly static string RequestContextValue = "JustAString";
 
         public override Task OnActivateAsync()
         {
@@ -100,7 +102,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberProduced()
         {
-            logger.Info("GetNumberProduced");
+            logger.Info("GetNumberProduced {0}", numProducedItems);
             return Task.FromResult(numProducedItems);
         }
 
@@ -124,6 +126,7 @@ namespace UnitTests.Grains
         {
             numProducedItems++;
             logger.Info("{0} (item={1})", caller, numProducedItems);
+            RequestContext.Set(RequestContextKey, RequestContextValue);
             return producer.OnNextAsync(numProducedItems);
         }
 

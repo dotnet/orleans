@@ -5,7 +5,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <Platform>AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</ProjectGuid>
@@ -15,7 +15,6 @@
     <AssemblyName>Orleans</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <PlatformTarget>x86</PlatformTarget>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
@@ -102,7 +101,11 @@
     <Compile Include="Messaging\IncomingMessageBuffer.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
+    <Compile Include="Providers\IControllable.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
+    <Compile Include="RelationalStorage\AdoNetInvariants.cs" />
+    <Compile Include="RelationalStorage\QueryConstantsBag.cs" />
+    <Compile Include="RelationalStorage\RelationalVendorConstants.cs" />
     <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
@@ -121,13 +124,14 @@
     <Compile Include="RelationalStorage\DictionaryExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorage.cs" />
     <Compile Include="RelationalStorage\IRelationalStorage.cs" />
-    <Compile Include="RelationalStorage\OrleansRelationalConstants.cs" />
+    <Compile Include="RelationalStorage\QueryKeys.cs" />
     <Compile Include="RelationalStorage\OrleansRelationalExtensions.cs" />
-    <Compile Include="RelationalStorage\RelationalConstants.cs" />
     <Compile Include="RelationalStorage\RelationalManagementExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorageExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorageUtilities.cs" />
     <Compile Include="RelationalStorage\SqlFormatProvider.cs" />
+    <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
+    <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />
@@ -182,7 +186,7 @@
     <Compile Include="Streams\Predicates\OrFilter.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamSubscriberTable.cs" />
     <Compile Include="Streams\PubSub\PubSubPublisherState.cs" />
-    <Compile Include="Streams\PubSub\PubSubRuntime.cs" />
+    <Compile Include="Streams\PubSub\GrainBasedPubSubRuntime.cs" />
     <Compile Include="Providers\IBootstrapProvider.cs" />
     <Compile Include="Providers\ClientProviderRuntime.cs" />
     <Compile Include="Providers\IOrleansProvider.cs" />

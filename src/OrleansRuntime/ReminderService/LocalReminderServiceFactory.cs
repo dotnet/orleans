@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             var reminderServiceType = silo.GlobalConfig.ReminderServiceType;
             logger.Info("Creating reminder system target for type={0}", Enum.GetName(typeof(GlobalConfiguration.ReminderServiceProviderType), reminderServiceType));
 
-            ReminderTable.Initialize(silo, grainFactory);
+            ReminderTable.Initialize(silo, grainFactory, silo.GlobalConfig.ReminderTableAssembly);
             return new LocalReminderService(
                 silo.SiloAddress, 
                 Constants.ReminderServiceId, 

@@ -1013,6 +1013,8 @@ namespace Orleans
         PersistentStreamPullingAgent_22 = PersistentStreamPullingAgentBase + 22,
         PersistentStreamPullingAgent_23 = PersistentStreamPullingAgentBase + 23,
         PersistentStreamPullingAgent_24 = PersistentStreamPullingAgentBase + 24,
+        PersistentStreamPullingAgent_25 = PersistentStreamPullingAgentBase + 25,
+        PersistentStreamPullingAgent_26 = PersistentStreamPullingAgentBase + 26,
 
         StreamProviderManagerBase = Runtime +3400,
         StreamProvider_FailedToDispose              = StreamProviderManagerBase + 1,
@@ -1022,6 +1024,7 @@ namespace Orleans
         Stream_ExtensionNotInstalled                = StreamProviderManagerBase + 5,
         Stream_ProducerIsDead                       = StreamProviderManagerBase + 6,
         StreamProvider_NoStreamForBatch             = StreamProviderManagerBase + 7,
+        StreamProvider_ConsumerFailedToUnregister   = StreamProviderManagerBase + 8,
 
         PersistentStreamPullingManagerBase = Runtime + 3500,
         PersistentStreamPullingManager_01 = PersistentStreamPullingManagerBase + 1,
@@ -1036,9 +1039,18 @@ namespace Orleans
         PersistentStreamPullingManager_10 = PersistentStreamPullingManagerBase + 10,
         PersistentStreamPullingManager_11 = PersistentStreamPullingManagerBase + 11,
         PersistentStreamPullingManager_12 = PersistentStreamPullingManagerBase + 12,
+        PersistentStreamPullingManager_13 = PersistentStreamPullingManagerBase + 13,
+        PersistentStreamPullingManager_14 = PersistentStreamPullingManagerBase + 14,
+        PersistentStreamPullingManager_15 = PersistentStreamPullingManagerBase + 15,
+        PersistentStreamPullingManager_16 = PersistentStreamPullingManagerBase + 16,
+        PersistentStreamPullingManager_Starting         = PersistentStreamPullingManagerBase + 17,
+        PersistentStreamPullingManager_Stopping         = PersistentStreamPullingManagerBase + 18,
+        PersistentStreamPullingManager_Started          = PersistentStreamPullingManagerBase + 19,
+        PersistentStreamPullingManager_Stopped          = PersistentStreamPullingManagerBase + 20,
+        PersistentStreamPullingManager_AlreadyStarted   = PersistentStreamPullingManagerBase + 21,
+        PersistentStreamPullingManager_AlreadyStopped   = PersistentStreamPullingManagerBase + 22,
+        PersistentStreamPullingManager_PeriodicPrint    = PersistentStreamPullingManagerBase + 23,
 
-        StreamProviderBase = Runtime + 3600,
-        StreamProvider_FailedToUnsubscribeFromPubSub = StreamProviderBase + 1,
 
         AzureServiceRuntimeWrapper = Runtime + 3700,
         AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper +1,

@@ -326,12 +326,13 @@ namespace Orleans.Runtime.Host
                 logger = traceLogger;
             }
 
-            public override void process(WatchedEvent @event)
+            public override Task process(WatchedEvent @event)
             {
                 if (logger.IsVerbose)
                 {
                     logger.Verbose(@event.ToString());
                 }
+                return TaskDone.Done;
             }
         }
     }

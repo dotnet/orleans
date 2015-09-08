@@ -22,98 +22,156 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
     [Serializable]
-    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IAsyncObserver<T>, IStreamFilterPredicateWrapper
+    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
+        private StreamImpl<T> streamImpl;
+        private readonly IStreamFilterPredicateWrapper filterWrapper;
+        private readonly GuidId subscriptionId;
+
         [NonSerialized]
         private IAsyncObserver<T> observer;
-        private readonly StreamImpl<T> streamImpl;
-        private readonly IStreamFilterPredicateWrapper filterWrapper;
+        [NonSerialized]
+        private StreamSequenceToken expectedToken;
 
-        internal StreamId StreamId { get { return streamImpl.StreamId; } }
-        public object FilterData { get { return filterWrapper != null ? filterWrapper.FilterData : null; } }
+        internal bool IsValid { get { return streamImpl != null; } }
+        internal GuidId SubscriptionId { get { return subscriptionId; } }
+
+
         public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
+        public override Guid HandleId { get { return subscriptionId.Guid; } }
 
-        public GuidId SubscriptionId { get; protected set; }
-        public bool IsValid { get; private set; }
-
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> stream)
-            : this(subscriptionId, null, stream, null)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
+            : this(subscriptionId, null, streamImpl, null, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
         {
             if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
-            if (stream == null) throw new ArgumentNullException("stream");
+            if (streamImpl == null) throw new ArgumentNullException("streamImpl");
 
-            IsValid = true;
+            this.subscriptionId = subscriptionId;
             this.observer = observer;
-            streamImpl = stream;
-            this.SubscriptionId = subscriptionId;
+            this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
+            expectedToken = token;
         }
 
         public void Invalidate()
         {
-            IsValid = false;
+            streamImpl = null;
+            observer = null;
+        }
+
+        public StreamSequenceToken GetSequenceToken()
+        {
+            return expectedToken;
         }
 
         public override Task UnsubscribeAsync()
         {
-            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid.  It has been used to unsubscribe or resume.");
+            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
             return streamImpl.UnsubscribeAsync(this);
         }
 
         public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> obs, StreamSequenceToken token = null)
         {
-            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid.  It has been used to unsubscribe or resume.");
+            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        #region IAsyncObserver methods
-        public Task OnNextAsync(T item, StreamSequenceToken token)
+        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch, StreamSequenceToken prevToken)
         {
-            // This method could potentially be invoked after Dispose() has been called, 
-            // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
-            if (observer == null)
-                return TaskDone.Done;
+            if (expectedToken != null)
+            {
+                if (!expectedToken.Equals(prevToken))
+                    return expectedToken;
+            }
 
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, FilterData, item))
-                return TaskDone.Done;
+            foreach (var itemTuple in batch.GetEvents<T>())
+            {
+                await NextItem(itemTuple.Item1, itemTuple.Item2);
+            }
 
-            return observer.OnNextAsync(item, token);
+            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
+            if (expectedToken != null)
+            {
+                if (!expectedToken.Equals(prevToken))
+                    return expectedToken;
+            }
+
+            expectedToken = batch.SequenceToken;
+
+            return null;
         }
 
-        public Task OnCompletedAsync()
+        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken prevToken)
+        {
+            if (expectedToken != null)
+            {
+                if (!expectedToken.Equals(prevToken))
+                    return expectedToken;
+            }
+
+            await NextItem(item, currentToken);
+
+            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
+            if (expectedToken != null)
+            {
+                if (!expectedToken.Equals(prevToken))
+                    return expectedToken;
+            }
+
+            expectedToken = currentToken;
+
+            return null;
+        }
+
+
+        private Task NextItem(object item, StreamSequenceToken token)
+        {
+            T typedItem;
+            try
+            {
+                typedItem = (T)item;
+            }
+            catch (InvalidCastException)
+            {
+                // We got an illegal item on the stream -- close it with a Cast exception
+                throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
+            }
+
+            // This method could potentially be invoked after Dispose() has been called, 
+            // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
+            if (observer == null || !IsValid)
+                return TaskDone.Done;
+
+            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
+                return TaskDone.Done;
+
+            return observer.OnNextAsync(typedItem, token);
+        }
+
+        public Task CompleteStream()
         {
             return observer == null ? TaskDone.Done : observer.OnCompletedAsync();
         }
 
-        public Task OnErrorAsync(Exception ex)
+        public Task ErrorInStream(Exception ex)
         {
             return observer == null ? TaskDone.Done : observer.OnErrorAsync(ex);
         }
 
-        internal void Clear()
+        internal bool SameStreamId(StreamId streamId)
         {
-            observer = null;
+            return IsValid && streamImpl.StreamId.Equals(streamId);
         }
-        #endregion
-
-        #region IStreamFilterPredicateWrapper methods
-        public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
-        {
-            return filterWrapper == null || filterWrapper.ShouldReceive(stream, filterData, item);
-        }
-
-        #endregion
 
         #region IEquatable<StreamId> Members
 
@@ -137,7 +195,7 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return String.Format("StreamSubscriptionHandleImpl:Stream={0},Subscription={1}", StreamIdentity, SubscriptionId);
+            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.StreamId.ToString() : "null", HandleId);
         }
     }
 }

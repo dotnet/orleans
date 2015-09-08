@@ -3,7 +3,7 @@
   <Import Project="$(SolutionDir)packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.props" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.Templates.Interfaces.1.0.9\build\Microsoft.Orleans.Templates.Interfaces.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Platform>AnyCPU</Platform>
     <ProductVersion>
     </ProductVersion>
     <SchemaVersion>

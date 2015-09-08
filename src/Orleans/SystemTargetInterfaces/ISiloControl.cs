@@ -48,5 +48,7 @@ namespace Orleans
         Task UpdateConfiguration(string configuration);
 
         Task<int> GetActivationCount();
+
+        Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg);
     }
 }

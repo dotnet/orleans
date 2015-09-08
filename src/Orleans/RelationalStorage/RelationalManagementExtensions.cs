@@ -21,20 +21,82 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Orleans.Runtime.Storage.Relational;
+using System;
+using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Transactions;
 
 
-namespace Orleans.Runtime.Storage.Management
+namespace Orleans.Runtime.Storage.Relational.Management
 {
     /// <summary>
     /// Contains some relational database management extension methods.
     /// </summary>
     public static class RelationalManagementExtensions
     {
+        /// <summary>
+        /// Seeks for database provider factory classes from GAC or as indicated by
+        /// the configuration file, see at <see href="https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx">Obtaining a DbProviderFactory</see>.
+        /// </summary>
+        /// <returns>Database constants with values from <see cref="DbProviderFactories"/>.</returns>
+        /// <remarks>Every call may potentially update data as it is refreshed from <see cref="DbProviderFactories"/>.</remarks>
+        public static QueryConstantsBag GetAdoNetFactoryData()
+        {
+            var queryBag = new QueryConstantsBag();
+
+            //This method seeks for factory classes either from the GAC or as indicated in a config file.            
+            var factoryData = DbProviderFactories.GetFactoryClasses();
+
+            //The provided default information will be loaded from here to the factory constants
+            //which are further augmented with predefined query templates.
+            foreach(DataRow row in factoryData.Rows)
+            {
+                var invariantName = row[AdoNetInvariants.InvariantNameKey].ToString();
+                queryBag.AddOrModifyQueryConstant(invariantName, AdoNetInvariants.InvariantNameKey, invariantName);
+                queryBag.AddOrModifyQueryConstant(invariantName, AdoNetInvariants.NameKey, row[AdoNetInvariants.NameKey].ToString());
+                queryBag.AddOrModifyQueryConstant(invariantName, AdoNetInvariants.DescriptionKey, row[AdoNetInvariants.DescriptionKey].ToString());
+                queryBag.AddOrModifyQueryConstant(invariantName, AdoNetInvariants.AssemblyQualifiedNameKey, row[AdoNetInvariants.AssemblyQualifiedNameKey].ToString());
+            }
+
+            return queryBag;
+        }
+
+
+        /// <summary>
+        /// Initializes Orleans queries from the database. Orleans uses only these queries and the variables therein, nothing more.
+        /// </summary>
+        /// <param name="storage">The storage to use.</param>
+        /// <returns>Orleans queries have been loaded to silo or client memory.</returns>
+        /// <remarks>This is public only to be usable to the statistics providers. Not intended for public use otherwise.</remarks>
+        public static async Task<QueryConstantsBag> InitializeOrleansQueriesAsync(this IRelationalStorage storage)
+        {
+            var queryConstants = new QueryConstantsBag();            
+            var query = queryConstants.GetConstant(storage.InvariantName, QueryKeys.OrleansQueriesKey);
+            var orleansQueries = await storage.ReadAsync(query, _ => { }, (selector, _) =>
+            {
+                return Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText"));
+            }).ConfigureAwait(continueOnCapturedContext: false);
+
+            //The queries need to be added to be used later with a given key.
+            foreach(var orleansQuery in orleansQueries)
+            {
+                queryConstants.AddOrModifyQueryConstant(storage.InvariantName, orleansQuery.Item1, orleansQuery.Item2);
+            }
+
+            //Check that all the required keys are loaded and throw an exception giving the keys expected but not loaded.
+            var loadedQueriesKeys = queryConstants.GetAllConstants(storage.InvariantName).Keys;
+            var missingQueryKeys = QueryKeys.Keys.Except(loadedQueriesKeys);
+            if(missingQueryKeys.Any())
+            {
+                throw new ArgumentException(string.Format("Not all required queries found when loading from the database. Missing are: {0}", string.Join(",", missingQueryKeys)));
+            }
+
+            return await Task.FromResult(queryConstants);
+        }
+
+
         /// <summary>
         /// Creates a transaction scope in which the storage operates.
         /// </summary>
@@ -48,7 +110,7 @@ namespace Orleans.Runtime.Storage.Management
             //The timeout is regardless of what has been set on the command object itself and
             //the query would be rolled back in the end. These defaults are more usable and
             //can be customized per database.            
-            var transactionOptions = new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted, Timeout = TransactionManager.MaximumTimeout };
+            var transactionOptions = new TransactionOptions { IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted, Timeout = TransactionManager.MaximumTimeout };
             return new TransactionScope(TransactionScopeOption.Required, transactionOptions);
         }
 
@@ -64,7 +126,7 @@ namespace Orleans.Runtime.Storage.Management
             string databaseKey = string.Empty;
             switch(storage.InvariantName)
             {
-                case(WellKnownRelationalInvariants.SqlServer):
+                case(AdoNetInvariants.InvariantNameSqlServer):
                 {
                     databaseKey = "Database";
                     break;
@@ -81,65 +143,6 @@ namespace Orleans.Runtime.Storage.Management
             csb[databaseKey] = newDatabaseName;
 
             return RelationalStorage.CreateInstance(storage.InvariantName, csb.ConnectionString);
-        }
-
-
-        /// <summary>
-        /// Checks the existence of a database using the given <see paramref="storage"/> storage object.
-        /// </summary>
-        /// <param name="storage">The storage to use.</param>
-        /// <param name="databaseName">The name of the database existence of which to check.</param>
-        /// <returns><em>TRUE</em> if the given database exists. <em>FALSE</em> otherwise.</returns>
-        public static async Task<bool> ExistsDatabaseAsync(this IRelationalStorage storage, string databaseName)
-        {
-            var existsTemplate = RelationalConstants.GetConstant(storage.InvariantName, RelationalConstants.ExistsDatabaseKey);
-            var ret = await storage.ReadAsync(string.Format(existsTemplate, databaseName), command =>
-            {
-                var p = command.CreateParameter();
-                p.ParameterName = "databaseName";
-                p.Value = databaseName;
-                command.Parameters.Add(p);
-            }, (selector, resultSetCount) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
-
-            return ret.First();
-        }
-
-
-        /// <summary>
-        /// Creates a database with a given name.
-        /// </summary>
-        /// <param name="storage">The storage to use.</param>
-        /// <param name="databaseName">The name of the database to create.</param>
-        /// <returns>The call will be succesful if the DDL query is succseful. Otherwisen an exception will be thrown.</returns>
-        public static async Task CreateDatabaseAsync(this IRelationalStorage storage, string databaseName)
-        {
-            var creationTemplate = RelationalConstants.GetConstant(storage.InvariantName, RelationalConstants.CreateDatabaseKey);
-            await storage.ExecuteAsync(string.Format(creationTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
-        }
-
-
-        /// <summary>
-        /// Drops a database with a given name.
-        /// </summary>
-        /// <param name="storage">The storage to use.</param>
-        /// <param name="databaseName">The name of the database to drop.</param>
-        /// <returns>The call will be succesful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        public static async Task DropDatabaseAsync(this IRelationalStorage storage, string databaseName)
-        {
-            var dropTemplate = RelationalConstants.GetConstant(storage.InvariantName, RelationalConstants.DropDatabaseKey);
-            await storage.ExecuteAsync(string.Format(dropTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
-        }
-
-
-        /// <summary>
-        /// Deletes all data from Orleans database tables.
-        /// </summary>
-        /// <param name="storage">The storage to use.</param>        
-        /// <returns>The call will be succesful if the DDL query is successful. Otherwise an exception will be thrown.</returns>               
-        public static async Task DeleteAllDataAsync(this IRelationalStorage storage)
-        {
-            var deleteAllTemplate = RelationalConstants.GetConstant(storage.InvariantName, RelationalConstants.DeleteAllDataKey);
-            await storage.ExecuteAsync(deleteAllTemplate, command => { }).ConfigureAwait(continueOnCapturedContext: false);
         }
     }
 }

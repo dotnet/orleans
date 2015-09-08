@@ -56,8 +56,6 @@ namespace UnitTests.MembershipTests
             TraceLogger.Initialize(new NodeConfiguration());        
         }
 
-        // Use TestInitialize to run code before running each test 
-        [TestInitialize]
         private async Task Initialize()
         {
             deploymentId = "test-" + Guid.NewGuid();
@@ -72,7 +70,7 @@ namespace UnitTests.MembershipTests
                 DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString()
             };
 
-            var mbr = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>("OrleansZooKeeperUtils.dll", logger);
+            var mbr = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
             await mbr.InitializeMembershipTable(config, true, logger).WithTimeout(timeout);
             membership = mbr;
         }

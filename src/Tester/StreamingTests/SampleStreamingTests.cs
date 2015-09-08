@@ -34,6 +34,7 @@ using UnitTests.Tester;
 namespace UnitTests.StreamingTests
 {
     [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
+    [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class SampleStreamingTests : UnitTestSiloHost
@@ -51,6 +52,10 @@ namespace UnitTests.StreamingTests
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+            },
+            new TestingClientOptions()
+            {
+                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
             })
         {
         }
@@ -115,6 +120,30 @@ namespace UnitTests.StreamingTests
             streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task MultipleImplicitSubscriptionTest()
+        {
+            logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");
+            streamId = Guid.NewGuid();
+            const int nRedEvents = 5, nBlueEvents = 3;
+
+            var provider = GrainClient.GetStreamProvider(SMS_STREAM_PROVIDER_NAME);
+            var redStream = provider.GetStream<int>(streamId, "red");
+            var blueStream = provider.GetStream<int>(streamId, "blue");
+
+            for (int i = 0; i < nRedEvents; i++)
+                await redStream.OnNextAsync(i);
+            for (int i = 0; i < nBlueEvents; i++)
+                await blueStream.OnNextAsync(i);
+
+            var grain = GrainClient.GrainFactory.GetGrain<IMultipleImplicitSubscriptionGrain>(streamId);
+            var counters = await grain.GetCounters();
+
+            Assert.AreEqual(nRedEvents, counters.Item1);
+            Assert.AreEqual(nBlueEvents, counters.Item2);
+        }
+
 
         private async Task StreamingTests_Consumer_Producer(Guid streamId, string streamProvider)
         {

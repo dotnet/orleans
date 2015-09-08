@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Platform>AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{3972213F-189B-41D4-90FE-38D513C1106D}</ProjectGuid>
@@ -47,11 +47,14 @@
   <ItemGroup>
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGenericInterfaces.cs" />
+    <Compile Include="IInitialStateGrain.cs" />
+    <Compile Include="IMultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyIGrains.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="CodegenTestInterfaces.cs" />
+    <Compile Include="IStatelessWorkerGrain.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />
     <Compile Include="ISimpleGrain.cs" />

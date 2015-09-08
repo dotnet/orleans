@@ -63,7 +63,8 @@ namespace Orleans.TestingHost.Extensions
         {
             if (String.IsNullOrEmpty(@value)) return;
 
-            var providerConfigs = providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME))
+            var providerConfigs = providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME) ||
+                                                                    kv.Key.Equals(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
                                                         .Select(kv => kv.Value)
                                                         .SelectMany(catagory => catagory.Providers.Values);
             foreach (IProviderConfiguration providerConfig in providerConfigs)

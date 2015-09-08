@@ -23,7 +23,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 
 namespace Orleans.Runtime.Storage.Relational
@@ -43,18 +42,7 @@ namespace Orleans.Runtime.Storage.Relational
             return sqlScript.Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries);
         }
 
-
-        /// <summary>
-        /// Creates and instance of SQL Server storage.
-        /// </summary>
-        /// <returns>A <see cref="IRelationalStorage"/> with <see cref="IRelationalStorage.InvariantName"/> of <see cref="WellKnownRelationalInvariants.SqlServer"/>.</returns>
-        public static IRelationalStorage CreateDefaultSqlServerStorageInstance()
-        {
-            var sqlServer = RelationalConstants.GetRelationalConstants().First(i => i.InvariantName == WellKnownRelationalInvariants.SqlServer);
-            return CreateGenericStorageInstance(sqlServer.InvariantName, sqlServer.DefaultConnectionString);
-        }
-
-
+        
         /// <summary>
         /// Creates an instance of a database of type <see cref="IRelationalStorage"/>.
         /// </summary>

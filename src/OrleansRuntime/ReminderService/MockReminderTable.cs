@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -36,7 +37,7 @@ namespace Orleans.Runtime.ReminderService
             this.delay = delay;
         }
 
-        public Task Init(Guid serviceId, string deploymentId, string connectionString)
+        public Task Init(GlobalConfiguration config,TraceLogger logger)
         {
             return TaskDone.Done;
         }

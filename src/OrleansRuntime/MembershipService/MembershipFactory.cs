@@ -58,7 +58,7 @@ namespace Orleans.Runtime.MembershipService
             return new MembershipOracle(silo, membershipTable);
         }
 
-        internal IMembershipTable GetMembershipTable(GlobalConfiguration.LivenessProviderType livenessType)
+        internal IMembershipTable GetMembershipTable(GlobalConfiguration.LivenessProviderType livenessType, string membershipTableAssembly = null)
         {
             IMembershipTable membershipTable;
             if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
@@ -77,6 +77,10 @@ namespace Orleans.Runtime.MembershipService
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.ZooKeeper))
             {
                 membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
+            }
+            else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.Custom))
+            {
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(membershipTableAssembly, logger);
             }
             else
             {

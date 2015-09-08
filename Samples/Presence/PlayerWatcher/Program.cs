@@ -22,11 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Orleans;
 using Orleans.Samples.Presence.GrainInterfaces;
 
@@ -46,7 +42,7 @@ namespace PlayerWatcher
 
                 // Hardcoded player ID
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");
-                IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId);
+                IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
                 IGameGrain game = null;
 
                 while (game == null)

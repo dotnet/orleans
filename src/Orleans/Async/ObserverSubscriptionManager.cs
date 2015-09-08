@@ -72,6 +72,15 @@ namespace Orleans
                 throw new OrleansException(String.Format("Cannot subscribe already subscribed observer {0}.", observer));
         }
 
+        /// <summary>
+        /// Determines if the SubscriptionManager has the input observer
+        /// </summary>
+        /// <param name="observer">True if the the observer is already subscribed, otherwise False.</param>
+        /// <returns>True is the SubscriptionManager has the input observer.</returns>
+        public bool IsSubscribed(T observer)
+        {
+            return observers.Contains(observer);
+        }
 
         /// <summary>
         /// Removes a (former) subscriber.

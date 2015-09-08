@@ -37,6 +37,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private bool                        fireAndForgetDelivery;
         internal const string               FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
         internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = false;
+        internal const StreamPubSubType     DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
 
         public bool IsRewindable { get { return false; } }
 
@@ -57,6 +58,11 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             return TaskDone.Done;
         }
 
+        public Task Stop()
+        {
+            return TaskDone.Done;
+        }
+
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
         {
             var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
@@ -65,7 +71,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 () => new StreamImpl<T>(streamId, this, IsRewindable));
         }
 
-        public IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime, fireAndForgetDelivery, IsRewindable);
         }
@@ -77,7 +83,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(DEFAULT_STREAM_PUBSUB_TYPE), IsRewindable);
         }
     }
 }
