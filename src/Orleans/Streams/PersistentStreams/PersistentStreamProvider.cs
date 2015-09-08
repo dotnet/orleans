@@ -23,9 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -121,7 +119,7 @@ namespace Orleans.Providers.Streams.Common
             var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
             if (siloRuntime != null)
             {
-                await pullingAgentManager.StopAgents();
+                await pullingAgentManager.Stop();
             }
         }
 
