@@ -361,7 +361,7 @@ namespace Orleans.Streams
                         if (pubSubCache.TryGetValue(streamId, out streamData))
                         {
                             streamData.RefreshActivity(now);
-                            StartInactiveCursors(streamId, streamData); // if this is an existing stream, start any inactive cursors
+                            StartInactiveCursors(streamData); // if this is an existing stream, start any inactive cursors
                         }
                         else
                         {
@@ -406,17 +406,23 @@ namespace Orleans.Streams
             }
         }
 
-        private void StartInactiveCursors(StreamId streamId, StreamConsumerCollection streamData)
+        private void StartInactiveCursors(StreamConsumerCollection streamData)
         {
-            // if stream is already registered, just wake inactive consumers
-            // get list of inactive consumers
-            var inactiveStreamConsumers = streamData.AllConsumers()
-                .Where(consumer => consumer.State == StreamConsumerDataState.Inactive)
-                .ToList();
-
-            // for each inactive stream
-            foreach (StreamConsumerData consumerData in inactiveStreamConsumers)
-                RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
+            foreach (StreamConsumerData consumerData in streamData.AllConsumers())
+            {
+                if (consumerData.State == StreamConsumerDataState.Inactive)
+                {
+                    // wake up inactive consumers
+                    RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
+                }
+                else
+                {
+                    if (consumerData.Cursor != null)
+                    {
+                        consumerData.Cursor.Refresh();
+                    }
+                }
+            }
         }
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData, IStreamFilterPredicateWrapper filterWrapper)
