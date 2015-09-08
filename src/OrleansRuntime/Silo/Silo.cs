@@ -739,11 +739,19 @@ namespace Orleans.Runtime
                 SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
                 // 8:
+                SafeExecute(() =>
+                {                
+                    var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
+                    scheduler.QueueTask(() => siloStreamProviderManager.StopStreamProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+
+                // 9:
                 SafeExecute(storageProviderManager.UnloadStorageProviders);
             }
             finally
             {
-                // 8, 9, 10: Write Dead in the table, Drain scheduler, Stop msg center, ...
+                // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
                 FastKill();
                 logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
             }
