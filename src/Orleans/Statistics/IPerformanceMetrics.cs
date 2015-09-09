@@ -157,6 +157,11 @@ namespace Orleans.Runtime
         /// </summary>
         public long ClientCount { get; internal set; }
 
+        public long ReceivedMessages { get; internal set; }
+
+        public long SentMessages { get; internal set; }
+
+
         /// <summary>
         /// The DateTime when this statistics was created.
         /// </summary>
@@ -177,6 +182,8 @@ namespace Orleans.Runtime
             IsOverloaded = metrics.IsOverloaded;
             ClientCount = metrics.ClientCount;
             TotalPhysicalMemory = metrics.TotalPhysicalMemory;
+            ReceivedMessages = metrics.ReceivedMessages;
+            SentMessages = metrics.SentMessages;
             DateTime = dateTime;
         }
 

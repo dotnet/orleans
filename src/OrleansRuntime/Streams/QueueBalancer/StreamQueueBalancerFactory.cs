@@ -70,6 +70,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("queueMapper");
             }
+            bool isFixed;
             switch (balancerType)
             {
                 case StreamQueueBalancerType.ConsistentRingBalancer:
@@ -78,16 +79,20 @@ namespace Orleans.Streams
                     IConsistentRingProviderForGrains ringProvider = runtime.GetConsistentRingProvider(0, 1);
                     return new ConsistentRingQueueBalancer(ringProvider, queueMapper);
                 }
-                case StreamQueueBalancerType.AzureDeploymentBalancer:
+                case StreamQueueBalancerType.DynamicAzureDeploymentBalancer:
+                case StreamQueueBalancerType.StaticAzureDeploymentBalancer:
                 {
                     TraceLogger logger = TraceLogger.GetLogger(typeof(StreamQueueBalancerFactory).Name, TraceLogger.LoggerType.Runtime);
                     var wrapper = AssemblyLoader.LoadAndCreateInstance<IDeploymentConfiguration>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
-                    return new DeploymentBasedQueueBalancer(siloStatusOracle, wrapper, queueMapper);
+                    isFixed = balancerType == StreamQueueBalancerType.StaticAzureDeploymentBalancer;
+                    return new DeploymentBasedQueueBalancer(siloStatusOracle, wrapper, queueMapper, isFixed);
                 }
-                case StreamQueueBalancerType.StaticClusterDeploymentBalancer:
+                case StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer:
+                case StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer:
                 {
                     IDeploymentConfiguration deploymentConfiguration = new StaticClusterDeploymentConfiguration(clusterConfiguration);
-                    return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper);
+                    isFixed = balancerType == StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer;
+                    return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper, isFixed);
                 }
                 default:
                 {

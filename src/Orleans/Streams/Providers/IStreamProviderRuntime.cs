@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Streams
 {
@@ -117,14 +118,9 @@ namespace Orleans.Streams
         /// <returns></returns>
         Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
-            StreamQueueBalancerType balancerType,
-            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
-            TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout,
-            TimeSpan maxEventDeliveryTime,
-            TimeSpan streamInactivityPeriod);
+            PersistentStreamProviderConfig config);
     }
 
     public enum StreamPubSubType
@@ -132,6 +128,87 @@ namespace Orleans.Streams
         ExplicitGrainBasedAndImplicit,
         ExplicitGrainBasedOnly,
         ImplicitOnly,
+    }
+
+    [Serializable]
+    public class PersistentStreamProviderConfig
+    {
+        public const string GET_QUEUE_MESSAGES_TIMER_PERIOD = "GetQueueMessagesTimerPeriod";
+        public static readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
+
+        public const string INIT_QUEUE_TIMEOUT = "InitQueueTimeout";
+        public static readonly TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT = TimeSpan.FromSeconds(5);
+
+        public const string MAX_EVENT_DELIVERY_TIME = "MaxEventDeliveryTime";
+        public static readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
+
+        public const string STREAM_INACTIVITY_PERIOD = "StreamInactivityPeriod";
+        public static readonly TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD = TimeSpan.FromMinutes(30);
+
+        public const string QUEUE_BALANCER_TYPE = "QueueBalancerType";
+        public const StreamQueueBalancerType DEFAULT_STREAM_QUEUE_BALANCER_TYPE = StreamQueueBalancerType.ConsistentRingBalancer;
+
+        public const string STREAM_PUBSUB_TYPE = "PubSubType";
+        public const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
+
+
+        public TimeSpan GetQueueMsgsTimerPeriod { get; private set; }
+        public TimeSpan InitQueueTimeout { get; private set; }
+        public TimeSpan MaxEventDeliveryTime { get; private set; }
+        public TimeSpan StreamInactivityPeriod { get; private set; }
+        public StreamQueueBalancerType BalancerType { get; private set; }
+        public StreamPubSubType PubSubType { get; private set; }
+
+
+        public PersistentStreamProviderConfig(IProviderConfiguration config)
+        {
+            string timePeriod;
+            if (!config.Properties.TryGetValue(GET_QUEUE_MESSAGES_TIMER_PERIOD, out timePeriod))
+                GetQueueMsgsTimerPeriod = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
+            else
+                GetQueueMsgsTimerPeriod = ConfigUtilities.ParseTimeSpan(timePeriod,
+                    "Invalid time value for the " + GET_QUEUE_MESSAGES_TIMER_PERIOD + " property in the provider config values.");
+
+            string timeout;
+            if (!config.Properties.TryGetValue(INIT_QUEUE_TIMEOUT, out timeout))
+                InitQueueTimeout = DEFAULT_INIT_QUEUE_TIMEOUT;
+            else
+                InitQueueTimeout = ConfigUtilities.ParseTimeSpan(timeout,
+                    "Invalid time value for the " + INIT_QUEUE_TIMEOUT + " property in the provider config values.");
+
+            string balanceTypeString;
+            BalancerType = !config.Properties.TryGetValue(QUEUE_BALANCER_TYPE, out balanceTypeString)
+                ? DEFAULT_STREAM_QUEUE_BALANCER_TYPE
+                : (StreamQueueBalancerType)Enum.Parse(typeof(StreamQueueBalancerType), balanceTypeString);
+
+            if (!config.Properties.TryGetValue(MAX_EVENT_DELIVERY_TIME, out timeout))
+                MaxEventDeliveryTime = DEFAULT_MAX_EVENT_DELIVERY_TIME;
+            else
+                MaxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
+                    "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
+
+            if (!config.Properties.TryGetValue(STREAM_INACTIVITY_PERIOD, out timeout))
+               StreamInactivityPeriod = DEFAULT_STREAM_INACTIVITY_PERIOD;
+            else
+                StreamInactivityPeriod = ConfigUtilities.ParseTimeSpan(timeout,
+                    "Invalid time value for the " + STREAM_INACTIVITY_PERIOD + " property in the provider config values.");
+
+            string pubSubTypeString;
+            PubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
+                ? DEFAULT_STREAM_PUBSUB_TYPE
+                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
+        }
+
+        public override string ToString()
+        {
+            return String.Format("{0}={1}, {2}={3}, {4}={5}, {6}={7}, {8}={9}, {10}={11}",
+                GET_QUEUE_MESSAGES_TIMER_PERIOD, GetQueueMsgsTimerPeriod,
+                INIT_QUEUE_TIMEOUT, InitQueueTimeout,
+                MAX_EVENT_DELIVERY_TIME, MaxEventDeliveryTime,
+                STREAM_INACTIVITY_PERIOD, StreamInactivityPeriod,
+                QUEUE_BALANCER_TYPE, BalancerType,
+                STREAM_PUBSUB_TYPE, PubSubType);
+        }
     }
 
     internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
