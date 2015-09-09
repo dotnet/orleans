@@ -38,6 +38,11 @@ namespace Orleans.Streams
         public abstract IStreamIdentity StreamIdentity { get; }
 
         /// <summary>
+        /// Unique identifier for this StreamSubscriptionHandle
+        /// </summary>
+        public abstract Guid HandleId { get; }
+
+        /// <summary>
         /// Unsubscribe a stream consumer from this observable.
         /// </summary>
         /// <param name="handle">The stream handle to unsubscribe.</param>

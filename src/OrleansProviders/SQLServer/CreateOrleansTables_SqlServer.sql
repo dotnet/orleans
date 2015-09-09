@@ -39,7 +39,7 @@ Implementation notes:
    by virtue of uniform naming across concrete implementations.
 
 5) ETag or VersionETag for Orleans is an opaque BINARY(n) or VARBINARY(n) column that Orleans transforms to a string and back to BINARY(n) or
-   VARBINARY(n) when querying. The type of its actual implementation is not important.
+   VARBINARY(n) when querying. The type of its actual implementation is not important as long as it represents a unique version.
 
 6) For the sake of being explicit and removing ambiquity, Orleans expects some queries to return either TRUE or FALSE as an
    indication of success. Orleans reads this value as ADO.NET Boolean value.
@@ -53,6 +53,7 @@ Implementation notes:
    The operations *must* succeed atomically as mandated by Orleans membership protocol. For more
    information, see at
 		http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html
+		http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management
 		https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs
 */
 
@@ -70,14 +71,15 @@ SELECT
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 10 
             AND RIGHT(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), 5), 2) = 50 THEN 'SQL Server 2008 R2' 
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 11 THEN 'SQL Server 2012'
-        WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 12 THEN 'SQL Server 2014' 				
+        WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 12 THEN 'SQL Server 2014'
+		WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 13 THEN 'SQL Server 2016' 				
     END AS [Value],
     N'The database product name.' AS [Description]
 UNION ALL
 SELECT
     N'Database version' AS [Id], 
     CAST(SERVERPROPERTY('productversion') AS NVARCHAR) AS [Value],
-    N'The version number of the database' AS [Description];
+    N'The version number of the database.' AS [Description];
 
 GO
 
@@ -100,22 +102,24 @@ GO
 
 -- This table defines Orleans operational queries. Orleans uses these to manage its operations,
 -- these are the only queries Orleans issues to the database.
--- These can be redefined provided the stated interface principles hold.
+-- These can be redefined (e.g. to provide non-destructive updates) provided the stated interface principles hold.
 CREATE TABLE [OrleansQuery]
 (	
-    [Key] VARCHAR(64) NOT NULL,
-    [Query] NVARCHAR(MAX) NOT NULL,
+    [QueryKey] VARCHAR(64) NOT NULL,
+    [QueryText] NVARCHAR(MAX) NOT NULL,
     [Description] NVARCHAR(MAX) NOT NULL
 
-	CONSTRAINT OrleansQuery_Key PRIMARY KEY([Key])
+	CONSTRAINT OrleansQuery_Key PRIMARY KEY([QueryKey])
 );
 
 
--- There will ever be only one (active) membership version table version column of which will be updated periodically.
+-- There will ever be only one (active) membership version table version column which will be updated periodically.
 -- See table description at http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html. The following
 -- IF-ELSE does SQL Server version detection and defines separate table structures and queries for them.
 -- Orleans issues the queries as defined in [OrleansQuery] and operates through parameter names and types with no
 -- regard to other matters.
+--
+-- This is only an optimization to use features in newer database editions and not strictly necessary for proper functioning of Orleans.
 IF(NOT EXISTS(SELECT [Value] FROM [OrleansDatabaseInfo] WHERE Id = N'ProductName' AND [Value] IN (N'SQL Server 2000')))
 BEGIN
 	-- These table definitions are SQL Server 2005 and later. The differences are
@@ -230,11 +234,11 @@ BEGIN
 		CONSTRAINT FK_OrleansSiloMetricsTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
 	);
 
-	-- Some of the Orleans queries are version specific due to ROWVERSION in SQL Server 2005 and later.
+	-- Some of the Orleans queries are version specific due to an optimization to use ROWVERSION on SQL Server 2005 and later.
 	-- ROWVERSION is applied automatically whereas an etag mechanism of using UNIQUEIDENTIFIER in SQL Server is not.
 	-- Also some queries could be tuned better on SQL Server 2005 and later such as error handling or SQL Server 2008
 	-- and later using MERGE for UPSERT (reminders).
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateIAmAlivetimeKey',
@@ -255,7 +259,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		-- There should ever be only one version row. A new one is tried to insert only once when a silo starts.
@@ -293,11 +297,9 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
-	(
-		-- There should ever be only one version row. A new one is tried to insert only once when a silo starts.
-		-- The concurrency is virtually non-existent, but for the sake robustness, appropriate locks are taken.
+	(		
 		'InsertMembershipKey',
 		N'SET NOCOUNT ON;
 		BEGIN TRANSACTION; --  @@TRANCOUNT = 0 -> +1.
@@ -388,7 +390,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateMembershipKey',
@@ -452,7 +454,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReminderRowKey',
@@ -494,14 +496,13 @@ BEGIN
 			WHERE
 				[ServiceId] = @serviceId AND @serviceId IS NOT NULL
 				AND [GrainId] = @grainId AND @grainId IS NOT NULL
-				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL
-				AND ETag = @etag AND @etag IS NOT NULL;
+				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
 			END	
 			COMMIT TRANSACTION;',
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReportClientMetricsKey',
@@ -561,7 +562,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertSiloMetricsKey',
@@ -768,7 +769,7 @@ BEGIN
 		CONSTRAINT FK_OrleansSiloMetricsTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateIAmAlivetimeKey',
@@ -790,7 +791,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'InsertMembershipVersionKey',
@@ -828,7 +829,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'InsertMembershipKey',
@@ -924,7 +925,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpdateMembershipKey',
@@ -990,7 +991,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReminderRowKey',
@@ -1034,15 +1035,14 @@ BEGIN
 			WHERE
 				[ServiceId] = @serviceId AND @serviceId IS NOT NULL
 				AND [GrainId] = @grainId AND @grainId IS NOT NULL
-				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL
-				AND ETag = @etag AND @etag IS NOT NULL;
+				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
 		END	
 		COMMIT TRANSACTION;
 		SELECT @newEtag;',
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertReportClientMetricsKey',
@@ -1102,7 +1102,7 @@ BEGIN
 		N''
 	);
 
-	INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 	VALUES
 	(
 		'UpsertSiloMetricsKey',
@@ -1187,7 +1187,7 @@ BEGIN
 	);
 END
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ActiveGatewaysQueryKey',
@@ -1195,6 +1195,7 @@ VALUES
 	SELECT
 		[Address],
         [ProxyPort]
+		[Generation]
       FROM
 		[MembershipReadAll]
       WHERE
@@ -1203,7 +1204,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'MembershipReadRowKey',
@@ -1231,14 +1232,15 @@ VALUES
 	FROM
 		[OrleansMembershipVersionTable] v
 		-- This ensures the version table will returned even if there is no matching membership row.
-		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.DeploymentId = m.DeploymentId AND @deploymentId IS NOT NULL	
+		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.[DeploymentId] = m.[DeploymentId]	
 		AND ([Address] = @address AND @address IS NOT NULL)
 		AND ([Port]    = @port AND @port IS NOT NULL)
-		AND ([Generation] = @generation AND @generation IS NOT NULL);',
+		AND ([Generation] = @generation AND @generation IS NOT NULL)
+		WHERE v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;',
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'MembershipReadAllKey',
@@ -1269,7 +1271,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'DeleteMembershipTableEntriesKey',
@@ -1284,7 +1286,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadReminderRowsKey',
@@ -1302,7 +1304,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadReminderRowKey',
@@ -1321,7 +1323,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadRangeRows1Key',
@@ -1340,7 +1342,7 @@ VALUES
 	N''
 );
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'ReadRangeRows2Key',
@@ -1360,7 +1362,7 @@ VALUES
 );
 
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'InsertOrleansStatisticsKey',
@@ -1389,7 +1391,7 @@ VALUES
 );
 
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'DeleteReminderRowKey',
@@ -1407,7 +1409,7 @@ VALUES
 		SELECT CAST(@rowsDeleted AS BIT);',
 	N'');
 
-INSERT INTO [OrleansQuery]([Key], [Query], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
 VALUES
 (
 	'DeleteReminderRowsKey',

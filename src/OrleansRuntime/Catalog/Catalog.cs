@@ -59,6 +59,8 @@ namespace Orleans.Runtime
             public NonExistentActivationException(string message) : base(message) { }
 
             public ActivationAddress NonExistentActivation { get; set; }
+
+            public bool IsStatelessWorker { get; set; }
         }
 
         
@@ -344,6 +346,8 @@ namespace Orleans.Runtime
         {
             ActivationData result;
             activatedPromise = TaskDone.Done;
+            PlacementStrategy placement;
+
             lock (activations)
             {
                 if (TryGetActivationData(address.Activation, out result))
@@ -351,19 +355,18 @@ namespace Orleans.Runtime
                     ActivationCollector.TryRescheduleCollection(result);
                     return result;
                 }
-                
+
+                int typeCode = address.Grain.GetTypeCode();
+                string actualGrainType = null;
+
+                if (typeCode != 0) // special case for Membership grain.
+                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement);
+                else
+                    placement = SystemPlacement.Singleton;
+
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     // create a dummy activation that will queue up messages until the real data arrives
-                    PlacementStrategy placement;
-                    int typeCode = address.Grain.GetTypeCode();
-                    string actualGrainType = null;
-
-                    if (typeCode != 0) // special case for Membership grain.
-                        GetGrainTypeInfo(typeCode, out actualGrainType, out placement);
-                    else
-                        placement = SystemPlacement.Singleton;
-
                     if (string.IsNullOrEmpty(grainType))
                     {
                         grainType = actualGrainType;
@@ -387,7 +390,7 @@ namespace Orleans.Runtime
                                            address.ToFullString(), grainType);
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.CatalogNonExistingActivation2, msg);
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
-                throw new NonExistentActivationException(msg) { NonExistentActivation = address };
+                throw new NonExistentActivationException(msg) { NonExistentActivation = address, IsStatelessWorker = placement is StatelessWorkerPlacement };
             }
    
             SetupActivationInstance(result, grainType, genericArguments);
@@ -421,7 +424,7 @@ namespace Orleans.Runtime
             try
             {
                 initStage = 1;
-                await RegisterActivationInGrainDirectory(address, !activation.IsMultiActivationGrain);
+                await RegisterActivationInGrainDirectoryAndValidate(activation);
 
                 initStage = 2;
                 await SetupActivationState(activation, grainType);                
@@ -464,20 +467,27 @@ namespace Orleans.Runtime
                             activation.ForwardingAddress = target;
                             if (target != null)
                             {
+                                var primary = ((DuplicateActivationException)dupExc).PrimaryDirectoryForGrain;
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
-                                logger.Info(ErrorCode.Catalog_DuplicateActivation,
-                                    "Tried to create a duplicate activation {0}, but we'll use {1} instead. " +
-                                    "GrainInstanceType is {2}. " +
-                                    "Primary Directory partition for this grain is {3}, " +
-                                    "full activation address is {4}. We have {5} messages to forward.",
-                                    address,
-                                    target,
-                                    activation.GrainInstanceType,
-                                    ((DuplicateActivationException) dupExc).PrimaryDirectoryForGrain,
-                                    address.ToFullString(),
-                                    activation.WaitingCount);
-
+                                string logMsg = String.Format("Tried to create a duplicate activation {0}, but we'll use {1} instead. " +
+                                                            "GrainInstanceType is {2}. " +
+                                                            "{3}" +
+                                                            "Full activation address is {4}. We have {5} messages to forward.",
+                                                address,
+                                                target,
+                                                activation.GrainInstanceType,
+                                                primary != null ? "Primary Directory partition for this grain is " + primary + ". " : String.Empty,
+                                                address.ToFullString(),
+                                                activation.WaitingCount);
+                                if (activation.IsStatelessWorker)
+                                {
+                                    if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                                }
+                                else
+                                {
+                                    logger.Info(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                                }
                                 RerouteAllQueuedMessages(activation, target, "Duplicate activation", ex);
                             }
                             else
@@ -486,9 +496,11 @@ namespace Orleans.Runtime
                                     String.Format("Failed to RegisterActivationInGrainDirectory for {0}.",
                                         activation), ex);
                                 // Need to undo the registration we just did earlier
-                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
-                                    SchedulingContext).Ignore();
-
+                                if (!activation.IsStatelessWorker)
+                                {
+                                    scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                        SchedulingContext).Ignore();
+                                }
                                 RerouteAllQueuedMessages(activation, null,
                                     "Failed RegisterActivationInGrainDirectory", ex);
                             }
@@ -499,8 +511,11 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_Failed_SetupActivationState,
                                 String.Format("Failed to SetupActivationState for {0}.", activation), ex);
                             // Need to undo the registration we just did earlier
-                            scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
-                                SchedulingContext).Ignore();
+                            if (!activation.IsStatelessWorker)
+                            {
+                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                    SchedulingContext).Ignore();
+                            }
 
                             RerouteAllQueuedMessages(activation, null, "Failed SetupActivationState", ex);
                             break;
@@ -510,8 +525,11 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_Failed_InvokeActivate,
                                 String.Format("Failed to InvokeActivate for {0}.", activation), ex);
                             // Need to undo the registration we just did earlier
-                            scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
-                                SchedulingContext).Ignore();
+                            if (!activation.IsStatelessWorker)
+                            {
+                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                    SchedulingContext).Ignore();
+                            }
 
                             RerouteAllQueuedMessages(activation, null, "Failed InvokeActivate", ex);
                             break;
@@ -886,10 +904,17 @@ namespace Orleans.Runtime
                 //logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Starting FinishDestroyActivations #{0} - with {1} Activations.", number, list.Count);
                 // step 3 - UnregisterManyAsync
                 try
-                {
-                    await scheduler.RunOrQueueTask(() =>
-                        directory.UnregisterManyAsync(list.Select(d => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList()),
-                        SchedulingContext);
+                {            
+                    List<ActivationAddress> activationsToDeactivate = list.
+                        Where((ActivationData d) => !d.IsStatelessWorker).
+                        Select((ActivationData d) => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList();
+
+                    if (activationsToDeactivate.Count > 0)
+                    {
+                        await scheduler.RunOrQueueTask(() =>
+                            directory.UnregisterManyAsync(activationsToDeactivate),
+                            SchedulingContext);
+                    }
                 }
                 catch (Exception exc)
                 {
@@ -1036,13 +1061,16 @@ namespace Orleans.Runtime
             return activation;
         }
 
-        private async Task RegisterActivationInGrainDirectory(ActivationAddress address, bool singleActivationMode)
+        private async Task RegisterActivationInGrainDirectoryAndValidate(ActivationData activation)
         {
+            ActivationAddress address = activation.Address;
+            bool singleActivationMode = !activation.IsStatelessWorker;
+
             if (singleActivationMode)
             {
                 ActivationAddress returnedAddress = await scheduler.RunOrQueueTask(() => directory.RegisterSingleActivationAsync(address), this.SchedulingContext);
                 if (address.Equals(returnedAddress)) return;
-                
+
                 SiloAddress primaryDirectoryForGrain = directory.GetPrimaryForGrain(address.Grain);
                 var dae = new DuplicateActivationException
                 {
@@ -1052,8 +1080,26 @@ namespace Orleans.Runtime
 
                 throw dae;
             }
-            
-            await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address), this.SchedulingContext);
+            else
+            {
+                StatelessWorkerPlacement stPlacement = activation.PlacedUsing as StatelessWorkerPlacement;
+                int maxNumLocalActivations = stPlacement.MaxLocal;
+                lock (activations)
+                {
+                    List<ActivationData> local;
+                    if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
+                        return;
+
+                    var id = StatelessWorkerDirector.PickRandom(local).Address;
+                    var dae = new DuplicateActivationException
+                    {
+                        ActivationToUse = id,
+                    };
+                    throw dae;
+                }
+            }
+            // We currently don't have any other case for multiple activations except for StatelessWorker.
+            //await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address), this.SchedulingContext);
         }
 
         #endregion

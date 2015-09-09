@@ -23,10 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Streams;
 
 using Orleans.Runtime;
@@ -34,13 +31,15 @@ using Orleans.Runtime;
 namespace Orleans.Providers
 {
     internal class ClientProviderRuntime : IStreamProviderRuntime
-    { 
-        private IStreamPubSub pubSub;
+    {
+        private IStreamPubSub grainBasedPubSub;
+        private IStreamPubSub implictPubSub;
+        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
 
-        private ClientProviderRuntime(IGrainFactory grainFactory) 
+        public ClientProviderRuntime(IGrainFactory grainFactory) 
         {
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
@@ -49,25 +48,17 @@ namespace Orleans.Providers
 
         public IGrainFactory GrainFactory { get; private set; }
 
-        public static ClientProviderRuntime Instance { get; private set; }
-
-        public static void InitializeSingleton(IGrainFactory grainFactory) 
-        {
-            if (Instance != null)
-            {
-                UninitializeSingleton();
-            }
-            Instance = new ClientProviderRuntime(grainFactory);
-        }
-
-        public static void StreamingInitialize(IGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
             if (null == implicitStreamSubscriberTable)
             {
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
-            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(grainFactory), implicitStreamSubscriberTable);
-            Instance.streamDirectory = new StreamDirectory();
+            grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
+            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
+            implictPubSub = tmp;
+            combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
+            streamDirectory = new StreamDirectory();
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -75,9 +66,14 @@ namespace Orleans.Providers
             return streamDirectory;
         }
 
-        public static void UninitializeSingleton()
+        public async Task Reset()
         {
-            Instance = null;
+            if (streamDirectory != null)
+            {
+                var tmp = streamDirectory;
+                streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
+                await tmp.Cleanup(true, true);
+            }
         }
 
         public Logger GetLogger(string loggerName)
@@ -170,7 +166,17 @@ namespace Orleans.Providers
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
-            return pubSubType == StreamPubSubType.GrainBased ? pubSub : null;
+            switch (pubSubType)
+            {
+                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
+                    return combinedGrainBasedAndImplicitPubSub;
+                case StreamPubSubType.ExplicitGrainBasedOnly:
+                    return grainBasedPubSub;
+                case StreamPubSubType.ImplicitOnly:
+                    return implictPubSub;
+                default:
+                    return null;
+            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
@@ -190,18 +196,6 @@ namespace Orleans.Providers
         public object GetCurrentSchedulingContext()
         {
             return null;
-        }
-
-        public Task StartPullingAgents(
-            string streamProviderName,
-            StreamQueueBalancerType balancerType,
-            IQueueAdapterFactory adapterFactory,
-            IQueueAdapter queueAdapter,
-            TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout,
-            TimeSpan maxEventDeliveryTime)
-        {        
-            return TaskDone.Done;
         }
     }
 }

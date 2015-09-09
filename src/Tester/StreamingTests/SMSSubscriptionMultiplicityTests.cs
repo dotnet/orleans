@@ -61,14 +61,14 @@ namespace UnitTests.StreamingTests
         public async Task SMSMultipleSubscriptionTest()
         {
             logger.Info("************************ SMSMultipleSubscriptionTest *********************************");
-            await runner.MultipleSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSAddAndRemoveSubscriptionTest()
         {
             logger.Info("************************ SMSAddAndRemoveSubscriptionTest *********************************");
-            await runner.AddAndRemoveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]

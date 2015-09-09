@@ -134,7 +134,10 @@ namespace Orleans.Storage
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
             IDictionary<string, object> state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
-            grainState.SetAll(state);
+            if (state != null)
+            {
+                grainState.SetAll(state);
+            }
         }
 
         /// <summary> Write state data function for this storage provider. </summary>

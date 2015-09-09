@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans
@@ -35,9 +36,9 @@ namespace Orleans
     /// Azure Table, SQL, development emulator grain, and a mock implementation.
     /// Defined as a grain interface for the development emulator grain case.
     /// </summary>  
-    internal interface IReminderTable
+    public interface IReminderTable
     {
-        Task Init(Guid serviceId, string deploymentId, string connectionString);
+        Task Init(GlobalConfiguration config, TraceLogger traceLogger);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 
@@ -74,7 +75,7 @@ namespace Orleans
         
     }
 
-    internal class ReminderTableData
+    public class ReminderTableData
     {
         public IList<ReminderEntry> Reminders { get; private set; }
 
@@ -102,7 +103,7 @@ namespace Orleans
 
 
     [Serializable]
-    internal class ReminderEntry
+    public class ReminderEntry
     {
         // 1 & 2 combine to form a unique key, i.e., a reminder is uniquely identified using these two together
         public GrainReference GrainRef { get; set; }        // 1

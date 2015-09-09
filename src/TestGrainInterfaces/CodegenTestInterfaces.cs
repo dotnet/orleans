@@ -21,6 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 
@@ -34,3 +36,69 @@ namespace UnitTests.GrainInterfaces
 }
 
 public class Outsider { }
+
+namespace UnitTests.GrainInterfaces
+{
+
+    [Serializable]
+    public class RootType
+    {
+        public RootType()
+        {
+            MyDictionary = new Dictionary<string, object>();
+            MyDictionary.Add("obj1", new InnerType());
+            MyDictionary.Add("obj2", new InnerType());
+            MyDictionary.Add("obj3", new InnerType());
+            MyDictionary.Add("obj4", new InnerType());
+        }
+        public Dictionary<string, object> MyDictionary { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            var actual = obj as RootType;
+            if (actual == null)
+            {
+                return false;
+            }
+            if (MyDictionary == null) return actual.MyDictionary == null;
+            if (actual.MyDictionary == null) return false;
+
+            var set1 = new HashSet<KeyValuePair<string, object>>(MyDictionary);
+            var set2 = new HashSet<KeyValuePair<string, object>>(actual.MyDictionary);
+            bool ret = set1.SetEquals(set2);
+            return ret;
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+    }
+
+    [Serializable]
+    public class InnerType
+    {
+        public InnerType()
+        {
+            Id = Guid.NewGuid();
+            Something = Id.ToString();
+        }
+        public Guid Id { get; set; }
+        public string Something { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            var actual = obj as InnerType;
+            if (actual == null)
+            {
+                return false;
+            }
+            return Id.Equals(actual.Id) && Equals(Something, actual.Something);
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+    }
+}

@@ -21,28 +21,25 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-
 
 namespace Orleans.Runtime.Storage.Relational
 {
     /// <summary>
-    /// Query templates Orleans uses for operational queries.
+    /// Keys to operational queries Orleans uses to operate a given relational database.
+    /// These keys point to queries loaded from the database when starting up.
     /// </summary>
-    public class OrleansRelationalConstants
+    /// <remarks>These keys point to the only queries Orleans ever issues to the database.
+    /// See file <em>CreateOrleansTables_SqlServer.sql</em> for further implementation details.</remarks>
+    public static class QueryKeys
     {
-        //Note: The following are string keys so that if needed, they can
-        //easily altered even on runtime.
-
         /// <summary>
         /// This key defines the query to retrieve Orleans operational queries
         /// and fill in the queries matching the other keys.
         /// </summary>
         public const string OrleansQueriesKey = "OrleansQueriesKey";
-        
+
         /// <summary>
         /// A key for a query template to retrieve gateway URIs.
         /// </summary>        
@@ -57,17 +54,17 @@ namespace Orleans.Runtime.Storage.Relational
         /// A key for a query template to retrieve all membership data.
         /// </summary>        
         public const string MembershipReadAllKey = "MembershipReadAllKey";
-        
+
         /// <summary>
         /// A key for a query to insert a membership version row.
         /// </summary>
         public const string InsertMembershipVersionKey = "InsertMembershipVersionKey";
-        
+
         /// <summary>
         /// A key for a query to update "I Am Alive Time".
         /// </summary>
         public const string UpdateIAmAlivetimeKey = "UpdateIAmAlivetimeKey";
-        
+
         /// <summary>
         /// A key for a query to insert a membership row.
         /// </summary>
@@ -133,18 +130,17 @@ namespace Orleans.Runtime.Storage.Relational
         /// </summary>
         public const string DeleteReminderRowsKey = "DeleteReminderRowsKey";
 
-
         /// <summary>
         /// A collection of the well known keys Orleans uses to retrieve operational database queries.
         /// </summary>
-        public static IReadOnlyCollection<string> Keys = new ReadOnlyCollection<string>(new[]
+        public static readonly IReadOnlyCollection<string> Keys = new ReadOnlyCollection<string>(new[]
         {
             OrleansQueriesKey,
             ActiveGatewaysQuery,
             MembershipReadRowKey,
             MembershipReadAllKey,
-            UpdateIAmAlivetimeKey,            
-            InsertMembershipVersionKey,            
+            UpdateIAmAlivetimeKey,
+            InsertMembershipVersionKey,
             InsertMembershipKey,
             UpdateMembershipKey,
             DeleteMembershipTableEntriesKey,
@@ -159,69 +155,5 @@ namespace Orleans.Runtime.Storage.Relational
             DeleteReminderRowKey,
             DeleteReminderRowsKey
         });
-
-
-        private static Dictionary<string, Dictionary<string, string>> QueryConstants = new Dictionary<string, Dictionary<string, string>>();
-
-
-        public static string GetConstant(string invariantName, string key)
-        {
-            if(string.IsNullOrWhiteSpace(invariantName))
-            {
-                throw new ArgumentException("The name of invariant must contain characters", "invariantName");
-            }
-
-            if(!Keys.Contains(key))
-            {
-                throw new ArgumentException("The key must be one defined in the Keys collection", "key");
-            }
-
-            return QueryConstants[invariantName][key];
-        }
-
-
-        /// <summary>
-        /// Adds data to query constants or modifies it..
-        /// </summary>
-        /// <param name="invariantName">A well known database provider invariant name.</param>
-        /// <param name="key">One of the keys in <see cref="Keys"/>.</param>
-        /// <param name="value">The value to add.</param>
-        /// <returns><em>TRUE</em> if the value was added, <em>FALSE</em> if modified.</returns>
-        public static bool AddOrModifyQueryConstant(string invariantName, string key, string value)
-        {
-            if(string.IsNullOrWhiteSpace(invariantName))
-            {
-                throw new ArgumentException("The name of invariant must contain characters", "invariantName");
-            }
-
-            if(!Keys.Contains(key))
-            {
-                throw new ArgumentException(string.Format("The key \"{0}\" must be one defined in the OrleansRelationalConstants.Keys collection", key), "key");
-            }
-
-            if(!QueryConstants.ContainsKey(invariantName))
-            {
-                QueryConstants.Add(invariantName, new Dictionary<string, string>());
-            }
-
-            bool isAdded = !QueryConstants[invariantName].ContainsKey(key);
-            if(isAdded)
-            {
-                QueryConstants[invariantName].Add(key, value);
-            }
-            else
-            {
-                QueryConstants[invariantName][key] = value;
-            }
-
-            return isAdded;
-        }
-
-
-        static OrleansRelationalConstants()
-        {
-            const string OrleansQueries = @"SET NOCOUNT ON; SELECT [Key], [Query] FROM [OrleansQuery];";
-            AddOrModifyQueryConstant(WellKnownRelationalInvariants.SqlServer, OrleansQueriesKey, OrleansQueries);
-        }
     }
 }

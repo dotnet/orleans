@@ -32,9 +32,9 @@ namespace Orleans.Streams
     internal interface IStreamControl
     {
         /// <summary>
-        /// Perform cleanup functiuons for this stream.
+        /// Perform cleanup functions for this stream.
         /// </summary>
         /// <returns>Completion promise for the cleanup operstions for this stream.</returns>
-        Task Cleanup();
+        Task Cleanup(bool cleanupProducers, bool cleanupConsumers);
     }
 }

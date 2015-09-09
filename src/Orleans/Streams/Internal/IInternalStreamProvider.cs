@@ -21,7 +21,7 @@ namespace Orleans.Streams
 {
     internal interface IInternalStreamProvider : IStreamProviderImpl
     {
-        IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId);
+        IInternalAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId);
         IInternalAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId);
     }
 }

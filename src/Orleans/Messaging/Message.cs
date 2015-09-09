@@ -551,8 +551,11 @@ namespace Orleans.Runtime
             }
             if (Message.WriteMessagingTraces) response.AddTimestamp(LifecycleTag.CreateResponse);
 
-            Runtime.RequestContext.ExportToMessage(response);
-
+            var contextData = RequestContext.Export();
+            if (contextData != null)
+            {
+                response.RequestContextData = contextData;
+            }
             return response;
         }
 

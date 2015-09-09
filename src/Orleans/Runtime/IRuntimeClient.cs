@@ -98,6 +98,8 @@ namespace Orleans.Runtime
 
         Streams.IStreamProviderManager CurrentStreamProviderManager { get; }
 
+        Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
+
         IGrainTypeResolver GrainTypeResolver { get; }
 
         string CaptureRuntimeEnvironment();

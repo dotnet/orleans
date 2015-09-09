@@ -31,13 +31,13 @@ using System.Globalization;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
-using Orleans.Core;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Streams;
 
 
 namespace Orleans.Runtime
@@ -89,7 +89,9 @@ namespace Orleans.Runtime
 
         public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
 
-        public Streams.IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
+        public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
+
+        public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
         public Catalog Catalog { get; private set; }
 
@@ -347,7 +349,7 @@ namespace Orleans.Runtime
                 if (Message.WriteMessagingTraces)
                     message.AddTimestamp(Message.LifecycleTag.InvokeIncoming);
 
-                RequestContext.ImportFromMessage(message);
+                RequestContext.Import(message.RequestContextData);
                 if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message));

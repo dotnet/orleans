@@ -31,17 +31,20 @@ namespace Orleans.Streams
     [Serializable]
     internal class StreamConsumerCollection
     {
-        private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one queue: from Guid ConsumerId to StreamConsumerData
+        private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
+        private DateTime lastActivityTime;
 
-        public StreamConsumerCollection()
+        public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();
+            lastActivityTime = now;
         }
 
-        public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
             var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filter);
             queueData.Add(subscriptionId, consumerData);
+            lastActivityTime = DateTime.UtcNow;
             return consumerData;
         }
 
@@ -69,14 +72,29 @@ namespace Orleans.Streams
             return queueData.TryGetValue(subscriptionId, out data);
         }
 
-        public IEnumerable<StreamConsumerData> AllConsumersForStream(StreamId streamId)
+        public IEnumerable<StreamConsumerData> AllConsumers()
         {
-            return queueData.Values.Where(consumer => consumer.StreamId.Equals(streamId));
+            return queueData.Values;
         }
 
         public int Count
         {
             get { return queueData.Count; }
+        }
+
+        public void RefreshActivity(DateTime now)
+        {
+            lastActivityTime = now;
+        }
+
+        public bool IsInactive(DateTime now, TimeSpan inactivityPeriod)
+        {
+            // Consider stream inactive (with all its consumers) from the pulling agent perspective if:
+            // 1) There were no new events received for that stream in the last inactivityPeriod
+            // 2) All consumer for that stream are currently inactive (that is, all cursors are inactive) - 
+            //    meaning there is nothing for those consumers in the adapter cache.
+            if (now - lastActivityTime < inactivityPeriod) return false;
+            return !queueData.Values.Any(data => data.State.Equals(StreamConsumerDataState.Active));
         }
     }
 }
