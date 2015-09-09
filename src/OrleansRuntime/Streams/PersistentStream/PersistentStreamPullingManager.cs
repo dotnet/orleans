@@ -119,6 +119,15 @@ namespace Orleans.Streams
             return TaskDone.Done;
         }
 
+        public async Task Stop()
+        {
+            await StopAgents();
+            if (queuePrintTimer != null)
+            {
+                queuePrintTimer.Dispose();
+            }
+        }
+
         public async Task StartAgents()
         {
             managerState = PersistentStreamProviderState.AgentsStarted;
