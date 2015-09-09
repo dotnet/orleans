@@ -90,7 +90,7 @@ namespace Orleans.Runtime.MembershipService
             return membershipTable;
         }
 
-        // Only used with MembershipTableGrain to wiat for primary to start.
+        // Only used with MembershipTableGrain to wait for primary to start.
         internal async Task WaitForTableToInit(IMembershipTable membershipTable)
         {
             var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
@@ -102,15 +102,8 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     MembershipTableData table = await membershipTable.ReadAll().WithTimeout(timespan);
-                    if (table.Members.Any(tuple => tuple.Item1.IsPrimary))
-                    {
-                        logger.Info(ErrorCode.MembershipTableGrainInit1,
-                            "-Connected to membership table provider and also found primary silo registered in the table.");
-                        return;
-                    }
-
-                    logger.Info(ErrorCode.MembershipTableGrainInit2,
-                        "-Connected to membership table provider but did not find primary silo registered in the table. Going to try again for a {0}th time.", i);
+                    logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
+                    return;
                 }
                 catch (Exception exc)
                 {

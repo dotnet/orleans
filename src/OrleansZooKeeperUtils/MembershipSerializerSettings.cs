@@ -67,7 +67,6 @@ namespace Orleans.Runtime.Host
                 JObject jo = JObject.Load(reader);
                 return new MembershipEntry
                 {
-                    IsPrimary = true,
                     SiloAddress = jo["SiloAddress"].ToObject<SiloAddress>(serializer),
                     HostName = jo["HostName"].ToObject<string>(),
                     InstanceName = jo["InstanceName"].ToObject<string>(),
