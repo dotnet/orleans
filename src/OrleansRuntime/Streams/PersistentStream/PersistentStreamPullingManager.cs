@@ -53,6 +53,7 @@ namespace Orleans.Streams
         private readonly IQueueAdapterFactory adapterFactory;
         private PersistentStreamProviderState managerState;
         private readonly IDisposable queuePrintTimer;
+        private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
         internal PersistentStreamPullingManager(
             GrainId id, 
@@ -252,7 +253,10 @@ namespace Orleans.Streams
             }
             if (agents.Count > 0)
             {
-                Log(ErrorCode.PersistentStreamPullingManager_08, "Took {0} new queues under my responsibility: {1}", agents.Count, Utils.EnumerableToString(agents, agent => agent.QueueId.ToString()));
+                Log(ErrorCode.PersistentStreamPullingManager_08, "Took {0} new queues. Now own {1} queues: {2}",
+                    agents.Count,
+                    NumberRunningAgents,
+                    Utils.EnumerableToString(queuesToAgentsMap.Values, agent => agent.QueueId.ToString()));
             }
         }
 
@@ -337,7 +341,7 @@ namespace Orleans.Streams
                     case PersistentStreamProviderCommand.GetAgentsState:
                         return managerState;
                     case PersistentStreamProviderCommand.GetNumberRunningAgents:
-                        return queuesToAgentsMap.Count;
+                        return NumberRunningAgents;
                     default:
                         throw new OrleansException(String.Format("PullingAgentManager does not support command {0}.", command));
                 }
@@ -345,8 +349,8 @@ namespace Orleans.Streams
             finally
             {
                 Log(ErrorCode.PersistentStreamPullingManager_15,
-                    String.Format("Done executing command {0}: commandSeqNumber = {1}, managerState = {2}.", 
-                    command, commandSeqNumber, managerState));
+                    String.Format("Done executing command {0}: commandSeqNumber = {1}, managerState = {2}, num running agents = {3}.", 
+                    command, commandSeqNumber, managerState, NumberRunningAgents));
             }
         }
 
