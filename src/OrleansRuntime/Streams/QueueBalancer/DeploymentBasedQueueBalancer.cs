@@ -148,7 +148,7 @@ namespace Orleans.Streams
             foreach(var siloStatus in siloStatusOracle.GetApproximateSiloStatuses(true))
             {
                 string siloName;
-                if (!siloStatusOracle.TryGetSiloName(siloStatus.Key, out siloName))
+                if (siloStatusOracle.TryGetSiloName(siloStatus.Key, out siloName))
                 {
                     activeSiloNames.Add(siloName);
                 }
