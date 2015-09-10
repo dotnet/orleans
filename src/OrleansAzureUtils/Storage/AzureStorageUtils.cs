@@ -288,6 +288,22 @@ namespace Orleans.AzureUtils
             }
         }
 
+        public static string SanitizeTableProperty(string key)
+        {
+            // Remove any characters that can't be used in Azure PartitionKey or RowKey values
+            // http://www.jamestharpe.com/web-development/azure-table-service-character-combinations-disallowed-in-partitionkey-rowkey/
+            key.Replace('/', '_');  // Forward slash
+            key.Replace('\\', '_'); // Backslash
+            key.Replace('#', '_');  // Pound sign
+            key.Replace('?', '_');  // Question mark
+
+            if (key.Length >= 1024)
+                throw new ArgumentException(string.Format("Key length {0} is too long to be an Azure table key. Key={1}", key.Length, key));
+
+            return key;
+        }
+
+
         internal static string PrintCloudQueueMessage(CloudQueueMessage message)
         {
             return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",

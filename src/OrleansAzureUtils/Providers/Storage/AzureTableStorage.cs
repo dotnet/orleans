@@ -338,19 +338,8 @@ namespace Orleans.Storage
 
         private string GetKeyString(GrainReference grainReference)
         {
-            var key = new StringBuilder( string.Format("{0}_{1}", serviceId, grainReference.ToKeyString()));
-
-            // Remove any characters that can't be used in Azure PartitionKey values
-            // http://www.jamestharpe.com/web-development/azure-table-service-character-combinations-disallowed-in-partitionkey-rowkey/
-            key.Replace('/','_');   // Forward slash
-            key.Replace('\\', '_'); // Backslash
-            key.Replace('#', '_');  // Pound sign
-            key.Replace('?', '_');  // Question mark
-
-            if (key.Length >= 1024)
-                throw new ArgumentException(string.Format("Key length {0} is too long to be an Azure table key. Key={1}", key.Length, key));
-            
-            return key.ToString();
+            var key = String.Format("{0}_{1}", serviceId, grainReference.ToKeyString());
+            return AzureStorageUtils.SanitizeTableProperty(key);
         }
 
 
