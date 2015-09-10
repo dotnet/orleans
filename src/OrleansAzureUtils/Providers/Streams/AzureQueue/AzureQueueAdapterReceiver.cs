@@ -107,7 +107,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             }
         }
 
-        public async Task ReleaseMessagesAsync(IList<IBatchContainer> messages)
+        public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
         {
             try
             {
