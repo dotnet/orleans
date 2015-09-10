@@ -332,10 +332,10 @@ namespace Orleans.Streams
 
                     if (queueCache != null)
                     {
-                        IList<IBatchContainer> itemsToRelease;
-                        if (queueCache.TryRelease(out itemsToRelease))
+                        IList<IBatchContainer> purgedItems;
+                        if (queueCache.TryPurgeFromCache(out purgedItems))
                         {
-                            await rcvr.ReleaseMessagesAsync(itemsToRelease);
+                            await rcvr.MessagesDeliveredAsync(purgedItems);
                         }
                     }
 

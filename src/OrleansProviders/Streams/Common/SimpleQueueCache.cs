@@ -100,9 +100,9 @@ namespace Orleans.Providers.Streams.Common
         }
 
 
-        public virtual bool TryRelease(out IList<IBatchContainer> itemsToRelease)
+        public virtual bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
-            itemsToRelease = null;
+            purgedItems = null;
             if (cachedMessages.Count == 0) return false; // empty cache
             if (cacheCursorHistogram.Count == 0) return false;  // no cursors yet - zero consumers basically yet.
             if (cacheCursorHistogram[0].NumCurrentCursors > 0) return false; // consumers are still active in the oldest bucket - fast path
@@ -114,7 +114,7 @@ namespace Orleans.Providers.Streams.Common
                 allItems.AddRange(items);
                 cacheCursorHistogram.RemoveAt(0); // remove the last bucket
             }
-            itemsToRelease = allItems;
+            purgedItems = allItems;
             return true;
         }
 
