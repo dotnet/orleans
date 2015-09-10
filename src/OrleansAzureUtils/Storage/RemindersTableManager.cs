@@ -44,11 +44,12 @@ namespace Orleans.Runtime.ReminderService
         public string StartAt               { get; set; }    
         public string Period                { get; set; }    
         public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
-                
+
 
         public static string ConstructRowKey(GrainReference grainRef, string reminderName)
         {
-            return String.Format("{0}-{1}", grainRef.ToKeyString(), reminderName); //grainRef.ToString(), reminderName);
+            var key = String.Format("{0}-{1}", grainRef.ToKeyString(), reminderName); //grainRef.ToString(), reminderName);
+            return AzureStorageUtils.SanitizeTableProperty(key);
         }
 
         public static string ConstructPartitionKey(Guid serviceId, GrainReference grainRef)
