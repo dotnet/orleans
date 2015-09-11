@@ -87,27 +87,34 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
-            if (queueRef == null) return new List<IBatchContainer>();
             try
             {
-                int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ? 
+                int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
                     CloudQueueMessage.MaxNumberOfMessagesToPeek : Math.Min(maxCount, CloudQueueMessage.MaxNumberOfMessagesToPeek);
 
-                var task = queueRef.GetQueueMessages(count);
+                var task = queue.GetQueueMessages(count);
                 outstandingTask = task;
                 IEnumerable<CloudQueueMessage> messages = await task;
-                
+
                 List<IBatchContainer> azureQueueMessages = messages
                     .Select(msg => (IBatchContainer)AzureQueueBatchContainer.FromCloudQueueMessage(msg, lastReadMessage++)).ToList();
 
-                if (azureQueueMessages.Count == 0)
-                    return azureQueueMessages;
-
-                outstandingTask = Task.WhenAll(messages.Select(queueRef.DeleteQueueMessage));
-                await outstandingTask;
-
                 return azureQueueMessages;
+            }
+            finally
+            {
+                outstandingTask = null;
+            }
+        }
+
+        public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
+        {
+            try
+            {
+                if (messages.Count == 0) return;
+                List<CloudQueueMessage> cloudQueueMessages = messages.Cast<AzureQueueBatchContainer>().Select(b => b.CloudQueueMessage).ToList();
+                outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queue.DeleteQueueMessage));
+                await outstandingTask;
             }
             finally
             {
