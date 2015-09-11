@@ -57,6 +57,8 @@ namespace Orleans.Runtime.MembershipService
         public SiloStatus CurrentStatus { get { return membershipOracleData.CurrentStatus; } } // current status of this silo.
 
         public string SiloName { get { return membershipOracleData.SiloName; } }
+        public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
+
 
         internal MembershipOracle(Silo silo, IMembershipTable membershipTable)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
