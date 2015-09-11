@@ -25,10 +25,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -51,16 +51,68 @@ namespace Orleans.Runtime
             public ActivationAddress ActivationToUse { get; set; }
 
             public SiloAddress PrimaryDirectoryForGrain { get; set; } // for diagnostics only!
+
+            public DuplicateActivationException() : base("DuplicateActivationException") { }
+            public DuplicateActivationException(string msg) : base(msg) { }
+            public DuplicateActivationException(string message, Exception innerException) : base(message, innerException) { }
+
+
+            // Implementation of exception serialization with custom properties according to:
+            // http://stackoverflow.com/questions/94488/what-is-the-correct-way-to-make-a-custom-net-exception-serializable
+            protected DuplicateActivationException(SerializationInfo info, StreamingContext context)
+                : base(info, context)
+            {
+                if (info != null)
+                {
+                    ActivationToUse = (ActivationAddress) info.GetValue("ActivationToUse", typeof (ActivationAddress));
+                    PrimaryDirectoryForGrain = (SiloAddress) info.GetValue("PrimaryDirectoryForGrain", typeof (SiloAddress));
+                }
+            }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                if (info != null)
+                {
+                    info.AddValue("ActivationToUse", ActivationToUse, typeof (ActivationAddress));
+                    info.AddValue("PrimaryDirectoryForGrain", PrimaryDirectoryForGrain, typeof (SiloAddress));                   
+                }
+                // MUST call through to the base class to let it save its own state
+                base.GetObjectData(info, context);
+            }
         }
 
         [Serializable]
         internal class NonExistentActivationException : Exception
         {
-            public NonExistentActivationException(string message) : base(message) { }
-
             public ActivationAddress NonExistentActivation { get; set; }
 
             public bool IsStatelessWorker { get; set; }
+
+            public NonExistentActivationException() : base("NonExistentActivationException") { }
+            public NonExistentActivationException(string msg) : base(msg) { }
+            public NonExistentActivationException(string message, Exception innerException) 
+                : base(message, innerException) { }
+
+            protected NonExistentActivationException(SerializationInfo info, StreamingContext context)
+                : base(info, context)
+            {
+                if (info != null)
+                {
+                    NonExistentActivation = (ActivationAddress)info.GetValue("NonExistentActivation", typeof(ActivationAddress));
+                    IsStatelessWorker = (bool)info.GetValue("IsStatelessWorker", typeof(bool));
+                }
+            }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                if (info != null)
+                {
+                    info.AddValue("NonExistentActivation", NonExistentActivation, typeof(ActivationAddress));
+                    info.AddValue("IsStatelessWorker", IsStatelessWorker, typeof(bool));
+                }
+                // MUST call through to the base class to let it save its own state
+                base.GetObjectData(info, context);
+            }
         }
 
         

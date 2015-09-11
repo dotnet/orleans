@@ -64,6 +64,10 @@ namespace Orleans.Runtime
     {
         public GatewayTooBusyException() : base("Gateway too busy") { }
 
+        public GatewayTooBusyException(string message) : base(message) { }
+
+        public GatewayTooBusyException(string message, Exception innerException) : base(message, innerException) { }
+
         protected GatewayTooBusyException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -85,10 +89,14 @@ namespace Orleans.Runtime
     {
         public LimitExceededException() : base("Limit exceeded") { }
 
+        public LimitExceededException(string message) : base(message) { }
+
+        public LimitExceededException(string message, Exception innerException) : base(message, innerException) { }
+
         public LimitExceededException(string limitName, int current, int threshold, object extraInfo) 
             : base(string.Format("Limit exceeded {0} Current={1} Threshold={2} {3}", limitName, current, threshold, extraInfo)) { }
 
-        public LimitExceededException(SerializationInfo info, StreamingContext context)
+        protected LimitExceededException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -115,6 +123,10 @@ namespace Orleans.Runtime
 
         public DeadlockException() : base("Deadlock between grain calls") {}
 
+        public DeadlockException(string message) : base(message) { }
+
+        public DeadlockException(string message, Exception innerException) : base(message, innerException) { }
+
         internal DeadlockException(IEnumerable<Tuple<GrainId, int, int>> callChain)
             : base(String.Format("Deadlock Exception for grain call chain {0}.", Utils.EnumerableToString(callChain, 
                             elem => String.Format("{0}.{1}.{2}", elem.Item1, elem.Item2, elem.Item3)))) 
@@ -127,7 +139,7 @@ namespace Orleans.Runtime
         {
             if (info != null)
             {
-                this.CallChain = (IEnumerable<Tuple<GrainId, int, int>>)info.GetValue("CallChain", typeof(IEnumerable<Tuple<GrainId, int, int>>));
+                CallChain = (IEnumerable<Tuple<GrainId, int, int>>)info.GetValue("CallChain", typeof(IEnumerable<Tuple<GrainId, int, int>>));
             }
         }
 
@@ -150,8 +162,9 @@ namespace Orleans.Runtime
     {
         public GrainExtensionNotInstalledException() : base("GrainExtensionNotInstalledException") { }
         public GrainExtensionNotInstalledException(string msg) : base(msg) { }
+        public GrainExtensionNotInstalledException(string message, Exception innerException) : base(message, innerException) { }
 
-        public GrainExtensionNotInstalledException(SerializationInfo info, StreamingContext context)
+        protected GrainExtensionNotInstalledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
     }
