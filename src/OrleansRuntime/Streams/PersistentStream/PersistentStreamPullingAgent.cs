@@ -330,6 +330,15 @@ namespace Orleans.Streams
                         CleanupPubSubCache(now);
                     }
 
+                    if (queueCache != null)
+                    {
+                        IList<IBatchContainer> purgedItems;
+                        if (queueCache.TryPurgeFromCache(out purgedItems))
+                        {
+                            await rcvr.MessagesDeliveredAsync(purgedItems);
+                        }
+                    }
+
                     if (queueCache != null && queueCache.IsUnderPressure())
                     {
                         // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
