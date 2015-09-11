@@ -728,7 +728,7 @@ namespace Orleans.Runtime
                 }
             }
             logger.Info(ErrorCode.Catalog_ShutdownActivations_2,
-                "DeactivateActivationOnIdle: 1 {0}.", promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
+                "DeactivateActivationOnIdle: {0} {1}.", data.ToString(), promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
 
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE).Increment();
             if (promptly)
