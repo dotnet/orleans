@@ -21,6 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -34,25 +35,23 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
+    [DeploymentItem("OrleansConfigurationForStreaming4SilosUnitTests.xml")]
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class PullingAgentManagementTests : UnitTestSiloHost
+    public class DelayedQueueRebalancingTests : UnitTestSiloHost
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
+        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(10); // matches the config
+        private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(5);
 
-        public PullingAgentManagementTests()
+        public DelayedQueueRebalancingTests()
             : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
                 StartSecondary = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-            },
-            new TestingClientOptions()
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
+                SiloConfigFile = new FileInfo("OrleansConfigurationForStreaming4SilosUnitTests.xml"),
             })
         {
         }
@@ -65,45 +64,40 @@ namespace UnitTests.StreamingTests
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task PullingAgents_ControlCmd_1()
+        public async Task DelayedQueueRebalancingTests_1()
         {
-            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);;
+            await ValidateAgentsState(2, 2);
 
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+            await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);
 
-            await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
-
-            await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StopAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStopped);
-
-
-            await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
-
+            await ValidateAgentsState(2, 4);
         }
 
-        private async Task ValidateAgentsState(PersistentStreamProviderState expectedState)
+        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task DelayedQueueRebalancingTests_2()
+        {
+            await ValidateAgentsState(2, 2);
+
+            StartAdditionalSilos(2);
+
+            await ValidateAgentsState(4, 2);
+
+            await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);
+
+            await ValidateAgentsState(4, 2);
+        }
+
+        private async Task ValidateAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo)
         {
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            var states = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
-            Assert.AreEqual(2, states.Length);
-            foreach (var state in states.Cast<PersistentStreamProviderState>())
+            object[] results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+            Assert.AreEqual(numExpectedSilos, results.Length);
+            int[] numAgents = results.Cast<int>().ToArray();
+            logger.Info("Got back NumberRunningAgents: {0}." + Utils.EnumerableToString(numAgents));
+            foreach (var agents in numAgents)
             {
-                Assert.AreEqual(expectedState, state);
-            }
-
-            var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
-            Assert.AreEqual(2, numAgents.Length);
-            int totalNumAgents = numAgents.Cast<int>().Sum();
-            if (expectedState == PersistentStreamProviderState.AgentsStarted)
-            {
-                Assert.AreEqual(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, totalNumAgents);
-            }
-            else
-            {
-                Assert.AreEqual(0, totalNumAgents);
+                Assert.AreEqual(numExpectedAgentsPerSilo, agents);
             }
         }
     }

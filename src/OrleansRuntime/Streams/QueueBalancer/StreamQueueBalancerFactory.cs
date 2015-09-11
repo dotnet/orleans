@@ -41,6 +41,7 @@ namespace Orleans.Streams
         /// <param name="clusterConfiguration">cluster configuration</param>
         /// <param name="runtime">stream provider runtime environment to run in</param>
         /// <param name="queueMapper">queue mapper of requesting stream provider</param>
+        /// <param name="siloMaturityPeriod">Maturity Period of a silo for queue rebalancing purposes</param>
         /// <returns>Constructed stream queue balancer</returns>
         public static IStreamQueueBalancer Create(
             StreamQueueBalancerType balancerType,
@@ -48,7 +49,8 @@ namespace Orleans.Streams
             ISiloStatusOracle siloStatusOracle,
             ClusterConfiguration clusterConfiguration,
             IStreamProviderRuntime runtime,
-            IStreamQueueMapper queueMapper)
+            IStreamQueueMapper queueMapper,
+            TimeSpan siloMaturityPeriod)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
@@ -85,14 +87,14 @@ namespace Orleans.Streams
                     TraceLogger logger = TraceLogger.GetLogger(typeof(StreamQueueBalancerFactory).Name, TraceLogger.LoggerType.Runtime);
                     var wrapper = AssemblyLoader.LoadAndCreateInstance<IDeploymentConfiguration>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
                     isFixed = balancerType == StreamQueueBalancerType.StaticAzureDeploymentBalancer;
-                    return new DeploymentBasedQueueBalancer(siloStatusOracle, wrapper, queueMapper, isFixed);
+                    return new DeploymentBasedQueueBalancer(siloStatusOracle, wrapper, queueMapper, siloMaturityPeriod, isFixed);
                 }
                 case StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer:
                 case StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer:
                 {
                     IDeploymentConfiguration deploymentConfiguration = new StaticClusterDeploymentConfiguration(clusterConfiguration);
                     isFixed = balancerType == StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer;
-                    return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper, isFixed);
+                    return new DeploymentBasedQueueBalancer(siloStatusOracle, deploymentConfiguration, queueMapper, siloMaturityPeriod, isFixed);
                 }
                 default:
                 {
