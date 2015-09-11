@@ -31,15 +31,14 @@ namespace Orleans.EventSourcing
     public class JournaledGrain<TGrainState> : Grain<TGrainState>
         where TGrainState : JournaledGrainState
     {
-        protected delegate void ApplyAction(TGrainState state, StateEvent @event);
-
         /// <summary>
         /// This methiod is for events that know how to apply themselves to TGrainState, subclasses of StateEvent&lt;T&gt;.
         /// </summary>
         /// <param name="event">Event to raise</param>
         /// <param name="commit">Whether or not the event needs to be immediately committed to storage</param>
         /// <returns></returns>
-        protected Task RaiseStateEvent(StateEvent @event, bool commit = true)
+        protected Task RaiseStateEvent<TEvent>(TEvent @event, bool commit = true)
+            where TEvent : StateEvent
         {
             if (@event == null) throw new ArgumentNullException("event");
 

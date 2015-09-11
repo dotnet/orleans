@@ -96,6 +96,7 @@
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IGrainState.cs" />
     <Compile Include="Core\IStorage.cs" />
+    <Compile Include="EventSourcing\IJournaledGrainStateTransition.cs" />
     <Compile Include="EventSourcing\JournaledGrain.cs" />
     <Compile Include="EventSourcing\JournaledGrainState.cs" />
     <Compile Include="EventSourcing\StateEvent.cs" />
