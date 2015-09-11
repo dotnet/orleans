@@ -550,10 +550,7 @@ namespace Orleans.Streams
 
         private async Task DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
-            if (batch.RequestContext != null)
-            {
-                RequestContext.Import(batch.RequestContext);
-            }
+            bool wasSet = batch.SetRequestContext();
             try
             {
                 StreamSequenceToken prevToken = consumerData.LastToken;
@@ -571,28 +568,25 @@ namespace Orleans.Streams
             }
             finally
             {
-                if (batch.RequestContext != null)
+                if (wasSet)
                 {
-                    RequestContext.Clear();
+                    batch.ClearRequestContext();
                 }
             }
         }
 
         private async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
-            if (batch !=null && batch.RequestContext != null)
-            {
-                RequestContext.Import(batch.RequestContext);
-            }
+            bool wasSet = batch != null && batch.SetRequestContext();
             try
             {
                 await consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
             }
             finally
             {
-                if (batch != null && batch.RequestContext != null)
+                if (wasSet)
                 {
-                    RequestContext.Clear();
+                    batch.ClearRequestContext();
                 }
             }
         }
