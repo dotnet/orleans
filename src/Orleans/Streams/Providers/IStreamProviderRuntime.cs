@@ -151,6 +151,9 @@ namespace Orleans.Streams
         public const string STREAM_PUBSUB_TYPE = "PubSubType";
         public const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
 
+        public const string SILO_MATURITY_PERIOD = "SiloMaturityPeriod";
+        public static readonly TimeSpan DEFAULT_SILO_MATURITY_PERIOD = TimeSpan.FromMinutes(2);
+
 
         public TimeSpan GetQueueMsgsTimerPeriod { get; private set; }
         public TimeSpan InitQueueTimeout { get; private set; }
@@ -158,6 +161,7 @@ namespace Orleans.Streams
         public TimeSpan StreamInactivityPeriod { get; private set; }
         public StreamQueueBalancerType BalancerType { get; private set; }
         public StreamPubSubType PubSubType { get; private set; }
+        public TimeSpan SiloMaturityPeriod { get; private set; }
 
 
         public PersistentStreamProviderConfig(IProviderConfiguration config)
@@ -197,17 +201,25 @@ namespace Orleans.Streams
             PubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
                 ? DEFAULT_STREAM_PUBSUB_TYPE
                 : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
+
+            string immaturityPeriod;
+            if (!config.Properties.TryGetValue(SILO_MATURITY_PERIOD, out immaturityPeriod))
+                SiloMaturityPeriod = DEFAULT_SILO_MATURITY_PERIOD;
+            else
+                SiloMaturityPeriod = ConfigUtilities.ParseTimeSpan(immaturityPeriod,
+                    "Invalid time value for the " + SILO_MATURITY_PERIOD + " property in the provider config values.");
         }
 
         public override string ToString()
         {
-            return String.Format("{0}={1}, {2}={3}, {4}={5}, {6}={7}, {8}={9}, {10}={11}",
+            return String.Format("{0}={1}, {2}={3}, {4}={5}, {6}={7}, {8}={9}, {10}={11}, {12}={13}",
                 GET_QUEUE_MESSAGES_TIMER_PERIOD, GetQueueMsgsTimerPeriod,
                 INIT_QUEUE_TIMEOUT, InitQueueTimeout,
                 MAX_EVENT_DELIVERY_TIME, MaxEventDeliveryTime,
                 STREAM_INACTIVITY_PERIOD, StreamInactivityPeriod,
                 QUEUE_BALANCER_TYPE, BalancerType,
-                STREAM_PUBSUB_TYPE, PubSubType);
+                STREAM_PUBSUB_TYPE, PubSubType,
+                SILO_MATURITY_PERIOD, SiloMaturityPeriod);
         }
     }
 
