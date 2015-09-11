@@ -48,14 +48,26 @@ namespace Orleans.Runtime
         [Serializable]
         internal class DuplicateActivationException : Exception
         {
-            public ActivationAddress ActivationToUse { get; set; }
+            public ActivationAddress ActivationToUse { get; private set; }
 
-            public SiloAddress PrimaryDirectoryForGrain { get; set; } // for diagnostics only!
+            public SiloAddress PrimaryDirectoryForGrain { get; private set; } // for diagnostics only!
 
             public DuplicateActivationException() : base("DuplicateActivationException") { }
             public DuplicateActivationException(string msg) : base(msg) { }
             public DuplicateActivationException(string message, Exception innerException) : base(message, innerException) { }
 
+            public DuplicateActivationException(ActivationAddress activationToUse)
+                : base("DuplicateActivationException")
+            {
+                ActivationToUse = activationToUse;
+            }
+
+            public DuplicateActivationException(ActivationAddress activationToUse, SiloAddress primaryDirectoryForGrain)
+                : base("DuplicateActivationException")
+            {
+                ActivationToUse = activationToUse;
+                PrimaryDirectoryForGrain = primaryDirectoryForGrain;
+            }
 
             // Implementation of exception serialization with custom properties according to:
             // http://stackoverflow.com/questions/94488/what-is-the-correct-way-to-make-a-custom-net-exception-serializable
@@ -84,14 +96,21 @@ namespace Orleans.Runtime
         [Serializable]
         internal class NonExistentActivationException : Exception
         {
-            public ActivationAddress NonExistentActivation { get; set; }
+            public ActivationAddress NonExistentActivation { get; private set; }
 
-            public bool IsStatelessWorker { get; set; }
+            public bool IsStatelessWorker { get; private set; }
 
             public NonExistentActivationException() : base("NonExistentActivationException") { }
             public NonExistentActivationException(string msg) : base(msg) { }
             public NonExistentActivationException(string message, Exception innerException) 
                 : base(message, innerException) { }
+
+            public NonExistentActivationException(string msg, ActivationAddress nonExistentActivation, bool isStatelessWorker)
+                : base(msg)
+            {
+                NonExistentActivation = nonExistentActivation;
+                IsStatelessWorker = isStatelessWorker;
+            }
 
             protected NonExistentActivationException(SerializationInfo info, StreamingContext context)
                 : base(info, context)
@@ -442,7 +461,7 @@ namespace Orleans.Runtime
                                            address.ToFullString(), grainType);
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.CatalogNonExistingActivation2, msg);
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
-                throw new NonExistentActivationException(msg) { NonExistentActivation = address, IsStatelessWorker = placement is StatelessWorkerPlacement };
+                throw new NonExistentActivationException(msg, address, placement is StatelessWorkerPlacement);
             }
    
             SetupActivationInstance(result, grainType, genericArguments);
@@ -1124,13 +1143,7 @@ namespace Orleans.Runtime
                 if (address.Equals(returnedAddress)) return;
 
                 SiloAddress primaryDirectoryForGrain = directory.GetPrimaryForGrain(address.Grain);
-                var dae = new DuplicateActivationException
-                {
-                    ActivationToUse = returnedAddress,
-                    PrimaryDirectoryForGrain = primaryDirectoryForGrain
-                };
-
-                throw dae;
+                throw new DuplicateActivationException(returnedAddress, primaryDirectoryForGrain);
             }
             else
             {
@@ -1143,11 +1156,7 @@ namespace Orleans.Runtime
                         return;
 
                     var id = StatelessWorkerDirector.PickRandom(local).Address;
-                    var dae = new DuplicateActivationException
-                    {
-                        ActivationToUse = id,
-                    };
-                    throw dae;
+                    throw new DuplicateActivationException(id);
                 }
             }
             // We currently don't have any other case for multiple activations except for StatelessWorker.
