@@ -22,48 +22,39 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.EventSourcing;
 using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonRegistered : StateEvent
+    public class StaticPersonState : JournaledGrainState,
+        IJournaledGrainStateTransition<PersonRegistered>,
+        IJournaledGrainStateTransition<PersonMarried>,
+        IJournaledGrainStateTransition<PersonLastNameChanged>
     {
-        public string FirstName { get; private set; }
-        public string LastName { get; private set; }
-        public GenderType Gender { get; private set; }
+        public StaticPersonState()
+            : base(typeof(StaticPersonState))
+        { }
 
-        public PersonRegistered(string firstName, string lastName, GenderType gender)
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public GenderType Gender { get; set; }
+
+        public void Apply(PersonRegistered registered)
         {
-            FirstName = firstName;
-            LastName = lastName;
-            Gender = gender;
+            FirstName = registered.FirstName;
+            LastName = registered.LastName;
+            Gender = registered. Gender;
         }
-    }
 
-    public class PersonMarried : StateEvent
-    {
-        public Guid SpouseId { get; private set; }
-        public string SpouseFirstName { get; private set; }
-        public string SpouseLastName { get; private set; }
-        
-        public PersonMarried(Guid spouseId, string spouseFirstName, string spouseLastName)
+        public void Apply(PersonMarried married)
         {
-            SpouseId = spouseId;
-            SpouseFirstName = spouseFirstName;
-            SpouseLastName = spouseLastName;
+            // TODO
         }
-    }
 
-    public class PersonLastNameChanged : StateEvent
-    {
-        public string LastName { get; private set; }
-
-        public PersonLastNameChanged(string lastName)
+        public void Apply(PersonLastNameChanged lnChanged)
         {
-            LastName = lastName;
+            LastName = lnChanged.LastName;
         }
     }
 }

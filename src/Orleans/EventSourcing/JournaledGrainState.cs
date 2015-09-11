@@ -31,7 +31,8 @@ namespace Orleans.EventSourcing
     public abstract class JournaledGrainState : GrainState
     {
         private List<StateEvent> events = new List<StateEvent>();
-        protected JournaledGrainState(Type type )
+
+        protected JournaledGrainState(Type type)
             : base(type.FullName)
         {
         }
@@ -39,25 +40,45 @@ namespace Orleans.EventSourcing
         public IEnumerable<StateEvent> Events
         {
             get { return events.AsReadOnly(); }
-            set { events = new List<StateEvent>(value); }
         }
 
         public int Version { get; private set; }
 
-        public void AddEvent(StateEvent @event)
+        public void AddEvent<TEvent>(TEvent @event)
+            where TEvent: StateEvent
         {
             events.Add(@event);
-            ApplyEvent(@event);
+
+            DynamicStateTransition(@event);
+            //StaticStateTransition(@event);
+
             Version++;
         }
-
-        public abstract void ApplyEvent(StateEvent @event);
 
         public override void SetAll(IDictionary<string, object> values)
         {
             base.SetAll(values);
-            foreach(StateEvent @event in Events)
-                ApplyEvent(@event);
+
+            dynamic me = this;
+
+            foreach (StateEvent @event in Events)
+                me.Apply(@event);
+        }
+
+        private void DynamicStateTransition<TEvent>(TEvent @event)
+            where TEvent : StateEvent
+        {
+            dynamic me = this;
+            me.Apply(@event);
+        }
+
+        private void StaticStateTransition<TEvent>(TEvent @event)
+            where TEvent : StateEvent
+        {
+            var transition = this as IJournaledGrainStateTransition<TEvent>;
+            
+            if(transition != null)
+                transition.Apply(@event);
         }
     }
 }

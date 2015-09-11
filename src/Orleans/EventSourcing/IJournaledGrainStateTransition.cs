@@ -1,4 +1,5 @@
-﻿/*
+﻿using System;
+/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,39 +22,16 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Orleans.EventSourcing
 {
-    /// <summary>
-    /// Basic low level container for events
-    /// </summary>
-    public class StateEvent
+    public interface IJournaledGrainStateTransition<TEvent>
+        where TEvent : StateEvent
     {
-        /// <summary>
-        /// ID of  event unique withing the scope of the grain
-        /// </summary>
-        public string Id { get; private set; }
-        /// <summary>
-        /// Time when event was raised.
-        /// </summary>
-        public DateTime Timestamp { get; private set; }
-        /// <summary>
-        /// Correlation ID for associating event with a request or transaction.
-        /// </summary>
-        public string CorrelationId { get; private set; }
-        /// <summary>
-        /// Additional context, such as user/device ID, security token, etc.
-        /// </summary>
-        public string Context { get; private set; }
-
-        public StateEvent(string id = null, DateTime? timestamp = null, string correlationId = null, string context = null)
-        {
-            Id = id ?? Guid.NewGuid().ToString();
-            Timestamp = timestamp ?? DateTime.UtcNow;
-            CorrelationId = correlationId;
-            Context = context;
-        }
+        void Apply(TEvent @event);
     }
 }

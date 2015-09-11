@@ -37,18 +37,6 @@ namespace TestGrains
         public string LastName { get; set; }
         public GenderType Gender { get; set; }
 
-        public override void ApplyEvent(StateEvent @event)
-        {
-            if (@event is PersonRegistered)
-                Apply(@event as PersonRegistered);
-            else if (@event is PersonMarried)
-                Apply(@event as PersonMarried);
-            else if (@event is PersonLastNameChanged)
-                Apply(@event as PersonLastNameChanged);
-            else
-                throw new ArgumentException(String.Format("Unsupported event of type {0}", @event.GetType().FullName));
-        }
-
         public void Apply(PersonRegistered registered)
         {
             FirstName = registered.FirstName;
