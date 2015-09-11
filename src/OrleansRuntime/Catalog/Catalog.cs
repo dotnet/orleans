@@ -660,7 +660,6 @@ namespace Orleans.Runtime
 
             lock (data)
             {
-                var grain = (Grain) Runtime.Silo.CurrentSilo.DependencyResolver.GetService(grainType);
                 grain.Identity = data.Identity;
                 data.SetGrainInstance(grain);
 
