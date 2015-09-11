@@ -32,7 +32,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using System.Collections.Generic;
 
-namespace UnitTests.General
+namespace Tests.General
 {
     /// <summary>
     /// Unit tests for grains implementing generic interfaces
@@ -96,12 +96,12 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceMultiplicity()
         {
-            var grainId = GetRandomGrainId();
+            var id = GetRandomGrainId();
 
-            var grainRef1 = GetGrain<IGenericGrain<int, float>>(grainId);
+            var grainRef1 = GetGrain<IGenericGrain<int, float>>(id);
             await grainRef1.SetT(123);
 
-            var grainRef2 = GetGrain<IGenericGrain<int, float>>(grainId);
+            var grainRef2 = GetGrain<IGenericGrain<int, float>>(id);
             var floatResult = await grainRef2.MapT2U();
 
             Assert.AreEqual(123f, floatResult);
@@ -155,13 +155,13 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task GenericGrainTests_SimpleGenericGrainMultiplicity()
         {
-            var grainId = GetRandomGrainId();
+            var id = GetRandomGrainId();
 
-            var grainRef1 = GetGrain<ISimpleGenericGrain<float>>(grainId);
+            var grainRef1 = GetGrain<ISimpleGenericGrain<float>>(id);
             await grainRef1.Set(1.2f);
             await grainRef1.Transform();  // NOP for generic grain class
 
-            var grainRef2 = GetGrain<ISimpleGenericGrain<float>>(grainId);
+            var grainRef2 = GetGrain<ISimpleGenericGrain<float>>(id);
             var floatResult = await grainRef2.Get();
 
             Assert.AreEqual(1.2f, floatResult);
@@ -193,14 +193,14 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task GenericGrainTests_PreferConcreteGrainImplementationOfGenericInterfaceMultiplicity()
         {
-            var grainId = GetRandomGrainId();
+            var id = GetRandomGrainId();
 
-            var grainRef1 = GetGrain<ISimpleGenericGrain<double>>(grainId);
+            var grainRef1 = GetGrain<ISimpleGenericGrain<double>>(id);
             await grainRef1.Set(1.0);
             await grainRef1.Transform();  // SpecializedSimpleGenericGrain doubles the value for generic grain class
 
             // a second reference with the same id points to the same grain:
-            var grainRef2 = GetGrain<ISimpleGenericGrain<double>>(grainId);
+            var grainRef2 = GetGrain<ISimpleGenericGrain<double>>(id);
             await grainRef2.Transform();
             var floatResult = await grainRef2.Get();
 
@@ -232,16 +232,16 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task GenericGrainTests_ConcreteGrainWithMultipleGenericInterfacesMultiplicity1()
         {
-            var grainId = GetRandomGrainId();
+            var id = GetRandomGrainId();
 
-            var grainRef1 = GetGrain<ISimpleGenericGrain<int>>(grainId);
+            var grainRef1 = GetGrain<ISimpleGenericGrain<int>>(id);
             await grainRef1.Set(1);
 
             // ConcreteGrainWith2GenericInterfaces multiplies the set value by 10:
             await grainRef1.Transform();  
 
             //A second reference to the interface will point to the same grain
-            var grainRef2 = GetGrain<ISimpleGenericGrain<int>>(grainId);
+            var grainRef2 = GetGrain<ISimpleGenericGrain<int>>(id);
             await grainRef2.Transform();
             var floatResult = await grainRef2.Get();
 
@@ -252,15 +252,15 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task GenericGrainTests_ConcreteGrainWithMultipleGenericInterfacesMultiplicity2()
         {
-            var grainId = GetRandomGrainId();
+            var id = GetRandomGrainId();
 
-            var grainRef1 = GetGrain<ISimpleGenericGrain<int>>(grainId);
+            var grainRef1 = GetGrain<ISimpleGenericGrain<int>>(id);
             await grainRef1.Set(1);
             await grainRef1.Transform();  // ConcreteGrainWith2GenericInterfaces multiplies the set value by 10:
 
             // A second reference to a different interface implemented by ConcreteGrainWith2GenericInterfaces 
             // will reference the same grain:
-            var grainRef2 = GetGrain<IGenericGrain<int, string>>(grainId);
+            var grainRef2 = GetGrain<IGenericGrain<int, string>>(id);
             // ConcreteGrainWith2GenericInterfaces returns a string representation of the current value multiplied by 10:
             var floatResult = await grainRef2.MapT2U(); 
 
@@ -270,9 +270,9 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task GenericGrainTests_UseGenericFactoryInsideGrain()
         {
-            var grainId = GetRandomGrainId();
+            var id = GetRandomGrainId();
 
-            var grainRef1 = GetGrain<ISimpleGenericGrain<string>>(grainId);
+            var grainRef1 = GetGrain<ISimpleGenericGrain<string>>(id);
             await grainRef1.Set("JustString");
             await grainRef1.CompareGrainReferences(grainRef1);
         }
@@ -311,9 +311,9 @@ namespace UnitTests.General
 
             var grain = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
-            var setAPromise = grain.SetA(a);
+            Task setAPromise = grain.SetA(a);
             var setBPromise = grain.SetB(b);
-            var stringPromise = Task.WhenAll(setAPromise, setBPromise).ContinueWith((_) => grain.GetAxB()).Unwrap();
+            var stringPromise = Task.WhenAll(setAPromise, setBPromise).ContinueWith(_ => grain.GetAxB()).Unwrap();
 
             var x = await stringPromise;
             Assert.AreEqual(expected, x, "Got expected result");
@@ -426,8 +426,8 @@ namespace UnitTests.General
             int b = random.Next(100);
             string expected = a + "x" + b;
 
-            long grainId = GetRandomGrainId();
-            var g1 = GrainFactory.GetGrain<IGrainWithNoProperties>(grainId);
+            long id = GetRandomGrainId();
+            var g1 = GrainFactory.GetGrain<IGrainWithNoProperties>(id);
 
             string r1 = await g1.GetAxB(a, b);
             Assert.AreEqual(expected, r1);
