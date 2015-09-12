@@ -102,11 +102,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             return false;
         }
 
-        public void ClearRequestContext()
-        {
-            RequestContext.Clear();
-        }
-
         public override string ToString()
         {
             return string.Format("[AzureQueueBatchContainer:Stream={0},#Items={1}]", StreamGuid, events.Count);
