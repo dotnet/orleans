@@ -61,11 +61,6 @@ namespace Orleans.Streams
         bool SetRequestContext();
 
         /// <summary>
-        /// Gives an opportunity to IBatchContainer to clear the RequestContext after this IBatchContainer was sent to consumers.
-        /// </summary>
-        void ClearRequestContext();
-
-        /// <summary>
         /// Decide whether this batch should be sent to the specified target.
         /// </summary>
         bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc);
