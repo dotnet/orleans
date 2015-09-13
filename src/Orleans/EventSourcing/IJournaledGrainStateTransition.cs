@@ -29,9 +29,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.EventSourcing
 {
-    public interface IJournaledGrainStateTransition<TEvent>
+    public interface IJournaledGrainStateTransition<TState, TEvent>
         where TEvent : StateEvent
     {
-        void Apply(TEvent @event);
+        void Apply(TState journaledGrainState, TEvent @event);
     }
 }

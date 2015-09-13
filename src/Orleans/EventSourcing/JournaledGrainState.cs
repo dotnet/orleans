@@ -28,7 +28,8 @@ using Orleans.CodeGeneration;
 
 namespace Orleans.EventSourcing
 {
-    public abstract class JournaledGrainState : GrainState
+    public abstract class JournaledGrainState<TGrainState> : GrainState
+        where TGrainState : JournaledGrainState<TGrainState>
     {
         private List<StateEvent> events = new List<StateEvent>();
 
@@ -69,16 +70,16 @@ namespace Orleans.EventSourcing
             where TEvent : StateEvent
         {
             dynamic me = this;
-            me.Apply(@event);
+            me.Apply(this, @event);
         }
 
         private void StaticStateTransition<TEvent>(TEvent @event)
             where TEvent : StateEvent
         {
-            var transition = this as IJournaledGrainStateTransition<TEvent>;
+            var transition = this as IJournaledGrainStateTransition<TGrainState, TEvent>;
             
             if(transition != null)
-                transition.Apply(@event);
+                transition.Apply(this as TGrainState, @event);
         }
     }
 }

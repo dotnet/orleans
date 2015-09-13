@@ -27,7 +27,7 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonState : JournaledGrainState
+    public class PersonState : JournaledGrainState<PersonState>
     {
         public PersonState()
             : base(typeof(PersonState))
@@ -37,21 +37,21 @@ namespace TestGrains
         public string LastName { get; set; }
         public GenderType Gender { get; set; }
 
-        public void Apply(PersonRegistered registered)
+        public void Apply(PersonState state, PersonRegistered registered)
         {
-            FirstName = registered.FirstName;
-            LastName = registered.LastName;
-            Gender = registered. Gender;
+            state.FirstName = registered.FirstName;
+            state.LastName = registered.LastName;
+            state.Gender = registered. Gender;
         }
 
-        public void Apply(PersonMarried married)
+        public void Apply(PersonState state, PersonMarried married)
         {
             // TODO
         }
 
-        public void Apply(PersonLastNameChanged lnChanged)
+        public void Apply(PersonState state, PersonLastNameChanged lnChanged)
         {
-            LastName = lnChanged.LastName;
+            state.LastName = lnChanged.LastName;
         }
     }
 }

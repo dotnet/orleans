@@ -29,7 +29,7 @@ using System.Threading.Tasks;
 namespace Orleans.EventSourcing
 {
     public class JournaledGrain<TGrainState> : Grain<TGrainState>
-        where TGrainState : JournaledGrainState
+        where TGrainState : JournaledGrainState<TGrainState>
     {
         /// <summary>
         /// This methiod is for events that know how to apply themselves to TGrainState, subclasses of StateEvent&lt;T&gt;.
