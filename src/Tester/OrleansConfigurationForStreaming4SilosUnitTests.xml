@@ -7,7 +7,7 @@
     <StreamProviders>
       <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
       <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider"
-           QueueBalancerType="DynamicClusterConfigDeploymentBalancer" SiloMaturityPeriod="10s"/>
+           QueueBalancerType="DynamicClusterConfigDeploymentBalancer" SiloMaturityPeriod="20s"/>
     </StreamProviders>
     <SeedNode Address="localhost" Port="22222"/>
     <Messaging ResponseTimeout="30s"/>
