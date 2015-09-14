@@ -58,7 +58,7 @@ namespace Orleans.Streams
         /// It can be the data that was set at the time event was generated and enqueued into the persistent provider or any other data.
         /// </summary>
         /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
-        bool SetRequestContext();
+        bool ImportRequestContext();
 
         /// <summary>
         /// Decide whether this batch should be sent to the specified target.
