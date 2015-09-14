@@ -26,6 +26,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
@@ -475,11 +476,36 @@ namespace Orleans.Runtime
             headerBytes = null;
         }
 
-        public Message(Categories type, Directions subtype)
+        private Message(Categories type, Directions subtype)
             : this()
         {
             Category = type;
             Direction = subtype;
+        }
+
+        internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
+        {
+            var message = new Message(
+                Categories.Application,
+                (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request)
+            {
+                Id = CorrelationId.GetNext(),
+                InterfaceId = request.InterfaceId,
+                MethodId = request.MethodId,
+                IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
+                IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
+                BodyObject = request
+            };
+
+            if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
+                message.IsAlwaysInterleave = true;
+
+            var contextData = RequestContext.Export();
+            if (contextData != null)
+            {
+                message.RequestContextData = contextData;
+            }
+            return message;
         }
 
         // Initializes body and header but does not take ownership of byte.
@@ -567,6 +593,15 @@ namespace Orleans.Runtime
             response.RejectionInfo = info;
             if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, new System.Diagnostics.StackTrace(true));
             return response;
+        }
+
+        public Message CreatePromptTimeoutResponse(string errorMsg)
+        {
+            return new Message(Category, Directions.Response)
+            {
+                Result = ResponseTypes.Error,
+                BodyObject = Response.ExceptionResponse(new TimeoutException(errorMsg))
+            };
         }
 
         public bool ContainsHeader(Header tag)
