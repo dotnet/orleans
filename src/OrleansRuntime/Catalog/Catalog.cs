@@ -569,28 +569,38 @@ namespace Orleans.Runtime
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
             Type grainType = grainTypeData.Type;
+            Grain grain = (Grain) Activator.CreateInstance(grainType);
+            // Inject runtime hookups into grain instance
+            grain.Runtime = grainRuntime;
+            grain.Data = data;
+
             Type stateObjectType = grainTypeData.StateObjectType;
+            GrainState state;
+            if (stateObjectType != null)
+            {
+                state = (GrainState) Activator.CreateInstance(stateObjectType);
+                state.InitState(null);
+            }
+            else
+            {
+                state = null;
+            }
+
             lock (data)
             {
-                var grain = (Grain) Activator.CreateInstance(grainType);
                 grain.Identity = data.Identity;
-                grain.Runtime = grainRuntime;
                 data.SetGrainInstance(grain);
 
-                if (stateObjectType != null)
+                if (state != null)
                 {
                     SetupStorageProvider(data);
 
-                    var state = (GrainState)Activator.CreateInstance(stateObjectType);
-                    state.InitState(null);
                     data.GrainInstance.GrainState = state;
                     data.GrainInstance.Storage = new GrainStateStorageBridge(data.GrainTypeName, data.GrainInstance, data.StorageProvider);
                 }
             }
 
             activations.IncrementGrainCounter(grainClassName);
-
-            data.GrainInstance.Data = data;
 
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }
