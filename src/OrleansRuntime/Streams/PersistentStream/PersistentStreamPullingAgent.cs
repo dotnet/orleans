@@ -550,51 +550,52 @@ namespace Orleans.Streams
 
         private async Task DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
-            if (batch.RequestContext != null)
-            {
-                RequestContext.Import(batch.RequestContext);
-            }
+            StreamSequenceToken prevToken = consumerData.LastToken;
+            Task<StreamSequenceToken> batchDeliveryTask;
+
+            bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                StreamSequenceToken prevToken = consumerData.LastToken;
-                StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
-                if (newToken != null)
-                {
-                    consumerData.LastToken = newToken;
-                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
-                        consumerData.StreamId.Namespace, newToken);
-                }
-                else
-                {
-                    consumerData.LastToken = batch.SequenceToken; // this is the currently delivered token
-                }
+                batchDeliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
             }
             finally
             {
-                if (batch.RequestContext != null)
+                if (isRequestContextSet)
                 {
+                    // clear RequestContext before await!
                     RequestContext.Clear();
                 }
             }
+            StreamSequenceToken newToken = await batchDeliveryTask;
+            if (newToken != null)
+            {
+                consumerData.LastToken = newToken;
+                consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
+                    consumerData.StreamId.Namespace, newToken);
+            }
+            else
+            {
+                consumerData.LastToken = batch.SequenceToken; // this is the currently delivered token
+            }
+
         }
 
         private async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
-            if (batch !=null && batch.RequestContext != null)
-            {
-                RequestContext.Import(batch.RequestContext);
-            }
+            Task errorDeliveryTask;
+            bool isRequestContextSet = batch != null && batch.ImportRequestContext();
             try
             {
-                await consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
+                errorDeliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
             }
             finally
             {
-                if (batch != null && batch.RequestContext != null)
+                if (isRequestContextSet)
                 {
-                    RequestContext.Clear();
+                    RequestContext.Clear(); // clear RequestContext before await!
                 }
             }
+            await errorDeliveryTask;
         }
 
         private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)
