@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 
@@ -49,11 +50,6 @@ namespace Orleans.Providers.Streams.AzureQueue
         public StreamSequenceToken SequenceToken 
         {
             get { return sequenceToken; }
-        }
-
-        public Dictionary<string, object> RequestContext
-        {
-            get { return requestContext; }
         }
 
         private AzureQueueBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
@@ -94,6 +90,16 @@ namespace Orleans.Providers.Streams.AzureQueue
             azureQueueBatch.CloudQueueMessage = cloudMsg;
             azureQueueBatch.sequenceToken = new EventSequenceToken(sequenceId);
             return azureQueueBatch;
+        }
+
+        public bool ImportRequestContext()
+        {
+            if (requestContext != null)
+            {
+                RequestContext.Import(requestContext);
+                return true;
+            }
+            return false;
         }
 
         public override string ToString()
