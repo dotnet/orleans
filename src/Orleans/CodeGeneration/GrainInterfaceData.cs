@@ -80,11 +80,6 @@ namespace Orleans.CodeGeneration
 
         public string StateClassBaseName { get; internal set; }
 
-        public string StateClassName
-        {
-            get { return TypeUtils.GetParameterizedTemplateName(StateClassBaseName, Type, language: language); }
-        }
-
         public string InvokerClassBaseName { get; internal set; }
 
         public string InvokerClassName
@@ -171,15 +166,6 @@ namespace Orleans.CodeGeneration
             return methodInfos.ToArray();
         }
 
-        public static string GetFactoryClassForInterface(Type referenceInterface, Language language)
-        {
-            // remove "Reference" from the end of the type name
-            var name = referenceInterface.Name;
-            if (name.EndsWith("Reference", StringComparison.Ordinal)) 
-                name = name.Substring(0, name.Length - 9);
-            return TypeUtils.GetParameterizedTemplateName(GetFactoryNameBase(name), referenceInterface, language: language);
-        }
-
         public static string GetFactoryNameBase(string typeName)
         {
             if (typeName.Length > 1 && typeName[0] == 'I' && Char.IsUpper(typeName[1]))
@@ -194,28 +180,6 @@ namespace Orleans.CodeGeneration
             return string.IsNullOrEmpty(n) ? "arg" + info.Position : n;
         }
 
-        public static PropertyInfo[] GetPersistentProperties(Type persistenceInterface)
-        {
-            // those flags only apply to class members, they do not apply to inherited interfaces (so BindingFlags.DeclaredOnly is meaningless here)
-            // need to explicitely take all properties from all sub interfaces.
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-            if ((null != persistenceInterface) && (typeof (IGrainState).IsAssignableFrom(persistenceInterface)))
-            {
-                // take all inherited intefaces that are subtypes of IGrainState except for IGrainState itself (it has internal properties which we don't want to expose here)
-                // plus add the persistenceInterface itself
-                IEnumerable<Type> allInterfaces = persistenceInterface.GetInterfaces().
-                    Where(t => !(t == typeof(IGrainState))).
-                    Union( new[] { persistenceInterface });
-
-                return allInterfaces
-                    .SelectMany(i => i.GetProperties(flags))
-                    .GroupBy(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1))
-                    .Select(g => g.OrderBy(p => p.Name.LastIndexOf('.')).First())
-                    .ToArray();
-            }
-            return new PropertyInfo[] {};
-        }
-
         public static bool IsSystemTargetType(Type interfaceType)
         {
             return typeof (ISystemTarget).IsAssignableFrom(interfaceType);
@@ -225,15 +189,6 @@ namespace Orleans.CodeGeneration
         {
             return t == typeof (Task)
                 || (t.IsGenericType && t.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.Task`1");
-        }
-
-        public static Type GetPromptType(Type type)
-        {
-            if (typeof (Task).IsAssignableFrom(type))
-                if (typeof (Task<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
-                    return type.GetGenericArguments()[0];
-
-            return type;
         }
 
         /// <summary>
