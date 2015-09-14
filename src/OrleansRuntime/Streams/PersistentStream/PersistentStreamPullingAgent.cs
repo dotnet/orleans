@@ -551,22 +551,22 @@ namespace Orleans.Streams
         private async Task DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
             StreamSequenceToken prevToken = consumerData.LastToken;
-            Task<StreamSequenceToken> task;
+            Task<StreamSequenceToken> batchDeliveryTask;
 
-            bool wasSet = batch.SetRequestContext();
+            bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                task = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
+                batchDeliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
             }
             finally
             {
-                if (wasSet)
+                if (isRequestContextSet)
                 {
                     // clear RequestContext before await!
                     RequestContext.Clear();
                 }
             }
-            StreamSequenceToken newToken = await task;
+            StreamSequenceToken newToken = await batchDeliveryTask;
             if (newToken != null)
             {
                 consumerData.LastToken = newToken;
@@ -582,20 +582,20 @@ namespace Orleans.Streams
 
         private async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
-            Task task;
-            bool wasSet = batch != null && batch.SetRequestContext();
+            Task errorDeliveryTask;
+            bool isRequestContextSet = batch != null && batch.ImportRequestContext();
             try
             {
-                task = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
+                errorDeliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
             }
             finally
             {
-                if (wasSet)
+                if (isRequestContextSet)
                 {
                     RequestContext.Clear(); // clear RequestContext before await!
                 }
             }
-            await task;
+            await errorDeliveryTask;
         }
 
         private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)

@@ -92,7 +92,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             return azureQueueBatch;
         }
 
-        public bool SetRequestContext()
+        public bool ImportRequestContext()
         {
             if (requestContext != null)
             {
