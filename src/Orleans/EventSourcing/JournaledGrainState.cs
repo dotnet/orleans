@@ -33,8 +33,8 @@ namespace Orleans.EventSourcing
     {
         private List<StateEvent> events = new List<StateEvent>();
 
-        protected JournaledGrainState(Type type)
-            : base(type.FullName)
+        protected JournaledGrainState()
+            : base(typeof(TGrainState).FullName)
         {
         }
 
