@@ -43,7 +43,7 @@ namespace UnitTests.StreamingTests
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
-        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(10); // matches the config
+        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(20); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(5);
 
         public DelayedQueueRebalancingTests()
@@ -66,38 +66,38 @@ namespace UnitTests.StreamingTests
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task DelayedQueueRebalancingTests_1()
         {
-            await ValidateAgentsState(2, 2);
+            await ValidateAgentsState(2, 2, "1");
 
             await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);
 
-            await ValidateAgentsState(2, 4);
+            await ValidateAgentsState(2, 4, "2");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task DelayedQueueRebalancingTests_2()
         {
-            await ValidateAgentsState(2, 2);
+            await ValidateAgentsState(2, 2, "1");
 
             StartAdditionalSilos(2);
 
-            await ValidateAgentsState(4, 2);
+            await ValidateAgentsState(4, 2, "2");
 
             await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);
 
-            await ValidateAgentsState(4, 2);
+            await ValidateAgentsState(4, 2, "3");
         }
 
-        private async Task ValidateAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo)
+        private async Task ValidateAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo, string callContext)
         {
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
-            Assert.AreEqual(numExpectedSilos, results.Length);
+            Assert.AreEqual(numExpectedSilos, results.Length, "numExpectedSilos-" + callContext);
             int[] numAgents = results.Cast<int>().ToArray();
             logger.Info("Got back NumberRunningAgents: {0}." + Utils.EnumerableToString(numAgents));
             foreach (var agents in numAgents)
             {
-                Assert.AreEqual(numExpectedAgentsPerSilo, agents);
+                Assert.AreEqual(numExpectedAgentsPerSilo, agents, "numExpectedAgentsPerSilo-" + callContext);
             }
         }
     }
