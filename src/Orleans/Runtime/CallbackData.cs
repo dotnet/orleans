@@ -47,18 +47,21 @@ namespace Orleans.Runtime
         private readonly TaskCompletionSource<object> context;
 
         private bool alreadyFired;
-        private TimeSpan timeout;
-        private readonly Action<CallbackData> onTimeout;
-        
+        private TimeSpan timeout; 
         private SafeTimer timer;
         private ITimeInterval timeSinceIssued;
+        private IMessagingConfiguration config;
         private static readonly TraceLogger logger = TraceLogger.GetLogger("CallbackData");
-
-        internal static IMessagingConfiguration Config;
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
 
-        public CallbackData(Action<Message, TaskCompletionSource<object>> callback, Func<Message, bool> resendFunc, TaskCompletionSource<object> ctx, Message msg, Action unregisterDelegate, Action<CallbackData> onTimeout = null)
+        public CallbackData(
+            Action<Message, TaskCompletionSource<object>> callback, 
+            Func<Message, bool> resendFunc, 
+            TaskCompletionSource<object> ctx, 
+            Message msg, 
+            Action unregisterDelegate,
+            IMessagingConfiguration config)
         {
             // We are never called without a callback func, but best to double check.
             if (callback == null) throw new ArgumentNullException("callback");
@@ -67,11 +70,11 @@ namespace Orleans.Runtime
 
             this.callback = callback;
             this.resendFunc = resendFunc;
-            this.context = ctx;
-            this.Message = msg;
-            this.unregister = unregisterDelegate;
-            this.alreadyFired = false;
-            this.onTimeout = onTimeout;
+            context = ctx;
+            Message = msg;
+            unregister = unregisterDelegate;
+            alreadyFired = false;
+            this.config = config;
         }
 
         /// <summary>
@@ -91,9 +94,9 @@ namespace Orleans.Runtime
 
             TimeSpan firstPeriod = timeout;
             TimeSpan repeatPeriod = Constants.INFINITE_TIMESPAN; // Single timeout period --> No repeat
-            if (Config.ResendOnTimeout && Config.MaxResendCount > 0)
+            if (config.ResendOnTimeout && config.MaxResendCount > 0)
             {
-                firstPeriod = repeatPeriod = timeout.Divide(Config.MaxResendCount + 1);
+                firstPeriod = repeatPeriod = timeout.Divide(config.MaxResendCount + 1);
             }
             // Start time running
             DisposeTimer();
@@ -103,27 +106,20 @@ namespace Orleans.Runtime
 
         private void TimeoutCallback(object obj)
         {
-            if (onTimeout != null)
-            {
-                onTimeout(this);
-            }
-            else
-            {
-                OnTimeout();
-            }
+            OnTimeout();
         }
 
         public void OnTimeout()
         {
             if (alreadyFired)
                 return;
-            var msg = this.Message; // Local working copy
+            var msg = Message; // Local working copy
             lock (this)
             {
                 if (alreadyFired)
                     return;
 
-                if (Config.ResendOnTimeout && resendFunc(msg))
+                if (config.ResendOnTimeout && resendFunc(msg))
                 {
                     if(logger.IsVerbose) logger.Verbose("OnTimeout - Resend {0} for {1}", msg.ResendCount, msg);
                     return;
@@ -147,11 +143,7 @@ namespace Orleans.Runtime
                                 timeout, msg, messageHistory);
             logger.Warn(ErrorCode.Runtime_Error_100157, "{0}. About to break its promise.", errorMsg);
 
-            var error = new Message(Message.Categories.Application, Message.Directions.Response)
-            {
-                Result = Message.ResponseTypes.Error,
-                BodyObject = Response.ExceptionResponse(new TimeoutException(errorMsg))
-            };
+            var error = msg.CreatePromptTimeoutResponse(errorMsg);
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
                 ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);
