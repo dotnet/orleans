@@ -87,7 +87,8 @@ namespace Orleans.Providers
                 var fullConfig = (ProviderConfiguration) providerConfig;
                 if (providers.TryGetValue(fullConfig.Name, out provider)) continue;
 
-                var msg = String.Format("Provider of type {0} name {1} was not loaded.", fullConfig.Type, fullConfig.Name);
+                var msg = String.Format("Provider of type {0} name {1} was not loaded." +
+                    "Please check that you deployed the assembly in which the provider class is defined to the execution folder.", fullConfig.Type, fullConfig.Name);
                 logger.Error(ErrorCode.Provider_ConfiguredProviderNotLoaded, msg);
                 throw new OrleansException(msg);
             }
