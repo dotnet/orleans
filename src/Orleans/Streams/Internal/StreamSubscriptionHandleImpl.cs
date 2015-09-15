@@ -86,11 +86,11 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch, StreamSequenceToken prevToken)
+        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch, StreamSequenceToken handshakeToken)
         {
             if (expectedToken != null)
             {
-                if (!expectedToken.Equals(prevToken))
+                if (!expectedToken.Equals(handshakeToken))
                     return expectedToken;
             }
 
@@ -102,7 +102,7 @@ namespace Orleans.Streams
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
             if (expectedToken != null)
             {
-                if (!expectedToken.Equals(prevToken))
+                if (!expectedToken.Equals(handshakeToken))
                     return expectedToken;
             }
 
@@ -111,11 +111,11 @@ namespace Orleans.Streams
             return null;
         }
 
-        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken prevToken)
+        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken handshakeToken)
         {
             if (expectedToken != null)
             {
-                if (!expectedToken.Equals(prevToken))
+                if (!expectedToken.Equals(handshakeToken))
                     return expectedToken;
             }
 
@@ -124,7 +124,7 @@ namespace Orleans.Streams
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
             if (expectedToken != null)
             {
-                if (!expectedToken.Equals(prevToken))
+                if (!expectedToken.Equals(handshakeToken))
                     return expectedToken;
             }
 
