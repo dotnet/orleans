@@ -349,7 +349,6 @@ namespace Orleans.CodeGeneration
                     try
                     {
                         var grainInterfaceData = GrainInterfaceData.FromGrainClass(type, options.TargetLanguage.Value);
-                        grainNamespace.AddStateClass(grainInterfaceData);
                     }
                     catch (GrainInterfaceData.RulesViolationException rve)
                     {
