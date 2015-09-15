@@ -43,5 +43,11 @@ namespace Orleans.Streams
         {
             return TaskDone.Done;
         }
+
+        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+            StreamSequenceToken sequenceToken)
+        {
+            return TaskDone.Done;
+        }
     }
 }

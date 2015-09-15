@@ -90,8 +90,20 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public async Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
             StreamSequenceToken sequenceToken)
+        {
+            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+        }
+
+        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+            StreamSequenceToken sequenceToken)
+        {
+            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+        }
+
+        private async Task OnFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+                StreamSequenceToken sequenceToken)
         {
             if (subscriptionId == null)
             {
