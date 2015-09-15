@@ -23,6 +23,7 @@
   </metadata>
   <files>
     <file src="OrleansManager.exe" target="lib\net45" />
+    <file src="OrleansManager.pdb" target="lib\net45" />
     <file src="OrleansManager.exe.config" target="lib\net45" />
     <file src="ClientConfiguration.xml" target="lib\net45" />
   </files>
