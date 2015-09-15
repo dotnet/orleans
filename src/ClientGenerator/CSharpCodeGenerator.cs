@@ -1,25 +1,28 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+// Project Orleans Cloud Service SDK ver. 1.0
+//  
+// Copyright (c) .NET Foundation
+// 
+// All rights reserved.
+//  
+// MIT License
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 using System;
 using System.CodeDom;
@@ -27,7 +30,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
@@ -160,7 +162,7 @@ namespace Orleans.CodeGeneration
             var invokerField = new CodeSnippetTypeMember(fieldImpl);
             factoryClass.Members.Add(invokerField);
 
-            var methodImpl = String.Format(@"
+            var methodImpl = string.Format(@"
         public async static System.Threading.Tasks.Task<{0}> CreateObjectReference({0} obj)
         {{
             if (methodInvoker == null) methodInvoker = new {2}();
@@ -169,7 +171,7 @@ namespace Orleans.CodeGeneration
             var createObjectReferenceMethod = new CodeSnippetTypeMember(methodImpl);
             factoryClass.Members.Add(createObjectReferenceMethod);
 
-            methodImpl = String.Format(@"
+            methodImpl = string.Format(@"
         public static System.Threading.Tasks.Task DeleteObjectReference({0} reference)
         {{
             return global::Orleans.Runtime.GrainReference.DeleteObjectReference(reference);
@@ -201,7 +203,7 @@ namespace Orleans.CodeGeneration
             try
             {{");
 
-            var interfaceSwitchBody = String.Empty;
+            var interfaceSwitchBody = string.Empty;
             foreach (int interfaceId in grainInterfaceInfo.Interfaces.Keys)
             {
                 InterfaceInfo interfaceInfo = grainInterfaceInfo.Interfaces[interfaceId];
@@ -231,7 +233,7 @@ namespace Orleans.CodeGeneration
 
         private string GetMethodDispatchSwitchForInterface(int interfaceId, InterfaceInfo interfaceInfo)
         {
-            string methodSwitchBody = String.Empty;
+            string methodSwitchBody = string.Empty;
 
             foreach (int methodId in interfaceInfo.Methods.Keys)
             {
@@ -313,7 +315,7 @@ namespace Orleans.CodeGeneration
             const string defaultCase = @"default: 
                             throw new NotImplementedException(""interfaceId=""+interfaceId+"",methodId=""+methodId);";
 
-            return String.Format(@"case {0}:  // {1}
+            return string.Format(@"case {0}:  // {1}
                         switch (methodId)
                         {{
 {2}                            {3}
@@ -332,11 +334,11 @@ namespace Orleans.CodeGeneration
             }
 
             var interfaces = new Dictionary<int, InterfaceInfo>(grainInterfaceInfo.Interfaces); // Copy, as we may alter the original collection in the loop below
-            var interfaceSwitchBody = String.Empty;
+            var interfaceSwitchBody = string.Empty;
 
             foreach (var kv in interfaces)
             {
-                var methodSwitchBody = String.Empty;
+                var methodSwitchBody = string.Empty;
                 int interfaceId = kv.Key;
                 InterfaceInfo interfaceInfo = kv.Value;
 
@@ -354,7 +356,7 @@ namespace Orleans.CodeGeneration
                     ", methodId, invokeGrainMethod);
                 }
 
-                interfaceSwitchBody += String.Format(@"
+                interfaceSwitchBody += string.Format(@"
                 case {0}:  // {1}
                     switch (methodId)
                     {{
@@ -379,7 +381,7 @@ namespace Orleans.CodeGeneration
             RecordReferencedNamespaceAndAssembly(iface.Type);
             var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.Type);
             Action<string> add = codeFmt => factoryClass.Members.Add(
-                new CodeSnippetTypeMember(String.Format(codeFmt, iface.InterfaceTypeName)));
+                new CodeSnippetTypeMember(string.Format(codeFmt, iface.InterfaceTypeName)));
 
             bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
             bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
@@ -570,7 +572,7 @@ namespace Orleans.CodeGeneration
                 methodImpl = string.Format(@"
                     base.InvokeOneWayMethod({0}, {1} {2});",
                     methodId, 
-                    invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
+                    invokeArguments.Equals(string.Empty) ? "null" : string.Format("new object[] {{{0}}}", invokeArguments),
                     optional);
             }
             else
@@ -580,7 +582,7 @@ namespace Orleans.CodeGeneration
                     methodImpl = string.Format(@"
                 return base.InvokeMethodAsync<object>({0}, {1} {2});",
                         methodId,
-                        invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
+                        invokeArguments.Equals(string.Empty) ? "null" : string.Format("new object[] {{{0}}}", invokeArguments),
                         optional);
                 }
                 else
@@ -589,7 +591,7 @@ namespace Orleans.CodeGeneration
                 return base.InvokeMethodAsync<{0}>({1}, {2} {3});",
                         GetActualMethodReturnType(methodInfo.ReturnType, SerializeFlag.NoSerialize),
                         methodId,
-                        invokeArguments.Equals(string.Empty) ? "null" : String.Format("new object[] {{{0}}}", invokeArguments),
+                        invokeArguments.Equals(string.Empty) ? "null" : string.Format("new object[] {{{0}}}", invokeArguments),
                         optional);
                 }
             }

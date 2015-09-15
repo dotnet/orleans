@@ -659,9 +659,6 @@ namespace Orleans.Runtime.Storage.Relational
                 var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort, direction);
                 command.Parameters.Add(proxyPortParameter);
 
-                var primaryParameter = CreatePrimaryParameter(command, membershipEntry.IsPrimary, direction);
-                command.Parameters.Add(primaryParameter);
-
                 var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName, direction);
                 command.Parameters.Add(roleNameParameter);
 
@@ -738,9 +735,6 @@ namespace Orleans.Runtime.Storage.Relational
                 var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort, direction);
                 command.Parameters.Add(proxyPortParameter);
 
-                var primaryParameter = CreatePrimaryParameter(command, membershipEntry.IsPrimary, direction);
-                command.Parameters.Add(primaryParameter);
-
                 var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName, direction);
                 command.Parameters.Add(roleNameParameter);
 
@@ -808,7 +802,6 @@ namespace Orleans.Runtime.Storage.Relational
                     HostName = record.GetValueOrDefault<string>("HostName"),
                     Status = record.GetValue<SiloStatus>("Status"),
                     ProxyPort = record.GetValueOrDefault<int>("ProxyPort"),
-                    IsPrimary = record.GetValueOrDefault<bool>("Primary"),
                     RoleName = record.GetValue<string>("RoleName"),
                     InstanceName = record.GetValue<string>("InstanceName"),
                     UpdateZone = record.GetValue<int>("UpdateZone"),
@@ -1158,19 +1151,6 @@ namespace Orleans.Runtime.Storage.Relational
 
             return parameter;
         }
-
-
-        private static IDbDataParameter CreatePrimaryParameter(IDbCommand command, bool primary, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "primary";
-            parameter.Value = primary;
-            parameter.DbType = DbType.Boolean;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
 
         private static IDbDataParameter CreateRoleNameParameter(IDbCommand command, string roleName, ParameterDirection direction)
         {

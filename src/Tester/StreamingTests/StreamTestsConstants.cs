@@ -21,39 +21,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-
-namespace Orleans.Streams
+namespace UnitTests.StreamingTests
 {
-    /// <summary>
-    /// Enumerates the messages in a stream
-    /// </summary>
-    public interface IQueueCacheCursor : IDisposable
+    public class StreamTestsConstants
     {
-        /// <summary>
-        /// Get the current value.
-        /// </summary>
-        /// <param name="exception"></param>
-        /// <returns>
-        /// Returns the current batch container.
-        /// If null then the stream has completed or there was a stream error.  
-        /// If there was a stream error, an error exception will be provided in the output.
-        /// </returns>
-        IBatchContainer GetCurrent(out Exception exception);
-
-        /// <summary>
-        /// Move to next message in the stream.
-        /// If it returns false, there are no more messages.  The enumerator is still
-        ///  valid howerver and can be called again when more data has come in on this
-        ///  stream.
-        /// </summary>
-        /// <returns></returns>
-        bool MoveNext();
-
-        /// <summary>
-        /// Refresh that cache cursor. Called when new data is added into a cache.
-        /// </summary>
-        /// <returns></returns>
-        void Refresh();
+        public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
     }
 }

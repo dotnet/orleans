@@ -25,10 +25,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -48,19 +48,90 @@ namespace Orleans.Runtime
         [Serializable]
         internal class DuplicateActivationException : Exception
         {
-            public ActivationAddress ActivationToUse { get; set; }
+            public ActivationAddress ActivationToUse { get; private set; }
 
-            public SiloAddress PrimaryDirectoryForGrain { get; set; } // for diagnostics only!
+            public SiloAddress PrimaryDirectoryForGrain { get; private set; } // for diagnostics only!
+
+            public DuplicateActivationException() : base("DuplicateActivationException") { }
+            public DuplicateActivationException(string msg) : base(msg) { }
+            public DuplicateActivationException(string message, Exception innerException) : base(message, innerException) { }
+
+            public DuplicateActivationException(ActivationAddress activationToUse)
+                : base("DuplicateActivationException")
+            {
+                ActivationToUse = activationToUse;
+            }
+
+            public DuplicateActivationException(ActivationAddress activationToUse, SiloAddress primaryDirectoryForGrain)
+                : base("DuplicateActivationException")
+            {
+                ActivationToUse = activationToUse;
+                PrimaryDirectoryForGrain = primaryDirectoryForGrain;
+            }
+
+            // Implementation of exception serialization with custom properties according to:
+            // http://stackoverflow.com/questions/94488/what-is-the-correct-way-to-make-a-custom-net-exception-serializable
+            protected DuplicateActivationException(SerializationInfo info, StreamingContext context)
+                : base(info, context)
+            {
+                if (info != null)
+                {
+                    ActivationToUse = (ActivationAddress) info.GetValue("ActivationToUse", typeof (ActivationAddress));
+                    PrimaryDirectoryForGrain = (SiloAddress) info.GetValue("PrimaryDirectoryForGrain", typeof (SiloAddress));
+                }
+            }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                if (info != null)
+                {
+                    info.AddValue("ActivationToUse", ActivationToUse, typeof (ActivationAddress));
+                    info.AddValue("PrimaryDirectoryForGrain", PrimaryDirectoryForGrain, typeof (SiloAddress));                   
+                }
+                // MUST call through to the base class to let it save its own state
+                base.GetObjectData(info, context);
+            }
         }
 
         [Serializable]
         internal class NonExistentActivationException : Exception
         {
-            public NonExistentActivationException(string message) : base(message) { }
+            public ActivationAddress NonExistentActivation { get; private set; }
 
-            public ActivationAddress NonExistentActivation { get; set; }
+            public bool IsStatelessWorker { get; private set; }
 
-            public bool IsStatelessWorker { get; set; }
+            public NonExistentActivationException() : base("NonExistentActivationException") { }
+            public NonExistentActivationException(string msg) : base(msg) { }
+            public NonExistentActivationException(string message, Exception innerException) 
+                : base(message, innerException) { }
+
+            public NonExistentActivationException(string msg, ActivationAddress nonExistentActivation, bool isStatelessWorker)
+                : base(msg)
+            {
+                NonExistentActivation = nonExistentActivation;
+                IsStatelessWorker = isStatelessWorker;
+            }
+
+            protected NonExistentActivationException(SerializationInfo info, StreamingContext context)
+                : base(info, context)
+            {
+                if (info != null)
+                {
+                    NonExistentActivation = (ActivationAddress)info.GetValue("NonExistentActivation", typeof(ActivationAddress));
+                    IsStatelessWorker = (bool)info.GetValue("IsStatelessWorker", typeof(bool));
+                }
+            }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                if (info != null)
+                {
+                    info.AddValue("NonExistentActivation", NonExistentActivation, typeof(ActivationAddress));
+                    info.AddValue("IsStatelessWorker", IsStatelessWorker, typeof(bool));
+                }
+                // MUST call through to the base class to let it save its own state
+                base.GetObjectData(info, context);
+            }
         }
 
         
@@ -390,7 +461,7 @@ namespace Orleans.Runtime
                                            address.ToFullString(), grainType);
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.CatalogNonExistingActivation2, msg);
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
-                throw new NonExistentActivationException(msg) { NonExistentActivation = address, IsStatelessWorker = placement is StatelessWorkerPlacement };
+                throw new NonExistentActivationException(msg, address, placement is StatelessWorkerPlacement);
             }
    
             SetupActivationInstance(result, grainType, genericArguments);
@@ -569,28 +640,38 @@ namespace Orleans.Runtime
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
             Type grainType = grainTypeData.Type;
+            Grain grain = (Grain) Activator.CreateInstance(grainType);
+            // Inject runtime hookups into grain instance
+            grain.Runtime = grainRuntime;
+            grain.Data = data;
+
             Type stateObjectType = grainTypeData.StateObjectType;
+            GrainState state;
+            if (stateObjectType != null)
+            {
+                state = (GrainState) Activator.CreateInstance(stateObjectType);
+                state.InitState(null);
+            }
+            else
+            {
+                state = null;
+            }
+
             lock (data)
             {
-                var grain = (Grain) Activator.CreateInstance(grainType);
                 grain.Identity = data.Identity;
-                grain.Runtime = grainRuntime;
                 data.SetGrainInstance(grain);
 
-                if (stateObjectType != null)
+                if (state != null)
                 {
                     SetupStorageProvider(data);
 
-                    var state = (GrainState)Activator.CreateInstance(stateObjectType);
-                    state.InitState(null);
                     data.GrainInstance.GrainState = state;
                     data.GrainInstance.Storage = new GrainStateStorageBridge(data.GrainTypeName, data.GrainInstance, data.StorageProvider);
                 }
             }
 
             activations.IncrementGrainCounter(grainClassName);
-
-            data.GrainInstance.Data = data;
 
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }
@@ -728,7 +809,7 @@ namespace Orleans.Runtime
                 }
             }
             logger.Info(ErrorCode.Catalog_ShutdownActivations_2,
-                "DeactivateActivationOnIdle: 1 {0}.", promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
+                "DeactivateActivationOnIdle: {0} {1}.", data.ToString(), promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
 
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE).Increment();
             if (promptly)
@@ -1072,13 +1153,7 @@ namespace Orleans.Runtime
                 if (address.Equals(returnedAddress)) return;
 
                 SiloAddress primaryDirectoryForGrain = directory.GetPrimaryForGrain(address.Grain);
-                var dae = new DuplicateActivationException
-                {
-                    ActivationToUse = returnedAddress,
-                    PrimaryDirectoryForGrain = primaryDirectoryForGrain
-                };
-
-                throw dae;
+                throw new DuplicateActivationException(returnedAddress, primaryDirectoryForGrain);
             }
             else
             {
@@ -1091,11 +1166,7 @@ namespace Orleans.Runtime
                         return;
 
                     var id = StatelessWorkerDirector.PickRandom(local).Address;
-                    var dae = new DuplicateActivationException
-                    {
-                        ActivationToUse = id,
-                    };
-                    throw dae;
+                    throw new DuplicateActivationException(id);
                 }
             }
             // We currently don't have any other case for multiple activations except for StatelessWorker.

@@ -95,30 +95,30 @@ namespace Orleans.Streams
             }
 
             // sanitize active buckets.  Remove duplicates, ensure all buckets are valid
-            List<TBucket> activeBucketsList = activeBuckets.Distinct().ToList();
-            if (activeBucketsList.Except(idealDistribution.Keys).Any())
+            HashSet<TBucket> activeBucketsSet = new HashSet<TBucket>(activeBuckets);
+            foreach (var bucket in activeBucketsSet)
             {
-                throw new ArgumentOutOfRangeException("activeBuckets", "Active buckets contains buckets no in master list");
+                if (!idealDistribution.ContainsKey(bucket))
+                {
+                    throw new ArgumentOutOfRangeException("activeBuckets", String.Format("Active buckets contain a bucket {0} not in the master list.", bucket));
+                }
             }
 
             var newDistribution = new Dictionary<TBucket, List<TResource>>();
             // if no buckets, return empty resource distribution
-            if (activeBucketsList.Count == 0)
+            if (activeBucketsSet.Count == 0)
             {
                 return newDistribution;
             }
-
-            // sanitize inputs.  Stort active buckets
-            activeBucketsList.Sort();
             
             // setup ideal distribution for active buckets
-            foreach (TBucket bucket in idealDistribution.Keys.Where(activeBucketsList.Contains))
+            foreach (TBucket bucket in idealDistribution.Keys.Where(activeBucketsSet.Contains))
             {
-                newDistribution.Add(bucket, idealDistribution[bucket].ToList());
+                newDistribution.Add(bucket, idealDistribution[bucket]);
             }
 
             // get list of inactive buckets
-            List<TBucket> inactiveBuckets = idealDistribution.Keys.Where(bucket => !activeBucketsList.Contains(bucket)).ToList();
+            List<TBucket> inactiveBuckets = idealDistribution.Keys.Where(bucket => !activeBucketsSet.Contains(bucket)).ToList();
 
             // build list of all resources that need redistributed from inactive buckets
             var resourcesToRedistribute = new List<TResource>();

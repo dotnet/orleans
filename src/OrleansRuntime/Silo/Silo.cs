@@ -45,6 +45,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
+using System.Runtime;
 
 
 namespace Orleans.Runtime
@@ -195,8 +196,15 @@ namespace Orleans.Runtime
             }
             TraceLogger.MyIPEndPoint = here;
             logger = TraceLogger.GetLogger("Silo", TraceLogger.LoggerType.Runtime);
-            logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on {1} at {2}, gen {3} --------------", siloType, nodeConfig.DNSHostName, here, generation);
-            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with runtime Version='{1}' Config= " + Environment.NewLine + "{2}", name, RuntimeVersion.Current, config.ToString(name));
+
+            logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
+            if (!GCSettings.IsServerGC || !GCSettings.LatencyMode.Equals(GCLatencyMode.Batch))
+                logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on or with GCLatencyMode.Batch enabled - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\"> and <configuration>-<runtime>-<gcConcurrent enabled=\"false\"/>");
+
+            logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on host {1} MachineName {2} at {3}, gen {4} --------------",
+                siloType, nodeConfig.DNSHostName, Environment.MachineName, here, generation);
+            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with runtime Version='{1}' .NET version='{2}' Is .NET 4.5={3} OS version='{4}' Config= " + Environment.NewLine + "{5}",
+                name, RuntimeVersion.Current, Environment.Version, ConfigUtilities.IsNet45OrNewer(), Environment.OSVersion, config.ToString(name));
 
             if (keyStore != null)
             {
@@ -695,11 +703,19 @@ namespace Orleans.Runtime
                 SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
                 // 8:
+                SafeExecute(() =>
+                {                
+                    var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
+                    scheduler.QueueTask(() => siloStreamProviderManager.StopStreamProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+
+                // 9:
                 SafeExecute(storageProviderManager.UnloadStorageProviders);
             }
             finally
             {
-                // 8, 9, 10: Write Dead in the table, Drain scheduler, Stop msg center, ...
+                // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
                 FastKill();
                 logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
             }

@@ -54,9 +54,11 @@ namespace Orleans.Streams
         StreamSequenceToken SequenceToken { get; }
 
         /// <summary>
-        /// The RequestContext that was set at the time event was generated and enqueued into the persistent provider.
+        /// Gives an opportunity to IBatchContainer to set any data in the RequestContext before this IBatchContainer is sent to consumers.
+        /// It can be the data that was set at the time event was generated and enqueued into the persistent provider or any other data.
         /// </summary>
-        Dictionary<string, object> RequestContext { get; }
+        /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
+        bool ImportRequestContext();
 
         /// <summary>
         /// Decide whether this batch should be sent to the specified target.

@@ -330,6 +330,15 @@ namespace Orleans.Streams
                         CleanupPubSubCache(now);
                     }
 
+                    if (queueCache != null)
+                    {
+                        IList<IBatchContainer> purgedItems;
+                        if (queueCache.TryPurgeFromCache(out purgedItems))
+                        {
+                            await rcvr.MessagesDeliveredAsync(purgedItems);
+                        }
+                    }
+
                     if (queueCache != null && queueCache.IsUnderPressure())
                     {
                         // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
@@ -361,7 +370,7 @@ namespace Orleans.Streams
                         if (pubSubCache.TryGetValue(streamId, out streamData))
                         {
                             streamData.RefreshActivity(now);
-                            StartInactiveCursors(streamId, streamData); // if this is an existing stream, start any inactive cursors
+                            StartInactiveCursors(streamData); // if this is an existing stream, start any inactive cursors
                         }
                         else
                         {
@@ -406,17 +415,23 @@ namespace Orleans.Streams
             }
         }
 
-        private void StartInactiveCursors(StreamId streamId, StreamConsumerCollection streamData)
+        private void StartInactiveCursors(StreamConsumerCollection streamData)
         {
-            // if stream is already registered, just wake inactive consumers
-            // get list of inactive consumers
-            var inactiveStreamConsumers = streamData.AllConsumers()
-                .Where(consumer => consumer.State == StreamConsumerDataState.Inactive)
-                .ToList();
-
-            // for each inactive stream
-            foreach (StreamConsumerData consumerData in inactiveStreamConsumers)
-                RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
+            foreach (StreamConsumerData consumerData in streamData.AllConsumers())
+            {
+                if (consumerData.State == StreamConsumerDataState.Inactive)
+                {
+                    // wake up inactive consumers
+                    RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
+                }
+                else
+                {
+                    if (consumerData.Cursor != null)
+                    {
+                        consumerData.Cursor.Refresh();
+                    }
+                }
+            }
         }
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData, IStreamFilterPredicateWrapper filterWrapper)
@@ -535,51 +550,52 @@ namespace Orleans.Streams
 
         private async Task DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
-            if (batch.RequestContext != null)
-            {
-                RequestContext.Import(batch.RequestContext);
-            }
+            StreamSequenceToken prevToken = consumerData.LastToken;
+            Task<StreamSequenceToken> batchDeliveryTask;
+
+            bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                StreamSequenceToken prevToken = consumerData.LastToken;
-                StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
-                if (newToken != null)
-                {
-                    consumerData.LastToken = newToken;
-                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
-                        consumerData.StreamId.Namespace, newToken);
-                }
-                else
-                {
-                    consumerData.LastToken = batch.SequenceToken; // this is the currently delivered token
-                }
+                batchDeliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable(), prevToken);
             }
             finally
             {
-                if (batch.RequestContext != null)
+                if (isRequestContextSet)
                 {
+                    // clear RequestContext before await!
                     RequestContext.Clear();
                 }
             }
+            StreamSequenceToken newToken = await batchDeliveryTask;
+            if (newToken != null)
+            {
+                consumerData.LastToken = newToken;
+                consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
+                    consumerData.StreamId.Namespace, newToken);
+            }
+            else
+            {
+                consumerData.LastToken = batch.SequenceToken; // this is the currently delivered token
+            }
+
         }
 
         private async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
-            if (batch !=null && batch.RequestContext != null)
-            {
-                RequestContext.Import(batch.RequestContext);
-            }
+            Task errorDeliveryTask;
+            bool isRequestContextSet = batch != null && batch.ImportRequestContext();
             try
             {
-                await consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
+                errorDeliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, exc);
             }
             finally
             {
-                if (batch != null && batch.RequestContext != null)
+                if (isRequestContextSet)
                 {
-                    RequestContext.Clear();
+                    RequestContext.Clear(); // clear RequestContext before await!
                 }
             }
+            await errorDeliveryTask;
         }
 
         private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)

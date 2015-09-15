@@ -39,9 +39,7 @@ namespace UnitTests.StreamingTests
     [TestClass]
     public class SampleStreamingTests : UnitTestSiloHost
     {
-        private const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
-        private const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
-        private const string StreamNamespace = "SampleStreamNamespace";
+        private const string StreamNamespace = "SampleStreamNamespace"; 
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private Guid streamId;
@@ -70,9 +68,9 @@ namespace UnitTests.StreamingTests
         [TestCleanup]
         public void TestCleanup()
         {
-            if (streamProvider != null && streamProvider.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
+            if (streamProvider != null && streamProvider.Equals(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
             }
         }
 
@@ -81,7 +79,7 @@ namespace UnitTests.StreamingTests
         {
             logger.Info("************************ SampleStreamingTests_1 *********************************");
             streamId = Guid.NewGuid();
-            streamProvider = SMS_STREAM_PROVIDER_NAME;
+            streamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
         }
 
@@ -90,7 +88,7 @@ namespace UnitTests.StreamingTests
         {
             logger.Info("************************ SampleStreamingTests_2 *********************************");
             streamId = Guid.NewGuid();
-            streamProvider = SMS_STREAM_PROVIDER_NAME;
+            streamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
@@ -99,7 +97,7 @@ namespace UnitTests.StreamingTests
         {
             logger.Info("************************ SampleStreamingTests_3 *********************************" );
             streamId = Guid.NewGuid();
-            streamProvider = SMS_STREAM_PROVIDER_NAME;
+            streamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             await StreamingTests_Producer_InlineConsumer(streamId, streamProvider );
         }
 
@@ -108,7 +106,7 @@ namespace UnitTests.StreamingTests
         {
             logger.Info("************************ SampleStreamingTests_4 *********************************");
             streamId = Guid.NewGuid();
-            streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
+            streamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             await StreamingTests_Consumer_Producer(streamId, streamProvider);
         }
 
@@ -117,7 +115,7 @@ namespace UnitTests.StreamingTests
         {
             logger.Info("************************ SampleStreamingTests_5 *********************************");
             streamId = Guid.NewGuid();
-            streamProvider = AZURE_QUEUE_STREAM_PROVIDER_NAME;
+            streamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             await StreamingTests_Producer_Consumer(streamId, streamProvider);
         }
 
@@ -128,7 +126,7 @@ namespace UnitTests.StreamingTests
             streamId = Guid.NewGuid();
             const int nRedEvents = 5, nBlueEvents = 3;
 
-            var provider = GrainClient.GetStreamProvider(SMS_STREAM_PROVIDER_NAME);
+            var provider = GrainClient.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             var redStream = provider.GetStream<int>(streamId, "red");
             var blueStream = provider.GetStream<int>(streamId, "blue");
 
