@@ -32,10 +32,6 @@ namespace TestGrains
         IJournaledGrainStateTransition<StaticPersonState, PersonMarried>,
         IJournaledGrainStateTransition<StaticPersonState, PersonLastNameChanged>
     {
-        public StaticPersonState()
-            : base(typeof(StaticPersonState))
-        { }
-
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public GenderType Gender { get; set; }

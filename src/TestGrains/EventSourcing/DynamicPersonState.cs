@@ -27,29 +27,25 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonState : JournaledGrainState<PersonState>
+    public class DynamicPersonState : JournaledGrainState<DynamicPersonState>
     {
-        public PersonState()
-            : base(typeof(PersonState))
-        { }
-
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public GenderType Gender { get; set; }
 
-        public void Apply(PersonState state, PersonRegistered registered)
+        public void Apply(DynamicPersonState state, PersonRegistered registered)
         {
             state.FirstName = registered.FirstName;
             state.LastName = registered.LastName;
             state.Gender = registered. Gender;
         }
 
-        public void Apply(PersonState state, PersonMarried married)
+        public void Apply(DynamicPersonState state, PersonMarried married)
         {
             // TODO
         }
 
-        public void Apply(PersonState state, PersonLastNameChanged lnChanged)
+        public void Apply(DynamicPersonState state, PersonLastNameChanged lnChanged)
         {
             state.LastName = lnChanged.LastName;
         }
