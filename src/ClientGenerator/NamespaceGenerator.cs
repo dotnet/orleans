@@ -583,19 +583,9 @@ namespace Orleans.CodeGeneration
             ConsoleText.WriteWarning("Warning: " + warning);
         }
         
-
         private void AddFactoryMethods(GrainInterfaceData si, CodeTypeDeclaration factoryClass)
         {
             RecordReferencedNamespaceAndAssembly(si.Type);
-            if (GrainInterfaceData.IsGrainType(si.Type) && ShouldGenerateGetGrainMethods(si.Type))
-                AddGetGrainMethods(si, factoryClass);
-        }
-
-        private static bool ShouldGenerateGetGrainMethods(Type type)
-        {
-            // we don't generate these methods if this is a client object factory.
-            var factoryType = FactoryAttribute.CollectFactoryTypesSpecified(type);
-            return factoryType != FactoryAttribute.FactoryTypes.ClientObject;
         }
         
         /// <summary>
