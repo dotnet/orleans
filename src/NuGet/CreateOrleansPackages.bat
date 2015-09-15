@@ -39,7 +39,7 @@ if "%PRODUCT_VERSION%" == "" (
 @echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%
 
 @set NUGET_PACK_OPTS= -Version %VERSION% 
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis -Symbols
 @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%"
 @REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
 
