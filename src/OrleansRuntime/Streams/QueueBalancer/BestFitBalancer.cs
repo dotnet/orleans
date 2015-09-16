@@ -176,7 +176,7 @@ namespace Orleans.Streams
             foreach (TBucket bucket in bucketList)
             {
                 // if we've filled the first bucketsToFillWithUpperResource buckets with upperResourceCountPerBucket
-                //   resource , fill the rest with lowerResourceCountPerBucket
+                //   resources, fill the rest with lowerResourceCountPerBucket
                 int resourcesToAddToBucket = bucketsFilledCount < bucketsToFillWithUpperResource
                     ? upperResourceCountPerBucket
                     : lowerResourceCountPerBucket;
