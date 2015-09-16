@@ -46,9 +46,61 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [TestMethod, TestCategory("Functional")]
+        public void IdealCaseMoreResourcesThanBuckets2Test()
+        {
+            const int resourceCount = 100;
+            const int bucketCount = 30;
+            var idealBalance = (int)Math.Floor((double)(resourceCount) / bucketCount);
+            List<int> resources = Enumerable.Range(0, resourceCount).ToList();
+            List<int> buckets = Enumerable.Range(0, bucketCount).ToList();
+            var resourceBalancer = new BestFitBalancer<int, int>(buckets, resources);
+            Dictionary<int, List<int>> balancerResults = resourceBalancer.GetDistribution(buckets);
+            ValidateBalance(buckets, resources, balancerResults, idealBalance);
+        }
+
+        [TestMethod, TestCategory("Functional")]
         public void IdealCaseLessResourcesThanBucketsTest()
         {
             const int bucketCount = 99;
+            const int resourceCount = 10;
+            var idealBalance = (int)Math.Floor((double)(resourceCount) / bucketCount);
+            List<int> buckets = Enumerable.Range(0, bucketCount).ToList();
+            List<int> resources = Enumerable.Range(0, resourceCount).ToList();
+            var resourceBalancer = new BestFitBalancer<int, int>(buckets, resources);
+            Dictionary<int, List<int>> balancerResults = resourceBalancer.GetDistribution(buckets);
+            ValidateBalance(buckets, resources, balancerResults, idealBalance);
+        }
+
+        [TestMethod, TestCategory("Functional")]
+        public void IdealCaseLessResourcesThanBuckets2Test()
+        {
+            const int bucketCount = 100;
+            const int resourceCount = 30;
+            var idealBalance = (int)Math.Floor((double)(resourceCount) / bucketCount);
+            List<int> buckets = Enumerable.Range(0, bucketCount).ToList();
+            List<int> resources = Enumerable.Range(0, resourceCount).ToList();
+            var resourceBalancer = new BestFitBalancer<int, int>(buckets, resources);
+            Dictionary<int, List<int>> balancerResults = resourceBalancer.GetDistribution(buckets);
+            ValidateBalance(buckets, resources, balancerResults, idealBalance);
+        }
+
+        [TestMethod, TestCategory("Functional")]
+        public void IdealCaseResourcesMatchBucketsTest()
+        {
+            const int bucketCount = 100;
+            const int resourceCount = 100;
+            var idealBalance = (int)Math.Floor((double)(resourceCount) / bucketCount);
+            List<int> buckets = Enumerable.Range(0, bucketCount).ToList();
+            List<int> resources = Enumerable.Range(0, resourceCount).ToList();
+            var resourceBalancer = new BestFitBalancer<int, int>(buckets, resources);
+            Dictionary<int, List<int>> balancerResults = resourceBalancer.GetDistribution(buckets);
+            ValidateBalance(buckets, resources, balancerResults, idealBalance);
+        }
+
+        [TestMethod, TestCategory("Functional")]
+        public void IdealCaseResourcesDevisibleByBucketsTest()
+        {
+            const int bucketCount = 100;
             const int resourceCount = 10;
             var idealBalance = (int)Math.Floor((double)(resourceCount) / bucketCount);
             List<int> buckets = Enumerable.Range(0, bucketCount).ToList();
