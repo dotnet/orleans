@@ -151,7 +151,7 @@ namespace Orleans.Streams
         /// <param name="buckets">Buckets among which to destribute resources.</param>
         /// <param name="resources">Resources to be distributed.</param>
         /// <returns>Dictionary of resources evenly distributed among the buckets</returns>
-        private Dictionary<TBucket, List<TResource>> BuildIdealDistribution(IEnumerable<TBucket> buckets, IEnumerable<TResource> resources)
+        private static Dictionary<TBucket, List<TResource>> BuildIdealDistribution(IEnumerable<TBucket> buckets, IEnumerable<TResource> resources)
         {
             var idealDistribution = new Dictionary<TBucket, List<TResource>>();
 
@@ -168,20 +168,29 @@ namespace Orleans.Streams
             resourceList.Sort();
 
             // Distribute resources evenly among buckets
-            var idealResourceCountPerBucket = (int)Math.Ceiling((double)resourceList.Count / bucketList.Count);
+            var upperResourceCountPerBucket = (int)Math.Ceiling((double)resourceList.Count / bucketList.Count);
+            var lowerResourceCountPerBucket = upperResourceCountPerBucket - 1;
             List<TResource>.Enumerator resourceEnumerator = resourceList.GetEnumerator();
+            int bucketsToFillWithUpperResource = resourceList.Count % bucketList.Count;
+            int bucketsFilledCount = 0;
             foreach (TBucket bucket in bucketList)
             {
+                // if we've filled the first bucketsToFillWithUpperResource buckets with upperResourceCountPerBucket
+                //   resource , fill the rest with lowerResourceCountPerBucket
+                int resourcesToAddToBucket = bucketsFilledCount < bucketsToFillWithUpperResource
+                    ? upperResourceCountPerBucket
+                    : lowerResourceCountPerBucket;
                 var bucketResources = new List<TResource>();
                 idealDistribution.Add(bucket, bucketResources);
                 while (resourceEnumerator.MoveNext())
                 {
                     bucketResources.Add(resourceEnumerator.Current);
-                    if (bucketResources.Count >= idealResourceCountPerBucket)
+                    if (bucketResources.Count >= resourcesToAddToBucket)
                     {
                         break;
                     }
                 }
+                bucketsFilledCount++;
             }
             return idealDistribution;
         }
