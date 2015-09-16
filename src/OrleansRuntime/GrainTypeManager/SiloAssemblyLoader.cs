@@ -74,7 +74,6 @@ namespace Orleans.Runtime
         public IDictionary<string, GrainTypeData> GetGrainClassTypes(bool strict)
         {
             var result = new Dictionary<string, GrainTypeData>();
-            IDictionary<string, Type> grainStateTypes = GetGrainStateTypes(strict);
             Type[] grainTypes = strict
                 ? TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass).ToArray()
                 : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsConcreteGrainClass).ToArray();
@@ -86,31 +85,28 @@ namespace Orleans.Runtime
                     throw new InvalidOperationException(
                         string.Format("Precondition violated: GetLoadedGrainTypes should not return a duplicate type ({0})", className));
                 
-                var parameterizedName = grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType);
-                Type grainStateType;
-                grainStateTypes.TryGetValue(parameterizedName, out grainStateType);
+                Type grainStateType = null;
 
-                if (grainStateType == null) // check if grainType derives from Grain<T> where T is a concrete class
+                // check if grainType derives from Grain<T> where T is a concrete class
+                
+                var parentType = grainType.BaseType;
+                while (parentType != typeof (Grain) && parentType != typeof(object))
                 {
-                    var parentType = grainType.BaseType;
-                    while (parentType != typeof (Grain) && parentType != typeof(object))
+                    if (parentType.IsGenericType)
                     {
-                        if (parentType.IsGenericType)
+                        var definition = parentType.GetGenericTypeDefinition();
+                        if (definition == typeof (Grain<>))
                         {
-                            var definition = parentType.GetGenericTypeDefinition();
-                            if (definition == typeof (Grain<>))
+                            var stateArg = parentType.GetGenericArguments()[0];
+                            if (stateArg.IsClass)
                             {
-                                var stateArg = parentType.GetGenericArguments()[0];
-                                if (stateArg.IsClass)
-                                {
-                                    grainStateType = stateArg;
-                                    break;
-                                }
+                                grainStateType = stateArg;
+                                break;
                             }
                         }
-
-                        parentType = parentType.BaseType;
                     }
+
+                    parentType = parentType.BaseType;
                 }
 
                 GrainTypeData typeData = GetTypeData(grainType, grainStateType);
@@ -118,25 +114,6 @@ namespace Orleans.Runtime
             }
 
             LogGrainTypesFound(logger, result);
-            return result;
-        }
-
-        private IDictionary<string, Type> GetGrainStateTypes(bool strict)
-        {
-            var result = new Dictionary<string, Type>();
-            Type[] types = strict
-                ? TypeUtils.GetTypes(TypeUtils.IsGrainStateType).ToArray()
-                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainStateType).ToArray();
-
-            foreach (var type in types)
-            {
-                var attr = (GrainStateAttribute)type.GetCustomAttributes(typeof(GrainStateAttribute), true).Single();
-                if (result.ContainsKey(attr.ForGrainType))
-                    throw new InvalidOperationException(
-                        string.Format("Grain class {0} is already associated with grain state object type {1}", attr.ForGrainType, type.FullName));
-            
-                result.Add(attr.ForGrainType, type);
-            }
             return result;
         }
 

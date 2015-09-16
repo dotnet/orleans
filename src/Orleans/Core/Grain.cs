@@ -41,7 +41,7 @@ namespace Orleans
     {
         private IGrainRuntime runtime;
 
-        internal IGrainState GrainState { get; set; }
+        internal GrainState GrainState { get; set; }
 
         internal IStorage Storage { get; set; }
 
@@ -277,9 +277,9 @@ namespace Orleans
     /// <summary>
     /// Base class for a Grain with declared persistent state.
     /// </summary>
-    /// <typeparam name="TGrainState">The interface of the persistent state object</typeparam>
+    /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
     public class Grain<TGrainState> : Grain
-        where TGrainState : class, IGrainState
+        where TGrainState : GrainState
     {
 
         /// <summary>

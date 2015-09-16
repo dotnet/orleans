@@ -66,11 +66,6 @@ namespace Orleans.CodeGeneration
 
         internal CodeNamespace ReferencedNamespace { get; private set; }
 
-        internal void AddStateClass(GrainInterfaceData interfaceData)
-        {
-            GetActivationNamespace(ReferencedNamespace, interfaceData);
-        }
-
         internal void AddReferenceClass(GrainInterfaceData interfaceData)
         {
             bool isObserver = IsObserver(interfaceData.Type);
@@ -274,170 +269,7 @@ namespace Orleans.CodeGeneration
         {
             return str;
         }
-
-        protected virtual CodeTypeDeclaration GetStateClass(
-            GrainInterfaceData grainInterfaceData,
-            Action<Type> referred,
-            string stateClassBaseName,
-            string stateClassName,
-            out bool hasStateClass)
-        {
-            var sourceType = grainInterfaceData.Type;
-
-            stateClassName = FixupTypeName(stateClassName);
-            CodeTypeParameterCollection genericTypeParams = grainInterfaceData.GenericTypeParams;
-
-            Func<Type, bool> nonamespace = t => CurrentNamespace == t.Namespace || ReferencedNamespaces.Contains(t.Namespace);
-
-            Type persistentInterface = GetPersistentInterface(sourceType);
-
-            if (persistentInterface!=null)
-            {
-                if (!persistentInterface.IsInterface)
-                {
-                    hasStateClass = false;
-                    return null;
-                }
-                ConsoleText.WriteError(string.Format("Warning: Usage of grain state interfaces as type arguments for Grain<T> has been deprecated. " +
-                                                     "Define an equivalent class with automatic properties instead of the state interface for {0}.", sourceType.FullName));
-            }
-
-            Dictionary<string, PropertyInfo> asyncProperties = GrainInterfaceData.GetPersistentProperties(persistentInterface)
-                .ToDictionary(p => p.Name.Substring(p.Name.LastIndexOf('.') + 1), p => p);
-
-            Dictionary<string, string> properties = asyncProperties.ToDictionary(p => p.Key,
-                    p => GetGenericTypeName(GrainInterfaceData.GetPromptType(p.Value.PropertyType), referred, nonamespace));
-
-            var stateClass = new CodeTypeDeclaration(stateClassBaseName);
-            if (genericTypeParams != null) 
-                stateClass.TypeParameters.AddRange(genericTypeParams);
-            stateClass.IsClass = true;
-
-            if (persistentInterface != null)
-                stateClass.TypeAttributes = persistentInterface.IsPublic ? TypeAttributes.Public : TypeAttributes.NotPublic;
-            else
-                stateClass.TypeAttributes = TypeAttributes.Public;
-
-            stateClass.BaseTypes.Add(new CodeTypeReference(typeof(GrainState), CodeTypeReferenceOptions.GlobalReference));
-            MarkAsGeneratedCode(stateClass);
-            referred(typeof(GrainState));
-
-            if (persistentInterface != null)
-                stateClass.BaseTypes.Add( new CodeTypeReference(GetGenericTypeName(persistentInterface, referred, nonamespace)));
-
-            stateClass.CustomAttributes.Add(new CodeAttributeDeclaration(typeof(SerializableAttribute).Name));
-            stateClass.CustomAttributes.Add(new CodeAttributeDeclaration(new CodeTypeReference(typeof(GrainStateAttribute), CodeTypeReferenceOptions.GlobalReference),
-                new CodeAttributeArgument(new CodePrimitiveExpression(grainInterfaceData.Type.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainInterfaceData.Type, language: language)))));
-
-            referred(typeof(SerializableAttribute));
-            referred(typeof(OnDeserializedAttribute));
-
-            var initStateFields = new CodeMemberMethod {Name = "InitStateFields"};
-            initStateFields.Attributes = (initStateFields.Attributes & ~MemberAttributes.AccessMask) | MemberAttributes.Private;
-            foreach (var peoperty in asyncProperties)
-            {
-                Type propertyType = peoperty.Value.PropertyType;
-
-                bool noCreateNew = propertyType.IsPrimitive || typeof(string).IsAssignableFrom(propertyType) // Primative types
-                    || propertyType.IsAbstract || propertyType.IsInterface || propertyType.IsGenericParameter // No concrete implementation
-                    || propertyType.GetConstructor(Type.EmptyTypes) == null; // No default constructor
-
-                var initExpression = noCreateNew // Pre-initialize this type to default value
-                    ? (CodeExpression) new CodeDefaultValueExpression( new CodeTypeReference(GetGenericTypeName(propertyType, referred, nonamespace)))
-                    : new CodeObjectCreateExpression( new CodeTypeReference(GetGenericTypeName(propertyType, referred, nonamespace)));
-
-                initStateFields.Statements.Add(new CodeAssignStatement(
-                    new CodePropertyReferenceExpression(new CodeThisReferenceExpression(), peoperty.Key),
-                    initExpression));
-            }
-
-            hasStateClass = properties.Count > 0;
-
-            if (hasStateClass)
-            {
-                foreach (var pair in properties)
-                    GenerateStateClassProperty(stateClass, asyncProperties[pair.Key], pair.Key, pair.Value);
-
-                var returnType = new CodeTypeReference("System.Collections.Generic.IDictionary",
-                    new CodeTypeReference(typeof(string)), new CodeTypeReference(typeof(object)));
-                var concreteType = new CodeTypeReference("System.Collections.Generic.Dictionary",
-                    new CodeTypeReference(typeof(string)), new CodeTypeReference(typeof(object)));
-
-                var asDictionary = new CodeMemberMethod
-                {
-                    Name = "AsDictionary",
-                    Attributes = MemberAttributes.Public | MemberAttributes.Override,
-                    ReturnType = returnType
-                };
-
-                asDictionary.Statements.Add(new CodeVariableDeclarationStatement(concreteType, "result", new CodeObjectCreateExpression(concreteType)));
-                foreach (var pair in properties)
-                    asDictionary.Statements.Add(new CodeAssignStatement(
-                        new CodeIndexerExpression(new CodeVariableReferenceExpression("result"), new CodePrimitiveExpression(pair.Key)),
-                        new CodePropertyReferenceExpression(new CodeThisReferenceExpression(), pair.Key)));
-
-                asDictionary.Statements.Add(new CodeMethodReturnStatement(new CodeVariableReferenceExpression("result")));
-                stateClass.Members.Add(asDictionary);
-
-                GenerateSetAll(stateClass, properties);
-                GenerateToString(stateClass, stateClassName, properties);
-            }
-
-            // Copier, serializer, and deserializer for the state class
-            var copier = SerializerGenerationUtilities.GenerateCopier("_Copier", stateClassName, genericTypeParams);
-            var serializer = SerializerGenerationUtilities.GenerateSerializer("_Serializer", stateClassName, genericTypeParams);
-            var deserializer = SerializerGenerationUtilities.GenerateDeserializer("_Deserializer", stateClassName, genericTypeParams);
-
-            var ctor = new CodeConstructor { Attributes = (copier.Attributes & ~MemberAttributes.AccessMask) | MemberAttributes.Public };
-            ctor.BaseConstructorArgs.Add(new CodePrimitiveExpression(TypeUtils.GetFullName(grainInterfaceData.Type, language)));
-            ctor.Statements.Add(new CodeMethodInvokeExpression(
-                new CodeThisReferenceExpression(),
-                "InitStateFields"));
-
-            copier.Statements.Add(new CodeMethodReturnStatement(
-                new CodeMethodInvokeExpression(new CodeVariableReferenceExpression("input"), "DeepCopy")));
-
-            serializer.Statements.Add(
-                new CodeMethodInvokeExpression(
-                    new CodeVariableReferenceExpression("input"),
-                    "SerializeTo", new CodeArgumentReferenceExpression("stream")));
-
-            deserializer.Statements.Add(new CodeVariableDeclarationStatement(stateClassName, "result",
-                new CodeObjectCreateExpression(stateClassName)));
-            deserializer.Statements.Add(new CodeMethodInvokeExpression(
-                    new CodeVariableReferenceExpression("result"),
-                    "DeserializeFrom",
-                    new CodeArgumentReferenceExpression("stream")));
-            deserializer.Statements.Add(new CodeMethodReturnStatement(
-                    new CodeVariableReferenceExpression("result")));
-
-            stateClass.Members.Add(ctor);
-            stateClass.Members.Add(initStateFields);
-            stateClass.Members.Add(copier);
-            stateClass.Members.Add(serializer);
-            stateClass.Members.Add(deserializer);
-
-            return stateClass;
-        }
-
-        protected virtual void GenerateSetAll(CodeTypeDeclaration stateClass, Dictionary<string, string> properties)
-        {
-            // Could be abstract if GenerateNamespace were abstract.
-            throw new NotImplementedException("InvokerGeneratorBasic.GenerateSetAll()");
-        }
-
-        protected virtual void GenerateToString(CodeTypeDeclaration stateClass, string stateClassName, Dictionary<string, string> properties)
-        {
-            // Could be abstract if GenerateNamespace were abstract.
-            throw new NotImplementedException("InvokerGeneratorBasic.GenerateToString()");
-        }
-
-        protected virtual void GenerateStateClassProperty(CodeTypeDeclaration stateClass, PropertyInfo propInfo, string name, string type)
-        {
-            // Could be abstract if GenerateNamespace were abstract.
-            throw new NotImplementedException("InvokerGeneratorBasic.GenerateToString()");
-        }
-
+        
         protected virtual void AddCreateObjectReferenceMethods(GrainInterfaceData grainInterfaceData, CodeTypeDeclaration factoryClass)
         {
             throw new NotImplementedException("GrainNamespace.AddCreateObjectReferenceMethods");
@@ -585,22 +417,6 @@ namespace Orleans.CodeGeneration
                     codeRef.TypeArguments.Add(CreateCodeTypeReference(genericArg, language));
 
             return codeRef;
-        }
-
-        private void GetActivationNamespace(CodeNamespace factoryNamespace, GrainInterfaceData grainInterfaceData)
-        {
-            if (!typeof (Grain).IsAssignableFrom(grainInterfaceData.Type)) return;
-
-            // generate a state class
-            bool hasStateClass;
-            var code = GetStateClass(grainInterfaceData,
-                RecordReferencedNamespaceAndAssembly,
-                grainInterfaceData.StateClassBaseName,
-                grainInterfaceData.StateClassName,
-                out hasStateClass);
-
-            if (code != null && hasStateClass)
-                factoryNamespace.Types.Add(code);
         }
 
         private CodeTypeDeclaration GetInvokerClass(GrainInterfaceData si, bool isClient)
@@ -767,19 +583,9 @@ namespace Orleans.CodeGeneration
             ConsoleText.WriteWarning("Warning: " + warning);
         }
         
-
         private void AddFactoryMethods(GrainInterfaceData si, CodeTypeDeclaration factoryClass)
         {
             RecordReferencedNamespaceAndAssembly(si.Type);
-            if (GrainInterfaceData.IsGrainType(si.Type) && ShouldGenerateGetGrainMethods(si.Type))
-                AddGetGrainMethods(si, factoryClass);
-        }
-
-        private static bool ShouldGenerateGetGrainMethods(Type type)
-        {
-            // we don't generate these methods if this is a client object factory.
-            var factoryType = FactoryAttribute.CollectFactoryTypesSpecified(type);
-            return factoryType != FactoryAttribute.FactoryTypes.ClientObject;
         }
         
         /// <summary>

@@ -177,34 +177,7 @@ namespace Orleans.CodeGeneration
                 new CodeAttributeDeclaration(new CodeTypeReference(typeof(DebuggerNonUserCodeAttribute))));
         }
         
-        /// <summary>
-        /// Finds the Persistent interface given the grain class
-        /// </summary>
-        /// <param name="sourceType">source grain type</param>
-        /// <returns>Persistent interface </returns>
-        protected static Type GetPersistentInterface(Type sourceType)
-        {
-            if (!typeof (Grain).IsAssignableFrom(sourceType)) return null;
-
-            Type persistentInterface = null;
-            Type baseType = sourceType.BaseType;
-
-            if (baseType == null || baseType == typeof (Grain)) return null;
-
-            // go up till we find the base classe that derives directly from Grain
-            while (!(baseType.BaseType == typeof (Grain)))
-                baseType = baseType.BaseType;
-
-            // Now we have a base class that derives from Grain,
-            // make sure it is generic and actually the Grain<T>
-            if (baseType.IsGenericType && baseType.Name.StartsWith(typeof(Grain).Name) 
-                && baseType.Namespace == typeof(Grain).Namespace)
-            {
-                // the argument is type of peristent interface
-                persistentInterface = baseType.GetGenericArguments()[0];
-            }
-            return persistentInterface;
-        }protected virtual string GetInvokerImpl(GrainInterfaceData si, CodeTypeDeclaration invokerClass, Type grainType, GrainInterfaceInfo grainInterfaceInfo, bool isClient)
+        protected virtual string GetInvokerImpl(GrainInterfaceData si, CodeTypeDeclaration invokerClass, Type grainType, GrainInterfaceInfo grainInterfaceInfo, bool isClient)
         {
             throw new NotImplementedException("InvokerGeneratorBasics.GetInvokerImpl");
         }

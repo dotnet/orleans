@@ -81,7 +81,6 @@ namespace Orleans.Runtime
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             Config = config;
             config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
-            CallbackData.Config = Config.Globals;
             RuntimeClient.Current = this;
             this.typeManager = typeManager;
             this.InternalGrainFactory = grainFactory;
@@ -119,7 +118,7 @@ namespace Orleans.Runtime
             InvokeMethodOptions options,
             string genericArguments = null)
         {
-            var message = RuntimeClient.CreateMessage(request, options);
+            var message = Message.CreateMessage(request, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
 
@@ -204,7 +203,8 @@ namespace Orleans.Runtime
                     TryResendMessage, 
                     context,
                     message,
-                    () => UnRegisterCallback(message.Id));
+                    () => UnRegisterCallback(message.Id),
+                    Config.Globals);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(ResponseTimeout);
             }
