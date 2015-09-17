@@ -104,8 +104,6 @@ namespace Orleans.Runtime
 
         private IDependencyResolver dependencyResolver = DefaultResolver.Instance;
 
-        private readonly List<IProvider> allSiloProviders;
-
         internal readonly string Name;
         internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; private set; }

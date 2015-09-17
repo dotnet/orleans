@@ -155,11 +155,5 @@ namespace Orleans.Providers.Streams.Common
                 (PersistentStreamProviderCommand)command, arg != null ? arg.ToString() : "null"));
             throw new ArgumentException("PullingAgentManager is not initialized yet.");
         }
-
-        public Task<object> ExecuteCommand(int command, object arg)
-        {
-            logger.Info(0, String.Format("Got command {0} with arg {1}.", command, arg != null ? arg.ToString() : "null"));
-            return Task.FromResult((object)null);
-        }
     }
 }
