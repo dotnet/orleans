@@ -162,7 +162,7 @@ namespace Orleans.Runtime
         /// <param name="config">Silo config data to be used for this silo.</param>
         public Silo(string name, SiloType siloType, ClusterConfiguration config)
             : this(name, siloType, config, null)
-        {}
+        { }
 
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
@@ -467,6 +467,7 @@ namespace Orleans.Runtime
                 .WaitForResultWithThrow(initTimeout);
             if (statsProviderName != null)
                 LocalConfig.StatisticsProviderName = statsProviderName;
+
             allSiloProviders.AddRange(statisticsProviderManager.GetProviders());
 
             // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).

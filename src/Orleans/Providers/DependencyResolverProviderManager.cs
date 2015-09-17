@@ -23,9 +23,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+<<<<<<< HEAD
 using System.IO;
 using System.Reflection;
 using Orleans.Runtime;
+=======
+>>>>>>> adc2287... AspNet vNext baseline
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Providers
@@ -40,7 +43,11 @@ namespace Orleans.Providers
             providerKind = kind;
         }
 
+<<<<<<< HEAD
         public void LoadProviders(IDictionary<string, ProviderCategoryConfiguration> configs, TraceLogger logger)
+=======
+        public void LoadProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
+>>>>>>> adc2287... AspNet vNext baseline
         {
             dependencyResolverProviderLoader = new ProviderLoader<IDependencyResolverProvider>();
 
@@ -62,6 +69,7 @@ namespace Orleans.Providers
                     string.Format("Only a single {0} provider is supported.", providerKind));
             }
 
+<<<<<<< HEAD
             //
             // Load the assemblies from the Silo's directory, since the dependency resolver's type is not directly referenced,
             // so the ProviderLoader will not find it within the loaded assemblies.
@@ -82,6 +90,8 @@ namespace Orleans.Providers
 
             var discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, null, loadCriteria, logger);
 
+=======
+>>>>>>> adc2287... AspNet vNext baseline
             dependencyResolverProviderLoader.LoadProviders(dependencyResolverProviders, this);
         }
 

@@ -21,29 +21,40 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-<<<<<<< HEAD
-using Orleans.Runtime.MembershipService;
-using Orleans.Streams;
-=======
->>>>>>> adc2287... AspNet vNext baseline
+using System;
 
-namespace Orleans.Providers
+namespace Orleans.Runtime
 {
-    /// <summary>
-    /// Interface to be implemented by any app dependency resolver classes that want to be loaded and initialized during silo startup
-    /// </summary>
-<<<<<<< HEAD
-    internal interface IDependencyResolverProvider : IProvider
+    internal class DefaultResolver : IDependencyResolver
     {
-        IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
-    }
+        private static readonly IDependencyResolver _instance = new DefaultResolver();
 
-=======
-    public interface IDependencyResolverProvider : IProvider
-    {
-        IDependencyResolver GetDependencyResolver(ClusterConfiguration config, NodeConfiguration nodeConfig, TraceLogger logger);
+        private DefaultResolver()
+        {
+        }
+
+        public static IDependencyResolver Instance
+        {
+            get { return _instance; }
+        }
+
+        public IDependencyScope BeginScope()
+        {
+            return this;
+        }
+
+        public void Dispose()
+        {
+        }
+
+        public object GetService(Type serviceType)
+        {
+            return Activator.CreateInstance(serviceType);
+        }
+
+        //public IEnumerable<object> GetServices(Type serviceType)
+        //{
+        //    return Enumerable.Empty<object>();
+        //}
     }
->>>>>>> adc2287... AspNet vNext baseline
 }
