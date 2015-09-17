@@ -29,3 +29,5 @@ This section covers a number of topics that are intended for the advanced user o
 [Configuring SQL Tables](Configuring-SQL-Tables)
 
 [Interceptors](Interceptors)
+
+[Using Azure Web Apps](Using-Azure-Web-Apps)
