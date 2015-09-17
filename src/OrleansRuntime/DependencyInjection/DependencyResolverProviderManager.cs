@@ -25,10 +25,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using Orleans.Runtime;
+using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Providers
+namespace Orleans.Runtime
 {
     internal class DependencyResolverProviderManager : IProviderManager
     {

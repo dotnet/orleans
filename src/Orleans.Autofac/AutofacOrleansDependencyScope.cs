@@ -26,6 +26,8 @@ using System.Collections.Generic;
 using System.Security;
 using System.Linq;
 using Autofac;
+using Autofac.Core;
+using Autofac.Core.Registration;
 using Orleans.Runtime;
 
 namespace Orleans.Autofac
@@ -72,27 +74,13 @@ namespace Orleans.Autofac
         /// Try to get a service of the given type.
         /// </summary>
         /// <param name="serviceType">ControllerType of service to request.</param>
-        /// <returns>An instance of the service, or null if the service is not found.</returns>
+        /// <returns>An instance of the service, or an excetpion will be raised if the service is not found.</returns>
+        /// <exception cref="DependencyResolutionException"></exception>
+        /// <exception cref="ComponentNotRegisteredException"></exception>
         [SecurityCritical]
         public object GetService(Type serviceType)
         {
-            return _lifetimeScope.ResolveOptional(serviceType);
-        }
-
-        /// <summary>
-        /// Try to get a list of services of the given type.
-        /// </summary>
-        /// <param name="serviceType">ControllerType of services to request.</param>
-        /// <returns>An enumeration (possibly empty) of the service.</returns>
-        [SecurityCritical]
-        public IEnumerable<object> GetServices(Type serviceType)
-        {
-            if (!_lifetimeScope.IsRegistered(serviceType))
-                return Enumerable.Empty<object>();
-
-            var enumerableServiceType = typeof(IEnumerable<>).MakeGenericType(serviceType);
-            var instance = _lifetimeScope.Resolve(enumerableServiceType);
-            return (IEnumerable<object>)instance;
+            return _lifetimeScope.Resolve(serviceType);
         }
 
         /// <summary>

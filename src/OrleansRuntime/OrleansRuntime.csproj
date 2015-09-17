@@ -72,6 +72,8 @@
   <ItemGroup>
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Counters\PerfCounterConfigData.cs" />
+    <Compile Include="DependencyInjection\DependencyResolverProviderBase.cs" />
+    <Compile Include="DependencyInjection\DependencyResolverProviderManager.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />
     <Compile Include="MembershipService\ISiloStatusListener.cs" />
     <Compile Include="MembershipService\ISiloStatusOracle.cs" />

@@ -21,20 +21,13 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
 using System.IO;
 using System.Threading.Tasks;
 using Autofac;
-using Autofac.Builder;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Autofac;
 using Orleans.Providers;
-using Orleans.Providers.DependencyInjection;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.ReminderService;
-using Orleans.Streams;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
