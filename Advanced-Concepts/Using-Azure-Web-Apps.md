@@ -4,7 +4,7 @@ title: Getting Started using Azure Web Apps
 ---
 {% include JB/setup %}
 
-If you would like to connect to an Azure Silo from an [Azure Webb App](http://azure.microsoft.com/en-gb/services/app-service/web/) rather than a Web Role hosted within the same cloud service you can.
+If you would like to connect to an Azure Silo from an [Azure Web App](http://azure.microsoft.com/en-gb/services/app-service/web/) rather than a Web Role hosted within the same cloud service you can.
 
 For this to work securely you will need to assign both the Azure Web App and the Worker Role hosting the Silo to an [Azure Virtual Network](http://azure.microsoft.com/en-gb/services/virtual-network/).
 
