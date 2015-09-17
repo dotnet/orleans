@@ -945,21 +945,25 @@ namespace Orleans.Runtime
             var enumerator = activationDirectory.GetEnumerator();
             while(enumerator.MoveNext())
             {
-                var activationData = enumerator.Current.Value;
-                var workItemGroup = scheduler.GetWorkItemGroup(new SchedulingContext(activationData));
-                if (workItemGroup == null)
+                Utils.SafeExecute(() =>
                 {
-                    sb.AppendFormat("Activation with no work item group!! Grain {0}, activation {1}.", activationData.Grain,
-                                    activationData.ActivationId);
-                    sb.AppendLine();
-                    continue;
-                }
+                    var activationData = enumerator.Current.Value;
+                    var workItemGroup = scheduler.GetWorkItemGroup(new SchedulingContext(activationData));
+                    if (workItemGroup == null)
+                    {
+                        sb.AppendFormat("Activation with no work item group!! Grain {0}, activation {1}.",
+                            activationData.Grain,
+                            activationData.ActivationId);
+                        sb.AppendLine();
+                        return;
+                    }
 
-                if (all || activationData.State.Equals(ActivationState.Valid))
-                {
-                    sb.AppendLine(workItemGroup.DumpStatus());
-                    sb.AppendLine(activationData.DumpStatus());
-                }
+                    if (all || activationData.State.Equals(ActivationState.Valid))
+                    {
+                        sb.AppendLine(workItemGroup.DumpStatus());
+                        sb.AppendLine(activationData.DumpStatus());
+                    }
+                });
             }
             logger.Info(ErrorCode.SiloDebugDump, sb.ToString());
             return sb.ToString();
