@@ -34,6 +34,8 @@ Also make sure the Silo endpoints are configured.
 </Endpoints>
 ```
 
+Finally, you need to specify the same deployment id for Silos and the Wen App Client.
+
 You can now use the `GrainClient` to make a connection from the Web App to the Silo.
 
 ### Potential Issues
