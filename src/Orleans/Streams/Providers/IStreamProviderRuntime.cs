@@ -91,12 +91,6 @@ namespace Orleans.Streams
         /// <returns></returns>
         bool InSilo { get; }
 
-        /// <summary>
-        /// Invoke the given async function from within a valid Orleans scheduler context.
-        /// </summary>
-        /// <param name="asyncFunc"></param>
-        Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context);
-
         object GetCurrentSchedulingContext();
     }
 
