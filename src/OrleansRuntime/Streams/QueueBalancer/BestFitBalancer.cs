@@ -172,6 +172,11 @@ namespace Orleans.Streams
             var lowerResourceCountPerBucket = upperResourceCountPerBucket - 1;
             List<TResource>.Enumerator resourceEnumerator = resourceList.GetEnumerator();
             int bucketsToFillWithUpperResource = resourceList.Count % bucketList.Count;
+            // a bucketsToFillWithUpperResource of 0 indicates resources are evenly devisible, so fill them all with upper resource count
+            if (bucketsToFillWithUpperResource == 0)
+            {
+                bucketsToFillWithUpperResource = bucketList.Count;
+            }
             int bucketsFilledCount = 0;
             foreach (TBucket bucket in bucketList)
             {
