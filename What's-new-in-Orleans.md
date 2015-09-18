@@ -63,7 +63,7 @@ If you were using the Local Silo environment from the SDK folder for testing you
 ### Release notes
 
 * Major refactoring of the stream adapter API.
-* Improvements to the steaming API to support subscription multiplicity.
+* Improvements to the streaming API to support subscription multiplicity.
 * Made IAddressable.AsReference strongly-typed.
 * Added a Chocolatey package.
 * Added support for private storage keys for testing.
