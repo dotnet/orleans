@@ -22,7 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
 
@@ -70,7 +70,27 @@ namespace Orleans.Runtime
 
         public void HandleResponse(Message response)
         {
-            RuntimeClient.Current.ReceiveResponse(response);
+            InsideRuntimeClient.Current.ReceiveResponse(response);
+        }
+
+        /// <summary>
+        /// Register a timer to send regular callbacks to this grain.
+        /// This timer will keep the current grain from being deactivated.
+        /// </summary>
+        /// <param name="asyncCallback"></param>
+        /// <param name="state"></param>
+        /// <param name="dueTime"></param>
+        /// <param name="period"></param>
+        /// <returns></returns>
+        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        {
+            var ctxt = RuntimeContext.CurrentActivationContext;
+            InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
+            String name = ctxt.Name + "Timer";
+          
+            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period, name);
+            timer.Start();
+            return timer;
         }
 
         public override string ToString()

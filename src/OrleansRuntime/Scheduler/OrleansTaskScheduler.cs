@@ -285,6 +285,15 @@ namespace Orleans.Runtime.Scheduler
             throw new InvalidSchedulingContextException(error);
         }
 
+        internal void CheckSchedulingContextValidity(ISchedulingContext context)
+        {
+            if (context == null)
+            {
+                throw new InvalidSchedulingContextException("CheckSchedulingContextValidity was called on a null SchedulingContext.");
+            }
+            GetWorkItemGroup(context); // GetWorkItemGroup throws for Invalid context
+        }
+
         public TaskScheduler GetTaskScheduler(ISchedulingContext context)
         {
             if (context == null)
