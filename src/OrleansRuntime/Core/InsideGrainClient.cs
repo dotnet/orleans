@@ -144,8 +144,9 @@ namespace Orleans.Runtime
             if (schedulingContext == null)
             {
                 throw new InvalidExpressionException(
-                    String.Format("Trying to send a message on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext) "
-                        + "RuntimeContext.Current={0} TaskScheduler.Current={1}",
+                    String.Format("Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext) "
+                        + "RuntimeContext.Current={1} TaskScheduler.Current={2}",
+                        message,
                         RuntimeContext.Current == null ? "null" : RuntimeContext.Current.ToString(),
                         TaskScheduler.Current));
             }
@@ -153,7 +154,7 @@ namespace Orleans.Runtime
             {
                 case SchedulingContextType.SystemThread:
                     throw new ArgumentException(
-                        String.Format("Trying to send a message on a silo not from within grain and not from within system target (RuntimeContext is of SchedulingContextType.SystemThread type)"), "context");
+                        String.Format("Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is of SchedulingContextType.SystemThread type)", message), "context");
 
                 case SchedulingContextType.Activation:
                     message.SendingActivation = schedulingContext.Activation.ActivationId;
@@ -635,7 +636,7 @@ namespace Orleans.Runtime
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context)
         {
             // Schedule call back to grain context
-            await OrleansTaskScheduler.Instance.RunOrQueueTask(asyncFunction, context);
+            await OrleansTaskScheduler.Instance.QueueTask(asyncFunction, context);
         }
 
         public void Reset()
