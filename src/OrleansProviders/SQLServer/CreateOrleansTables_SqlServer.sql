@@ -182,7 +182,7 @@ BEGIN
 		[HostName] NVARCHAR(150) NOT NULL, 
 		[Name] NVARCHAR(150) NULL, 
 		[IsDelta] BIT NOT NULL, 
-		[StatValue] NVARCHAR(250) NOT NULL,
+		[StatValue] NVARCHAR(1024) NOT NULL,
 		[Statistic] NVARCHAR(250) NOT NULL,
 
 		CONSTRAINT OrleansStatisticsTable_OrleansStatisticsTableId PRIMARY KEY([OrleansStatisticsTableId])	
@@ -713,7 +713,7 @@ BEGIN
 		[HostName] NVARCHAR(150) NOT NULL, 
 		[Name] NVARCHAR(150) NULL, 
 		[IsDelta] BIT NOT NULL, 
-		[StatValue] NVARCHAR(250) NOT NULL,
+		[StatValue] NVARCHAR(1024) NOT NULL,
 		[Statistic] NVARCHAR(250) NOT NULL,
 
 		CONSTRAINT OrleansStatisticsTable_OrleansStatisticsTableId PRIMARY KEY([OrleansStatisticsTableId])	
