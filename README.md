@@ -33,8 +33,6 @@ Documentation is located [here][Orleans Documentation]
 Contributing To This Project
 =======
 
-* [Orleans Community](https://github.com/OrleansContrib/) - Repository of community add-ons to Orleans Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
-
 * List of [Ideas for Contributions]
 
 * [Contributing Guide]
@@ -42,6 +40,8 @@ Contributing To This Project
 * [CLA - Contribution License Agreement][CLA]
 
 * The coding standards / style guide used for Orleans code is the [.NET Framework Design Guidelines][DotNet Framework Design Guidelines]
+
+* [Orleans Community](https://github.com/OrleansContrib/) - Repository of community add-ons to Orleans. Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
 
 You are also encouraged to start a discussion by filing an issue.
 
