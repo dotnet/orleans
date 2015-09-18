@@ -95,7 +95,7 @@ namespace Orleans.Streams
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = TraceLogger.GetLogger(GetType().Name + "-" + streamProviderName, TraceLogger.LoggerType.Provider);
-            logger.Info((int)ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
+            Log(ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);
             queuePrintTimer = base.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
@@ -105,7 +105,7 @@ namespace Orleans.Streams
         {
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
 
-            logger.Info((int)ErrorCode.PersistentStreamPullingManager_02, "Init.");
+            Log(ErrorCode.PersistentStreamPullingManager_02, "Init.");
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
@@ -114,7 +114,7 @@ namespace Orleans.Streams
             queueBalancer.SubscribeToQueueDistributionChangeEvents(meAsQueueBalanceListener);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
-            logger.Info((int)ErrorCode.PersistentStreamPullingManager_03, String.Format("Initialize: I am now responsible for {0} queues: {1}.", myQueues.Count, PrintQueues(myQueues)));
+            Log(ErrorCode.PersistentStreamPullingManager_03, String.Format("Initialize: I am now responsible for {0} queues: {1}.", myQueues.Count, PrintQueues(myQueues)));
 
             managerState = PersistentStreamProviderState.Initialized;
             return TaskDone.Done;
@@ -161,7 +161,7 @@ namespace Orleans.Streams
         {
             latestRingNotificationSequenceNumber++;
             int notificationSeqNumber = latestRingNotificationSequenceNumber;
-            if (logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingManager_04,
+            Log(ErrorCode.PersistentStreamPullingManager_04,
                 "Got QueueChangeNotification number {0} from the queue balancer. managerState = {1}", notificationSeqNumber, managerState);
 
             if (managerState == PersistentStreamProviderState.AgentsStopped)
@@ -169,7 +169,7 @@ namespace Orleans.Streams
                 return TaskDone.Done; // if agents not running, no need to rebalance the queues among them.
             }
 
-            return nonReentrancyGuarantor.SubmitNext(() =>
+            return nonReentrancyGuarantor.AddNext(() =>
             {
                 // skip execution of an older/previous notification since already got a newer range update notification.
                 if (notificationSeqNumber < latestRingNotificationSequenceNumber)
@@ -239,7 +239,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception exc)
                 {
-                    logger.Error((int)ErrorCode.PersistentStreamPullingManager_07, "Exception while creating PersistentStreamPullingAgent.", exc);
+                    logger.Error(ErrorCode.PersistentStreamPullingManager_07, "Exception while creating PersistentStreamPullingAgent.", exc);
                     // What should we do? This error is not recoverable and considered a bug. But we don't want to bring the silo down.
                     // If this is when silo is starting and agent is initializing, fail the silo startup. Otherwise, just swallow to limit impact on other receivers.
                     if (failOnInit) throw;
@@ -289,7 +289,7 @@ namespace Orleans.Streams
             }
             // Stop the agents that for queues that are not in my range anymore.
             var agents = new List<PersistentStreamPullingAgent>(queuesToRemove.Count);
-            if(logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingManager_10, "About to remove {0} agents from my responsibility: {1}", queuesToRemove.Count, Utils.EnumerableToString(queuesToRemove, q => q.ToString()));
+            Log(ErrorCode.PersistentStreamPullingManager_10, "About to remove {0} agents from my responsibility: {1}", queuesToRemove.Count, Utils.EnumerableToString(queuesToRemove, q => q.ToString()));
             
             var removeTasks = new List<Task>();
             foreach (var queueId in queuesToRemove)
@@ -323,7 +323,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception exc)
                 {
-                    logger.Info((int)ErrorCode.PersistentStreamPullingManager_12, 
+                    Log(ErrorCode.PersistentStreamPullingManager_12, 
                         "Exception while UnRegisterSystemTarget of PersistentStreamPullingAgent {0}. Ignoring. Exc.Message = {1}.", agent.GrainId, exc.Message);
                 }
             }
@@ -377,7 +377,7 @@ namespace Orleans.Streams
         // Therefore, we serialize them all via the same nonReentrancyGuarantor.
         private Task QueueCommandForExecution(PersistentStreamProviderCommand command, int commandSeqNumber)
         {
-            return nonReentrancyGuarantor.SubmitNext(() =>
+            return nonReentrancyGuarantor.AddNext(() =>
             {
                 // skip execution of an older/previous command since already got a newer command.
                 if (commandSeqNumber < latestCommandNumber)

@@ -75,7 +75,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return String.Format("RuntimeContext: Activation={0}, Scheduler={1}", 
+            return String.Format("RuntimeContext: ActivationContext={0}, Scheduler={1}", 
                 ActivationContext != null ? ActivationContext.ToString() : "null",
                 Scheduler != null ? Scheduler.ToString() : "null");
         }
