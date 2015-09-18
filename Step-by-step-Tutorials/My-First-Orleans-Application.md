@@ -78,7 +78,7 @@ In addition to the Dev/Test host, there are two more Orleans projects, and we sh
 
 Once you have them in your solution, make sure to add a reference to the grain interface project from each of the other projects: the host, which will contain our client code, and the grain collection project. 
 
-Add a project dependency (not a project reference) on the grain collection to the host project, so that it is automatically (re-)built when starting the debugger.
+Add a project reference for the grain collection project to the host project, so that it is automatically (re-)built and copied when starting the debugger.
 
 ![](../Images/New DevTest 7.PNG)
 
