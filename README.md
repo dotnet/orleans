@@ -33,7 +33,7 @@ Documentation is located [here][Orleans Documentation]
 Contributing To This Project
 =======
 
-* [Orleans Community] Repository of community add-ons to Orleans Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
+* [Orleans Community](https://github.com/OrleansContrib/) - Repository of community add-ons to Orleans Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
 
 * List of [Ideas for Contributions]
 
