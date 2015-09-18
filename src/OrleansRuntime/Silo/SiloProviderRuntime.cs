@@ -116,14 +116,6 @@ namespace Orleans.Runtime.Providers
             Silo.CurrentSilo.UnregisterSystemTarget((SystemTarget)target);
         }
 
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-        {
-            var context = RuntimeContext.CurrentActivationContext as SchedulingContext;
-            String name = context != null ? context.Name + "Timer" : null;
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period, name);
-            timer.Start();
-            return timer;
-        }
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
