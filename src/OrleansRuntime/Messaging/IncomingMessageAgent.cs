@@ -116,9 +116,9 @@ namespace Orleans.Runtime.Messaging
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
                     Message response = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable,
-                        String.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg.ToString()));
+                        String.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg));
                     messageCenter.SendMessage(response);
-                    Log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message for an unknown SystemTarget: {0}", msg.TargetAddress);
+                    Log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);
                     return;
                 }
                 context = target.SchedulingContext;

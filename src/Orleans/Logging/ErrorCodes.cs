@@ -738,6 +738,7 @@ namespace Orleans
         SchedulerTaskExecuteIncomplete4         = SchedulerBase + 28,
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
         SchedulerWorkerThreadExc                = SchedulerBase + 30,
+        SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
 
         GatewayBase                             = Runtime + 1300,
         GatewayClientOpenedSocket               = GatewayBase + 1,
@@ -777,6 +778,7 @@ namespace Orleans
         Timer_TimerInsideGrainIsDelayed         = TimerBase + 11,
         Timer_SafeTimerIsNotTicking             = TimerBase + 12,
         Timer_GrainTimerCallbackError           = TimerBase + 13,
+        Timer_InvalidContext                    = TimerBase + 14,
 
         DispatcherBase                          = Runtime + 1500,
         Dispatcher_SelectTarget_Failed          = Runtime_Error_100071, // Backward compatability

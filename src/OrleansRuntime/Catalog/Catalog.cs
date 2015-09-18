@@ -217,7 +217,7 @@ namespace Orleans.Runtime
         {
             if (gcTimer != null) gcTimer.Dispose();
 
-            var t = GrainTimer.FromTaskCallback(OnTimer, null, TimeSpan.Zero, ActivationCollector.Quantum);
+            var t = GrainTimer.FromTaskCallback(OnTimer, null, TimeSpan.Zero, ActivationCollector.Quantum, "Catalog.GCTimer");
             t.Start();
             gcTimer = t;
         }
