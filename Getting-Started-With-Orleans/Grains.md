@@ -35,7 +35,7 @@ That is, their return types have to be `Task`s (see [Asynchrony and Tasks](Async
 Example:
 
 ``` csharp
-public interface IChirperPublisher : IGrain 
+public interface IChirperPublisher : IGrainWithGuidKey 
 { 
   Task<long> GetUserIdAsync(); 
   Task<string> GetUserAliasAsync();

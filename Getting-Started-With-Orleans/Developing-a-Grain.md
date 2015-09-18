@@ -15,18 +15,18 @@ The grain client project can use any standard .NET code project template, such a
 
 A grain cannot be explicitly created or deleted. 
 It always exists "virtually" and is activated automatically when a request is sent to it. 
-A grain has either a GUID or a long integer key within the grain type. 
-Application code creates a reference to a grain by calling the `GetGrain(Guid id)` or `GetGrain(long id)` of a generic grain factory methods for a specific grain identity. 
+A grain has either a GUID, string or a long integer key within the grain type. 
+Application code creates a reference to a grain by calling the `GetGrain<TGrainType>(Guid id)` or `GetGrain<TGrainType>(long id)` or other overlaods of a generic grain factory methods for a specific grain identity. 
 The `GetGrain()` call is a purely local operation to create a grain reference. 
 It does not trigger creation of a grain activation and has not impact on its life cycle. 
 A grain activation is automatically created by the Orleans runtime upon a first request sent to the grain.
 
-A grain interface must inherit from `IGrain`. 
-The GUID or long integer key of a grain can later be retrieved via the `GetPrimaryKey()` or `GetPrimaryKeyLong()` extension methods, respectively.
+A grain interface must inherit from one of the `IGrainWithXKey`.interfaces where X is the type of the key used. 
+The GUID, string or long integer key of a grain can later be retrieved via the `GetPrimaryKey()` or `GetPrimaryKeyLong()` extension methods, respectively.
 
 ## Defining the Grain Interface
 
-A grain type is defined by an interface that inherits from the `IGrain` marker interface.
+A grain type is defined by an interface that inherits from one of the `IGrainWithXKey` marker interfaces like 'IGrainWithGuidKey' or 'IGrainWithStringKey'.
 
 All of the methods in the grain interface must return a `Task` or a `Task<T>` for .NET 4.5. 
 The underlying type `T` for value `Task` must be serializable.
@@ -34,7 +34,7 @@ The underlying type `T` for value `Task` must be serializable.
  Example:
 
 ``` csharp
-public interface IPlayerGrain : IGrain 
+public interface IPlayerGrain : IGrainWithGuidKey 
 { 
   Task<IGameGrain> GetCurrentGameAsync();
   Task JoinGameAsync(IGameGrain game); 
@@ -48,7 +48,7 @@ After the grain interface has been defined, building the project originally crea
 The code generation tool, _ClientGenerator.exe_, can also be invoked directly as a part of post-build processing. 
 However this should be used with caution and is generally not recommended.
 
-Application should use the generic grain factory class to get references to grains. Inside the grain code the factory is availiable via the protected Grain class member property. On the client side the factory is availiable via the `GrainClient.GrainFactory` static field.
+Application should use the generic grain factory class to get references to grains. Inside the grain code the factory is availiable via the protected GrainFactory class member property. On the client side the factory is availiable via the `GrainClient.GrainFactory` static field.
 
 When running inside a grain the following code should be used to get the grain reference:
 

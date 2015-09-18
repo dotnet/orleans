@@ -49,7 +49,7 @@ public override Task OnActivateAsync()
 
 A long integer is also available, which would make sense if the grain is persisted to a relational database, where numerical indexes are preferred over GUIDs.
 
-Referencing a grain by GUID in client code:
+Referencing a grain by long integer in client code:
 
 ``` csharp
 var grain = GrainClient.GrainFactory.GetGrain<IExample>(1);
@@ -89,11 +89,10 @@ public override Task OnActivateAsync()
 
 If you have a system that doesn't fit well with either GUIDs or longs, you can opt for an extended primary key which allows you to use a string to reference a grain.
 
-You can mark a grain interface with an `[ExtendedPrimaryKey]` attribute like this:
+You can inherit your interface from 'IGrainWithGuidCompoundKey' or 'IGrainWithIntegerCompoundKey" interface like this:
 
 ``` csharp
-[ExtendedPrimaryKey]
-public interface IExampleGrain : Orleans.IGrain
+public interface IExampleGrain : Orleans.IGrainWithIntegerCompoundKey
 {
     Task Hello();
 }
