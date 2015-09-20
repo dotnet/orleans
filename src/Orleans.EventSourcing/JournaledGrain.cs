@@ -22,66 +22,31 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using Orleans.CodeGeneration;
+using System.Threading.Tasks;
 
 
 namespace Orleans.EventSourcing
 {
-    public abstract class JournaledGrainState<TGrainState> : GrainState
+    /// <summary>
+    /// The base class for all grain classes that have event-sourced state.
+    /// </summary>
+    public class JournaledGrain<TGrainState> : Grain<TGrainState>
         where TGrainState : JournaledGrainState<TGrainState>
     {
-        private List<object> events = new List<object>();
-
-        protected JournaledGrainState()
-            : base(typeof(TGrainState).FullName)
-        {
-        }
-
-        public IEnumerable Events
-        {
-            get { return events.AsReadOnly(); }
-        }
-
-        public int Version { get; private set; }
-
-        public void AddEvent<TEvent>(TEvent @event)
+        /// <summary>
+        /// This methiod is for events that know how to apply themselves to TGrainState, subclasses of StateEvent&lt;T&gt;.
+        /// </summary>
+        /// <param name="event">Event to raise</param>
+        /// <param name="commit">Whether or not the event needs to be immediately committed to storage</param>
+        /// <returns></returns>
+        protected Task RaiseStateEvent<TEvent>(TEvent @event, bool commit = true)
             where TEvent : class
         {
-            events.Add(@event);
+            if (@event == null) throw new ArgumentNullException("event");
 
-            StateTransition(@event);
-
-            Version++;
-        }
-
-        public override void SetAll(IDictionary<string, object> values)
-        {
-            base.SetAll(values);
-
-            foreach (var @event in Events)
-                StateTransition(@event);
-        }
-
-        private void StateTransition<TEvent>(TEvent @event)
-            where TEvent : class
-        {
-            dynamic me = this;
-
-            try
-            {
-                me.Apply(@event);
-            }
-            catch(MissingMethodException)
-            {
-                OnMissingStateTransition(@event);
-            }
-        }
-
-        protected virtual void OnMissingStateTransition(object @event)
-        {
-            // Log
+            State.AddEvent(@event);
+            return commit ? WriteStateAsync() : TaskDone.Done;
         }
     }
 }
