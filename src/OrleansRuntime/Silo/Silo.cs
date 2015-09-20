@@ -24,7 +24,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
@@ -48,8 +47,11 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
 using System.Runtime;
-
-
+using Microsoft.Framework.DependencyInjection;
+using Orleans.Runtime.Management;
+using Orleans.Runtime.ReminderService;
+using Orleans.Runtime.Startup;
+                                     
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -101,8 +103,10 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
+        private readonly List<IProvider> allSiloProviders;
 
-        private IDependencyResolver dependencyResolver = DefaultResolver.Instance;
+        private IServiceProvider services = new DefaultServiceProvider();
+        private Type startupType;
 
         internal readonly string Name;
         internal readonly string SiloIdentity;
@@ -120,14 +124,14 @@ namespace Orleans.Runtime
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal static Silo CurrentSilo { get; private set; }
-        internal IReadOnlyCollection<IProvider> AllSiloProviders 
+        internal IReadOnlyCollection<IProvider> AllSiloProviders
         {
-            get { return allSiloProviders.AsReadOnly();  }
+            get { return allSiloProviders.AsReadOnly(); }
         }
 
-        internal IDependencyResolver DependencyResolver
+        internal IServiceProvider Services
         {
-            get { return dependencyResolver; }
+            get { return services; }
             set
             {
                 if (value == null)
@@ -135,7 +139,7 @@ namespace Orleans.Runtime
                     throw new ArgumentNullException("value");
                 }
 
-                dependencyResolver = value;
+                services = value;
             }
         }
 
@@ -228,7 +232,9 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            InitializeDependencyResolver();
+            var serviceCollection = RegisterSystemTypes();
+
+            HandleStartup(serviceCollection);
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -263,7 +269,7 @@ namespace Orleans.Runtime
             // GrainRuntime can be created only here, after messageCenter was created.
             grainRuntime = new GrainRuntime(
                 globalConfig.ServiceId,
-                SiloIdentity, 
+                SiloIdentity,
                 grainFactory,
                 new TimerRegistry(),
                 new ReminderRegistry(),
@@ -326,47 +332,95 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
 
-        private void InitializeDependencyResolver()
+        private IServiceCollection RegisterSystemTypes()
         {
-            if (String.IsNullOrWhiteSpace(nodeConfig.DependencyResolverProviderName))
+            //
+            // Register the system classes and grains in this method.
+            //
+
+            IServiceCollection serviceCollection = new ServiceCollection();
+
+            serviceCollection.AddTransient<ManagementGrain>();
+            serviceCollection.AddTransient<GrainBasedMembershipTable>();
+            serviceCollection.AddTransient<GrainBasedReminderTable>();
+            serviceCollection.AddTransient<PubSubRendezvousGrain>();
+            serviceCollection.AddTransient<MemoryStorageGrain>();
+            serviceCollection.AddTransient<GrainBasedPubSubRuntime>();
+
+            return serviceCollection;
+        }
+
+        private void HandleStartup(IServiceCollection serviceCollection)
+        {
+            if (String.IsNullOrWhiteSpace(nodeConfig.StartupTypeName))
             {
                 return;
             }
 
-            //
-            // Load the assemblies from the Silo's directory, since the dependency resolver's type is not directly referenced,
-            // so the ProviderLoader will not find it within the loaded assemblies.
-            //
+            var startupType = System.Type.GetType(nodeConfig.StartupTypeName);
 
-            var siloRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-
-            var directories = new Dictionary<string, SearchOption>
+            if (startupType == null)
             {
-                {siloRoot, SearchOption.TopDirectoryOnly}
-            };
-
-            AssemblyLoaderReflectionCriterion[] loadCriteria =
-            {
-                AssemblyLoaderCriteria.LoadTypesAssignableFrom(
-                    typeof (IDependencyResolverProvider))
-            };
-
-            var discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, null, loadCriteria, logger);
-
-            var dependencyResolverProviderManager = new DependencyResolverProviderManager(ProviderCategoryConfiguration.DEPENDENCY_RESOLVER_PROVIDER_CATEGORY_NAME);
-
-            dependencyResolverProviderManager.LoadProviders(GlobalConfig.ProviderConfigurations, logger);
-
-            var dependencyResolverProvider = (IDependencyResolverProvider)dependencyResolverProviderManager.GetProvider(nodeConfig.DependencyResolverProviderName);
-
-            var dependencyResolver = dependencyResolverProvider.GetDependencyResolver(OrleansConfig, nodeConfig, logger);
-
-            if (dependencyResolver == null)
-            {
-                throw new InvalidOperationException(string.Format("The configured provider: {0} did not returned a configured IDependencyResolver instance.", nodeConfig.DependencyResolverProviderName));
+                throw new InvalidOperationException(string.Format("Can not locate the type specified in the configuration file: '{0}'.", nodeConfig.StartupTypeName));
             }
 
-            DependencyResolver = dependencyResolver;
+            var servicesMethod = FindConfigureServicesDelegate(startupType);
+
+            var instance = default(object);
+
+            if ((servicesMethod != null && !servicesMethod.MethodInfo.IsStatic))
+            {
+                instance = Activator.CreateInstance(startupType);
+
+                services = servicesMethod.Build(instance, serviceCollection);
+            }
+        }
+
+        private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
+        {
+            var servicesMethod = FindMethod(startupType, "ConfigureServices", typeof(IServiceProvider), required: false);
+
+            return servicesMethod == null ? null : new ConfigureServicesBuilder(servicesMethod);
+        }
+
+        private static MethodInfo FindMethod(Type startupType, string methodName, Type returnType = null, bool required = true)
+        {
+            var methods = startupType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
+            var selectedMethods = methods.Where(method => method.Name.Equals(methodName)).ToList();
+
+            if (selectedMethods.Count > 1)
+            {
+                throw new InvalidOperationException(string.Format("Having multiple overloads of method '{0}' is not supported.", methodName));
+            }
+
+            var methodInfo = selectedMethods.FirstOrDefault();
+
+            if (methodInfo == null)
+            {
+                if (required)
+                {
+                    throw new InvalidOperationException(string.Format("A method named '{0}' in the type '{1}' could not be found.",
+                        methodName,
+                        startupType.FullName));
+                }
+
+                return null;
+            }
+
+            if (returnType != null && methodInfo.ReturnType != returnType)
+            {
+                if (required)
+                {
+                    throw new InvalidOperationException(string.Format("The '{0}' method in the type '{1}' must have a return type of '{2}'.",
+                        methodInfo.Name,
+                        startupType.FullName,
+                        returnType.Name));
+                }
+
+                return null;
+            }
+
+            return methodInfo;
         }
 
         private void CreateSystemTargets()
@@ -767,7 +821,7 @@ namespace Orleans.Runtime
 
                 // 8:
                 SafeExecute(() =>
-                {                
+                {
                     var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
                     scheduler.QueueTask(() => siloStreamProviderManager.StopStreamProviders(), providerManagerSystemTarget.SchedulingContext)
                             .WaitWithThrow(initTimeout);
@@ -815,8 +869,6 @@ namespace Orleans.Runtime
             SafeExecute(TraceLogger.Close);
 
             SafeExecute(GrainTypeManager.Stop);
-
-            SafeExecute(() => DependencyResolver.Dispose());
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
@@ -1038,6 +1090,14 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             return localGrainDirectory.ToString();
+        }
+
+        private class DefaultServiceProvider : IServiceProvider
+        {
+            public object GetService(Type serviceType)
+            {
+                return Activator.CreateInstance(serviceType);
+            }
         }
     }
 

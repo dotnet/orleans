@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -141,8 +141,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansZooKeeperUtils", "Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCounterControl", "OrleansCounterControl\OrleansCounterControl.csproj", "{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Autofac", "Orleans.Autofac\Orleans.Autofac.csproj", "{16E07C87-69A8-4FBB-B563-5A7FCAE3AD87}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -205,10 +203,6 @@ Global
 		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}.Release|Any CPU.Build.0 = Release|Any CPU
-		{16E07C87-69A8-4FBB-B563-5A7FCAE3AD87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{16E07C87-69A8-4FBB-B563-5A7FCAE3AD87}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{16E07C87-69A8-4FBB-B563-5A7FCAE3AD87}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{16E07C87-69A8-4FBB-B563-5A7FCAE3AD87}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

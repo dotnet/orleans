@@ -21,13 +21,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.IO;
 using System.Threading.Tasks;
-using Autofac;
+using Microsoft.Framework.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.Autofac;
-using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -38,19 +36,19 @@ namespace UnitTests.General
     /// <summary>
     /// Summary description for SimpleGrain
     /// </summary>
-    [DeploymentItem("OrleansDependencyResolverConfigurationForTesting.xml")]
+    [DeploymentItem("OrleansStartupConfigurationForTesting.xml")]
     [DeploymentItem("Orleans.Autofac.dll")]
     [TestClass]
-    public class DependencyResolverGrainTests : UnitTestSiloHost
+    public class DependencyInjectionGrainTests : UnitTestSiloHost
     {
         private const string SimpleDIGrainNamePrefix = "UnitTests.Grains.SimpleDIG";
 
-        public DependencyResolverGrainTests()
+        public DependencyInjectionGrainTests()
             : base(new TestingSiloOptions
             {
                 StartPrimary = true,
                 StartSecondary = false,
-                SiloConfigFile = new FileInfo("OrleansDependencyResolverConfigurationForTesting.xml")
+                SiloConfigFile = new FileInfo("OrleansStartupConfigurationForTesting.xml")
             })
         {
         }
@@ -79,37 +77,15 @@ namespace UnitTests.General
         }
     }
 
-    public class AutofacDependencyResolverProvider : DependencyResolverProviderBase
+    public class TestStartup
     {
-        public override IDependencyResolver ConfigureResolver(System.Type[] systemTypesToRegister)
+        public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            var builder = new ContainerBuilder();
+            services.AddSingleton<IInjectedService, InjectedService>();
 
-            builder.RegisterTypes(systemTypesToRegister);
+            services.AddTransient<SimpleDIGrain>();
 
-            //
-            // We've to register the concrete type and the interface of the grain too:
-            // - the test code is retrieving grains based on the interface.
-            // - Orleans messaging is retrieving grains by their type.
-            //
-
-            // DI container grain registration helper method is used to make grain registration a no brainer.
-            // One thing to note: at this point the type manager did not load all the assemblies,
-            // so to support grain registration based on the loaded assemblies you have to make sure that the
-            // assembly of the given grain types are loaded like in the sample below.
-            //
-
-            builder.RegisterGrains(typeof(SimpleDIGrain).Assembly)
-                .AsSelf()
-                .AsImplementedInterfaces();
-
-            builder.RegisterType<InjectedService>()
-                .AsImplementedInterfaces()
-                .SingleInstance();
-
-            var container = builder.Build();
-
-            return new AutofacOrleansDependencyResolver(container);
+            return services.BuildServiceProvider();
         }
     }
 }

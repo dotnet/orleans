@@ -43,10 +43,7 @@
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Autofac, Version=3.5.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
-      <HintPath>..\packages\Autofac.3.5.2\lib\net40\Autofac.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.Data.Edm">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
@@ -58,6 +55,14 @@
     </Reference>
     <Reference Include="Microsoft.Data.Services.Client">
       <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Framework.DependencyInjection, Version=1.0.0.0, Culture=neutral, PublicKeyToken=bae1edca294b34e3, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Framework.DependencyInjection.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Framework.DependencyInjection.Abstractions, Version=1.0.0.0, Culture=neutral, PublicKeyToken=f0d1747c96888f9a, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.Abstractions.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework">
@@ -98,7 +103,7 @@
     <Compile Include="SerializationTests.cs" />
     <Compile Include="DependencyResolverGrainTests.cs" />
     <Compile Include="RelationalUtilities\SqlTestsEnvironment.cs" />
-    <Compile Include="DependencyResolverGrainTests.cs" />
+    <Compile Include="DependencyInjectionGrainTests.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
@@ -125,10 +130,6 @@
       <Link>OrleansConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\OrleansTestingHost\OrleansDependencyResolverConfigurationForTesting.xml">
-      <Link>OrleansDependencyResolverConfigurationForTesting.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="ClientConfigurationForStreamTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -141,15 +142,14 @@
     <Content Include="OrleansConfigurationForStreamingUnitTests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="OrleansStartupConfigurationForTesting.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Orleans.Autofac\Orleans.Autofac.csproj">
-      <Project>{16e07c87-69a8-4fbb-b563-5a7fcae3ad87}</Project>
-      <Name>Orleans.Autofac</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>

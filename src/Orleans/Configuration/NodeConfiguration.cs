@@ -194,9 +194,9 @@ namespace Orleans.Runtime.Configuration
         public int BulkMessageLimit { get; set; }
 
         /// <summary>
-        /// Specifies the name of the DependencyResolverProvider name in the configuration file.
+        /// Specifies the name of the Startup class in the configuration file.
         /// </summary>
-        public string DependencyResolverProviderName { get; set; }
+        public string StartupTypeName { get; set; }
 
         public string StatisticsProviderName { get; set; }
         /// <summary>
@@ -350,7 +350,7 @@ namespace Orleans.Runtime.Configuration
             DefaultConnectionLimit = other.DefaultConnectionLimit;
             UseNagleAlgorithm = other.UseNagleAlgorithm;
 
-            DependencyResolverProviderName = other.DependencyResolverProviderName;
+            StartupTypeName = other.StartupTypeName;
         }
 
         public override string ToString()
@@ -503,10 +503,10 @@ namespace Orleans.Runtime.Configuration
                     case "Limits":
                         ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
                         break;
-                    case "DependencyResolver":
-                        if (child.HasAttribute("ProviderName"))
+                    case "Startup":
+                        if (child.HasAttribute("Type"))
                         {
-                            DependencyResolverProviderName = child.GetAttribute("ProviderName");
+                            StartupTypeName = child.GetAttribute("Type");
                         }
                         break;
                 }
