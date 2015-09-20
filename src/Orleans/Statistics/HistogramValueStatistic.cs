@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Globalization;
 using System.Text;
 
 namespace Orleans.Runtime
@@ -87,11 +88,11 @@ namespace Orleans.Runtime
                             Double.MaxValue == end ?
                                 "EOT" :
                                 TimeSpan.FromTicks((long) end).TotalMilliseconds.ToString();
-                        sb.Append(String.Format("[{0}:{1}]={2}, ", TimeSpan.FromTicks((long)start).TotalMilliseconds, one, bucket));
+                        sb.Append(String.Format(CultureInfo.InvariantCulture, "[{0}:{1}]={2}, ", TimeSpan.FromTicks((long)start).TotalMilliseconds, one, bucket));
                     }
                     else
                     {
-                        sb.Append(String.Format("[{0}:{1}]={2}, ", start, end, bucket));
+                        sb.Append(String.Format(CultureInfo.InvariantCulture, "[{0}:{1}]={2}, ", start, end, bucket));
                     }
                 }
             }
