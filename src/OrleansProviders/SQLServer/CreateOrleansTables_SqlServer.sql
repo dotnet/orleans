@@ -107,7 +107,7 @@ CREATE TABLE [OrleansQuery]
 (	
     [QueryKey] VARCHAR(64) NOT NULL,
     [QueryText] NVARCHAR(MAX) NOT NULL,
-    [Description] NVARCHAR(MAX) NOT NULL
+    [Description] NVARCHAR(MAX) NOT NULL,
 
 	CONSTRAINT OrleansQuery_Key PRIMARY KEY([QueryKey])
 );
@@ -1186,7 +1186,7 @@ VALUES
 	N'SET NOCOUNT ON;
 	SELECT
 		[Address],
-        [ProxyPort]
+        [ProxyPort],
 		[Generation]
       FROM
 		[MembershipReadAll]
