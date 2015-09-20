@@ -288,6 +288,11 @@ namespace Orleans.AzureUtils
             }
         }
 
+        /// <summary>
+        /// Remove any characters that can't be used in Azure PartitionKey or RowKey values.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
         public static string SanitizeTableProperty(string key)
         {
             // Remove any characters that can't be used in Azure PartitionKey or RowKey values

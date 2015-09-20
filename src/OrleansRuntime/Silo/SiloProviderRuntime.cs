@@ -116,12 +116,6 @@ namespace Orleans.Runtime.Providers
             Silo.CurrentSilo.UnregisterSystemTarget((SystemTarget)target);
         }
 
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-        {
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period);
-            timer.Start();
-            return timer;
-        }
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
@@ -228,19 +222,6 @@ namespace Orleans.Runtime.Providers
             
             throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", "handler");
         }
-        
-        public Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context)
-        {
-            if (null == asyncFunc)
-                throw new ArgumentNullException("asyncFunc");
-            if (null == context)
-                throw new ArgumentNullException("context");
-            if (!(context is ISchedulingContext))
-                throw new ArgumentException("context object is not of a ISchedulingContext type.", "context");
-
-            // copied from InsideRuntimeClient.ExecAsync().
-            return OrleansTaskScheduler.Instance.RunOrQueueTask(asyncFunc, (ISchedulingContext) context);
-        }
 
         public object GetCurrentSchedulingContext()
         {
@@ -254,7 +235,7 @@ namespace Orleans.Runtime.Providers
             PersistentStreamProviderConfig config)
         {
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
-                config.BalancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper());
+                config.BalancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config);
             this.RegisterSystemTarget(manager);

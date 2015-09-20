@@ -1,25 +1,28 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+// Project Orleans Cloud Service SDK ver. 1.0
+//  
+// Copyright (c) .NET Foundation
+// 
+// All rights reserved.
+//  
+// MIT License
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 using System;
 using System.CodeDom;
@@ -27,7 +30,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration.Serialization;
 using Orleans.Runtime;
 
@@ -86,74 +88,6 @@ namespace Orleans.CodeGeneration
             return builder.ToString();
         }
 
-
-        #region Grain State Classes
-        protected override void GenerateStateClassProperty(CodeTypeDeclaration stateClass, PropertyInfo propInfo, string name, string type)
-        {
-            var text = string.Format(@"Public Property {0} As {1} Implements {2}.{0}", name, type, GetGenericTypeName(propInfo.DeclaringType));
-            stateClass.Members.Add(new CodeSnippetTypeMember(text));
-        }
-        protected override void GenerateToString(CodeTypeDeclaration stateClass, string stateClassName, Dictionary<string, string> properties)
-        {
-            int i = 0;
-            var text = string.Format(@"
-            Public Overrides Function ToString() As System.String           
-                Return System.String.Format(""{0}( {1})""{2})
-            End Function",
-                stateClassName,
-                properties.Keys.ToStrings(p => p + "={" + i++ + "} ", ""),
-                properties.Keys.ToStrings(p => p, ", "));
-
-            stateClass.Members.Add(new CodeSnippetTypeMember(text));
-        }
-
-        protected override void GenerateSetAll(CodeTypeDeclaration stateClass, Dictionary<string, string> properties)
-        {
-            var snippet = new StringBuilder();
-            var setAllBody = @"If values Is Nothing Then
-                InitStateFields()
-                Exit Sub
-            End If
-            Dim value As Object = Nothing";
-
-            foreach (var pair in properties)
-            {
-                setAllBody += @"
-                ";
-
-                if ("long".Equals(pair.Value, StringComparison.OrdinalIgnoreCase)
-                    || "int64".Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
-                {
-                    setAllBody += string.Format(
-@"If values.TryGetValue(""{0}"", value) Then
-    {0} = If(TypeOf (value) Is Int32, CType(value, Int64), CType(value, Int64))
-End If", pair.Key);
-                }
-                else if ("int".Equals(pair.Value, StringComparison.OrdinalIgnoreCase)
-                    || "int32".Equals(pair.Value, StringComparison.OrdinalIgnoreCase))
-                {
-                    setAllBody += string.Format(
-@"If values.TryGetValue(""{0}"", value) Then
-    {0} = If(TypeOf (value) Is Int64, CType(CType(value, Int64), Int32), CType(value, Int32))
-End If", pair.Key);
-                }
-                else
-                {
-                    setAllBody += string.Format(
-@"If values.TryGetValue(""{0}"", value) Then
-    {0} = CType(value, {1})
-End If", pair.Key, pair.Value);
-                }
-            }
-            snippet.AppendFormat(@"
-            Public Overrides Sub SetAll(values As System.Collections.Generic.IDictionary(Of String,object))              
-                {0}
-            End Sub", setAllBody);
-
-            stateClass.Members.Add(new CodeSnippetTypeMember(snippet.ToString()));
-        }
-        #endregion
-
         #region Grain Interfaces
         protected override void AddCreateObjectReferenceMethods(GrainInterfaceData grainInterfaceData, CodeTypeDeclaration factoryClass)
         {
@@ -161,7 +95,7 @@ End If", pair.Key, pair.Value);
             var invokerField = new CodeSnippetTypeMember(fieldImpl);
             factoryClass.Members.Add(invokerField);
 
-            var methodImpl = String.Format(@"
+            var methodImpl = string.Format(@"
         Public Shared Async Function CreateObjectReference(obj As {0}) As System.Threading.Tasks.Task(Of {0})       
             If methodInvoker Is Nothing Then : methodInvoker = New {2}() : End If
             Return {1}.Cast(Await Global.Orleans.Runtime.GrainReference.CreateObjectReference(obj, methodInvoker))
@@ -172,7 +106,7 @@ End If", pair.Key, pair.Value);
             var createObjectReferenceMethod = new CodeSnippetTypeMember(methodImpl);
             factoryClass.Members.Add(createObjectReferenceMethod);
 
-            methodImpl = String.Format(@"
+            methodImpl = string.Format(@"
         Public Shared Function DeleteObjectReference(reference As {0}) As System.Threading.Tasks.Task
             Return Global.Orleans.Runtime.GrainReference.DeleteObjectReference(reference)
         End Function",
@@ -195,11 +129,11 @@ End If", pair.Key, pair.Value);
 
             var interfaces = new Dictionary<int, InterfaceInfo>(grainInterfaceInfo.Interfaces); // Copy, as we may alter the original collection in the loop below
 
-            var interfaceSwitchBody = String.Empty;
+            var interfaceSwitchBody = string.Empty;
 
             foreach (var kv in interfaces)
             {
-                var methodSwitchBody = String.Empty;
+                var methodSwitchBody = string.Empty;
                 int interfaceId = kv.Key;
                 InterfaceInfo interfaceInfo = kv.Value;
 
@@ -218,7 +152,7 @@ End If", pair.Key, pair.Value);
                     , methodId, invokeGrainMethod);
                 }
 
-                interfaceSwitchBody += String.Format(@"
+                interfaceSwitchBody += string.Format(@"
                 Case {0}  ' {1}
                     Select methodId
                         {2}
@@ -255,7 +189,7 @@ End If", pair.Key, pair.Value);
             builder.Append(@"            Try
             ");
 
-            var interfaceSwitchBody = String.Empty;
+            var interfaceSwitchBody = string.Empty;
             foreach (int interfaceId in grainInterfaceInfo.Interfaces.Keys)
             {
                 InterfaceInfo interfaceInfo = grainInterfaceInfo.Interfaces[interfaceId];
@@ -282,7 +216,7 @@ End If", pair.Key, pair.Value);
 
         private string GetMethodDispatchSwitchForInterface(int interfaceId, InterfaceInfo interfaceInfo)
         {
-            var methodSwitchBody = String.Empty;
+            var methodSwitchBody = string.Empty;
 
             foreach (int methodId in interfaceInfo.Methods.Keys)
             {
@@ -365,7 +299,7 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
             var defaultCase = @"                            Case Else 
                             Throw New NotImplementedException(""interfaceId=""+interfaceId+"",methodId=""+methodId)";
 
-            return String.Format(@"Case {0}  ' {1}
+            return string.Format(@"Case {0}  ' {1}
                         Select Case methodId
 {2}                            
 {3}
@@ -373,108 +307,6 @@ Return System.Threading.Tasks.Task.FromResult(CObj(True))
 ",
             interfaceId, interfaceInfo.InterfaceType.Name, methodSwitchBody, defaultCase);
         }
-
-        protected override void AddGetGrainMethods(GrainInterfaceData iface, CodeTypeDeclaration factoryClass)
-        {
-            RecordReferencedNamespaceAndAssembly(typeof(GrainId));
-            RecordReferencedNamespaceAndAssembly(iface.Type);
-            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(iface.Type);
-            var interfaceName = iface.InterfaceTypeName;
-
-            Action<string> add = codeFmt =>
-                factoryClass.Members.Add(new CodeSnippetTypeMember(
-                     String.Format(codeFmt, FixupTypeName(interfaceName))));
-
-            bool isGuidCompoundKey = typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(iface.Type);
-            bool isLongCompoundKey = typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(iface.Type);
-
-            bool isGuidKey = typeof(IGrainWithGuidKey).IsAssignableFrom(iface.Type);
-            bool isLongKey = typeof(IGrainWithIntegerKey).IsAssignableFrom(iface.Type);
-            bool isStringKey = typeof(IGrainWithStringKey).IsAssignableFrom(iface.Type);
-            bool isDefaultKey = !(isGuidKey || isStringKey || isLongKey);
-
-            if (isLongCompoundKey)
-            {
-                // the programmer has specified [ExtendedPrimaryKey] on the interface.
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey as System.Int64, keyExt as System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt))
-                        End Function");
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey as System.Int64, keyExt as System.String, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt, grainClassNamePrefix))
-                        End Function");
-            }
-            else if (isGuidCompoundKey)
-            {
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey As System.Guid, keyExt as System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt))
-                        End Function");
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey As System.Guid, keyExt as System.String, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeKeyExtendedGrainReferenceInternal(GetType({0}), primaryKey, keyExt,grainClassNamePrefix))
-                        End Function");
-            }
-            else
-            {
-                // the programmer has not specified [ExplicitPlacement] on the interface nor [ExtendedPrimaryKey].
-                if (isLongKey || isDefaultKey)
-                {
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey as System.Int64) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey))
-                        End Function");
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey as System.Int64, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey, grainClassNamePrefix))
-                        End Function");
-                }
-                if (isGuidKey || isDefaultKey)
-                {
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey As System.Guid) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey))
-                        End Function");
-                add(
-                    @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey As System.Guid, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey, grainClassNamePrefix))
-                        End Function");
-                }
-                if (isStringKey)
-                {
-                    add(
-                        @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey))
-                        End Function");
-                    add(
-                        @"
-                        <System.Obsolete(""This method has been deprecated. Please use GrainFactory.GetGrain<{0}> instead."")>
-                        Public Shared Function GetGrain(primaryKey As System.String, grainClassNamePrefix As System.String) As {0}
-                            Return Cast(Global.Orleans.CodeGeneration.GrainFactoryBase.MakeGrainReferenceInternal(GetType({0}), primaryKey, grainClassNamePrefix))
-                        End Function");
-                }
-            }
-        }
-
 
         /// <summary>
         /// Generate Cast method in CodeDom and add it in reference class

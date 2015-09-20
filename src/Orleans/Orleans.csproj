@@ -93,7 +93,6 @@
     <Compile Include="Core\Exceptions.cs" />
     <Compile Include="Core\GrainStateStorageBridge.cs" />
     <Compile Include="Core\IGrainIdentity.cs" />
-    <Compile Include="Core\IGrainState.cs" />
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="IDs\GuidId.cs" />
@@ -116,6 +115,7 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />

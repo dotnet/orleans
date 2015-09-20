@@ -38,33 +38,6 @@ namespace Orleans.Runtime.Host
     /// </summary>
     public static class AzureConfigUtils
     {
-        /// <summary>
-        /// Try to determine the base location for the Azure app directory we are being run from
-        /// </summary>
-        /// <returns>App directory this library is being run from</returns>
-        /// <exception cref="FileNotFoundException">If unable to determine our app directory location</exception>
-        [Obsolete("Use the AppDirectoryLocations enumerable instead")]
-        public static DirectoryInfo AzureAppDirectory
-        {
-            get
-            {
-                DirectoryInfo[] searchedLocations = AppDirectoryLocations;
-
-                foreach (var dir in searchedLocations)
-                    if (dir.Exists)
-                        return dir;
-                
-                // Report error using first (expected) search location
-                var sb = new StringBuilder();
-                sb.Append("Cannot find Azure app directyory. Tried locations:");
-                foreach (var loc in searchedLocations)
-                    sb.Append(" ").Append(loc.FullName);
-                
-                Trace.TraceError(sb.ToString());
-                throw new FileNotFoundException(sb.ToString(), "Azure AppRoot");
-            }
-        }
-
         ///<summary>
         /// Return the default file location for the Orleans client config file (ClientConfiguration.xml)
         ///</summary>

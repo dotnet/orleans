@@ -21,30 +21,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-namespace Orleans
+namespace UnitTests.StreamingTests
 {
-    /// <summary>
-    /// Base interface for interfaces that define persistent state properties of a grain.
-    /// </summary>
-    public interface IGrainState
+    public class StreamTestsConstants
     {
-        /// <summary>
-        /// Opaque value set by the storage provider representing an 'Etag' setting for the last time the state data was read from backing store.
-        /// </summary>
-        string Etag { get; set; }
-
-        /// <summary>
-        /// Return a snapshot of the current grain state data, as a Dictionary of Key-Value pairs.
-        /// </summary>
-        IDictionary<string, object> AsDictionary();
-
-        /// <summary>
-        /// Update the current grain state data with the specified Dictionary of Key-Value pairs.
-        /// </summary>
-        void SetAll(IDictionary<string, object> values);
+        public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
     }
 }

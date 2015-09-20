@@ -53,18 +53,6 @@ namespace Orleans.CodeGeneration
     }
     
     [AttributeUsage(System.AttributeTargets.Class)]
-    public sealed class GrainStateAttribute : GeneratedAttribute
-    {
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public GrainStateAttribute(string forGrainType)
-        {
-            ForGrainType = forGrainType;
-        }
-    }
-    
-    [AttributeUsage(System.AttributeTargets.Class)]
     public sealed class MethodInvokerAttribute : GeneratedAttribute
     {
         /// <summary>

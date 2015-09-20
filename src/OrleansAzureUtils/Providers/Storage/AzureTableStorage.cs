@@ -153,7 +153,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -176,7 +176,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -207,7 +207,7 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IStorageProvider.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -247,7 +247,7 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal void ConvertToStorageFormat(IGrainState grainState, GrainStateEntity entity)
+        internal void ConvertToStorageFormat(GrainState grainState, GrainStateEntity entity)
         {
             // Dehydrate
             var dataValues = grainState.AsDictionary();
@@ -289,7 +289,7 @@ namespace Orleans.Storage
         /// </summary>
         /// <param name="grainState">The grain state data to be deserialized in to</param>
         /// <param name="entity">The Azure table entity the stored data</param>
-        internal void ConvertFromStorageFormat(IGrainState grainState, GrainStateEntity entity)
+        internal void ConvertFromStorageFormat(GrainState grainState, GrainStateEntity entity)
         {
             Dictionary<string, object> dataValues = null;
             try
