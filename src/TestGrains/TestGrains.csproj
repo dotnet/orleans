@@ -48,9 +48,8 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EventSourcing\StaticPersonState.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
-    <Compile Include="EventSourcing\DynamicPersonState.cs" />
+    <Compile Include="EventSourcing\PersonState.cs" />
     <Compile Include="GenericGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />

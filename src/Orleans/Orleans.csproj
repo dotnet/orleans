@@ -94,10 +94,8 @@
     <Compile Include="Core\GrainStateStorageBridge.cs" />
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IStorage.cs" />
-    <Compile Include="EventSourcing\IJournaledGrainStateTransition.cs" />
     <Compile Include="EventSourcing\JournaledGrain.cs" />
     <Compile Include="EventSourcing\JournaledGrainState.cs" />
-    <Compile Include="EventSourcing\StateEvent.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
