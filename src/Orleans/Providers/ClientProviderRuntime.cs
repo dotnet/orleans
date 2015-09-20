@@ -23,10 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Streams;
 
 using Orleans.Runtime;
@@ -34,8 +31,10 @@ using Orleans.Runtime;
 namespace Orleans.Providers
 {
     internal class ClientProviderRuntime : IStreamProviderRuntime
-    { 
-        private IStreamPubSub pubSub;
+    {
+        private IStreamPubSub grainBasedPubSub;
+        private IStreamPubSub implictPubSub;
+        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
@@ -55,7 +54,10 @@ namespace Orleans.Providers
             {
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
-            pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(GrainFactory), implicitStreamSubscriberTable);
+            grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
+            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
+            implictPubSub = tmp;
+            combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
             streamDirectory = new StreamDirectory();
         }
 
@@ -164,7 +166,17 @@ namespace Orleans.Providers
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
-            return pubSubType == StreamPubSubType.GrainBased ? pubSub : null;
+            switch (pubSubType)
+            {
+                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
+                    return combinedGrainBasedAndImplicitPubSub;
+                case StreamPubSubType.ExplicitGrainBasedOnly:
+                    return grainBasedPubSub;
+                case StreamPubSubType.ImplicitOnly:
+                    return implictPubSub;
+                default:
+                    return null;
+            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
@@ -174,28 +186,9 @@ namespace Orleans.Providers
 
         public bool InSilo { get { return false; } }
 
-        public Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context)
-        {
-            if (context != null)
-                throw new ArgumentException("The grain client only supports a null scheduling context.");
-            return Task.Run(asyncFunc);
-        }
-
         public object GetCurrentSchedulingContext()
         {
             return null;
-        }
-
-        public Task StartPullingAgents(
-            string streamProviderName,
-            StreamQueueBalancerType balancerType,
-            IQueueAdapterFactory adapterFactory,
-            IQueueAdapter queueAdapter,
-            TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout,
-            TimeSpan maxEventDeliveryTime)
-        {        
-            return TaskDone.Done;
         }
     }
 }

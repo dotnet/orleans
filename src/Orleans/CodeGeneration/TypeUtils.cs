@@ -221,11 +221,13 @@ namespace Orleans.Runtime
             return i <= 0 ? typeName : typeName.Substring(0, i);
         }
 
+        private static string[] typeSeparator = new string[] { "],[" };
         public static Type[] GenericTypeArgs(string className)
         {
             var typeArgs = new List<Type>();
             var genericTypeDef = GenericTypeArgsString(className).Replace("[]", "##"); // protect array arguments
-            string[] genericArgs = genericTypeDef.Split('[', ']');
+            string[] genericArgs = genericTypeDef.Split(typeSeparator, StringSplitOptions.RemoveEmptyEntries);
+
             foreach (string genericArg in genericArgs)
             {
                 string typeArg = genericArg.Trim('[', ']');
@@ -379,16 +381,6 @@ namespace Orleans.Runtime
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));        
         }
 
-        public static bool IsGrainStateType(Type type)
-        {
-            var generalType = typeof(GrainState);
-            if (type.Assembly.ReflectionOnly)
-            {
-                generalType = ToReflectionOnlyType(generalType);
-            }
-            return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(GrainStateAttribute));
-        }
-            
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);

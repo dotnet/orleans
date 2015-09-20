@@ -31,6 +31,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Storage.Relational;
 using UnitTests.StorageTests;
+using UnitTests.General;
 
 namespace UnitTests.RemindersTest
 {
@@ -80,11 +81,12 @@ namespace UnitTests.RemindersTest
             GlobalConfiguration config = new GlobalConfiguration
                                          {
                                              DeploymentId = deploymentId,
-                                             DataConnectionString = relationalStorage.ConnectionString
+                                             DataConnectionStringForReminders = relationalStorage.ConnectionString,
+                                             AdoInvariantForReminders =  relationalStorage.InvariantName
                                          };
 
-            var rmndr = new SqlReminderTable(config);
-            await rmndr.Init(serviceId, deploymentId, config.DataConnectionString).WithTimeout(timeout);
+            var rmndr = new SqlReminderTable();
+            await rmndr.Init(config, logger).WithTimeout(timeout);
             reminder = rmndr;
         }
 

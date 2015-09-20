@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -22,29 +22,13 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans;
 
-namespace Orleans
+namespace UnitTests.GrainInterfaces
 {
-    /// <summary>
-    /// Base interface for interfaces that define persistent state properties of a grain.
-    /// </summary>
-    public interface IGrainState
+    public interface IMultipleImplicitSubscriptionGrain : IGrainWithGuidKey
     {
-        /// <summary>
-        /// Opaque value set by the storage provider representing an 'Etag' setting for the last time the state data was read from backing store.
-        /// </summary>
-        string Etag { get; set; }
-
-        /// <summary>
-        /// Return a snapshot of the current grain state data, as a Dictionary of Key-Value pairs.
-        /// </summary>
-        IDictionary<string, object> AsDictionary();
-
-        /// <summary>
-        /// Update the current grain state data with the specified Dictionary of Key-Value pairs.
-        /// </summary>
-        void SetAll(IDictionary<string, object> values);
+        Task<Tuple<int, int>> GetCounters();
     }
 }

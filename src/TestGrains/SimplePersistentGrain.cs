@@ -48,10 +48,13 @@ namespace UnitTests.Grains
     /// </summary>
     public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimplePersistentGrain
     {
+        private Logger logger;
         private Guid version;
 
         public override Task OnActivateAsync()
         {
+            logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimplePersistentGrain).Name, base.IdentityString, base.RuntimeIdentity));
+            logger.Info("Activate.");
             version = Guid.NewGuid();
             return base.OnActivateAsync();
         }
@@ -98,6 +101,18 @@ namespace UnitTests.Grains
         public Task<Guid> GetVersion()
         {
             return Task.FromResult(version);
+        }
+
+        public Task<object> GetRequestContext()
+        {
+            var info = RequestContext.Get("GrainInfo");
+            return Task.FromResult(info);
+        }
+
+        public Task SetRequestContext(int data)
+        {
+            RequestContext.Set("GrainInfo", data);
+            return TaskDone.Done;
         }
     }
 }

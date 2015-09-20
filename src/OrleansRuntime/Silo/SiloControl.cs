@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Providers;
 
 
 namespace Orleans.Runtime
@@ -133,6 +134,22 @@ namespace Orleans.Runtime
         public Task<int> GetActivationCount()
         {
             return Task.FromResult(InsideRuntimeClient.Current.Catalog.ActivationCount);
+        }
+
+        public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
+        {
+            IProvider provider = silo.AllSiloProviders.FirstOrDefault(pr => pr.GetType().FullName.Equals(providerTypeFullName) && pr.Name.Equals(providerName));
+            if (provider == null)
+            {
+                throw new ArgumentException("Could not find provider for type " + providerTypeFullName + " and name " + providerName);
+            }
+
+            var controllable = provider as IControllable;
+            if (controllable == null)
+            {
+                throw new ArgumentException("The found provider of type " + providerTypeFullName + " and name " + providerName + " is not controllable.");
+            }
+            return controllable.ExecuteCommand(command, arg);
         }
 
         #endregion

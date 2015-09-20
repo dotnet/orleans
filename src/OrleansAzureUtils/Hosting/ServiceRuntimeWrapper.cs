@@ -22,7 +22,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -135,12 +134,7 @@ namespace Orleans.Runtime.Host
 
         public string InstanceName
         {
-            get
-            {
-                return InstanceId.Length > DeploymentId.Length && InstanceId.StartsWith(DeploymentId)
-                ? InstanceId.Substring(DeploymentId.Length + 1)
-                : InstanceId;
-            }
+            get { return ExtractInstanceName(InstanceId, DeploymentId); }
         }
 
         public int RoleInstanceCount
@@ -157,7 +151,7 @@ namespace Orleans.Runtime.Host
             dynamic instances = role.Instances;
             var list = new List<string>();
             foreach(dynamic instance in instances)
-                list.Add(instance.Id);
+                list.Add(ExtractInstanceName(instance.Id,DeploymentId));
             
             return list;
         }
@@ -246,6 +240,13 @@ namespace Orleans.Runtime.Host
             instanceEndpoints = currentRoleInstance.InstanceEndpoints;
             role = currentRoleInstance.Role;
             RoleName = role.Name;
+        }
+
+        private static string ExtractInstanceName(string instanceId, string deploymentId)
+        {
+            return instanceId.Length > deploymentId.Length && instanceId.StartsWith(deploymentId)
+                ? instanceId.Substring(deploymentId.Length + 1)
+                : instanceId;
         }
     }
 }

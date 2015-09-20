@@ -57,6 +57,8 @@ namespace Orleans.Streams
     {
         private readonly Dictionary<TBucket, List<TResource>> idealDistribution;
 
+        public Dictionary<TBucket, List<TResource>> IdealDistribution { get { return idealDistribution; } }
+
         /// <summary>
         /// Constructor.
         /// Initializes an ideal distribution to be used to aid in resource to bucket affinity.
@@ -93,30 +95,30 @@ namespace Orleans.Streams
             }
 
             // sanitize active buckets.  Remove duplicates, ensure all buckets are valid
-            List<TBucket> activeBucketsList = activeBuckets.Distinct().ToList();
-            if (activeBucketsList.Except(idealDistribution.Keys).Any())
+            HashSet<TBucket> activeBucketsSet = new HashSet<TBucket>(activeBuckets);
+            foreach (var bucket in activeBucketsSet)
             {
-                throw new ArgumentOutOfRangeException("activeBuckets", "Active buckets contains buckets no in master list");
+                if (!idealDistribution.ContainsKey(bucket))
+                {
+                    throw new ArgumentOutOfRangeException("activeBuckets", String.Format("Active buckets contain a bucket {0} not in the master list.", bucket));
+                }
             }
 
             var newDistribution = new Dictionary<TBucket, List<TResource>>();
             // if no buckets, return empty resource distribution
-            if (activeBucketsList.Count == 0)
+            if (activeBucketsSet.Count == 0)
             {
                 return newDistribution;
             }
-
-            // sanitize inputs.  Stort active buckets
-            activeBucketsList.Sort();
             
             // setup ideal distribution for active buckets
-            foreach (TBucket bucket in idealDistribution.Keys.Where(activeBucketsList.Contains))
+            foreach (TBucket bucket in idealDistribution.Keys.Where(activeBucketsSet.Contains))
             {
-                newDistribution.Add(bucket, idealDistribution[bucket].ToList());
+                newDistribution.Add(bucket, idealDistribution[bucket]);
             }
 
             // get list of inactive buckets
-            List<TBucket> inactiveBuckets = idealDistribution.Keys.Where(bucket => !activeBucketsList.Contains(bucket)).ToList();
+            List<TBucket> inactiveBuckets = idealDistribution.Keys.Where(bucket => !activeBucketsSet.Contains(bucket)).ToList();
 
             // build list of all resources that need redistributed from inactive buckets
             var resourcesToRedistribute = new List<TResource>();
@@ -149,7 +151,7 @@ namespace Orleans.Streams
         /// <param name="buckets">Buckets among which to destribute resources.</param>
         /// <param name="resources">Resources to be distributed.</param>
         /// <returns>Dictionary of resources evenly distributed among the buckets</returns>
-        private Dictionary<TBucket, List<TResource>> BuildIdealDistribution(IEnumerable<TBucket> buckets, IEnumerable<TResource> resources)
+        private static Dictionary<TBucket, List<TResource>> BuildIdealDistribution(IEnumerable<TBucket> buckets, IEnumerable<TResource> resources)
         {
             var idealDistribution = new Dictionary<TBucket, List<TResource>>();
 
@@ -166,20 +168,34 @@ namespace Orleans.Streams
             resourceList.Sort();
 
             // Distribute resources evenly among buckets
-            var idealResourceCountPerBucket = (int)Math.Ceiling((double)resourceList.Count / bucketList.Count);
+            var upperResourceCountPerBucket = (int)Math.Ceiling((double)resourceList.Count / bucketList.Count);
+            var lowerResourceCountPerBucket = upperResourceCountPerBucket - 1;
             List<TResource>.Enumerator resourceEnumerator = resourceList.GetEnumerator();
+            int bucketsToFillWithUpperResource = resourceList.Count % bucketList.Count;
+            // a bucketsToFillWithUpperResource of 0 indicates resources are evenly devisible, so fill them all with upper resource count
+            if (bucketsToFillWithUpperResource == 0)
+            {
+                bucketsToFillWithUpperResource = bucketList.Count;
+            }
+            int bucketsFilledCount = 0;
             foreach (TBucket bucket in bucketList)
             {
+                // if we've filled the first bucketsToFillWithUpperResource buckets with upperResourceCountPerBucket
+                //   resources, fill the rest with lowerResourceCountPerBucket
+                int resourcesToAddToBucket = bucketsFilledCount < bucketsToFillWithUpperResource
+                    ? upperResourceCountPerBucket
+                    : lowerResourceCountPerBucket;
                 var bucketResources = new List<TResource>();
                 idealDistribution.Add(bucket, bucketResources);
                 while (resourceEnumerator.MoveNext())
                 {
                     bucketResources.Add(resourceEnumerator.Current);
-                    if (bucketResources.Count >= idealResourceCountPerBucket)
+                    if (bucketResources.Count >= resourcesToAddToBucket)
                     {
                         break;
                     }
                 }
+                bucketsFilledCount++;
             }
             return idealDistribution;
         }

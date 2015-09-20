@@ -3,7 +3,7 @@
   <Import Project="$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.props" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.9\build\Microsoft.Orleans.Templates.Grains.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Platform>AnyCPU</Platform>
     <ProjectGuid>{$guid2$}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>$safeprojectname$</RootNamespace>

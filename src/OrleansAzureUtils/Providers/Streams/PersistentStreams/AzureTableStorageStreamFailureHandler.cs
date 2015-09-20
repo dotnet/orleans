@@ -90,8 +90,28 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public async Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
             StreamSequenceToken sequenceToken)
+        {
+            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+        }
+
+        /// <summary>
+        /// Should be called when a subscription requested by a consumer could not be setup, after exhausting retry attempts.
+        /// </summary>
+        /// <param name="subscriptionId"></param>
+        /// <param name="streamProviderName"></param>
+        /// <param name="streamIdentity"></param>
+        /// <param name="sequenceToken"></param>
+        /// <returns></returns>
+        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+            StreamSequenceToken sequenceToken)
+        {
+            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+        }
+
+        private async Task OnFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+                StreamSequenceToken sequenceToken)
         {
             if (subscriptionId == null)
             {
