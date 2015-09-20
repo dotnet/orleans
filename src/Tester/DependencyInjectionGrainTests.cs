@@ -37,7 +37,6 @@ namespace UnitTests.General
     /// Summary description for SimpleGrain
     /// </summary>
     [DeploymentItem("OrleansStartupConfigurationForTesting.xml")]
-    [DeploymentItem("Orleans.Autofac.dll")]
     [TestClass]
     public class DependencyInjectionGrainTests : UnitTestSiloHost
     {
