@@ -42,6 +42,11 @@ namespace Orleans.Runtime
         string SiloName { get; }
 
         /// <summary>
+        /// Silo Address of this silo.
+        /// </summary>
+        SiloAddress SiloAddress { get; }
+
+        /// <summary>
         /// Start this oracle. Will register this silo in the SiloDirectory with SiloStatus.Starting status.
         /// </summary>
         Task Start();

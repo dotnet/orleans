@@ -89,10 +89,13 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             try
             {
+                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.    
+                if (queueRef == null) return new List<IBatchContainer>();  
+
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
                     CloudQueueMessage.MaxNumberOfMessagesToPeek : Math.Min(maxCount, CloudQueueMessage.MaxNumberOfMessagesToPeek);
 
-                var task = queue.GetQueueMessages(count);
+                var task = queueRef.GetQueueMessages(count);
                 outstandingTask = task;
                 IEnumerable<CloudQueueMessage> messages = await task;
 
@@ -111,9 +114,10 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             try
             {
-                if (messages.Count == 0) return;
+                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.  
+                if (messages.Count == 0 || queueRef==null) return;
                 List<CloudQueueMessage> cloudQueueMessages = messages.Cast<AzureQueueBatchContainer>().Select(b => b.CloudQueueMessage).ToList();
-                outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queue.DeleteQueueMessage));
+                outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queueRef.DeleteQueueMessage));
                 await outstandingTask;
             }
             finally

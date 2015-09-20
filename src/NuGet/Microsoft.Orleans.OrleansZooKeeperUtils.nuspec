@@ -26,5 +26,6 @@
   </metadata>
   <files>
     <file src="OrleansZooKeeperUtils.dll" target="lib\net45" />
+    <file src="OrleansZooKeeperUtils.pdb" target="lib\net45" />
   </files>
 </package>

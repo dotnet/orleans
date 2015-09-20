@@ -88,7 +88,6 @@ namespace Orleans.Runtime
         public abstract void Verbose3(string format, params object[] args);
 
         /// <summary> Output the specified message at <c>Info</c> log level. </summary>
-        ////[Obsolete("Use method Info(logCode,format,args) instead")]
         public abstract void Info(string format, params object[] args);
 
 #region Public log methods using int LogCode categorization.
