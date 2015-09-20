@@ -22,28 +22,69 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 
 
 namespace Orleans.EventSourcing
 {
-    public class JournaledGrain<TGrainState> : Grain<TGrainState>
+    /// <summary>
+    /// Base class for event-sourced grain state classes.
+    /// </summary>
+    public abstract class JournaledGrainState<TGrainState> : GrainState
         where TGrainState : JournaledGrainState<TGrainState>
     {
-        /// <summary>
-        /// This methiod is for events that know how to apply themselves to TGrainState, subclasses of StateEvent&lt;T&gt;.
-        /// </summary>
-        /// <param name="event">Event to raise</param>
-        /// <param name="commit">Whether or not the event needs to be immediately committed to storage</param>
-        /// <returns></returns>
-        protected Task RaiseStateEvent<TEvent>(TEvent @event, bool commit = true)
+        private List<object> events = new List<object>();
+
+        protected JournaledGrainState()
+            : base(typeof(TGrainState).FullName)
+        {
+        }
+
+        public IEnumerable Events
+        {
+            get { return events.AsReadOnly(); }
+        }
+
+        public int Version { get; private set; }
+
+        public void AddEvent<TEvent>(TEvent @event)
             where TEvent : class
         {
-            if (@event == null) throw new ArgumentNullException("event");
+            events.Add(@event);
 
-            State.AddEvent(@event);
-            return commit ? WriteStateAsync() : TaskDone.Done;
+            StateTransition(@event);
+
+            Version++;
+        }
+
+        public override void SetAll(IDictionary<string, object> values)
+        {
+            base.SetAll(values);
+
+            foreach (var @event in Events)
+                StateTransition(@event);
+        }
+
+        private void StateTransition<TEvent>(TEvent @event)
+            where TEvent : class
+        {
+            dynamic me = this;
+
+            try
+            {
+                me.Apply(@event);
+            }
+            catch(MissingMethodException)
+            {
+                OnMissingStateTransition(@event);
+            }
+        }
+
+        protected virtual void OnMissingStateTransition(object @event)
+        {
+            // Log
         }
     }
 }
