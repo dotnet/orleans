@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Orleans.CodeGeneration;
 
@@ -31,14 +32,14 @@ namespace Orleans.EventSourcing
     public abstract class JournaledGrainState<TGrainState> : GrainState
         where TGrainState : JournaledGrainState<TGrainState>
     {
-        private List<StateEvent> events = new List<StateEvent>();
+        private List<object> events = new List<object>();
 
         protected JournaledGrainState()
             : base(typeof(TGrainState).FullName)
         {
         }
 
-        public IEnumerable<StateEvent> Events
+        public IEnumerable Events
         {
             get { return events.AsReadOnly(); }
         }
@@ -46,12 +47,11 @@ namespace Orleans.EventSourcing
         public int Version { get; private set; }
 
         public void AddEvent<TEvent>(TEvent @event)
-            where TEvent: StateEvent
+            where TEvent : class
         {
             events.Add(@event);
 
-            DynamicStateTransition(@event);
-            //StaticStateTransition(@event);
+            StateTransition(@event);
 
             Version++;
         }
@@ -60,26 +60,28 @@ namespace Orleans.EventSourcing
         {
             base.SetAll(values);
 
+            foreach (var @event in Events)
+                StateTransition(@event);
+        }
+
+        private void StateTransition<TEvent>(TEvent @event)
+            where TEvent : class
+        {
             dynamic me = this;
 
-            foreach (StateEvent @event in Events)
+            try
+            {
                 me.Apply(@event);
+            }
+            catch(MissingMethodException)
+            {
+                OnMissingStateTransition(@event);
+            }
         }
 
-        private void DynamicStateTransition<TEvent>(TEvent @event)
-            where TEvent : StateEvent
+        protected virtual void OnMissingStateTransition(object @event)
         {
-            dynamic me = this;
-            me.Apply(this, @event);
-        }
-
-        private void StaticStateTransition<TEvent>(TEvent @event)
-            where TEvent : StateEvent
-        {
-            var transition = this as IJournaledGrainStateTransition<TGrainState, TEvent>;
-            
-            if(transition != null)
-                transition.Apply(this as TGrainState, @event);
+            // Log
         }
     }
 }

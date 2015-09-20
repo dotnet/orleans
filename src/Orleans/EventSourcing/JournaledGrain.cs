@@ -38,7 +38,7 @@ namespace Orleans.EventSourcing
         /// <param name="commit">Whether or not the event needs to be immediately committed to storage</param>
         /// <returns></returns>
         protected Task RaiseStateEvent<TEvent>(TEvent @event, bool commit = true)
-            where TEvent : StateEvent
+            where TEvent : class
         {
             if (@event == null) throw new ArgumentNullException("event");
 

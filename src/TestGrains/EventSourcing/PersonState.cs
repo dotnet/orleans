@@ -27,30 +27,28 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class StaticPersonState : JournaledGrainState<StaticPersonState>,
-        IJournaledGrainStateTransition<StaticPersonState, PersonRegistered>,
-        IJournaledGrainStateTransition<StaticPersonState, PersonMarried>,
-        IJournaledGrainStateTransition<StaticPersonState, PersonLastNameChanged>
+    public class PersonState : JournaledGrainState<PersonState>
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public GenderType Gender { get; set; }
+        public bool IsMarried { get; set; }
 
-        public void Apply(StaticPersonState state, PersonRegistered registered)
+        public void Apply(PersonRegistered @event)
         {
-            state.FirstName = registered.FirstName;
-            state.LastName = registered.LastName;
-            state.Gender = registered. Gender;
+            this.FirstName = @event.FirstName;
+            this.LastName = @event.LastName;
+            this.Gender = @event. Gender;
         }
 
-        public void Apply(StaticPersonState state, PersonMarried married)
+        public void Apply(PersonMarried @event)
         {
-            // TODO
+            this.IsMarried = true;
         }
 
-        public void Apply(StaticPersonState state, PersonLastNameChanged lnChanged)
+        public void Apply(PersonLastNameChanged @event)
         {
-            state.LastName = lnChanged.LastName;
+            this.LastName = @event.LastName;
         }
     }
 }

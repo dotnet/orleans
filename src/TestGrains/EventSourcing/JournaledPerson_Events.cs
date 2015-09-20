@@ -29,7 +29,7 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonRegistered : StateEvent
+    public class PersonRegistered
     {
         public string FirstName { get; private set; }
         public string LastName { get; private set; }
@@ -43,7 +43,7 @@ namespace TestGrains
         }
     }
 
-    public class PersonMarried : StateEvent
+    public class PersonMarried
     {
         public Guid SpouseId { get; private set; }
         public string SpouseFirstName { get; private set; }
@@ -57,7 +57,7 @@ namespace TestGrains
         }
     }
 
-    public class PersonLastNameChanged : StateEvent
+    public class PersonLastNameChanged
     {
         public string LastName { get; private set; }
 

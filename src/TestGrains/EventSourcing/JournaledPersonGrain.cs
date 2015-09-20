@@ -31,8 +31,7 @@ using TestGrainInterfaces;
 namespace TestGrains
 {
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class JournaledPersonGrain : JournaledGrain<DynamicPersonState>, IJournaledPersonGrain
-    //public class JournaledPersonGrain : JournaledGrain<StaticPersonState>, IJournaledPersonGrain
+    public class JournaledPersonGrain : JournaledGrain<PersonState>, IJournaledPersonGrain
     {
         public Task RegisterBirth(PersonAttributes props)
         {
@@ -41,12 +40,14 @@ namespace TestGrains
 
         public async Task Marry(IJournaledPersonGrain spouse)
         {
+            if (State.IsMarried)
+                throw new NotSupportedException(string.Format("{0} is already married.", State.LastName));
+
             var spouseData = await spouse.GetPersonalAttributes();
 
             await RaiseStateEvent(
                 new PersonMarried(spouse.GetPrimaryKey(), spouseData.FirstName, spouseData.LastName),
                 commit: false); // We are not storing the first event here
-
 
             if (State.LastName != spouseData.LastName)
             {
