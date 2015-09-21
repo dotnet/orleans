@@ -110,6 +110,7 @@ namespace Orleans.Runtime
                     message.IsNewPlacement, 
                     message.NewGrainType, 
                     message.GenericGrainType, 
+                    message.RequestContextData,
                     out ignore);
 
                 if (ignore != null)
