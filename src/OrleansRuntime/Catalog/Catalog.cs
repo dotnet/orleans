@@ -413,6 +413,7 @@ namespace Orleans.Runtime
             bool newPlacement,
             string grainType,
             string genericArguments,
+            Dictionary<string, object> requestContextData,
             out Task activatedPromise)
         {
             ActivationData result;
@@ -465,7 +466,7 @@ namespace Orleans.Runtime
             }
    
             SetupActivationInstance(result, grainType, genericArguments);
-            activatedPromise = InitActivation(result, grainType, genericArguments);
+            activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
             return result;
         }
 
@@ -483,7 +484,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task InitActivation(ActivationData activation, string grainType, string genericInterface)
+        private async Task InitActivation(ActivationData activation, string grainType, string genericInterface, Dictionary<string, object> requestContextData)
         {
             // We've created a dummy activation, which we'll eventually return, but in the meantime we'll queue up (or perform promptly)
             // the operations required to turn the "dummy" activation into a real activation
@@ -501,7 +502,7 @@ namespace Orleans.Runtime
                 await SetupActivationState(activation, grainType);                
 
                 initStage = 3;
-                await InvokeActivate(activation);
+                await InvokeActivate(activation, requestContextData);
 
                 ActivationCollector.ScheduleCollection(activation);
 
@@ -1055,7 +1056,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CallGrainActivate(ActivationData activation)
+        private async Task CallGrainActivate(ActivationData activation, Dictionary<string, object> requestContextData)
         {
             var grainTypeName = activation.GrainInstanceType.FullName;
 
@@ -1065,6 +1066,7 @@ namespace Orleans.Runtime
             // Call OnActivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
             try
             {
+                RequestContext.Import(requestContextData);
                 await activation.GrainInstance.OnActivateAsync();
 
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingActivate, "Returned from calling {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
@@ -1113,6 +1115,7 @@ namespace Orleans.Runtime
                     if (TryGetActivationData(activation.ActivationId, out ignore) &&
                         activation.State == ActivationState.Deactivating)
                     {
+                        RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
                         await activation.GrainInstance.OnDeactivateAsync();
                     }
                     if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
@@ -1181,14 +1184,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="activation"></param>
         /// <returns></returns>
-        private Task InvokeActivate(ActivationData activation)
+        private Task InvokeActivate(ActivationData activation, Dictionary<string, object> requestContextData)
         {
             // NOTE: This should only be called with the correct schedulering context for the activation to be invoked.
             lock (activation)
             {
                 activation.SetState(ActivationState.Activating);
             }
-            return scheduler.QueueTask(() => CallGrainActivate(activation), new SchedulingContext(activation)); // Target grain's scheduler context);
+            return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), new SchedulingContext(activation)); // Target grain's scheduler context);
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
         #endregion
@@ -1240,7 +1243,7 @@ namespace Orleans.Runtime
         {
             ActivationAddress target = ActivationAddress.NewActivationAddress(LocalSilo, grainId);
             Task activatedPromise;
-            GetOrCreateActivation(target, true, grainType, null, out activatedPromise);
+            GetOrCreateActivation(target, true, grainType, null, null, out activatedPromise);
             return activatedPromise ?? TaskDone.Done;
         }
 
