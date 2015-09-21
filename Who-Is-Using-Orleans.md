@@ -27,6 +27,7 @@ Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.co
 Microsoft Research  |  <a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
 NašeÚkoly.CZ    |<a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
 Trustev    |<a href="http://www.trustev.com/" target="_blank">www.trustev.com</a>|
+Mailcloud Limited |<a href="http://www.mailcloud.com/" target="_blank">http://www.mailcloud.com/</a>|
 
 
 ## Projects and Applications
