@@ -27,7 +27,7 @@ using System.Net;
 using System.Runtime;
 using System.Threading;
 using System.Globalization;
-
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 
@@ -98,6 +98,7 @@ namespace Orleans.Runtime.Host
         private TraceLogger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
+        private EventWaitHandle shutdownEvent;
         private bool disposed;
 
         /// <summary>
@@ -174,12 +175,36 @@ namespace Orleans.Runtime.Host
                 
                 if (orleans != null)
                 {
+                    var shutdownEventName = Config.Defaults.SiloShutdownEventName ?? Name + "-Shutdown";
+                    logger.Info(ErrorCode.SiloShutdownEventName, "Silo shutdown event name: {0}", shutdownEventName);
+
+                    bool createdNew;
+                    shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, shutdownEventName, out createdNew);
+                    if (!createdNew)
+                    {
+                        logger.Info(ErrorCode.SiloShutdownEventOpened, "Opened existing shutdown event. Setting the event {0}", shutdownEventName);
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.SiloShutdownEventCreated, "Created and set shutdown event {0}", shutdownEventName);
+                    }
+
+                    // Start silo
                     orleans.Start();
+
+                    // Wait for the shutdown event, and trigger a graceful shutdown if we receive it.
+
+                    var shutdownThread = new Thread( o =>
+                        {
+                            shutdownEvent.WaitOne();
+                            logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
+                            orleans.Shutdown();
+                        });
+                    shutdownThread.Start();
                     
                     var startupEventName = Name;
                     logger.Info(ErrorCode.SiloStartupEventName, "Silo startup event name: {0}", startupEventName);
 
-                    bool createdNew;
                     startupEvent = new EventWaitHandle(true, EventResetMode.ManualReset, startupEventName, out createdNew);
                     if (!createdNew)
                     {
