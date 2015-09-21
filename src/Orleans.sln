@@ -65,6 +65,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.Client.nuspec = NuGet\Microsoft.Orleans.Client.nuspec
 		NuGet\Microsoft.Orleans.Core.nuspec = NuGet\Microsoft.Orleans.Core.nuspec
 		NuGet\Microsoft.Orleans.CounterControl.nuspec = NuGet\Microsoft.Orleans.CounterControl.nuspec
+		NuGet\Microsoft.Orleans.EventSourcing.nuspec = NuGet\Microsoft.Orleans.EventSourcing.nuspec
 		NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec = NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansHost.nuspec = NuGet\Microsoft.Orleans.OrleansHost.nuspec
 		NuGet\Microsoft.Orleans.OrleansManager.nuspec = NuGet\Microsoft.Orleans.OrleansManager.nuspec
