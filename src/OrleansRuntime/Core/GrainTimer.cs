@@ -131,7 +131,8 @@ namespace Orleans.Runtime
                 logger.Verbose3(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
 
             try
-            { 
+            {
+                RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
                 currentlyExecutingTickTask = asyncCallback(state);
                 await currentlyExecutingTickTask;
                 
