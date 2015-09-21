@@ -166,7 +166,6 @@ namespace Orleans
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
                 localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
-                CallbackData.Config = config;
 
                 if (!secondary)
                 {
@@ -476,7 +475,7 @@ namespace Orleans
                     if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Invoke))
                         continue;
 
-                    RequestContext.ImportFromMessage(message);
+                    RequestContext.Import(message.RequestContextData);
                     var request = (InvokeMethodRequest)message.BodyObject;
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
@@ -623,7 +622,7 @@ namespace Orleans
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
-            var message = RuntimeClient.CreateMessage(request, options);
+            var message = Message.CreateMessage(request, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
 
@@ -664,7 +663,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(callback, TryResendMessage, context, message, () => UnRegisterCallback(message.Id));
+                var callbackData = new CallbackData(callback, TryResendMessage, context, message, () => UnRegisterCallback(message.Id), config);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(responseTimeout);
             }
@@ -707,6 +706,9 @@ namespace Orleans
             var found = callbacks.TryGetValue(response.Id, out callbackData);
             if (found)
             {
+                // We need to import the RequestContext here as well.
+                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
+                // RequestContext.Import(response.RequestContextData);
                 callbackData.DoCallback(response);
             }
             else

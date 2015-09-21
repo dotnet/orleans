@@ -40,12 +40,14 @@ namespace TestGrains
 
         public async Task Marry(IJournaledPersonGrain spouse)
         {
+            if (State.IsMarried)
+                throw new NotSupportedException(string.Format("{0} is already married.", State.LastName));
+
             var spouseData = await spouse.GetPersonalAttributes();
 
             await RaiseStateEvent(
                 new PersonMarried(spouse.GetPrimaryKey(), spouseData.FirstName, spouseData.LastName),
                 commit: false); // We are not storing the first event here
-
 
             if (State.LastName != spouseData.LastName)
             {

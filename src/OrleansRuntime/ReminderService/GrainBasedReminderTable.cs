@@ -25,6 +25,7 @@ using System;
 using System.Threading.Tasks;
 
 using Orleans.Concurrency;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime.ReminderService
@@ -44,7 +45,7 @@ namespace Orleans.Runtime.ReminderService
             return TaskDone.Done;
         }
 
-        public Task Init(Guid serviceId, string deploymentId, string connectionString)
+        public Task Init(GlobalConfiguration config, TraceLogger logger)
         {
             return TaskDone.Done;
         }

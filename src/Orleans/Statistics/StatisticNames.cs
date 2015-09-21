@@ -164,6 +164,8 @@ namespace Orleans.Runtime
         public static readonly StatisticName RUNTIME_GC_LARGEOBJECTHEAPSIZEKB                           = new StatisticName("Runtime.GC.LargeObjectHeapSizeKb");
         public static readonly StatisticName RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB                        = new StatisticName("Runtime.GC.PromotedFinalizationMemoryFromGen0Kb");
         public static readonly StatisticName RUNTIME_GC_NUMBEROFINDUCEDGCS                              = new StatisticName("Runtime.GC.NumberOfInducedGCs");
+        public static readonly StatisticName RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB                       = new StatisticName("Runtime.Memory.TotalPhysicalMemoryMb");
+        public static readonly StatisticName RUNTIME_MEMORY_AVAILABLEMEMORYMB                           = new StatisticName("Runtime.Memory.AvailableMemoryMb");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS             = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.WorkerThreads");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS     = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.CompletionPortThreads");
         public static readonly StatisticName RUNTIME_IS_OVERLOADED                                      = new StatisticName("Runtime.IsOverloaded");
@@ -349,6 +351,8 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS = new StatisticNameFormat("Streams.PersistentStream.{0}.NumPullingAgents");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumReadMessages");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumSentMessages");
+        public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.PubSubCacheSize");
+        public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.QueueCacheSize");
     }
 }
  

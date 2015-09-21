@@ -5,7 +5,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <Platform>AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</ProjectGuid>
@@ -15,7 +15,6 @@
     <AssemblyName>Orleans</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <PlatformTarget>x86</PlatformTarget>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
@@ -94,18 +93,18 @@
     <Compile Include="Core\Exceptions.cs" />
     <Compile Include="Core\GrainStateStorageBridge.cs" />
     <Compile Include="Core\IGrainIdentity.cs" />
-    <Compile Include="Core\IGrainState.cs" />
     <Compile Include="Core\IStorage.cs" />
-    <Compile Include="EventSourcing\JournaledGrain.cs" />
-    <Compile Include="EventSourcing\JournaledGrainState.cs" />
-    <Compile Include="EventSourcing\StateEvent.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\IncomingMessageBuffer.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
+    <Compile Include="Providers\IControllable.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
+    <Compile Include="RelationalStorage\AdoNetInvariants.cs" />
+    <Compile Include="RelationalStorage\QueryConstantsBag.cs" />
+    <Compile Include="RelationalStorage\RelationalVendorConstants.cs" />
     <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
@@ -116,6 +115,7 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />
@@ -124,13 +124,14 @@
     <Compile Include="RelationalStorage\DictionaryExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorage.cs" />
     <Compile Include="RelationalStorage\IRelationalStorage.cs" />
-    <Compile Include="RelationalStorage\OrleansRelationalConstants.cs" />
+    <Compile Include="RelationalStorage\QueryKeys.cs" />
     <Compile Include="RelationalStorage\OrleansRelationalExtensions.cs" />
-    <Compile Include="RelationalStorage\RelationalConstants.cs" />
     <Compile Include="RelationalStorage\RelationalManagementExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorageExtensions.cs" />
     <Compile Include="RelationalStorage\RelationalStorageUtilities.cs" />
     <Compile Include="RelationalStorage\SqlFormatProvider.cs" />
+    <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
+    <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />
@@ -185,7 +186,7 @@
     <Compile Include="Streams\Predicates\OrFilter.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamSubscriberTable.cs" />
     <Compile Include="Streams\PubSub\PubSubPublisherState.cs" />
-    <Compile Include="Streams\PubSub\PubSubRuntime.cs" />
+    <Compile Include="Streams\PubSub\GrainBasedPubSubRuntime.cs" />
     <Compile Include="Providers\IBootstrapProvider.cs" />
     <Compile Include="Providers\ClientProviderRuntime.cs" />
     <Compile Include="Providers\IOrleansProvider.cs" />

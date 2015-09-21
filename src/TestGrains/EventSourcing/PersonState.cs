@@ -27,43 +27,28 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonState : JournaledGrainState
+    public class PersonState : JournaledGrainState<PersonState>
     {
-        public PersonState()
-            : base(typeof(PersonState))
-        { }
-
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public GenderType Gender { get; set; }
+        public bool IsMarried { get; set; }
 
-        public override void ApplyEvent(StateEvent @event)
+        public void Apply(PersonRegistered @event)
         {
-            if (@event is PersonRegistered)
-                Apply(@event as PersonRegistered);
-            else if (@event is PersonMarried)
-                Apply(@event as PersonMarried);
-            else if (@event is PersonLastNameChanged)
-                Apply(@event as PersonLastNameChanged);
-            else
-                throw new ArgumentException(String.Format("Unsupported event of type {0}", @event.GetType().FullName));
+            this.FirstName = @event.FirstName;
+            this.LastName = @event.LastName;
+            this.Gender = @event. Gender;
         }
 
-        public void Apply(PersonRegistered registered)
+        public void Apply(PersonMarried @event)
         {
-            FirstName = registered.FirstName;
-            LastName = registered.LastName;
-            Gender = registered. Gender;
+            this.IsMarried = true;
         }
 
-        public void Apply(PersonMarried married)
+        public void Apply(PersonLastNameChanged @event)
         {
-            // TODO
-        }
-
-        public void Apply(PersonLastNameChanged lnChanged)
-        {
-            LastName = lnChanged.LastName;
+            this.LastName = @event.LastName;
         }
     }
 }

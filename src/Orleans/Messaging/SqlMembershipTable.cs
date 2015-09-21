@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage.Relational;
+using Orleans.Runtime.Storage.Relational.Management;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -37,7 +38,7 @@ namespace Orleans.Runtime.MembershipService
         private TimeSpan maxStaleness;
         private TraceLogger logger;
         private IRelationalStorage database;
-
+        private QueryConstantsBag queryConstants;
 
         public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
         {
@@ -45,14 +46,13 @@ namespace Orleans.Runtime.MembershipService
             deploymentId = config.DeploymentId;
 
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.InitializeMembershipTable called.");
-                                                
-            //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, config.DataConnectionString);
+
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(config.AdoInvariant, config.DataConnectionString);
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate defintions exists already.
-            await InitializeOrleansQueriesAsync();
-            
+            queryConstants = await database.InitializeOrleansQueriesAsync();
+
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
             // so we always have a first table version row, before this silo starts working.
@@ -74,13 +74,11 @@ namespace Orleans.Runtime.MembershipService
 
             deploymentId = config.DeploymentId;            
             maxStaleness = config.GatewayListRefreshPeriod;
-
-            //TODO: Orleans does not yet provide the type of database used (to, e.g., to load dlls), so SQL Server is assumed.
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(WellKnownRelationalInvariants.SqlServer, config.DataConnectionString);
+            database = RelationalStorageUtilities.CreateGenericStorageInstance(config.AdoInvariant, config.DataConnectionString);
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate defintions exists already.
-            await InitializeOrleansQueriesAsync();
+            queryConstants = await database.InitializeOrleansQueriesAsync();
         }
 
 
@@ -102,7 +100,8 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 //TODO: Refactor this to async.
-                return database.ActiveGatewaysAsync(deploymentId).Result;
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.ActiveGatewaysQuery);
+                return database.ActiveGatewaysAsync(query, deploymentId).Result;
             }
             catch(Exception ex)
             {
@@ -117,7 +116,8 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsVerbose3) logger.Verbose3(string.Format("SqlMembershipTable.ReadRow called with key: {0}.", key));
             try
             {
-                return database.MembershipDataAsync(deploymentId, key);                
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.MembershipReadRowKey);
+                return database.MembershipDataAsync(query, deploymentId, key);                
             }
             catch(Exception ex)
             {
@@ -132,7 +132,8 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.ReadAll called.");
             try
             {
-                return database.AllMembershipDataAsync(deploymentId);                
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.MembershipReadAllKey);
+                return database.AllMembershipDataAsync(query, deploymentId);                
             }
             catch(Exception ex)
             {
@@ -164,7 +165,8 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return database.InsertMembershipRowAsync(deploymentId, entry, tableVersion);
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.InsertMembershipKey);
+                return database.InsertMembershipRowAsync(query, deploymentId, entry, tableVersion);
             }
             catch(Exception ex)
             {
@@ -200,8 +202,9 @@ namespace Orleans.Runtime.MembershipService
             }
 
             try
-            {                
-                return database.UpdateMembershipRowAsync(deploymentId, etag, entry, tableVersion);                                
+            {
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.UpdateMembershipKey);
+                return database.UpdateMembershipRowAsync(query, deploymentId, etag, entry, tableVersion);                                
             }
             catch(Exception ex)
             {
@@ -221,7 +224,8 @@ namespace Orleans.Runtime.MembershipService
             }
             try
             {
-                return database.UpdateIAmAliveTimeAsync(deploymentId, entry);
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.UpdateIAmAlivetimeKey);
+                return database.UpdateIAmAliveTimeAsync(query, deploymentId, entry);
             }
             catch(Exception ex)
             {
@@ -236,7 +240,8 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsVerbose3) logger.Verbose3(string.Format("IMembershipTable.DeleteMembershipTableEntries called with deploymentId {0}.", deploymentId));
             try
             {
-                return database.DeleteMembershipTableEntriesAsync(deploymentId);
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.DeleteMembershipTableEntriesKey);
+                return database.DeleteMembershipTableEntriesAsync(query, deploymentId);
             }
             catch(Exception ex)
             {
@@ -244,19 +249,14 @@ namespace Orleans.Runtime.MembershipService
                 throw;
             }
         }
-
-
-        private Task InitializeOrleansQueriesAsync()
-        {
-            return database.InitializeOrleansQueriesAsync();
-        }
-
-
+               
+        
         private Task<bool> InitTableAsync()
         {
             try
-            {                
-                return database.InsertMembershipVersionRowAsync(deploymentId, 0);
+            {
+                var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.InsertMembershipVersionKey);
+                return database.InsertMembershipVersionRowAsync(query, deploymentId, 0);
             }
             catch(Exception ex)
             {

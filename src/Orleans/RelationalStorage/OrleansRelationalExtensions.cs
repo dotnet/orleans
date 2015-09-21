@@ -34,7 +34,7 @@ using System.Threading.Tasks;
 namespace Orleans.Runtime.Storage.Relational
 {
     /// <summary>
-    /// Orleans specific, handcrafted convenience queries for efficiency.
+    /// Orleans specific, hand-crafted convenience queries for efficiency.
     /// </summary>
     /// <remarks>This is public only to be usable to the statistics providers. Not intended for public use otherwise.</remarks>
     public static class OrleansRelationalExtensions
@@ -44,35 +44,13 @@ namespace Orleans.Runtime.Storage.Relational
         /// table that will be updated with multiple values. The other ones are updated with one value only.
         /// </summary>
         private readonly static string[] InsertStatisticsMultiupdateColumns = new[] { "@isDelta", "@statValue", "@statistic" };
-
-
-        /// <summary>
-        /// Initializes Orleans queries from the database. Orleans uses only these queries and the variables therein, nothing more.
-        /// </summary>
-        /// <param name="storage">The storage to use.</param>
-        /// <returns>Orleans queries have been loaded to silo or client memory.</returns>
-        /// <remarks>This is public only to be usable to the statistics providers. Not intended for public use otherwise.</remarks>
-        public static async Task InitializeOrleansQueriesAsync(this IRelationalStorage storage)
-        {
-            //The query to retrieve other queries.
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.OrleansQueriesKey);
-            var orleansQueries = await storage.ReadAsync(query, _ => { }, (selector, _) =>
-            {
-                return Tuple.Create(selector.GetValue<string>("Key"), selector.GetValue<string>("Query"));
-            }).ConfigureAwait(continueOnCapturedContext: false);
-
-            //The queries need to be added to be used later with a given key.
-            foreach(var orleansQuery in orleansQueries)
-            {
-                OrleansRelationalConstants.AddOrModifyQueryConstant(storage.InvariantName, orleansQuery.Item1, orleansQuery.Item2);
-            }
-        }
-
+        
         
         /// <summary>
         /// Either inserts or updates a silo metrics row.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId">The deployment ID.</param>
         /// <param name="siloId">The silo ID.</param>
         /// <param name="gateway">The gateway information.</param>
@@ -80,9 +58,8 @@ namespace Orleans.Runtime.Storage.Relational
         /// <param name="hostName">The hostname.</param>
         /// <param name="siloMetrics">The silo metrics to be either updated or inserted.</param>
         /// <returns></returns>
-        public static async Task UpsertSiloMetricsAsync(this IRelationalStorage storage, string deploymentId, string siloId, IPEndPoint gateway, SiloAddress siloAddress, string hostName, ISiloPerformanceMetrics siloMetrics)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpsertSiloMetricsKey);
+        public static async Task UpsertSiloMetricsAsync(this IRelationalStorage storage, string query, string deploymentId, string siloId, IPEndPoint gateway, SiloAddress siloAddress, string hostName, ISiloPerformanceMetrics siloMetrics)
+        {            
             await storage.ExecuteAsync(query, command =>
             {               
                 var direction = ParameterDirection.Input;
@@ -145,20 +122,20 @@ namespace Orleans.Runtime.Storage.Relational
             }).ConfigureAwait(continueOnCapturedContext: false);
         }
 
-                
+
         /// <summary>
         /// Either inserts or updates a silo metrics row. 
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId">The deployment ID.</param>
         /// <param name="clientId">The client ID.</param>
         /// <param name="clientAddress">The client address information.</param>
         /// <param name="hostName">The hostname.</param>
         /// <param name="clientMetrics">The client metrics to be either updated or inserted.</param>
         /// <returns></returns>
-        public static async Task UpsertReportClientMetricsAsync(this IRelationalStorage storage, string deploymentId, string clientId, IPAddress clientAddress, string hostName, IClientPerformanceMetrics clientMetrics)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpsertReportClientMetricsKey);
+        public static async Task UpsertReportClientMetricsAsync(this IRelationalStorage storage, string query, string deploymentId, string clientId, IPAddress clientAddress, string hostName, IClientPerformanceMetrics clientMetrics)
+        {            
             await storage.ExecuteAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -202,17 +179,14 @@ namespace Orleans.Runtime.Storage.Relational
         /// Inserts the given statistics counters to the Orleans database.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId">The deployment ID.</param>
         /// <param name="hostName">The hostname.</param>
         /// <param name="siloOrClientName">The silo or client name.</param>
         /// <param name="id">The silo address or client ID.</param>
         /// <param name="counters">The counters to be inserted.</param>        
-        public static async Task InsertStatisticsCountersAsync(this IRelationalStorage storage, string deploymentId, string hostName, string siloOrClientName, string id, IEnumerable<ICounter> counters)
-        {
-            //The query template from which to retrieve the set of columns that are being
-            //inserted.
-            var queryTemplate = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.InsertOrleansStatisticsKey);
-
+        public static async Task InsertStatisticsCountersAsync(this IRelationalStorage storage, string queryTemplate, string deploymentId, string hostName, string siloOrClientName, string id, IEnumerable<ICounter> counters)
+        {           
             //Zero statistic values mean either that the system is not running or no updates. Such values are not inserted and pruned
             //here so that no insert query or parameters are generated.
             var countersList = counters.Where(i => !"0".Equals(i.IsValueDelta ? i.GetDeltaString() : i.GetValueString())).ToList();
@@ -254,7 +228,7 @@ namespace Orleans.Runtime.Storage.Relational
             }
 
             //If this is an Oracle database, every UNION ALL SELECT needs to have "FROM DUAL" appended.
-            if(storage.InvariantName == WellKnownRelationalInvariants.OracleDatabase)
+            if(storage.InvariantName == AdoNetInvariants.InvariantNameOracleDatabase)
             {
                 //Counting starts from 1 as the first SELECT should not select from dual.
                 for(int i = 1; i < collectionOfParametersToBeUnionized.Count; ++i)
@@ -298,12 +272,12 @@ namespace Orleans.Runtime.Storage.Relational
         /// Reads Orleans reminder data from the tables.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="serviceId">The service ID.</param>
         /// <param name="grainref">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
-        internal static async Task<ReminderTableData> ReadReminderRowsAsync(this IRelationalStorage storage, string serviceId, GrainReference grainRef)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.ReadReminderRowsKey);
+        internal static async Task<ReminderTableData> ReadReminderRowsAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -325,14 +299,13 @@ namespace Orleans.Runtime.Storage.Relational
         /// Reads Orleans reminder data from the tables.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="serviceId">The service ID.</param>
         /// <param name="beginHash">The begin hash.</param>
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
-        internal static async Task<ReminderTableData> ReadReminderRowsAsync(this IRelationalStorage storage, string serviceId, uint beginHash, uint endHash)
-        {
-            var queryKey = beginHash < endHash ? OrleansRelationalConstants.ReadRangeRows1Key : OrleansRelationalConstants.ReadRangeRows2Key;
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, queryKey);
+        internal static async Task<ReminderTableData> ReadReminderRowsAsync(this IRelationalStorage storage, string query, string serviceId, uint beginHash, uint endHash)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -357,12 +330,12 @@ namespace Orleans.Runtime.Storage.Relational
         /// Reads one row of reminder data.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="grainref">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
-        internal static async Task<ReminderEntry> ReadReminderRowAsync(this IRelationalStorage storage, string serviceId, GrainReference grainRef, string reminderName)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.ReadReminderRowKey);
+        internal static async Task<ReminderEntry> ReadReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -387,13 +360,13 @@ namespace Orleans.Runtime.Storage.Relational
         /// Either inserts or updates a reminder row.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="serviceId">The service ID.</param>
         /// <param name="grainref">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-        internal static async Task<string> UpsertReminderRowAsync(this IRelationalStorage storage, string serviceId, GrainReference grainRef, string reminderName, DateTime startTime, TimeSpan period)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpsertReminderRowKey);
+        internal static async Task<string> UpsertReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName, DateTime startTime, TimeSpan period)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -427,13 +400,13 @@ namespace Orleans.Runtime.Storage.Relational
         /// 
         /// </summary>
         /// <param name="storage"></param>
+        /// <param name="query">The query to use.</param>
         /// <param name="grainRef"></param>
         /// <param name="reminderName"></param>
         /// <param name="etag"></param>
         /// <returns></returns>
-        internal static async Task<bool> DeleteReminderRowAsync(this IRelationalStorage storage, string serviceId, GrainReference grainRef, string reminderName, string etag)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.DeleteReminderRowKey);
+        internal static async Task<bool> DeleteReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName, string etag)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -461,11 +434,11 @@ namespace Orleans.Runtime.Storage.Relational
         /// 
         /// </summary>
         /// <param name="storage"></param>
+        /// <param name="query">The query to use.</param>
         /// <param name="serviceId"></param>
         /// <returns></returns>
-        internal static async Task DeleteReminderRowsAsync(this IRelationalStorage storage, string serviceId)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.DeleteReminderRowsKey);
+        internal static async Task DeleteReminderRowsAsync(this IRelationalStorage storage, string query, string serviceId)
+        {            
             await storage.ExecuteAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -480,11 +453,11 @@ namespace Orleans.Runtime.Storage.Relational
         /// Lists active gateways. Used mainly by Orleans clients.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId">The deployment for which to query the gateways.</param>
         /// <returns>The gateways for the silo.</returns>
-        internal static async Task<IList<Uri>> ActiveGatewaysAsync(this IRelationalStorage storage, string deploymentId)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.ActiveGatewaysQuery);
+        internal static async Task<IList<Uri>> ActiveGatewaysAsync(this IRelationalStorage storage, string query, string deploymentId)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -511,12 +484,12 @@ namespace Orleans.Runtime.Storage.Relational
         /// Queries Orleans membership data.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId">The deployment for which to query data.</param>
         /// <param name="key">Silo data used as parameters in the query.</param>
         /// <returns>Membership table data.</returns>
-        internal static async Task<MembershipTableData> MembershipDataAsync(this IRelationalStorage storage, string deploymentId, SiloAddress key)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.MembershipReadRowKey);
+        internal static async Task<MembershipTableData> MembershipDataAsync(this IRelationalStorage storage, string query, string deploymentId, SiloAddress key)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -548,11 +521,11 @@ namespace Orleans.Runtime.Storage.Relational
         /// 
         /// </summary>
         /// <param name="storage"></param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId"></param>
         /// <returns></returns>
-        internal static async Task<MembershipTableData> AllMembershipDataAsync(this IRelationalStorage storage, string deploymentId)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.MembershipReadAllKey);
+        internal static async Task<MembershipTableData> AllMembershipDataAsync(this IRelationalStorage storage, string query, string deploymentId)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -575,11 +548,11 @@ namespace Orleans.Runtime.Storage.Relational
         /// 
         /// </summary>
         /// <param name="storage"></param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId"></param>
         /// <returns></returns>
-        internal static async Task DeleteMembershipTableEntriesAsync(this IRelationalStorage storage, string deploymentId)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.DeleteMembershipTableEntriesKey);
+        internal static async Task DeleteMembershipTableEntriesAsync(this IRelationalStorage storage, string query, string deploymentId)
+        {            
             await storage.ExecuteAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -593,12 +566,12 @@ namespace Orleans.Runtime.Storage.Relational
         /// 
         /// </summary>
         /// <param name="storage"></param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId"></param>
         /// <param name="membershipEntry"></param>
         /// <returns></returns>
-        internal static async Task UpdateIAmAliveTimeAsync(this IRelationalStorage storage, string deploymentId, MembershipEntry membershipEntry)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpdateIAmAlivetimeKey);
+        internal static async Task UpdateIAmAliveTimeAsync(this IRelationalStorage storage, string query, string deploymentId, MembershipEntry membershipEntry)
+        {            
             await storage.ExecuteAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -624,12 +597,12 @@ namespace Orleans.Runtime.Storage.Relational
         /// Inserts a version row if one does not already exist.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
         /// <param name="deploymentId">The deployment for which to query data.</param>
         /// <param name="version">The version information to insert.</param>
         /// <returns><em>TRUE</em> if a row was inserted. <em>FALSE</em> otherwise.</returns>
-        internal static async Task<bool> InsertMembershipVersionRowAsync(this IRelationalStorage storage, string deploymentId, int version)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.InsertMembershipVersionKey);
+        internal static async Task<bool> InsertMembershipVersionRowAsync(this IRelationalStorage storage, string query, string deploymentId, int version)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -644,9 +617,17 @@ namespace Orleans.Runtime.Storage.Relational
         }
 
 
-        internal static async Task<bool> InsertMembershipRowAsync(this IRelationalStorage storage, string deploymentId, MembershipEntry membershipEntry, TableVersion version)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.InsertMembershipKey);
+        /// <summary>
+        /// Inserts a membership row if one does not already exist.
+        /// </summary>
+        /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
+        /// <param name="deploymentId">The deployment with which to insert row.</param>
+        /// <param name="membershipEntry">The membership entry data to insert.</param>
+        /// <param name="version">The version data to insert.</param>
+        /// <returns><em>TRUE</em> if insert succeeds. <em>FALSE</em> otherwise.</returns>
+        internal static async Task<bool> InsertMembershipRowAsync(this IRelationalStorage storage, string query, string deploymentId, MembershipEntry membershipEntry, TableVersion version)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -678,9 +659,6 @@ namespace Orleans.Runtime.Storage.Relational
                 var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort, direction);
                 command.Parameters.Add(proxyPortParameter);
 
-                var primaryParameter = CreatePrimaryParameter(command, membershipEntry.IsPrimary, direction);
-                command.Parameters.Add(primaryParameter);
-
                 var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName, direction);
                 command.Parameters.Add(roleNameParameter);
 
@@ -711,9 +689,18 @@ namespace Orleans.Runtime.Storage.Relational
         }
 
 
-        internal static async Task<bool> UpdateMembershipRowAsync(this IRelationalStorage storage, string deploymentId, string etag, MembershipEntry membershipEntry, TableVersion version)
-        {
-            var query = OrleansRelationalConstants.GetConstant(storage.InvariantName, OrleansRelationalConstants.UpdateMembershipKey);
+        /// <summary>
+        /// Updates membership row data.
+        /// </summary>
+        /// <param name="storage">The storage to use.</param>
+        /// <param name="query">The query to use.</param>
+        /// <param name="deploymentId">The deployment with which to insert row.</param>
+        /// <param name="etag">The etag of which to use to check if the membership data being updated is not stale.</param>
+        /// <param name="membershipEntry">The membership data to used to update database.</param>
+        /// <param name="version">The membership version used to update database.</param>
+        /// <returns><em>TRUE</em> if update SUCCEEDS. <em>FALSE</em> ot</returns>
+        internal static async Task<bool> UpdateMembershipRowAsync(this IRelationalStorage storage, string query, string deploymentId, string etag, MembershipEntry membershipEntry, TableVersion version)
+        {            
             var ret = await storage.ReadAsync(query, command =>
             {
                 var direction = ParameterDirection.Input;
@@ -747,9 +734,6 @@ namespace Orleans.Runtime.Storage.Relational
 
                 var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort, direction);
                 command.Parameters.Add(proxyPortParameter);
-
-                var primaryParameter = CreatePrimaryParameter(command, membershipEntry.IsPrimary, direction);
-                command.Parameters.Add(primaryParameter);
 
                 var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName, direction);
                 command.Parameters.Add(roleNameParameter);
@@ -818,7 +802,6 @@ namespace Orleans.Runtime.Storage.Relational
                     HostName = record.GetValueOrDefault<string>("HostName"),
                     Status = record.GetValue<SiloStatus>("Status"),
                     ProxyPort = record.GetValueOrDefault<int>("ProxyPort"),
-                    IsPrimary = record.GetValueOrDefault<bool>("Primary"),
                     RoleName = record.GetValue<string>("RoleName"),
                     InstanceName = record.GetValue<string>("InstanceName"),
                     UpdateZone = record.GetValue<int>("UpdateZone"),
@@ -1169,19 +1152,6 @@ namespace Orleans.Runtime.Storage.Relational
             return parameter;
         }
 
-
-        private static IDbDataParameter CreatePrimaryParameter(IDbCommand command, bool primary, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "primary";
-            parameter.Value = primary;
-            parameter.DbType = DbType.Boolean;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
         private static IDbDataParameter CreateRoleNameParameter(IDbCommand command, string roleName, ParameterDirection direction)
         {
             var parameter = command.CreateParameter();
@@ -1235,7 +1205,7 @@ namespace Orleans.Runtime.Storage.Relational
             var parameter = command.CreateParameter();
             parameter.ParameterName = "startTime";
             parameter.Value = EnsureSqlMinValue(startTime);
-            parameter.DbType = DbType.DateTime2;
+            parameter.DbType = DbType.DateTime;//Using DateTime for cross DB compatibility. The underlying DB table column type can be DateTime or DateTime2
             parameter.Direction = direction;
 
             return parameter;
@@ -1271,7 +1241,7 @@ namespace Orleans.Runtime.Storage.Relational
             var parameter = command.CreateParameter();
             parameter.ParameterName = "iAmAliveTime";
             parameter.Value = EnsureSqlMinValue(iAmAlive);
-            parameter.DbType = DbType.DateTime2;
+            parameter.DbType = DbType.DateTime;//Using DateTime for cross DB compatibility. The underlying DB table column type can be DateTime or DateTime2
             parameter.Direction = direction;
 
             return parameter;
@@ -1423,8 +1393,7 @@ namespace Orleans.Runtime.Storage.Relational
 
 
         private static IDbDataParameter CreateSuspectingSilosParameter(IDbCommand command, MembershipEntry membershipEntry, ParameterDirection direction)
-        {
-            //TODO: Refactor the database to take DATETIME2(7) and change the data type here accordingly.
+        {            
             var parameter = command.CreateParameter();
             parameter.ParameterName = "suspectingSilos";
             parameter.DbType = DbType.String;
@@ -1456,8 +1425,7 @@ namespace Orleans.Runtime.Storage.Relational
 
 
         private static IDbDataParameter CreateSuspectingTimesParameter(IDbCommand command, MembershipEntry membershipEntry, ParameterDirection direction)
-        {
-            //TODO: Refactor the database to take DATETIME2(7) and change the data type here accordingly.
+        {            
             var parameter = command.CreateParameter();
             parameter.ParameterName = "suspectingTimes";
             parameter.DbType = DbType.String;

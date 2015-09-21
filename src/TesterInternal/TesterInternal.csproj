@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Platform>AnyCPU</Platform>
     <ProjectGuid>{09610024-F5B9-4065-9557-BD9E36A32421}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -74,6 +74,7 @@
   <ItemGroup>
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
+    <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
@@ -82,7 +83,6 @@
     <Compile Include="MembershipTests\SQLMembershipTableTests.cs" />
     <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
     <Compile Include="RemindersTest\SqlRemindersTableTests.cs" />
-    <Compile Include="SqlTestsEnvironment.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
@@ -172,19 +172,8 @@
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup Condition=" '$(OS)' == 'Windows_NT' ">
     <!-- PostBuild.cmd script is platform specific, so for now we only want to run it on Windows -->
-    <PostBuildEvent>@echo Tester - Start Post-Build script
-
-set TEST_INPUT_DIR=$(TargetDir)TestInput
-if not exist "%25TEST_INPUT_DIR%25" ( mkdir "%25TEST_INPUT_DIR%25" )
-copy /y "$(ProjectDir)*.xml"  "%25TEST_INPUT_DIR%25\"
-
-if "$(BuildingInsideVisualStudio)" == "true" (
-  copy /y "$(SolutionDir)TestGrains\bin\$(ConfigurationName)\TestGrains.*"  "%25TEST_INPUT_DIR%25\"
-  copy /y "$(SolutionDir)TestGrainInterfaces\bin\$(ConfigurationName)\TestGrainInterfaces.*"  "%25TEST_INPUT_DIR%25\"
-) else (
-  copy /y "%25TargetDir%25TestGrains.*"  "%25TEST_INPUT_DIR%25\"
-  copy /y "%25TargetDir%25TestGrainInterfaces.*"  "%25TEST_INPUT_DIR%25\"
-)
+    <PostBuildEvent>
+@echo Tester - Start Post-Build script
 
 set SolutionDir=$(SolutionDir)
 set OutDir=$(OutDir)

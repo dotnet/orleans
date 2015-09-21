@@ -89,7 +89,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <returns></returns>
         public virtual StreamSequenceToken GetSequenceToken()
         {
-            return SequenceToken != null ? TokenFromBytes(SequenceToken) : default(StreamSequenceToken);
+            return SequenceToken != null ? TokenFromBytes(SequenceToken) : null;
         }
 
         /// <summary>

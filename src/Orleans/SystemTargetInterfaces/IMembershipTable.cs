@@ -259,8 +259,7 @@ namespace Orleans
 
         public string HostName { get; set; }          
         public SiloStatus Status { get; set; }          
-        public int ProxyPort { get; set; }             
-        public bool IsPrimary { get; set; }           
+        public int ProxyPort { get; set; }                   
 
         public string RoleName { get; set; }              // Optional - only for Azure role
         public string InstanceName { get; set; }          // Optional - only for Azure role
@@ -282,7 +281,6 @@ namespace Orleans
             //---
             HostName = updatedSiloEntry.HostName;
             ProxyPort = updatedSiloEntry.ProxyPort;
-            IsPrimary = updatedSiloEntry.IsPrimary;
 
             RoleName = updatedSiloEntry.RoleName;
             InstanceName = updatedSiloEntry.InstanceName;
@@ -342,13 +340,12 @@ namespace Orleans
             List<DateTime> timestamps = SuspectTimes == null
                 ? null
                 : SuspectTimes.Select(tuple => tuple.Item2).ToList();
-            return string.Format("[SiloAddress={0} Status={1} HostName={2} ProxyPort={3} IsPrimary={4} " +
-                                 "RoleName={5} InstanceName={6} UpdateZone={7} FaultZone={8} StartTime = {9} IAmAliveTime = {10} {11} {12}]",
+            return string.Format("[SiloAddress={0} Status={1} HostName={2} ProxyPort={3} " +
+                                 "RoleName={4} InstanceName={5} UpdateZone={6} FaultZone={7} StartTime = {8} IAmAliveTime = {9} {10} {11}]",
                 SiloAddress.ToLongString(),
                 Status,
                 HostName,
                 ProxyPort,
-                IsPrimary,
                 RoleName,
                 InstanceName,
                 UpdateZone,

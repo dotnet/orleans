@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <Platform>AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</ProjectGuid>
@@ -12,7 +12,6 @@
     <AssemblyName>OrleansRuntime</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <PlatformTarget>x86</PlatformTarget>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
@@ -187,7 +186,6 @@
     <Compile Include="Streams\QueueBalancer\StaticClusterDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\ConsistentRingQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
-    <Compile Include="Streams\QueueBalancer\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
   </ItemGroup>
   <ItemGroup>

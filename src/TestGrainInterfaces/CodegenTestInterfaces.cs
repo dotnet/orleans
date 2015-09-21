@@ -68,6 +68,11 @@ namespace UnitTests.GrainInterfaces
             bool ret = set1.SetEquals(set2);
             return ret;
         }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
     }
 
     [Serializable]
@@ -89,6 +94,11 @@ namespace UnitTests.GrainInterfaces
                 return false;
             }
             return Id.Equals(actual.Id) && Equals(Something, actual.Something);
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
         }
     }
 }

@@ -21,30 +21,29 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-
-namespace Orleans.EventSourcing
+namespace Orleans.Runtime.Storage.Relational
 {
-    public class JournaledGrain<TGrainState> : Grain<TGrainState>
-        where TGrainState : JournaledGrainState
+    /// <summary>
+    /// These are keys for vendor dependent constants.
+    /// </summary>
+    public static class RelationalVendorConstants
     {
-        protected delegate void ApplyAction(TGrainState state, StateEvent @event);
+        /// <summary>
+        /// The character that indicates a parameter.
+        /// </summary>
+        /// <remarks>Vendor specific.</remarks>
+        public const string ParameterIndicatorKey = "ParameterIndicator";
 
         /// <summary>
-        /// This methiod is for events that know how to apply themselves to TGrainState, subclasses of StateEvent&lt;T&gt;.
+        /// The character that indicates a start escape key for columns and tables that are reserved words.
         /// </summary>
-        /// <param name="event">Event to raise</param>
-        /// <param name="commit">Whether or not the event needs to be immediately committed to storage</param>
-        /// <returns></returns>
-        protected Task RaiseStateEvent(StateEvent @event, bool commit = true)
-        {
-            if (@event == null) throw new ArgumentNullException("event");
+        /// <remarks>Vendor specific.</remarks>
+        public const string StartEscapeIndicatorKey = "StartEscapeIndicator";
 
-            State.AddEvent(@event);
-            return commit ? WriteStateAsync() : TaskDone.Done;
-        }
+        /// <summary>
+        /// The character that indicates an end escape key for columns and tables that are reserved words.
+        /// </summary>
+        /// <remarks>Vendor specific.</remarks>
+        public const string EndEscapeIndicatorKey = "EndEscapeIndicator";
     }
 }

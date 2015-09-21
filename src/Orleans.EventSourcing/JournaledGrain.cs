@@ -22,43 +22,31 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 
 namespace Orleans.EventSourcing
 {
     /// <summary>
-    /// Basic low level container for events
+    /// The base class for all grain classes that have event-sourced state.
     /// </summary>
-    public class StateEvent
+    public class JournaledGrain<TGrainState> : Grain<TGrainState>
+        where TGrainState : JournaledGrainState<TGrainState>
     {
         /// <summary>
-        /// ID of  event unique withing the scope of the grain
+        /// This methiod is for events that know how to apply themselves to TGrainState, subclasses of StateEvent&lt;T&gt;.
         /// </summary>
-        public string Id { get; private set; }
-        /// <summary>
-        /// Time when event was raised.
-        /// </summary>
-        public DateTime Timestamp { get; private set; }
-        /// <summary>
-        /// Correlation ID for associating event with a request or transaction.
-        /// </summary>
-        public string CorrelationId { get; private set; }
-        /// <summary>
-        /// Additional context, such as user/device ID, security token, etc.
-        /// </summary>
-        public string Context { get; private set; }
-
-        public StateEvent(DateTime timestamp, string id = null, string correlationId = null, string context = null)
+        /// <param name="event">Event to raise</param>
+        /// <param name="commit">Whether or not the event needs to be immediately committed to storage</param>
+        /// <returns></returns>
+        protected Task RaiseStateEvent<TEvent>(TEvent @event, bool commit = true)
+            where TEvent : class
         {
-            Id = id ?? Guid.NewGuid().ToString();
-            Timestamp = timestamp;
-            CorrelationId = correlationId;
-            Context = context;
-        }
+            if (@event == null) throw new ArgumentNullException("event");
 
-        public StateEvent(string id = null)
-            : this(DateTime.UtcNow)
-        {
+            State.AddEvent(@event);
+            return commit ? WriteStateAsync() : TaskDone.Done;
         }
     }
 }

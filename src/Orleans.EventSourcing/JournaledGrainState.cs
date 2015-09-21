@@ -22,42 +22,69 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Orleans.CodeGeneration;
 
 
 namespace Orleans.EventSourcing
 {
-    public abstract class JournaledGrainState : GrainState
+    /// <summary>
+    /// Base class for event-sourced grain state classes.
+    /// </summary>
+    public abstract class JournaledGrainState<TGrainState> : GrainState
+        where TGrainState : JournaledGrainState<TGrainState>
     {
-        private List<StateEvent> events = new List<StateEvent>();
-        protected JournaledGrainState(Type type )
-            : base(type.FullName)
+        private List<object> events = new List<object>();
+
+        protected JournaledGrainState()
+            : base(typeof(TGrainState).FullName)
         {
         }
 
-        public IEnumerable<StateEvent> Events
+        public IEnumerable Events
         {
             get { return events.AsReadOnly(); }
-            set { events = new List<StateEvent>(value); }
         }
 
         public int Version { get; private set; }
 
-        public void AddEvent(StateEvent @event)
+        public void AddEvent<TEvent>(TEvent @event)
+            where TEvent : class
         {
             events.Add(@event);
-            ApplyEvent(@event);
+
+            StateTransition(@event);
+
             Version++;
         }
-
-        public abstract void ApplyEvent(StateEvent @event);
 
         public override void SetAll(IDictionary<string, object> values)
         {
             base.SetAll(values);
-            foreach(StateEvent @event in Events)
-                ApplyEvent(@event);
+
+            foreach (var @event in Events)
+                StateTransition(@event);
+        }
+
+        private void StateTransition<TEvent>(TEvent @event)
+            where TEvent : class
+        {
+            dynamic me = this;
+
+            try
+            {
+                me.Apply(@event);
+            }
+            catch(MissingMethodException)
+            {
+                OnMissingStateTransition(@event);
+            }
+        }
+
+        protected virtual void OnMissingStateTransition(object @event)
+        {
+            // Log
         }
     }
 }
