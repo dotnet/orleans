@@ -245,6 +245,8 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public bool UseNagleAlgorithm { get; set; }
 
+        public string SiloShutdownEventName { get; set; }
+
         internal const string DEFAULT_NODE_NAME = "default";
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
@@ -390,6 +392,7 @@ namespace Orleans.Runtime.Configuration
             sb.Append("      ").AppendFormat("   .NET ServicePointManager - DefaultConnectionLimit={0} Expect100Continue={1} UseNagleAlgorithm={2}", DefaultConnectionLimit, Expect100Continue, UseNagleAlgorithm).AppendLine();
             sb.Append("   Load Shedding Enabled: ").Append(LoadSheddingEnabled).AppendLine();
             sb.Append("   Load Shedding Limit: ").Append(LoadSheddingLimit).AppendLine();
+            sb.Append("   SiloShutdownEventName: ").Append(SiloShutdownEventName).AppendLine();
             sb.Append("   Debug: ").AppendLine();
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));

@@ -402,6 +402,10 @@ namespace Orleans
         SetReminderServiceType          = SiloBase + 38,
         SiloStartError                  = SiloBase + 39,
         SiloConfigDeprecated            = SiloBase + 40,
+        SiloShutdownEventName           = SiloBase + 41,
+        SiloShutdownEventCreated        = SiloBase + 42,
+        SiloShutdownEventOpened         = SiloBase + 43,
+        SiloShutdownEventReceived       = SiloBase + 44,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
