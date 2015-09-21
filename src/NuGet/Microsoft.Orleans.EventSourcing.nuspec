@@ -10,7 +10,7 @@
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
     <summary>
-      Event-Sourcing support for Microsoft Orleans - Orleans.EventSourcing.dll
+      Event-Sourcing support for Microsoft Orleans - OrleansEventSourcing.dll
     </summary>
     <description>
       Base types for creating Microsoft Orleans grains with event-sourced state.
@@ -22,7 +22,8 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="Orleans.EventSourcing.dll" target="lib\net45" />
-    <file src="Orleans.EventSourcing.pdb" target="lib\net45" />
+    <file src="OrleansEventSourcing.dll" target="lib\net45" />
+    <file src="OrleansEventSourcing.pdb" target="lib\net45" />
+    <file src="OrleansEventSourcing.xml" target="lib\net45" />
   </files>
 </package>

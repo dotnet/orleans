@@ -142,7 +142,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansZooKeeperUtils", "Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCounterControl", "OrleansCounterControl\OrleansCounterControl.csproj", "{606B9647-CC0C-4058-BFBC-B5B7ED4F3C56}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.EventSourcing", "Orleans.EventSourcing\Orleans.EventSourcing.csproj", "{CF7EE78B-39E1-4660-BEAF-0E2606098F8C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansEventSourcing", "Orleans.EventSourcing\OrleansEventSourcing.csproj", "{CF7EE78B-39E1-4660-BEAF-0E2606098F8C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
