@@ -891,7 +891,7 @@ namespace Orleans.Runtime
         public Task DeactivateAllActivations()
         {
             logger.Info(ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
-            var activationsToShutdown = activations.Select(kv => kv.Value).ToList();
+            var activationsToShutdown = activations.Where(kv => !kv.Value.IsExemptFromCollection).Select(kv => kv.Value).ToList();
             return DeactivateActivations(activationsToShutdown);
         }
 

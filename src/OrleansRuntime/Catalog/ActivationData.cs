@@ -256,7 +256,7 @@ namespace Orleans.Runtime
                 GrainInstanceType = grainInstance.GetType();
 
                 // Don't ever collect system grains or reminder table grain or memory store grains.
-                bool doNotCollect = typeof(IReminderTable).IsAssignableFrom(GrainInstanceType) || typeof(IMemoryStorageGrain).IsAssignableFrom(GrainInstanceType);
+                bool doNotCollect = typeof(IReminderTableGrain).IsAssignableFrom(GrainInstanceType) || typeof(IMemoryStorageGrain).IsAssignableFrom(GrainInstanceType);
                 if (doNotCollect)
                 {
                     this.collector = null;
