@@ -28,6 +28,7 @@ Microsoft Research  |  <a href="http://research.microsoft.com" target="_blank">r
 NašeÚkoly.CZ    |<a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
 Trustev    |<a href="http://www.trustev.com/" target="_blank">www.trustev.com</a>|
 Mailcloud Limited |<a href="http://www.mailcloud.com/" target="_blank">http://www.mailcloud.com/</a>|
+Gigya |<a href="http://gigya.com/" target="_blank">http://gigya.com/</a>|
 
 
 ## Projects and Applications
