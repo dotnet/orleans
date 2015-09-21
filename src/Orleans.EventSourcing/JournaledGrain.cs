@@ -35,7 +35,7 @@ namespace Orleans.EventSourcing
         where TGrainState : JournaledGrainState<TGrainState>
     {
         /// <summary>
-        /// This methiod is for events that know how to apply themselves to TGrainState, subclasses of StateEvent&lt;T&gt;.
+        /// Helper method for raising events, applying them to TGrainState and optionally committing to storage
         /// </summary>
         /// <param name="event">Event to raise</param>
         /// <param name="commit">Whether or not the event needs to be immediately committed to storage</param>
