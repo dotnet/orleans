@@ -59,7 +59,6 @@ namespace Orleans.Runtime.MembershipService
         public string SiloName { get { return membershipOracleData.SiloName; } }
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
 
-
         internal MembershipOracle(Silo silo, IMembershipTable membershipTable)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
         {

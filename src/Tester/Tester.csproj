@@ -101,7 +101,6 @@
     </Compile>
     <Compile Include="RequestContextTest.cs" />
     <Compile Include="SerializationTests.cs" />
-    <Compile Include="DependencyResolverGrainTests.cs" />
     <Compile Include="RelationalUtilities\SqlTestsEnvironment.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
