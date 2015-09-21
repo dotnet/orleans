@@ -193,6 +193,10 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public int BulkMessageLimit { get; set; }
 
+        /// <summary>
+        /// Specifies the name of the Startup class in the configuration file.
+        /// </summary>
+        public string StartupTypeName { get; set; }
 
         public string StatisticsProviderName { get; set; }
         /// <summary>
@@ -345,6 +349,8 @@ namespace Orleans.Runtime.Configuration
             Expect100Continue = other.Expect100Continue;
             DefaultConnectionLimit = other.DefaultConnectionLimit;
             UseNagleAlgorithm = other.UseNagleAlgorithm;
+
+            StartupTypeName = other.StartupTypeName;
         }
 
         public override string ToString()
@@ -496,6 +502,12 @@ namespace Orleans.Runtime.Configuration
                         break;
                     case "Limits":
                         ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
+                        break;
+                    case "Startup":
+                        if (child.HasAttribute("Type"))
+                        {
+                            StartupTypeName = child.GetAttribute("Type");
+                        }
                         break;
                 }
             }
