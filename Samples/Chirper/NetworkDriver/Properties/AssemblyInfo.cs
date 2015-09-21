@@ -57,4 +57,4 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.*")]
 
-[assembly: InternalsVisibleTo("ChirperUnitTests, PublicKey=00240000048000009400000006020000002400005253413100040000010001002b0b3330b7bf92d932e7b4681b9d62e7c89d29e0d618fd9a7fec4c829994d12c053e2eb3ae9c1f625bcb44c3360afd424efb01ad4b778be16de672b06bcf5b96e4613fb665aa2771cad69d5d5529d3ca66f1a1bcaf2607ba9a67469750a96dc73fd39a1330e1384c05697c6f2ff57f64e9eb02a2778cf7def39934523d71e9b8")]
+[assembly: InternalsVisibleTo("ChirperUnitTests")]

@@ -12,8 +12,6 @@
     <AssemblyName>OrleansRuntime</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -206,9 +204,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Orleans.snk">
-      <Link>Orleans.snk</Link>
-    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup />
@@ -234,7 +229,4 @@
   </Choose>
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
-  <Target Name="BeforeBuild">
-    <Exec ContinueOnError="false" Command="&quot;..\packages\Brutal.Dev.StrongNameSigner.1.5.1\tools\StrongNameSigner.Console.exe&quot; -in &quot;..\packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta7|..\packages\Microsoft.Framework.DependencyInjection.1.0.0-beta7&quot;" />
-  </Target>
 </Project>
