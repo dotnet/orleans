@@ -106,7 +106,6 @@ namespace Orleans.Runtime
         private readonly List<IProvider> allSiloProviders;
 
         private IServiceProvider services = new DefaultServiceProvider();
-        private Type startupType;
 
         internal readonly string Name;
         internal readonly string SiloIdentity;
@@ -345,7 +344,6 @@ namespace Orleans.Runtime
             serviceCollection.AddTransient<GrainBasedReminderTable>();
             serviceCollection.AddTransient<PubSubRendezvousGrain>();
             serviceCollection.AddTransient<MemoryStorageGrain>();
-            serviceCollection.AddTransient<GrainBasedPubSubRuntime>();
 
             return serviceCollection;
         }
