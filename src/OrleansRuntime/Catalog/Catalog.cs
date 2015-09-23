@@ -795,6 +795,7 @@ namespace Orleans.Runtime
                 {
                     // Change the ActivationData state here, since we're about to give up the lock.
                     data.PrepareForDeactivation(); // Don't accept any new messages
+                    ActivationCollector.TryCancelCollection(data);
                     if (!data.IsCurrentlyExecuting)
                     {
                         promptly = true;
@@ -843,6 +844,7 @@ namespace Orleans.Runtime
                     {
                         // Change the ActivationData state here, since we're about to give up the lock.
                         activationData.PrepareForDeactivation(); // Don't accept any new messages
+                        ActivationCollector.TryCancelCollection(activationData);
                         if (!activationData.IsCurrentlyExecuting)
                         {
                             if (destroyNow == null)
@@ -889,7 +891,7 @@ namespace Orleans.Runtime
         public Task DeactivateAllActivations()
         {
             logger.Info(ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
-            var activationsToShutdown = activations.Select(kv => kv.Value).ToList();
+            var activationsToShutdown = activations.Where(kv => !kv.Value.IsExemptFromCollection).Select(kv => kv.Value).ToList();
             return DeactivateActivations(activationsToShutdown);
         }
 
