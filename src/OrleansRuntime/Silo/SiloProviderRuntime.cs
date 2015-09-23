@@ -116,12 +116,6 @@ namespace Orleans.Runtime.Providers
             Silo.CurrentSilo.UnregisterSystemTarget((SystemTarget)target);
         }
 
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-        {
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period);
-            timer.Start();
-            return timer;
-        }
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
@@ -227,19 +221,6 @@ namespace Orleans.Runtime.Providers
                 return (IGrainExtensionMethodInvoker) invoker;
             
             throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", "handler");
-        }
-        
-        public Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context)
-        {
-            if (null == asyncFunc)
-                throw new ArgumentNullException("asyncFunc");
-            if (null == context)
-                throw new ArgumentNullException("context");
-            if (!(context is ISchedulingContext))
-                throw new ArgumentException("context object is not of a ISchedulingContext type.", "context");
-
-            // copied from InsideRuntimeClient.ExecAsync().
-            return OrleansTaskScheduler.Instance.RunOrQueueTask(asyncFunc, (ISchedulingContext) context);
         }
 
         public object GetCurrentSchedulingContext()

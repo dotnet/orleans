@@ -273,11 +273,25 @@ namespace Orleans.Runtime.Scheduler
         // public for testing only -- should be private, otherwise
         public WorkItemGroup GetWorkItemGroup(ISchedulingContext context)
         {
-            WorkItemGroup workGroup = null;
-            if (context != null)
-                workgroupDirectory.TryGetValue(context, out workGroup);
-            
-            return workGroup;
+            if (context == null)
+                return null;
+           
+            WorkItemGroup workGroup;
+            if(workgroupDirectory.TryGetValue(context, out workGroup))
+                return workGroup;
+
+            var error = String.Format("QueueWorkItem was called on a non-null context {0} but there is no valid WorkItemGroup for it.", context);
+            logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
+            throw new InvalidSchedulingContextException(error);
+        }
+
+        internal void CheckSchedulingContextValidity(ISchedulingContext context)
+        {
+            if (context == null)
+            {
+                throw new InvalidSchedulingContextException("CheckSchedulingContextValidity was called on a null SchedulingContext.");
+            }
+            GetWorkItemGroup(context); // GetWorkItemGroup throws for Invalid context
         }
 
         public TaskScheduler GetTaskScheduler(ISchedulingContext context)

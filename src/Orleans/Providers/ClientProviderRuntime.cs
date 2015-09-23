@@ -186,13 +186,6 @@ namespace Orleans.Providers
 
         public bool InSilo { get { return false; } }
 
-        public Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context)
-        {
-            if (context != null)
-                throw new ArgumentException("The grain client only supports a null scheduling context.");
-            return Task.Run(asyncFunc);
-        }
-
         public object GetCurrentSchedulingContext()
         {
             return null;

@@ -402,6 +402,10 @@ namespace Orleans
         SetReminderServiceType          = SiloBase + 38,
         SiloStartError                  = SiloBase + 39,
         SiloConfigDeprecated            = SiloBase + 40,
+        SiloShutdownEventName           = SiloBase + 41,
+        SiloShutdownEventCreated        = SiloBase + 42,
+        SiloShutdownEventOpened         = SiloBase + 43,
+        SiloShutdownEventReceived       = SiloBase + 44,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
@@ -738,6 +742,7 @@ namespace Orleans
         SchedulerTaskExecuteIncomplete4         = SchedulerBase + 28,
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
         SchedulerWorkerThreadExc                = SchedulerBase + 30,
+        SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
 
         GatewayBase                             = Runtime + 1300,
         GatewayClientOpenedSocket               = GatewayBase + 1,
@@ -777,6 +782,7 @@ namespace Orleans
         Timer_TimerInsideGrainIsDelayed         = TimerBase + 11,
         Timer_SafeTimerIsNotTicking             = TimerBase + 12,
         Timer_GrainTimerCallbackError           = TimerBase + 13,
+        Timer_InvalidContext                    = TimerBase + 14,
 
         DispatcherBase                          = Runtime + 1500,
         Dispatcher_SelectTarget_Failed          = Runtime_Error_100071, // Backward compatability

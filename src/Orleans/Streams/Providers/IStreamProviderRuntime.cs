@@ -51,17 +51,6 @@ namespace Orleans.Streams
         void UnRegisterSystemTarget(ISystemTarget target);
 
         /// <summary>
-        /// Register a timer to send regular callbacks to this grain.
-        /// This timer will keep the current grain from being deactivated.
-        /// </summary>
-        /// <param name="callback"></param>
-        /// <param name="state"></param>
-        /// <param name="dueTime"></param>
-        /// <param name="period"></param>
-        /// <returns></returns>
-        IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
-
-        /// <summary>
         /// Binds an extension to an addressable object, if not already done.
         /// </summary>
         /// <typeparam name="TExtension">The type of the extension (e.g. StreamConsumerExtension).</typeparam>
@@ -90,12 +79,6 @@ namespace Orleans.Streams
         /// <param name="pubSubType"></param>
         /// <returns></returns>
         bool InSilo { get; }
-
-        /// <summary>
-        /// Invoke the given async function from within a valid Orleans scheduler context.
-        /// </summary>
-        /// <param name="asyncFunc"></param>
-        Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context);
 
         object GetCurrentSchedulingContext();
     }

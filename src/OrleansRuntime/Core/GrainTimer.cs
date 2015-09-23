@@ -52,8 +52,7 @@ namespace Orleans.Runtime
             this.Name = name;
             this.asyncCallback = asyncCallback;
             timer = new AsyncTaskSafeTimer( 
-                stateObj => TimerAlreadyStopped ? TaskDone.Done : 
-                    RuntimeClient.Current.ExecAsync(() => ForwardToAsyncCallback(stateObj), ctxt),
+                stateObj => TimerTick(stateObj, ctxt),
                 state);
             this.dueTime = dueTime;
             timerFrequency = period;
@@ -104,6 +103,23 @@ namespace Orleans.Runtime
             asyncCallback = null;
         }
 
+        private async Task TimerTick(object state, ISchedulingContext context)
+        {
+            if (TimerAlreadyStopped)
+                return;
+            try
+            {
+                await RuntimeClient.Current.ExecAsync(() => ForwardToAsyncCallback(state), context);
+            }
+            catch (InvalidSchedulingContextException exc)
+            {
+                logger.Error(ErrorCode.Timer_InvalidContext,
+                    string.Format("Caught an InvalidSchedulingContextException on timer {0}, context is {1}. Going to dispose this timer!",
+                        GetFullName(), context), exc);
+                DisposeTimer();
+            }
+        }
+
         private async Task ForwardToAsyncCallback(object state)
         {
             // AsyncSafeTimer ensures that calls to this method are serialized.
@@ -115,7 +131,8 @@ namespace Orleans.Runtime
                 logger.Verbose3(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
 
             try
-            { 
+            {
+                RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
                 currentlyExecutingTickTask = asyncCallback(state);
                 await currentlyExecutingTickTask;
                 

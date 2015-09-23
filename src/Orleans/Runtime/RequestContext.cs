@@ -122,7 +122,7 @@ namespace Orleans.Runtime
             return retValue;
         }
 
-        internal static void Import(Dictionary<string, object> contextData)
+        public static void Import(Dictionary<string, object> contextData)
         {
             if (PropagateActivityId)
             {
@@ -147,7 +147,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal static Dictionary<string, object> Export()
+        public static Dictionary<string, object> Export()
         {
             Dictionary<string, object> values = GetContextData();
 
@@ -167,7 +167,7 @@ namespace Orleans.Runtime
             return null;
         }
 
-        internal static void Clear()
+        public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
             CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);
