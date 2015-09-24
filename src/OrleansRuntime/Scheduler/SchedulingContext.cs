@@ -147,6 +147,23 @@ namespace Orleans.Runtime.Scheduler
                     return "";
             }
         }
+        public string DetailedStatus()
+        {
+            switch (ContextType)
+            {
+                case SchedulingContextType.Activation:
+                    return Activation.ToDetailedString(true);
+
+                case SchedulingContextType.SystemTarget:
+                    return SystemTarget.ToDetailedString();
+
+                case SchedulingContextType.SystemThread:
+                    return String.Format("DispatcherTarget{0}", DispatcherTarget);
+
+                default:
+                    return "";
+            }
+        }
 
         public string Name 
         {
