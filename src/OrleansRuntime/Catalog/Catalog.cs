@@ -28,6 +28,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Framework.DependencyInjection;
 
 using Orleans.Core;
 using Orleans.Providers;
@@ -641,7 +642,7 @@ namespace Orleans.Runtime
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
             Type grainType = grainTypeData.Type;
-            Grain grain = (Grain) Activator.CreateInstance(grainType);
+            var grain = (Grain)Runtime.Silo.CurrentSilo.Services.GetRequiredService(grainType);
             // Inject runtime hookups into grain instance
             grain.Runtime = grainRuntime;
             grain.Data = data;
