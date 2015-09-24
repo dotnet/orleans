@@ -325,7 +325,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal void CheckForLongTurns()
         {
-            if (!HasFreeze()) return;
+            if (!IsFrozen()) return;
 
             // Since this thread is running a long turn, which (we hope) is blocked on some IO 
             // or other external process, we'll create a replacement thread and tell this thread to 
@@ -348,7 +348,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal bool DoHealthCheck()
         {
-            if (!HasFreeze()) return true;
+            if (!IsFrozen()) return true;
 
             Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
                 "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
@@ -356,18 +356,17 @@ namespace Orleans.Runtime.Scheduler
             return false;
         }
 
-        private bool HasFreeze()
+        private bool IsFrozen()
         {
-            if (CurrentTask == null)
+            if (CurrentTask != null)
             {
-                // If there is no active Task, we are not frozen, 
-                // unless there is somehow an active WorkItem that is also frozen.
-                // This should not happen, since work items executes only Tasks (so if there is an active work item there also should be an active Task), but still worth checking.
+                return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+            }else
+            {
+                // If there is no active Task, check current wokr item, if any.
                 bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
                 return frozenWorkItem;
             }
-            // there is an active Task.
-            return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
         }
     }
 }
