@@ -29,7 +29,7 @@ namespace Orleans.Samples.Chirper.GrainInterfaces
     /// <summary>
     /// Orleans grain interface IChirperPublisher
     /// </summary>
-    public interface IChirperPublisher : IGrain
+    public interface IChirperPublisher : IGrainWithIntegerKey
     {
         /// <summary>Unique Id for this actor / user</summary>
         Task<long> GetUserId();

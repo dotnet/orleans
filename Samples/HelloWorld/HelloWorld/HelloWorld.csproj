@@ -38,48 +38,28 @@
     <StartupObject>HelloWorld.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Data.Edm">
-      <HintPath>..\packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.OData">
-      <HintPath>..\packages\Microsoft.Data.OData.5.6.0\lib\net40\Microsoft.Data.OData.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Data.Services.Client">
-      <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Configuration">
-      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>..\packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
     <Reference Include="Orleans, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.9\lib\net45\Orleans.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.10\lib\net45\Orleans.dll</HintPath>
+      <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansCounterControl">
-      <HintPath>..\packages\Microsoft.Orleans.CounterControl.1.0.9\lib\net45\OrleansCounterControl.exe</HintPath>
+    <Reference Include="OrleansCounterControl, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.CounterControl.1.0.10\lib\net45\OrleansCounterControl.exe</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="OrleansHost, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.0.9\lib\net45\OrleansHost.exe</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.0.10\lib\net45\OrleansHost.exe</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="OrleansProviders, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.0.9\lib\net45\OrleansProviders.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.0.10\lib\net45\OrleansProviders.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="OrleansRuntime, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.0.9\lib\net45\OrleansRuntime.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.0.10\lib\net45\OrleansRuntime.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Spatial">
-      <HintPath>..\packages\System.Spatial.5.6.0\lib\net40\System.Spatial.dll</HintPath>
-    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />

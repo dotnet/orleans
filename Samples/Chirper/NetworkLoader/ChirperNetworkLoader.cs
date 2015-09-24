@@ -274,7 +274,7 @@ namespace Orleans.Samples.Chirper.Network.Loader
             // Create Chirper account grain for this user
             long userId = userData.UserId;
             string userAlias = userData.UserAlias;
-            IChirperAccount grain = ChirperAccountFactory.GetGrain(userId);
+            IChirperAccount grain = GrainClient.GrainFactory.GetGrain<IChirperAccount>(userId);
             this.Users[userId] = grain;
             try
             {

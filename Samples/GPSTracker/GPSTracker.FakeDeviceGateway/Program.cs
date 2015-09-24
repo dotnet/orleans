@@ -111,7 +111,7 @@ namespace GPSTracker.FakeDeviceGateway
             }
 
             // send the mesage to Orleans
-            var device = DeviceGrainFactory.GetGrain(model.DeviceId);
+            var device = GrainClient.GrainFactory.GetGrain<IDeviceGrain>(model.DeviceId);
             await device.ProcessMessage(new DeviceMessage(model.Lat, model.Lon, counter, model.DeviceId, DateTime.UtcNow));
             Interlocked.Increment(ref counter);
         }
