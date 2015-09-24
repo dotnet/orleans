@@ -377,12 +377,10 @@ namespace Orleans.Runtime.Scheduler
             if (CurrentTask != null)
             {
                 return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
-            }else
-            {
-                // If there is no active Task, check current wokr item, if any.
-                bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
-                return frozenWorkItem;
-            }
+            } 
+            // If there is no active Task, check current wokr item, if any.
+            bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+            return frozenWorkItem;
         }
     }
 }
