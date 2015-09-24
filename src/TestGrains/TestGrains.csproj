@@ -49,9 +49,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="FaultableConsumerGrain.cs" />
+    <Compile Include="EventSourcing\PersonState.cs" />
     <Compile Include="GenericGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
+    <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
+    <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
@@ -71,6 +74,10 @@
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrleansEventSourcing\OrleansEventSourcing.csproj">
+      <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
+      <Name>OrleansEventSourcing</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
