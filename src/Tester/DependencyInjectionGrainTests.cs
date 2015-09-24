@@ -33,15 +33,10 @@ using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    /// <summary>
-    /// Summary description for SimpleGrain
-    /// </summary>
     [DeploymentItem("OrleansStartupConfigurationForTesting.xml")]
     [TestClass]
     public class DependencyInjectionGrainTests : UnitTestSiloHost
     {
-        private const string SimpleDIGrainNamePrefix = "UnitTests.Grains.SimpleDIG";
-
         public DependencyInjectionGrainTests()
             : base(new TestingSiloOptions
             {
@@ -50,11 +45,6 @@ namespace UnitTests.General
                 SiloConfigFile = new FileInfo("OrleansStartupConfigurationForTesting.xml")
             })
         {
-        }
-
-        public ISimpleDIGrain GetSimpleDIGrain()
-        {
-            return GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), SimpleDIGrainNamePrefix);
         }
 
         private static int GetRandomGrainId()
@@ -69,9 +59,9 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        public async Task SimpleDIGrainGetGrain()
+        public async Task DiTests_SimpleDiGrainGetGrain()
         {
-            ISimpleDIGrain grain = GetSimpleDIGrain();
+            ISimpleDIGrain grain = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId());
             long ignored = await grain.GetTicksFromService();
         }
     }

@@ -52,16 +52,19 @@ namespace Orleans.Runtime.Startup
 
         public IServiceProvider Build (object instance, IServiceCollection services)
         {
+            if (instance == null)
+            {
+                throw new ArgumentNullException("instance");
+            }
+            if (services == null)
+            {
+                throw new ArgumentNullException("services");
+            }
             return Invoke(instance, services);
         }
 
         private IServiceProvider Invoke(object instance, IServiceCollection exportServices)
         {
-            if (exportServices == null)
-            {
-                throw new ArgumentNullException("exportServices");
-            }
-
             var parameters = new object[MethodInfo.GetParameters().Length];
 
             // Ctor ensures we have at most one IServiceCollection parameter
