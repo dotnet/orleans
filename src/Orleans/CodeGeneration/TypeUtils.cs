@@ -102,6 +102,9 @@ namespace Orleans.Runtime
 
         public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
         {
+            if (fullName == null)
+                fullName = _ => true; // default to full type names
+
             if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName, language), t, t.GetGenericArguments(), fullName, language);
 
             if (t.IsArray)
@@ -156,7 +159,7 @@ namespace Orleans.Runtime
         public static string GetParameterizedTemplateName(Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
-                fullName = tt => false;
+                fullName = tt => true;
 
             return GetParameterizedTemplateName(t, fullName, applyRecursively, language);
         }
