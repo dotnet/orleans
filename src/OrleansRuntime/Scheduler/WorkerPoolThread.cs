@@ -53,14 +53,16 @@ namespace Orleans.Runtime.Scheduler
         // For status reporting
         private IWorkItem currentWorkItem;
         private Task currentTask;
+        private DateTime currentWorkItemStarted;
+        private DateTime currentTaskStarted;
+
         internal IWorkItem CurrentWorkItem
         {
             get { return currentWorkItem; }
             set
             {
                 currentWorkItem = value;
-                currentTask = null;
-                CurrentStateStarted = DateTime.UtcNow;
+                currentWorkItemStarted = DateTime.UtcNow;
             }
         }
         internal Task CurrentTask
@@ -69,26 +71,25 @@ namespace Orleans.Runtime.Scheduler
             set
             {
                 currentTask = value;
-                currentWorkItem = null;
-                CurrentStateStarted = DateTime.UtcNow;
+                currentTaskStarted = DateTime.UtcNow;
             }
         }
-        
-        internal DateTime CurrentStateStarted { get; private set; }
 
         internal string GetThreadStatus()
         {
             // Take status snapshot before checking status, to avoid race
             Task task = currentTask;
             IWorkItem workItem = currentWorkItem;
-            TimeSpan since = Utils.Since(CurrentStateStarted);
 
             if (task != null)
-                return string.Format("Executing Task Id={0} Status={1} for {2}", task.Id, task.Status, since);
+                return string.Format("Executing Task Id={0} Status={1} for {2} on WorkItem={3} (executing work item for {4})",
+                    task.Id, task.Status, Utils.Since(currentTaskStarted), currentWorkItem, Utils.Since(currentWorkItemStarted));
 
-            return workItem != null ? 
-                string.Format("Executing Work Item {0} for {1}", workItem, since) : 
-                string.Format("Idle for {0}", since);
+            if (workItem != null)
+                return string.Format("Executing Work Item {0} for {1}", workItem, Utils.Since(currentWorkItemStarted));
+
+            var becomeIdle = currentWorkItemStarted < currentTaskStarted ? currentTaskStarted : currentWorkItemStarted;
+            return string.Format("Idle for {0}", Utils.Since(becomeIdle));
         }
 
         internal readonly int WorkerThreadStatisticsNumber;
@@ -102,7 +103,8 @@ namespace Orleans.Runtime.Scheduler
             IsSystem = system;
             maxWorkQueueWait = IsSystem ? Constants.INFINITE_TIMESPAN : gtp.MaxWorkQueueWait;
             OnFault = FaultBehavior.IgnoreFault;
-            CurrentStateStarted = DateTime.UtcNow;
+            currentWorkItemStarted = DateTime.UtcNow;
+            currentTaskStarted = DateTime.UtcNow;
             CurrentWorkItem = null;
             if (StatisticsCollector.CollectTurnsStats)
                 WorkerThreadStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkingThread(Name);
@@ -323,8 +325,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal void CheckForLongTurns()
         {
-            if ((CurrentWorkItem == null && CurrentTask == null) ||
-                (Utils.Since(CurrentStateStarted) <= OrleansTaskScheduler.TurnWarningLengthThreshold)) return;
+            if (!HasFreeze()) return;
 
             // Since this thread is running a long turn, which (we hope) is blocked on some IO 
             // or other external process, we'll create a replacement thread and tell this thread to 
@@ -347,13 +348,26 @@ namespace Orleans.Runtime.Scheduler
 
         internal bool DoHealthCheck()
         {
-            if ((CurrentWorkItem == null && CurrentTask == null) ||
-                (Utils.Since(CurrentStateStarted) <= OrleansTaskScheduler.TurnWarningLengthThreshold)) return true;
+            if (!HasFreeze()) return true;
 
             Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
                 "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
                 Name, ManagedThreadId, GetThreadStatus()));
             return false;
+        }
+
+        private bool HasFreeze()
+        {
+            if (CurrentTask == null)
+            {
+                // If there is no active Task, we are not frozen, 
+                // unless there is somehow an active WorkItem that is also frozen.
+                // This should not happen, since work items executes only Tasks (so if there is an active work item there also should be an active Task), but still worth checking.
+                bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+                return frozenWorkItem;
+            }
+            // there is an active Task.
+            return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
         }
     }
 }
