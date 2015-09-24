@@ -74,7 +74,7 @@
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.EventSourcing\OrleansEventSourcing.csproj">
+    <ProjectReference Include="..\OrleansEventSourcing\OrleansEventSourcing.csproj">
       <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
       <Name>OrleansEventSourcing</Name>
     </ProjectReference>
