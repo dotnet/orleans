@@ -170,14 +170,6 @@ namespace Orleans.Streams
                 Utils.SafeExecute(tmp.Dispose);
             }
 
-            var unregisterTasks = new List<Task>();
-            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
-            foreach (var streamId in pubSubCache.Keys)
-            {
-                logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
-                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
-            }
-
             try
             {
                 var task = OrleansTaskExtentions.SafeExecute(() => receiver.Shutdown(config.InitQueueTimeout));
@@ -191,6 +183,16 @@ namespace Orleans.Streams
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
             }
 
+            var unregisterTasks = new List<Task>();
+            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
+            foreach (var tuple in pubSubCache)
+            {
+                tuple.Value.DisposeAll();
+                var streamId = tuple.Key;
+                logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
+                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
+            }
+
             try
             {
                 await Task.WhenAll(unregisterTasks);
@@ -200,6 +202,7 @@ namespace Orleans.Streams
                 logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_08,
                     "Failed to unregister myself as stream producer to some streams taht used to be in my responsibility.", exc);
             }
+            pubSubCache.Clear();
         }
 
         public Task AddSubscriber(
@@ -263,8 +266,7 @@ namespace Orleans.Streams
 
                     if (requestedToken != null)
                     {
-                        if (consumerData.Cursor != null) 
-                            consumerData.Cursor.Dispose();
+                        consumerData.SafeDisposeCursor();
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, requestedToken);
                     }
                     else
@@ -398,9 +400,12 @@ namespace Orleans.Streams
         {
             if (pubSubCache.Count == 0) return;
             var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, config.StreamInactivityPeriod))
-                         .Select(pair => pair.Key)
                          .ToList();
-            toRemove.ForEach(key => pubSubCache.Remove(key));
+            toRemove.ForEach(tuple =>
+            {                
+                pubSubCache.Remove(tuple.Key);
+                tuple.Value.DisposeAll();
+            });
         }
 
         private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken, DateTime now)
@@ -463,7 +468,7 @@ namespace Orleans.Streams
                     catch (Exception exc)
                     {
                         exceptionOccured = exc;
-                        if (consumerData.Cursor != null) consumerData.Cursor.Dispose();
+                        if (consumerData.Cursor != null) consumerData.SafeDisposeCursor();
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, null);
                     }
 

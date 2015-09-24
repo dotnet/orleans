@@ -51,5 +51,19 @@ namespace Orleans.Streams
             StreamConsumer = streamConsumer;
             Filter = filter;
         }
+
+        internal void SafeDisposeCursor()
+        {
+            try
+            {
+                if (Cursor != null)
+                {
+                    // kill cursor activity and ensure it does not start again on this consumer data.
+                    Cursor.Dispose();
+                    Cursor = null;
+                }
+            }
+            catch (Exception) { }
+        }
     }
 }
