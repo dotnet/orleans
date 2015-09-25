@@ -33,6 +33,8 @@ using Orleans.Concurrency;
 
 namespace Orleans.Serialization
 {
+    using System.Runtime.CompilerServices;
+
     internal static class TypeUtilities
     {
         internal static bool IsOrleansPrimitive(this Type t)
@@ -217,19 +219,74 @@ namespace Orleans.Serialization
             }
         }
 
-        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module currentModule, Assembly grainAssembly)
+        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module fromModule, Assembly fromAssembly)
         {
-            if(t.GetCustomAttributes(typeof(SerializableAttribute), false).Length > 0)
-                return false;
-
-            if (t.IsNotPublic)
+            if (!t.IsVisible && t.IsConstructedGenericType)
             {
-                if (!t.Module.Equals(currentModule)) return true; // subtype is defined in a different assembly from the outer type
-                if (!t.Assembly.Equals(grainAssembly)) return true; // subtype defined in a different assembly from the one we are generating serializers for.
+                foreach (var inner in t.GetGenericArguments())
+                {
+                    if (IsTypeIsInaccessibleForSerialization(inner, fromModule, fromAssembly))
+                    {
+                        return true;
+                    }
+                }
+                
+                return IsTypeIsInaccessibleForSerialization(
+                    t.GetGenericTypeDefinition(),
+                    fromModule,
+                    fromAssembly);
             }
 
-            return t.IsNestedPrivate || t.IsNestedFamily ||
-                (t.IsArray && IsTypeIsInaccessibleForSerialization(t.GetElementType(), currentModule, grainAssembly));
+            if ((t.IsNotPublic || !t.IsVisible) && !AreInternalsVisibleTo(t.Assembly, fromAssembly))
+            {
+                // subtype is defined in a different assembly from the outer type
+                if (!t.Module.Equals(fromModule))
+                {
+                    return true;
+                }
+
+                // subtype defined in a different assembly from the one we are generating serializers for.
+                if (!t.Assembly.Equals(fromAssembly))
+                {
+                    return true;
+                }
+            }
+
+            if (t.IsArray)
+            {
+                return IsTypeIsInaccessibleForSerialization(t.GetElementType(), fromModule, fromAssembly);
+            }
+
+            var result = t.IsNestedPrivate || t.IsNestedFamily;
+            
+            return result;
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="fromAssembly"/> has exposed its internals to <paramref name="toAssembly"/>, false otherwise.
+        /// </summary>
+        /// <param name="fromAssembly">The assembly containing internal types.</param>
+        /// <param name="toAssembly">The assembly requiring access to internal types.</param>
+        /// <returns>
+        /// true if <paramref name="fromAssembly"/> has exposed its internals to <paramref name="toAssembly"/>, false otherwise
+        /// </returns>
+        private static bool AreInternalsVisibleTo(Assembly fromAssembly, Assembly toAssembly)
+        {
+            // If the to-assembly is null, it cannot have internals visible to it.
+            if (toAssembly == null)
+            {
+                return false;
+            }
+
+            // Check InternalsVisibleTo attributes on the from-assembly, pointing to the to-assembly.
+            var serializationAssemblyName = toAssembly.GetName().FullName;
+            var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
+            if (internalsVisibleTo.All(_ => _.AssemblyName != serializationAssemblyName))
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }

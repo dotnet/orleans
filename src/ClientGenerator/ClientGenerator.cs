@@ -32,11 +32,15 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
+
 using Orleans.CodeGeneration.Serialization;
 using Orleans.Runtime;
 
+
 namespace Orleans.CodeGeneration
 {
+    using Orleans.Runtime.Configuration;
+
     /// <summary>
     /// Generates factory, grain reference, and invoker classes for grain interfaces.
     /// Generates state object classes for grain implementation classes.
@@ -168,9 +172,17 @@ namespace Orleans.CodeGeneration
             var outputFileName = Path.Combine(options.SourcesDir, Path.GetFileNameWithoutExtension(options.InputLib.Name) + suffix);
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", outputFileName);
 
+            var codeGenerator = AssemblyLoader.TryLoadAndCreateInstance<ISourceCodeGenerator>(
+                "OrleansCodeGenerator",
+                TraceLogger.GetLogger("OrleansCodeGenerator"));
+
             using (var sourceWriter = new StreamWriter(outputFileName))
             {
-                if (options.TargetLanguage != Language.FSharp)
+                if (options.TargetLanguage == Language.CSharp && codeGenerator != null)
+                {
+                    sourceWriter.Write(codeGenerator.GenerateSourceForAssembly(grainAssembly));
+                }
+                else if (options.TargetLanguage != Language.FSharp)
                 {
                     var unit = new CodeCompileUnit();
 
@@ -321,9 +333,6 @@ namespace Orleans.CodeGeneration
             ConsoleText.WriteStatus("Orleans-CodeGen - Adding grain namespaces from input Assembly " + inputAssembly.GetName());
             foreach (var type in inputAssembly.GetTypes())
             {
-                if (!type.IsNested && !type.IsGenericParameter && type.IsSerializable)
-                    SerializerGenerationManager.RecordTypeToGenerate(type);
-
                 if (!options.ServerGen && GrainInterfaceData.IsGrainInterface(type))
                 {
                     NamespaceGenerator grainNamespace = RegisterNamespace(inputAssembly, namespaceDictionary, type, options.TargetLanguage.Value);
@@ -417,9 +426,9 @@ namespace Orleans.CodeGeneration
 
             using (StreamWriter output = File.CreateText(source + ".copy"))
             {
+                bool headerWritten = false;
                 using (StreamReader input = File.OpenText(source))
                 {
-                    bool headerWritten = false;
                     var line = input.ReadLine();
                     while (line != null)
                     {
@@ -430,13 +439,9 @@ namespace Orleans.CodeGeneration
                         else
                         {
                             // Now past the header comment lines
-
                             if (!headerWritten)
                             {
                                 // Write Header
-                                // surround the generated code with defines so that we can conditionally exclude it elsewhere
-                                output.WriteLine("#if !EXCLUDE_CODEGEN");
-
                                 // Write pragmas to disable selected compiler warnings in generated code
                                 DisableWarnings(output, suppressCompilerWarnings);
                                 headerWritten = true;
@@ -448,7 +453,6 @@ namespace Orleans.CodeGeneration
                 }
                 // Write Footer
                 RestoreWarnings(output, suppressCompilerWarnings);
-                output.WriteLine("#endif");
             }
             File.Delete(source);
             File.Move(source + ".copy", source);
@@ -612,8 +616,6 @@ namespace Orleans.CodeGeneration
             if (options.TargetLanguage == Language.VisualBasic)
                 foreach (string imp in options.Imports)
                     compilerParams.CompilerOptions += string.Format(" /imports:{0} ", imp);
-
-            compilerParams.CompilerOptions += " /define:EXCLUDE_CODEGEN ";
 
             using (CodeDomProvider codeProvider = CodeGeneratorBase.GetCodeProvider(options.TargetLanguage.Value, true))
             {

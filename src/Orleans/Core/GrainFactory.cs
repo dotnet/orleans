@@ -24,36 +24,63 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Core;
 using Orleans.Runtime;
+using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
 
 namespace Orleans
 {
-    using System.Threading.Tasks;
-
     /// <summary>
     /// Factory for accessing grains.
     /// </summary>
     public class GrainFactory : IGrainFactory
     {
         /// <summary>
-        /// The collection of <see cref="IGrainObserver"/> <c>CreateObjectReference</c> delegates.
+        /// The cached <see cref="MethodInfo"/> for <see cref="GrainReference.CastInternal"/>.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Delegate> referenceCreators =
-            new ConcurrentDictionary<Type, Delegate>();
+        private static readonly MethodInfo GrainReferenceCastInternalMethodInfo =
+            TypeUtils.Method(() => GrainReference.CastInternal(default(Type), null, default(IAddressable), 0));
 
         /// <summary>
-        /// The collection of <see cref="IGrainObserver"/> <c>DeleteObjectReference</c> delegates.
+        /// The mapping between grain types and the corresponding type for the <see cref="IGrainMethodInvoker"/> implementation.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Delegate> referenceDestoyers =
-            new ConcurrentDictionary<Type, Delegate>();
+        private static readonly ConcurrentDictionary<Type, Type> GrainToInvokerMapping
+            = new ConcurrentDictionary<Type, Type>();
+
+        /// <summary>
+        /// The mapping between grain types and the corresponding type for the <see cref="GrainReference"/> implementation.
+        /// </summary>
+        private static readonly ConcurrentDictionary<Type, Type> GrainToReferenceMapping
+            = new ConcurrentDictionary<Type, Type>();
+
+        /// <summary>
+        /// The mapping between concrete grain interface types and delegate
+        /// </summary>
+        private readonly ConcurrentDictionary<Type, GrainReferenceCaster> casters
+            = new ConcurrentDictionary<Type, GrainReferenceCaster>();
+
+        /// <summary>
+        /// The collection of <see cref="IGrainMethodInvoker"/>s for their corresponding grain interface type.
+        /// </summary>
+        private readonly ConcurrentDictionary<Type, IGrainMethodInvoker> invokers =
+            new ConcurrentDictionary<Type, IGrainMethodInvoker>();
 
         // Make this internal so that client code is forced to access the IGrainFactory using the 
         // GrainClient (to make sure they don't forget to initialize the client).
         internal GrainFactory()
         {
         }
+
+        /// <summary>
+        /// Casts an <see cref="IAddressable"/> to a concrete <see cref="GrainReference"/> implementaion.
+        /// </summary>
+        /// <param name="existingReference">The existing <see cref="IAddressable"/> reference.</param>
+        /// <returns>The concrete <see cref="GrainReference"/> implementation.</returns>
+        private delegate object GrainReferenceCaster(IAddressable existingReference);
 
         /// <summary>
         /// Gets a reference to a grain.
@@ -163,7 +190,7 @@ namespace Orleans
             return CreateObjectReferenceImpl<TGrainObserverInterface>(obj);
         }
 
-        private Task<TGrainObserverInterface> CreateObjectReferenceImpl<TGrainObserverInterface>(object obj)
+        private Task<TGrainObserverInterface> CreateObjectReferenceImpl<TGrainObserverInterface>(IAddressable obj)
         {
             var interfaceType = typeof(TGrainObserverInterface);
             if (!interfaceType.IsInterface)
@@ -180,16 +207,28 @@ namespace Orleans
                     string.Format("The provided object must implement '{0}'.", interfaceType.FullName),
                     "obj");
             }
-
-            Delegate creator;
-
-            if (!referenceCreators.TryGetValue(interfaceType, out creator))
+            
+            IGrainMethodInvoker invoker;
+            if (!this.invokers.TryGetValue(interfaceType, out invoker))
             {
-                creator = referenceCreators.GetOrAdd(interfaceType, MakeCreateObjectReferenceDelegate);
+                invoker = MakeInvoker(interfaceType);
+                if (invoker != null)
+                {
+                    this.invokers.TryAdd(interfaceType, invoker);
+                }
             }
 
-            var resultTask = ((Func<TGrainObserverInterface, Task<TGrainObserverInterface>>)creator)((TGrainObserverInterface)obj);
-            return resultTask;
+            if (invoker == null)
+            {
+                throw new InvalidOperationException(
+                    string.Format(
+                        "Cannot find generated IMethodInvoker implementation for interface '{0}'",
+                        interfaceType));
+            }
+
+            return
+                GrainReference.CreateObjectReference(obj, invoker)
+                    .ContinueWith(result => this.Cast<TGrainObserverInterface>(result.GetAwaiter().GetResult()));
         }
 
         /// <summary>
@@ -203,67 +242,107 @@ namespace Orleans
         public Task DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
-            var interfaceType = typeof(TGrainObserverInterface);
-            if (!interfaceType.IsInterface)
-            {
-                throw new ArgumentException(
-                    string.Format(
-                        "The provided type parameter must be an interface. '{0}' is not an interface.",
-                        interfaceType.FullName));
-            }
-
-            if (!interfaceType.IsInstanceOfType(obj))
-            {
-                throw new ArgumentException(
-                    string.Format("The provided object must implement '{0}'.", interfaceType.FullName),
-                    "obj");
-            }
-
-            Delegate destroyer;
-
-            if (!referenceDestoyers.TryGetValue(interfaceType, out destroyer))
-            {
-                destroyer = referenceDestoyers.GetOrAdd(interfaceType, MakeDeleteObjectReferenceDelegate);
-            }
-
-            return ((Func<TGrainObserverInterface, Task>)destroyer)((TGrainObserverInterface)obj);
+            return GrainReference.DeleteObjectReference(obj);
         }
 
-        #region IGrainObserver Methods
-        private static Delegate MakeCreateObjectReferenceDelegate(Type interfaceType)
+        private static IGrainMethodInvoker MakeInvoker(Type interfaceType)
         {
-            var delegateType = typeof(Func<,>).MakeGenericType(interfaceType, typeof(Task<>).MakeGenericType(interfaceType));
-            return MakeFactoryDelegate(interfaceType, "CreateObjectReference", delegateType);
-        }
+            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(interfaceType.Assembly);
+            var genericInterfaceType = interfaceType.IsConstructedGenericType
+                                           ? interfaceType.GetGenericTypeDefinition()
+                                           : interfaceType;
 
-        private static Delegate MakeDeleteObjectReferenceDelegate(Type interfaceType)
-        {
-            var delegateType = typeof(Func<,>).MakeGenericType(interfaceType, typeof(Task));
-            return MakeFactoryDelegate(interfaceType, "DeleteObjectReference", delegateType);
+            // Try to find the correct IGrainMethodInvoker type for this interface.
+            Type invokerType;
+            if (!GrainToInvokerMapping.TryGetValue(genericInterfaceType, out invokerType))
+            {
+                return null;
+            }
+
+            if (interfaceType.IsConstructedGenericType)
+            {
+                invokerType = invokerType.MakeGenericType(interfaceType.GenericTypeArguments);
+            }
+
+            return (IGrainMethodInvoker)Activator.CreateInstance(invokerType);
         }
-        #endregion
 
         #region Interface Casting
-        private readonly ConcurrentDictionary<Type, Func<IAddressable, object>> casters
-            = new ConcurrentDictionary<Type, Func<IAddressable, object>>();
-
         internal TGrainInterface Cast<TGrainInterface>(IAddressable grain)
         {
             var interfaceType = typeof(TGrainInterface);
-            Func<IAddressable, object> caster;
-
-            if (!casters.TryGetValue(interfaceType, out caster))
-            {
-                caster = casters.GetOrAdd(interfaceType, MakeCaster);
-            }
-
-            return (TGrainInterface)caster(grain);
+            return (TGrainInterface)this.Cast(grain, interfaceType);
         }
 
-        private static Func<IAddressable, object> MakeCaster(Type interfaceType)
+        internal object Cast(IAddressable grain, Type interfaceType)
         {
-            var delegateType = typeof(Func<IAddressable, object>);
-            return (Func<IAddressable, object>)MakeFactoryDelegate(interfaceType, "Cast", delegateType);
+            GrainReferenceCaster caster;
+            if (!this.casters.TryGetValue(interfaceType, out caster))
+            {
+                // Create and cache a caster for the interface type.
+                caster = this.casters.GetOrAdd(interfaceType, MakeCaster);
+            }
+
+            return caster(grain);
+        }
+
+        private static GrainReferenceCaster MakeCaster(Type interfaceType)
+        {
+            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(interfaceType.Assembly);
+            var genericInterfaceType = interfaceType.IsConstructedGenericType
+                                           ? interfaceType.GetGenericTypeDefinition()
+                                           : interfaceType;
+
+            // Try to find the correct GrainReference type for this interface.
+            Type grainReferenceType;
+            if (!GrainToReferenceMapping.TryGetValue(genericInterfaceType, out grainReferenceType))
+            {
+                throw new InvalidOperationException(
+                    string.Format("Cannot find generated GrainReference class for interface '{0}'", interfaceType));
+            }
+
+            if (interfaceType.IsConstructedGenericType)
+            {
+                grainReferenceType = grainReferenceType.MakeGenericType(interfaceType.GenericTypeArguments);
+            }
+
+            // Get the grain reference constructor.
+            var constructor =
+                grainReferenceType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(
+                        _ =>
+                        {
+                            var parameters = _.GetParameters();
+                            return parameters.Length == 1 && parameters[0].ParameterType == typeof(GrainReference);
+                        }).FirstOrDefault();
+
+            if (constructor == null)
+            {
+                throw new InvalidOperationException(
+                    string.Format(
+                        "Cannot find suitable constructor on generated reference type for interface '{0}'",
+                        interfaceType));
+            }
+
+            // Construct an expression to construct a new instance of this grain reference when given another grain
+            // reference.
+            var createLambdaParameter = Expression.Parameter(typeof(GrainReference), "gr");
+            var createLambda =
+                Expression.Lambda<Func<GrainReference, IAddressable>>(
+                    Expression.New(constructor, createLambdaParameter),
+                    createLambdaParameter);
+            var grainRefParameter = Expression.Parameter(typeof(IAddressable), "grainRef");
+            var body =
+                Expression.Call(
+                    GrainReferenceCastInternalMethodInfo,
+                    Expression.Constant(interfaceType),
+                    createLambda,
+                    grainRefParameter,
+                    Expression.Constant(GrainInterfaceData.GetGrainInterfaceId(interfaceType)));
+
+            // Compile and return the reference casting lambda.
+            var lambda = Expression.Lambda<GrainReferenceCaster>(body, grainRefParameter);
+            return lambda.Compile();
         }
         #endregion
 
@@ -271,7 +350,7 @@ namespace Orleans
 
         private readonly Dictionary<Tuple<GrainId,Type>, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
                     new Dictionary<Tuple<GrainId, Type>, Dictionary<SiloAddress, ISystemTarget>>();
-
+        
         internal TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
             where TGrainInterface : ISystemTarget
         {
@@ -308,60 +387,22 @@ namespace Orleans
         #endregion
 
         #region Utility functions
-        /// <summary>
-        /// Creates a delegate for calling into the static method named <paramref name="methodName"/> on the generated
-        /// factory for <paramref name="interfaceType"/>.
-        /// </summary>
-        /// <param name="interfaceType">The interface type.</param>
-        /// <param name="methodName">The name of the static factory method.</param>
-        /// <param name="delegateType">The type of delegate to create.</param>
-        /// <returns>The created delegate.</returns>
-        private static Delegate MakeFactoryDelegate(Type interfaceType, string methodName, Type delegateType)
+
+        internal static void FindSupportClasses(Type type)
         {
-            var grainFactoryName = TypeUtils.GetSimpleTypeName(interfaceType, t => false);
-            if (interfaceType.IsInterface && grainFactoryName.Length > 1 && grainFactoryName[0] == 'I'
-                && char.IsUpper(grainFactoryName[1]))
+            var invokerAttr = type.GetCustomAttribute<MethodInvokerAttribute>(false);
+            if (invokerAttr != null)
             {
-                grainFactoryName = grainFactoryName.Substring(1);
+                GrainToInvokerMapping.TryAdd(invokerAttr.GrainType, type);
             }
-
-            grainFactoryName = grainFactoryName + "Factory";
-
-            if (interfaceType.IsGenericType)
+            
+            var grainReferenceAttr = type.GetCustomAttribute<GrainReferenceAttribute>(false);
+            if (grainReferenceAttr != null)
             {
-                grainFactoryName = grainFactoryName + "`" + interfaceType.GetGenericArguments().Length;
+                GrainToReferenceMapping.TryAdd(grainReferenceAttr.GrainType, type);
             }
-
-            // expect grain reference to be generated into same namespace that interface is declared within
-            if (!string.IsNullOrEmpty(interfaceType.Namespace))
-            {
-                grainFactoryName = interfaceType.Namespace + "." + grainFactoryName;
-            }
-
-            var grainFactoryType = interfaceType.Assembly.GetType(grainFactoryName);
-            if (grainFactoryType == null)
-            {
-                throw new InvalidOperationException(
-                    string.Format("Cannot find generated factory type for interface '{0}'", interfaceType));
-            }
-
-            if (interfaceType.IsGenericType)
-            {
-                grainFactoryType = grainFactoryType.MakeGenericType(interfaceType.GetGenericArguments());
-            }
-
-            var method = grainFactoryType.GetMethod(
-                methodName,
-                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic
-                | System.Reflection.BindingFlags.Public);
-            if (method == null)
-            {
-                throw new InvalidOperationException(
-                    string.Format("Cannot find '{0}' method for interface '{1}'", methodName, interfaceType));
-            }
-
-            return method.CreateDelegate(delegateType);
         }
+
         #endregion
     }
 }

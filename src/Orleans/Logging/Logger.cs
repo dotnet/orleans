@@ -50,6 +50,13 @@ namespace Orleans.Runtime
             get;
         }
 
+        /// <summary> Whether the current SeverityLevel would output <c>Warning</c> messages for this logger. </summary>
+        [DebuggerHidden]
+        public bool IsWarning
+        {
+            get { return SeverityLevel >= Severity.Warning; }
+        }
+
         /// <summary> Whether the current SeverityLevel would output <c>Info</c> messages for this logger. </summary>
         [DebuggerHidden]
         public bool IsInfo

@@ -23,6 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+using Orleans.CodeGeneration;
+
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
@@ -37,3 +39,4 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("6fac9056-5fb2-44ef-a3ba-63aa58f09428")]
+[assembly: SkipCodeGeneration]

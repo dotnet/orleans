@@ -39,6 +39,8 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
+    using System.Diagnostics.CodeAnalysis;
+
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
     /// </summary>
@@ -50,14 +52,12 @@ namespace Orleans.Serialization
         /// <param name="original">Original object to be deep copied.</param>
         /// <returns>Deep copy of the original object.</returns>
         public delegate object DeepCopier(object original);
-        private static readonly Type[] deepCopierParams = { typeof(object) };
 
         /// <summary> Serializer function. </summary>
         /// <param name="raw">Input object to be serialized.</param>
         /// <param name="stream">Stream to write this data to.</param>
         /// <param name="expected">Current Type active in this stream.</param>
         public delegate void Serializer(object raw, BinaryTokenStreamWriter stream, Type expected);
-        private static readonly Type[] serializerParams = { typeof(object), typeof(BinaryTokenStreamWriter), typeof(Type) };
 
         /// <summary>
         /// Deserializer function.
@@ -66,7 +66,6 @@ namespace Orleans.Serialization
         /// <param name="stream">Input stream to be read from.</param>
         /// <returns>Rehydrated object of the specified Type read from the current position in the input stream.</returns>
         public delegate object Deserializer(Type expected, BinaryTokenStreamReader stream);
-        private static readonly Type[] deserializerParams = { typeof(Type), typeof(BinaryTokenStreamReader) };
 
         private static readonly string[] safeFailSerializers = { "Orleans.FSharp" };
 
@@ -83,7 +82,6 @@ namespace Orleans.Serialization
         #region Privates
 
         private static readonly HashSet<Type> registeredTypes;
-        private static readonly HashSet<Assembly> scannedAssemblies;
         private static readonly Dictionary<string, Type> types;
         private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
@@ -137,11 +135,7 @@ namespace Orleans.Serialization
         public static void InitializeForTesting()
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            // Load serialization info for currently-loaded assemblies
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                FindSerializationInfo(assembly);
-            }
+            AssemblyProcessor.Initialize();
         }
 
         internal static void Initialize(bool useStandardSerializer)
@@ -179,7 +173,7 @@ namespace Orleans.Serialization
                 FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
             }
 
-            InstallAssemblyLoadEventHandler();
+            AssemblyProcessor.Initialize();
         }
 
         static SerializationManager()
@@ -187,7 +181,6 @@ namespace Orleans.Serialization
             AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
 
             registeredTypes = new HashSet<Type>();
-            scannedAssemblies = new HashSet<Assembly>();
             types = new Dictionary<string, Type>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
@@ -453,230 +446,344 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
+        /// Registers <paramref name="serializerType"/> as the serializer for <paramref name="type"/>.
+        /// </summary>
+        /// <param name="type">The type serialized by the provided serializer type.</param>
+        /// <param name="serializerType">The type containing serialization methods for <paramref name="type"/>.</param>
+        public static void Register(Type type, Type serializerType)
+        {
+            try
+            {
+                if (type.IsGenericTypeDefinition)
+                {
+                    Register(
+                        type,
+                        obj =>
+                        {
+                            var concrete = RegisterConcreteSerializer(obj.GetType(), serializerType);
+                            return concrete.DeepCopy(obj);
+                        },
+                        (obj, stream, exp) =>
+                        {
+                            var concrete = RegisterConcreteSerializer(obj.GetType(), serializerType);
+                            concrete.Serialize(obj, stream, exp);
+                        },
+                        (expected, stream) =>
+                        {
+                            var concrete = RegisterConcreteSerializer(expected, serializerType);
+                            return concrete.Deserialize(expected, stream);
+                        },
+                        true);
+                }
+                else
+                {
+                    MethodInfo copier;
+                    MethodInfo serializer;
+                    MethodInfo deserializer;
+                    GetSerializationMethods(serializerType, out copier, out serializer, out deserializer);
+                    Register(
+                        type,
+                        (DeepCopier)copier.CreateDelegate(typeof(DeepCopier)),
+                        (Serializer)serializer.CreateDelegate(typeof(Serializer)),
+                        (Deserializer)deserializer.CreateDelegate(typeof(Deserializer)),
+                        true);
+                }
+            }
+            catch (ArgumentException)
+            {
+                logger.Warn(
+                    ErrorCode.SerMgr_ErrorBindingMethods,
+                    "Error binding serialization methods for type {0}",
+                    type.OrleansTypeName());
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Looks for types with marked serializer and deserializer methods, and registers them if necessary.
         /// </summary>
         /// <param name="assembly">The assembly to look through.</param>
-        internal static void FindSerializationInfo(Assembly assembly)
+        internal static void FindSerializationInfo(Type type)
         {
-            // If we're using the .Net serializer, then don't bother with this at all
-            if (UseStandardSerializer) return;
-
-            // serialization of reflection-only types isn't supported.
-            if (assembly.ReflectionOnly) return;
-
-            // Don't bother re-processing an assembly we've already scanned
-            lock (scannedAssemblies)
-            {
-                if (scannedAssemblies.Contains(assembly)) return;
-
-                scannedAssemblies.Add(assembly);
-            }
-
-            bool systemAssembly = 
-                !assembly.IsDynamic 
-                && (assembly.FullName.StartsWith("mscorlib", StringComparison.OrdinalIgnoreCase)
-                    || assembly.FullName.StartsWith("System.", StringComparison.Ordinal));
+            var assembly = type.Assembly;
+            bool systemAssembly = !assembly.IsDynamic
+                                  && (assembly.FullName.StartsWith("mscorlib", StringComparison.OrdinalIgnoreCase)
+                                      || assembly.FullName.StartsWith("System.", StringComparison.Ordinal));
 
             if (logger.IsVerbose2) logger.Verbose2("Scanning assembly {0} for serialization info", assembly.GetLocationSafe());
 
             try
             {
-                // Check each type in the assembly for serializer and deserializer methods
-                foreach (var type in assembly.GetTypes())
+                if (type.IsEnum)
                 {
-                    if (type.IsEnum)
-                    {
-                        Register(type);
-                    }
-                    else if (!systemAssembly)
-                    {
-                        if (!type.IsInterface && !type.IsAbstract &&
-                            (type.Namespace == null ||
-                             (!type.Namespace.Equals("System", StringComparison.Ordinal) 
+                    Register(type);
+                }
+                else if (!systemAssembly)
+                {
+                    if (!type.IsInterface && !type.IsAbstract
+                        && (type.Namespace == null
+                            || (!type.Namespace.Equals("System", StringComparison.Ordinal)
                                 && !type.Namespace.StartsWith("System.", StringComparison.Ordinal))))
+                    {
+                        if (type.GetCustomAttributes(typeof(RegisterSerializerAttribute), false).Length > 0)
                         {
-                            if (type.GetCustomAttributes(typeof(RegisterSerializerAttribute), false).Length > 0)
-                            {
-                                // Call the static Register method on the type
-                                if (logger.IsVerbose3) logger.Verbose3("Running register method for type {0} from assembly {1}",
-                                    type.Name, assembly.GetName().Name);
+                            // Call the static Register method on the type
+                            if (logger.IsVerbose3)
+                                logger.Verbose3(
+                                    "Running register method for type {0} from assembly {1}",
+                                    type.Name,
+                                    assembly.GetName().Name);
 
-                                var register = type.GetMethod("Register");
-                                if (register != null)
+                            var register = type.GetMethod("Register");
+                            if (register != null)
+                            {
+                                try
                                 {
-                                    try
-                                    {
-                                        register.Invoke(null, Type.EmptyTypes);
-                                    }
-                                    catch (OrleansException ex)
-                                    {
-                                        logger.Error(ErrorCode.SerMgr_TypeRegistrationFailure, "Failure registering type " + type.OrleansTypeName() + " from assembly " + assembly.GetLocationSafe(), ex);
-                                        throw;
-                                    }
-                                    catch(Exception)
-                                    {
-                                        // Ignore failures to load our own serializers, such as the F# ones in case F# isn't installed.
-                                        if (safeFailSerializers.Contains(assembly.GetName().Name))
-                                            logger.Warn(ErrorCode.SerMgr_TypeRegistrationFailureIgnore, "Failure registering type " + type.OrleansTypeName() + " from assembly " + assembly.GetLocationSafe() + ". Ignoring it.");
-                                        else
-                                            throw;
-                                    }
+                                    register.Invoke(null, Type.EmptyTypes);
                                 }
-                                else
+                                catch (OrleansException ex)
                                 {
-                                    logger.Warn(ErrorCode.SerMgr_MissingRegisterMethod,
-                                        "Type {0} from assembly {1} has the RegisterSerializer attribute but no Register static method",
-                                        type.Name, assembly.GetName().Name);
+                                    logger.Error(
+                                        ErrorCode.SerMgr_TypeRegistrationFailure,
+                                        "Failure registering type " + type.OrleansTypeName() + " from assembly "
+                                        + assembly.GetLocationSafe(),
+                                        ex);
+                                    throw;
+                                }
+                                catch (Exception)
+                                {
+                                    // Ignore failures to load our own serializers, such as the F# ones in case F# isn't installed.
+                                    if (safeFailSerializers.Contains(assembly.GetName().Name))
+                                        logger.Warn(
+                                            ErrorCode.SerMgr_TypeRegistrationFailureIgnore,
+                                            "Failure registering type " + type.OrleansTypeName() + " from assembly "
+                                            + assembly.GetLocationSafe() + ". Ignoring it.");
+                                    else throw;
                                 }
                             }
                             else
                             {
-                                MethodInfo copier = null;
-                                MethodInfo serializer = null;
-                                MethodInfo deserializer = null;
-                                foreach ( var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-                                {
-                                    if (method.GetCustomAttributes(typeof(CopierMethodAttribute), true).Length > 0)
-                                    {
-                                        copier = method;
-                                    }
-                                    else if (method.GetCustomAttributes(typeof(SerializerMethodAttribute), true).Length > 0)
-                                    {
-                                        serializer = method;
-                                    }
-                                    else if (method.GetCustomAttributes(typeof(DeserializerMethodAttribute), true).Length > 0)
-                                    {
-                                        deserializer = method;
-                                    }
-                                }
-                                if ((serializer != null) && (deserializer != null) && (copier != null))
-                                {
-                                    try
-                                    {
-                                        if (type.IsGenericTypeDefinition)
-                                        {
-                                            Register(type,
-                                                     obj =>
-                                                     {
-                                                         var t = obj.GetType();
-                                                         var concreteCop = t.GetMethod(copier.Name, deepCopierParams);
-                                                         var cop = (DeepCopier)concreteCop.CreateDelegate(typeof(DeepCopier));
-                                                         var concreteSer = t.GetMethod(serializer.Name, serializerParams);
-                                                         var ser = (Serializer)concreteSer.CreateDelegate(typeof(Serializer));
-                                                         var concreteDeser = t.GetMethod(deserializer.Name, deserializerParams);
-                                                         var deser = (Deserializer)concreteDeser.CreateDelegate(typeof(Deserializer));
-                                                         Register(obj.GetType(), cop, ser, deser, true);
-                                                         return cop(obj);
-                                                     },
-                                                     (obj, stream, exp) =>
-                                                     {
-                                                         var t = obj.GetType();
-                                                         var concreteCop = t.GetMethod(copier.Name, deepCopierParams);
-                                                         var cop = (DeepCopier)concreteCop.CreateDelegate(typeof(DeepCopier));
-                                                         var concreteSer = t.GetMethod(serializer.Name, serializerParams);
-                                                         var ser = (Serializer)concreteSer.CreateDelegate(typeof(Serializer));
-                                                         var concreteDeser = t.GetMethod(deserializer.Name, deserializerParams);
-                                                         var deser = (Deserializer)concreteDeser.CreateDelegate(typeof(Deserializer));
-                                                         Register(obj.GetType(), cop, ser, deser, true);
-                                                         ser(obj, stream, exp);
-                                                     },
-                                                     (t, stream) =>
-                                                     {
-                                                         var concreteCop = t.GetMethod(copier.Name, deepCopierParams);
-                                                         var cop = (DeepCopier)concreteCop.CreateDelegate(typeof(DeepCopier));
-                                                         var concreteSer = t.GetMethod(serializer.Name, serializerParams);
-                                                         var ser = (Serializer)concreteSer.CreateDelegate(typeof(Serializer));
-                                                         var concreteDeser = t.GetMethod(deserializer.Name, deserializerParams);
-                                                         var deser = (Deserializer)concreteDeser.CreateDelegate(typeof(Deserializer));
-                                                         Register(t, cop, ser, deser, true);
-                                                         return deser(t, stream);
-                                                     }, true);
-                                        }
-                                        else
-                                        {
-                                            Register(type,
-                                                (DeepCopier)copier.CreateDelegate(typeof(DeepCopier)),
-                                                (Serializer)serializer.CreateDelegate(typeof(Serializer)),
-                                                (Deserializer)deserializer.CreateDelegate(typeof(Deserializer)), true);
-                                        }
-                                    }
-                                    catch (ArgumentException)
-                                    {
-                                        logger.Warn(ErrorCode.SerMgr_ErrorBindingMethods, "Error binding serialization methods for type {0}", type.OrleansTypeName());
-                                        throw;
-                                    }
-                                    if (logger.IsVerbose3) logger.Verbose3("Loaded serialization info for type {0} from assembly {1}", type.Name, assembly.GetName().Name);
-                                }
-                                else if ((serializer != null) && (deserializer != null))
-                                {
-                                    try
-                                    {
-                                        Register(type, null,
-                                            (Serializer)serializer.CreateDelegate(typeof(Serializer)),
-                                            (Deserializer)deserializer.CreateDelegate(typeof(Deserializer)), true);
-                                    }
-                                    catch (ArgumentException)
-                                    {
-                                        logger.Warn(ErrorCode.SerMgr_ErrorBindingMethods, "Error binding serialization methods for type {0}", type.OrleansTypeName());
-                                        throw;
-                                    }
-                                    if (logger.IsVerbose3) logger.Verbose3("Loaded serialization info for type {0} from assembly {1}", type.Name, assembly.GetName().Name);
-                                }
-                                else if (copier != null)
-                                {
-                                    try
-                                    {
-                                        Register(type, (DeepCopier)copier.CreateDelegate(typeof(DeepCopier)), null, null, true);
-                                    }
-                                    catch (ArgumentException)
-                                    {
-                                        logger.Warn(ErrorCode.SerMgr_ErrorBindingMethods, "Error binding serialization methods for type {0}", type.OrleansTypeName());
-                                        throw;
-                                    }
-                                    if (logger.IsVerbose3) logger.Verbose3("Loaded serialization info for type {0} from assembly {1}", type.Name, assembly.GetName().Name);
-                                }
-                                else if (!type.IsSerializable)
-                                {
-                                    // Comparers with no fields can be safely dealt with as just a type name
-                                    var comparer = false;
-                                    foreach (var iface in type.GetInterfaces())
-                                        if (iface.IsGenericType &&
-                                            (iface.GetGenericTypeDefinition() == typeof (IComparer<>)
-                                             || iface.GetGenericTypeDefinition() == typeof (IEqualityComparer<>)))
-                                        {
-                                            comparer = true;
-                                            break;
-                                        }
-
-                                    if (comparer && (type.GetFields().Length == 0))
-                                        Register(type);
-                                }
-                                else
-                                {
-                                    Register(type);
-                                }
+                                logger.Warn(
+                                    ErrorCode.SerMgr_MissingRegisterMethod,
+                                    "Type {0} from assembly {1} has the RegisterSerializer attribute but no Register static method",
+                                    type.Name,
+                                    assembly.GetName().Name);
                             }
+                        }
+                        else if (IsGeneratedGrainReference(type))
+                        {
+                            RegisterGrainReferenceSerializers(type);
                         }
                         else
                         {
-                            Register(type);
+                            MethodInfo copier;
+                            MethodInfo serializer;
+                            MethodInfo deserializer;
+                            GetSerializationMethods(type, out copier, out serializer, out deserializer);
+                            if ((serializer != null) && (deserializer != null) && (copier != null))
+                            {
+                                // Register type as a serializer for type.
+                                Register(type, type);
+                                if (logger.IsVerbose3)
+                                    logger.Verbose3(
+                                        "Loaded serialization info for type {0} from assembly {1}",
+                                        type.Name,
+                                        assembly.GetName().Name);
+                            }
+                            else if ((serializer != null) && (deserializer != null))
+                            {
+                                try
+                                {
+                                    Register(
+                                        type,
+                                        null,
+                                        (Serializer)serializer.CreateDelegate(typeof(Serializer)),
+                                        (Deserializer)deserializer.CreateDelegate(typeof(Deserializer)),
+                                        true);
+                                }
+                                catch (ArgumentException)
+                                {
+                                    logger.Warn(
+                                        ErrorCode.SerMgr_ErrorBindingMethods,
+                                        "Error binding serialization methods for type {0}",
+                                        type.OrleansTypeName());
+                                    throw;
+                                }
+                                if (logger.IsVerbose3)
+                                    logger.Verbose3(
+                                        "Loaded serialization info for type {0} from assembly {1}",
+                                        type.Name,
+                                        assembly.GetName().Name);
+                            }
+                            else if (copier != null)
+                            {
+                                try
+                                {
+                                    Register(
+                                        type,
+                                        (DeepCopier)copier.CreateDelegate(typeof(DeepCopier)),
+                                        null,
+                                        null,
+                                        true);
+                                }
+                                catch (ArgumentException)
+                                {
+                                    logger.Warn(
+                                        ErrorCode.SerMgr_ErrorBindingMethods,
+                                        "Error binding serialization methods for type {0}",
+                                        type.OrleansTypeName());
+                                    throw;
+                                }
+                                if (logger.IsVerbose3)
+                                    logger.Verbose3(
+                                        "Loaded serialization info for type {0} from assembly {1}",
+                                        type.Name,
+                                        assembly.GetName().Name);
+                            }
+                            else if (!type.IsSerializable)
+                            {
+                                // Comparers with no fields can be safely dealt with as just a type name
+                                var comparer = false;
+                                foreach (var iface in type.GetInterfaces())
+                                    if (iface.IsGenericType
+                                        && (iface.GetGenericTypeDefinition() == typeof(IComparer<>)
+                                            || iface.GetGenericTypeDefinition() == typeof(IEqualityComparer<>)))
+                                    {
+                                        comparer = true;
+                                        break;
+                                    }
+
+                                if (comparer && (type.GetFields().Length == 0)) Register(type);
+                            }
+                            else
+                            {
+                                Register(type);
+                            }
                         }
+                    }
+                    else
+                    {
+                        Register(type);
                     }
                 }
             }
             catch (ReflectionTypeLoadException rtle)
             {
                 var sb = new StringBuilder();
-                foreach (var ex in rtle.LoaderExceptions)
-                    if (ex != null)
-                        sb.AppendFormat("    Exception loading type: {0}", ex).AppendLine();
+                foreach (var ex in rtle.LoaderExceptions) if (ex != null) sb.AppendFormat("    Exception loading type: {0}", ex).AppendLine();
 
-                foreach (var t in rtle.Types)
-                    if (t != null)
-                        sb.AppendFormat("    Successfully loaded type {0}", t.Name).AppendLine();
+                foreach (var t in rtle.Types) if (t != null) sb.AppendFormat("    Successfully loaded type {0}", t.Name).AppendLine();
 
-                logger.Warn(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes,
-                    "Error loading types for assembly {0}: {1}", assembly.GetName().Name, sb.ToString());
+                logger.Warn(
+                    ErrorCode.SerMgr_ErrorLoadingAssemblyTypes,
+                    "Error loading types for assembly {0}: {1}",
+                    assembly.GetName().Name,
+                    sb.ToString());
+            }
+        }
+
+        /// <summary>
+        /// Returns <see langword="true"/> if the type is a generated <see cref="GrainReference"/>,
+        /// <see langword="false"/> otherwise.
+        /// </summary>
+        /// <param name="type">
+        /// The type.
+        /// </param>
+        /// <returns>
+        /// <see langword="true"/> if the type is a generated <see cref="GrainReference"/>,
+        /// <see langword="false"/> otherwise.
+        /// </returns>
+        internal static bool IsGeneratedGrainReference(MemberInfo type)
+        {
+            var attr = type.GetCustomAttribute<GrainReferenceAttribute>();
+            return attr != null && attr.GrainType != null;
+        }
+
+        /// <summary>
+        /// Registers <see cref="GrainReference"/> serializers for the provided <paramref name="type"/>.
+        /// </summary>
+        /// <param name="type">
+        /// The type.
+        /// </param>
+        private static void RegisterGrainReferenceSerializers(Type type)
+        {
+            var attr = type.GetCustomAttribute<GrainReferenceAttribute>();
+            if (attr == null || attr.GrainType == null)
+            {
+                return;
+            }
+
+            // TODO: Optimize grain creation, eg using expression trees or IL.
+            var nonGenericConstructor =
+                type.GetConstructor(
+                    BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
+                    null,
+                    new[] { typeof(GrainReference) },
+                    null);
+
+            // Register GrainReference serialization methods.
+            Register(
+                type,
+                GrainReference.CopyGrainReference,
+                GrainReference.SerializeGrainReference,
+                (expected, stream) =>
+                {
+                    ConstructorInfo constructor;
+                    if (expected.IsConstructedGenericType)
+                    {
+                        var referenceType = type.MakeGenericType(expected.GenericTypeArguments);
+                        constructor =
+                            referenceType.GetConstructor(
+                                BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
+                                null,
+                                new[] { typeof(GrainReference) },
+                                null);
+                    }
+                    else
+                    {
+                        constructor = nonGenericConstructor;
+                    }
+
+                    var deserialized = (IAddressable)GrainReference.DeserializeGrainReference(expected, stream);
+                    return (IAddressable)constructor.Invoke(new object[] { deserialized });
+                });
+        }
+
+        private static SerializerMethods RegisterConcreteSerializer(Type concreteType, Type genericSerializerType)
+        {
+            MethodInfo copier;
+            MethodInfo serializer;
+            MethodInfo deserializer;
+
+            var concreteSerializerType = genericSerializerType.MakeGenericType(concreteType.GetGenericArguments());
+            GetSerializationMethods(concreteSerializerType, out copier, out serializer, out deserializer);
+            var concreteCopier = (DeepCopier)copier.CreateDelegate(typeof(DeepCopier));
+            var concreteSerializer = (Serializer)serializer.CreateDelegate(typeof(Serializer));
+            var concreteDeserializer = (Deserializer)deserializer.CreateDelegate(typeof(Deserializer));
+            Register(concreteType, concreteCopier, concreteSerializer, concreteDeserializer, true);
+
+            return new SerializerMethods(concreteCopier, concreteSerializer, concreteDeserializer);
+        }
+
+        private static void GetSerializationMethods(Type type, out MethodInfo copier, out MethodInfo serializer, out MethodInfo deserializer)
+        {
+            copier = null;
+            serializer = null;
+            deserializer = null;
+            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                if (method.GetCustomAttributes(typeof(CopierMethodAttribute), true).Length > 0)
+                {
+                    copier = method;
+                }
+                else if (method.GetCustomAttributes(typeof(SerializerMethodAttribute), true).Length > 0)
+                {
+                    serializer = method;
+                }
+                else if (method.GetCustomAttributes(typeof(DeserializerMethodAttribute), true).Length > 0)
+                {
+                    deserializer = method;
+                }
             }
         }
 
@@ -692,9 +799,7 @@ namespace Orleans.Serialization
                 if (copiers.TryGetValue(t.TypeHandle, out copier))
                     return copier;
 
-                if (!t.IsGenericType) return null;
-
-                if (copiers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out copier))
+                if (t.IsGenericType && copiers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out copier))
                     return copier;
             }
 
@@ -864,6 +969,21 @@ namespace Orleans.Serialization
 
         #region Serializing
 
+        /// <summary>
+        /// Returns true if <paramref name="t"/> is serializable, false otherwise.
+        /// </summary>
+        /// <param name="t">The type.</param>
+        /// <returns>true if <paramref name="t"/> is serializable, false otherwise.</returns>
+        internal static bool HasSerializer(Type t)
+        {
+            lock (serializers)
+            {
+                Serializer ser;
+                return serializers.TryGetValue(t.TypeHandle, out ser)
+                       || (t.IsGenericType && serializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out ser));
+            }
+        }
+
         internal static Serializer GetSerializer(Type t)
         {
             lock (serializers)
@@ -912,7 +1032,7 @@ namespace Orleans.Serialization
         /// <param name="raw">The input data to be serialized.</param>
         /// <param name="stream">The output stream to write to.</param>
         /// <param name="expected">Current expected Type on this stream.</param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
+        [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
         public static void SerializeInner(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
             // Nulls get special handling
@@ -923,6 +1043,7 @@ namespace Orleans.Serialization
             }
 
             var t = obj.GetType();
+
             // Enums are extra-special
             if (t.IsEnum)
             {
@@ -1454,23 +1575,20 @@ namespace Orleans.Serialization
         internal static Deserializer GetDeserializer(Type t)
         {
             Deserializer deser;
-            bool found;
 
             lock (deserializers)
             {
-                found = deserializers.TryGetValue(t.TypeHandle, out deser);
+                if (deserializers.TryGetValue(t.TypeHandle, out deser))
+                    return deser;
             }
-            if (found)
-                return deser;
 
             if (t.IsGenericType)
             {
                 lock (deserializers)
                 {
-                    found = deserializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out deser);
+                    if (deserializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out deser))
+                        return deser;
                 }
-                if (found)
-                    return deser;
             }
 
             return null;
@@ -1597,9 +1715,9 @@ namespace Orleans.Serialization
                     catch (Exception) { }
 
                     if(t != null)
-                        throw new SerializationException(string.Format("Introductory token for message headers is incorrect: token = {0}, SpecifiedTypeHeader = {1} ", token, t));
+                        throw new SerializationException(String.Format("Introductory token for message headers is incorrect: token = {0}, SpecifiedTypeHeader = {1} ", token, t));
                 }
-                throw new SerializationException(string.Format("Introductory token for message headers is incorrect: {0}", token));
+                throw new SerializationException(String.Format("Introductory token for message headers is incorrect: {0}", token));
             }
             var result = DeserializeMessageHeaderDictHelper(stream);
 
@@ -1656,7 +1774,7 @@ namespace Orleans.Serialization
                 if (des != null)
                     return des(t, stream);
             }
-            throw new SerializationException(string.Format("Unexpected token {0} parsing message headers", token));
+            throw new SerializationException(String.Format("Unexpected token {0} parsing message headers", token));
         }
 
         #endregion
@@ -1861,17 +1979,6 @@ namespace Orleans.Serialization
             return DeserializeFromByteArray<T>(data);
         }
 
-        private static void InstallAssemblyLoadEventHandler()
-        {
-            // initialize serialization for all assemblies to be loaded.
-            AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
-
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            // initialize serialization for already loaded assemblies.
-            foreach (var assembly in assemblies)
-                FindSerializationInfo(assembly);
-        }
-
         public static void LogRegisteredTypes()
         {
             int count = 0;
@@ -1908,15 +2015,10 @@ namespace Orleans.Serialization
                 }
             }
 
-            var report = string.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
+            var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
             logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
         }
-
-        private static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
-        {
-            FindSerializationInfo(args.LoadedAssembly);
-        }
-
+        
         /// <summary>
         /// This appears necessary because the BinaryFormatter by default will not see types
         /// that are defined by the InvokerGenerator.
@@ -1930,23 +2032,47 @@ namespace Orleans.Serialization
 
             public override Type BindToType(string assemblyName, string typeName)
             {
-                lock (assemblies)
+                lock (this.assemblies)
                 {
                     Assembly result;
-                    if (!assemblies.TryGetValue(assemblyName, out result))
+                    if (!this.assemblies.TryGetValue(assemblyName, out result))
                     {
                         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                            assemblies[assembly.GetName().FullName] = assembly;
+                            this.assemblies[assembly.GetName().FullName] = assembly;
 
                         // in some cases we have to explicitly load the assembly even though it seems to be already loaded but for some reason it's not listed in AppDomain.CurrentDomain.GetAssemblies()
-                        if (!assemblies.TryGetValue(assemblyName, out result))
-                            assemblies[assemblyName] = Assembly.Load(assemblyName);
+                        if (!this.assemblies.TryGetValue(assemblyName, out result))
+                            this.assemblies[assemblyName] = Assembly.Load(assemblyName);
 
-                        result = assemblies[assemblyName];
+                        result = this.assemblies[assemblyName];
                     }
+
                     return result.GetType(typeName);
                 }
             }
+        }
+
+        public struct SerializerMethods
+        {
+            public SerializerMethods(DeepCopier deepCopy, Serializer serialize, Deserializer deserialize)
+                : this()
+            {
+                this.DeepCopy = deepCopy;
+                this.Serialize = serialize;
+                this.Deserialize = deserialize;
+            }
+
+            public DeepCopier DeepCopy { get; private set; }
+            public Serializer Serialize { get; private set; }
+            public Deserializer Deserialize { get; private set; }
+        }
+
+        public static bool ShouldFindSerializationInfo(Assembly assembly)
+        {
+            // If we're using the .Net serializer, then don't bother with this at all
+            if (UseStandardSerializer) return false;
+            
+            return true;
         }
     }
 }
