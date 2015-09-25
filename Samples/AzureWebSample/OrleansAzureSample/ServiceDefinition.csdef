@@ -1,8 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<ServiceDefinition name="OrleansAzureSample" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition" schemaVersion="2014-06.2.4">
+<ServiceDefinition name="OrleansAzureSample" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition" schemaVersion="2015-04.2.6">
   <WorkerRole name="OrleansAzureSilos" vmsize="Medium">
-    <Imports>
-    </Imports>
+    <Imports></Imports>
     <ConfigurationSettings>
       <Setting name="DataConnectionString" />
     </ConfigurationSettings>
@@ -17,8 +16,7 @@
     -->
   </WorkerRole>
   <WebRole name="WebRole" vmsize="ExtraSmall">
-    <Imports>
-    </Imports>
+    <Imports></Imports>
     <ConfigurationSettings>
       <Setting name="DataConnectionString" />
     </ConfigurationSettings>
