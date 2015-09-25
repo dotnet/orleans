@@ -472,6 +472,7 @@ namespace Orleans.TestingHost
                 {
                     clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
                 }
+                clientOptions.ConfigMutator(clientConfig);
                 clientConfig.AdjustForTestEnvironment();
 
                 GrainClient.Initialize(clientConfig);
@@ -523,6 +524,7 @@ namespace Orleans.TestingHost
                 config.Globals.DataConnectionString = options.DataConnectionString;
             }
 
+            options.ConfigMutator(config);
             config.AdjustForTestEnvironment();
 
             _livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);

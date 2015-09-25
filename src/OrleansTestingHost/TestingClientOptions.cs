@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost
 {
@@ -38,6 +39,7 @@ namespace Orleans.TestingHost
         public List<IPEndPoint> Gateways { get; set; }
         public int PreferedGatewayIndex { get; set; }
         public bool PropagateActivityId { get; set; }
+        public Action<ClientConfiguration> ConfigMutator { get; set; }
 
         public TestingClientOptions()
         {
@@ -45,6 +47,7 @@ namespace Orleans.TestingHost
             ResponseTimeout = TimeSpan.FromMilliseconds(-1);
             PreferedGatewayIndex = -1;
             ClientConfigFile = new FileInfo(DEFAULT_CLIENT_CONFIG_FILE);
+            ConfigMutator = configuration => { };
         }
 
         public TestingClientOptions Copy()
@@ -57,6 +60,7 @@ namespace Orleans.TestingHost
                 PreferedGatewayIndex = PreferedGatewayIndex,
                 PropagateActivityId = PropagateActivityId,
                 ClientConfigFile = ClientConfigFile,
+                ConfigMutator = ConfigMutator,
             };
         }
     }

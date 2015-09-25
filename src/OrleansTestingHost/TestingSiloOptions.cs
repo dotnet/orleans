@@ -47,6 +47,7 @@ namespace Orleans.TestingHost
         public bool ParallelStart { get; set; }
         public GlobalConfiguration.ReminderServiceProviderType ReminderServiceType { get; set; }
         public string DataConnectionString { get; set; }
+        public Action<ClusterConfiguration> ConfigMutator { get; set; }
 
         public TestingSiloOptions()
         {
@@ -62,6 +63,7 @@ namespace Orleans.TestingHost
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
             SiloConfigFile = new FileInfo(DEFAULT_SILO_CONFIG_FILE);
             ParallelStart = false;
+            ConfigMutator = configuration => { };
         }
 
         public TestingSiloOptions Copy()
@@ -82,7 +84,7 @@ namespace Orleans.TestingHost
                 ReminderServiceType = ReminderServiceType,
                 DataConnectionString = DataConnectionString,
                 ParallelStart = ParallelStart,
-
+                ConfigMutator = ConfigMutator,
             };
         }
     }
