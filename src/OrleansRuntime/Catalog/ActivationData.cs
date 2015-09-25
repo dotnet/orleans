@@ -781,7 +781,7 @@ namespace Orleans.Runtime
                  State);
         }
 
-        internal string ToDetailedString(bool inludeRunning = false)
+        internal string ToDetailedString(bool includeExtraDetails = false)
         {
             return
                 String.Format(
@@ -797,7 +797,7 @@ namespace Orleans.Runtime
                     numRunning,                     // 8 NumRunning
                     GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
                     CollectionAgeLimit,             // 10 CollectionAgeLimit
-                    (inludeRunning && Running !=null) ? " CurrentlyExecuting=" + Running : "");  // 11: Running
+                    (includeExtraDetails && Running != null) ? " CurrentlyExecuting=" + Running : "");  // 11: Running
         }
 
         public string Name

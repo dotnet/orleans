@@ -440,16 +440,16 @@ namespace Orleans.Runtime.Scheduler
                 sb.Append(this);
                 sb.AppendFormat(". Currently QueuedWorkItems={0}; Total EnQueued={1}; Total processed={2}; Quantum expirations={3}; ",
                     WorkItemCount, totalItemsEnQueued, totalItemsProcessed, quantumExpirations);
-                Utils.SafeExecute(() =>
+         
+                if (AverageQueueLenght != 0)
                 {
-                    if (AverageQueueLenght != 0)
+                    sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
+                    if (!totalQueuingDelay.Equals(TimeSpan.Zero) && totalItemsProcessed > 0)
                     {
-                        sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
-                        if (!totalQueuingDelay.Equals(TimeSpan.Zero))
-                            sb.AppendFormat("average queue delay: {0}ms; ",
-                                totalQueuingDelay.Divide(totalItemsProcessed).TotalMilliseconds);
+                        sb.AppendFormat("average queue delay: {0}ms; ", totalQueuingDelay.Divide(totalItemsProcessed).TotalMilliseconds);
                     }
-                });
+                }
+                
                 sb.AppendFormat("TaskRunner={0}; ", TaskRunner);
                 if (SchedulingContext != null)
                 {
