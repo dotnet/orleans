@@ -52,18 +52,21 @@ namespace Orleans.Streams
             Filter = filter;
         }
 
-        internal void SafeDisposeCursor()
+        internal void SafeDisposeCursor(Logger logger)
         {
             try
             {
                 if (Cursor != null)
                 {
                     // kill cursor activity and ensure it does not start again on this consumer data.
-                    Cursor.Dispose();
-                    Cursor = null;
+                    Utils.SafeExecute(Cursor.Dispose, logger,
+                        () => String.Format("Cursor.Dispose on stream {0}, StreamConsumer {1} has thrown exception.", StreamId, StreamConsumer));
                 }
             }
-            catch (Exception) { }
+            finally
+            {
+                Cursor = null;
+            }
         }
     }
 }

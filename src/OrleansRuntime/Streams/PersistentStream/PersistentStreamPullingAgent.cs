@@ -55,6 +55,7 @@ namespace Orleans.Streams
         private IDisposable timer;
 
         internal readonly QueueId QueueId;
+        private bool IsShutdown { get { return timer == null; } }
 
 
         internal PersistentStreamPullingAgent(
@@ -187,7 +188,7 @@ namespace Orleans.Streams
             var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
             foreach (var tuple in pubSubCache)
             {
-                tuple.Value.DisposeAll();
+                tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
                 logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
                 unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
@@ -228,6 +229,8 @@ namespace Orleans.Streams
             StreamSequenceToken cacheToken,
             IStreamFilterPredicateWrapper filter)
         {
+            if (IsShutdown) return;
+
             StreamConsumerCollection streamDataCollection;
             if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
             {
@@ -266,7 +269,7 @@ namespace Orleans.Streams
 
                     if (requestedToken != null)
                     {
-                        consumerData.SafeDisposeCursor();
+                        consumerData.SafeDisposeCursor(logger);
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, requestedToken);
                     }
                     else
@@ -309,11 +312,13 @@ namespace Orleans.Streams
 
         public void RemoveSubscriber_Impl(GuidId subscriptionId, StreamId streamId)
         {
+            if (IsShutdown) return;
+
             StreamConsumerCollection streamData;
             if (!pubSubCache.TryGetValue(streamId, out streamData)) return;
 
             // remove consumer
-            bool removed = streamData.RemoveConsumer(subscriptionId);
+            bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed && logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
             
             if (streamData.Count == 0)
@@ -325,13 +330,13 @@ namespace Orleans.Streams
             try
             {
                 var myQueueId = (QueueId)(state);
-                if (timer == null) return; // timer was already removed, last tick
+                if (IsShutdown) return; // timer was already removed, last tick
                 
                 IQueueAdapterReceiver rcvr = receiver;
                 int maxCacheAddCount = queueCache != null ? queueCache.MaxAddCount : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
-                while (timer != null) // timer will be set to null when we are asked to shudown. 
+                while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
                 {
                     var now = DateTime.UtcNow;
                     // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
@@ -404,7 +409,7 @@ namespace Orleans.Streams
             toRemove.ForEach(tuple =>
             {                
                 pubSubCache.Remove(tuple.Key);
-                tuple.Value.DisposeAll();
+                tuple.Value.DisposeAll(logger);
             });
         }
 
@@ -468,7 +473,7 @@ namespace Orleans.Streams
                     catch (Exception exc)
                     {
                         exceptionOccured = exc;
-                        if (consumerData.Cursor != null) consumerData.SafeDisposeCursor();
+                        consumerData.SafeDisposeCursor(logger);
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, null);
                     }
 
