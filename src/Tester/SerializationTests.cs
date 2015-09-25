@@ -150,6 +150,7 @@ namespace UnitTests.General
             }
         }
 
+		[Ignore]
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_RecursiveSerialization()
         {
