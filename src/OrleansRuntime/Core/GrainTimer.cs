@@ -109,7 +109,7 @@ namespace Orleans.Runtime
                 return;
             try
             {
-                await RuntimeClient.Current.ExecAsync(() => ForwardToAsyncCallback(state), context);
+                await RuntimeClient.Current.ExecAsync(() => ForwardToAsyncCallback(state), context, Name);
             }
             catch (InvalidSchedulingContextException exc)
             {
