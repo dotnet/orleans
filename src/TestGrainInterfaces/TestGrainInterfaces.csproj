@@ -45,6 +45,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IExceptionGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IJournaledPersonGrain.cs" />
     <Compile Include="IGenericInterfaces.cs" />
