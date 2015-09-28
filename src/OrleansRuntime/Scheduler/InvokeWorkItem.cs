@@ -69,7 +69,7 @@ namespace Orleans.Runtime.Scheduler
                     // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
                     activation.DecrementInFlightCount();
                     InsideRuntimeClient.Current.Dispatcher.OnActivationCompletedRequest(activation, message);
-                }).Ignore();
+                }, TaskContinuationOptions.ExecuteSynchronously).Ignore();
             }
             catch (Exception exc)
             {
