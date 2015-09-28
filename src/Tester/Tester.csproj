@@ -103,6 +103,7 @@
     <Compile Include="SerializationTests.cs" />
     <Compile Include="RelationalUtilities\SqlTestsEnvironment.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
+    <Compile Include="ExceptionPropagationTests.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />

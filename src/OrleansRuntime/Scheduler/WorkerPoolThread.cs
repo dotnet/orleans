@@ -75,21 +75,38 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        internal string GetThreadStatus()
+        internal string GetThreadStatus(bool detailed)
         {
             // Take status snapshot before checking status, to avoid race
             Task task = currentTask;
             IWorkItem workItem = currentWorkItem;
 
-            if (task != null)
-                return string.Format("Executing Task Id={0} Status={1} for {2} on WorkItem={3} (executing work item for {4})",
-                    task.Id, task.Status, Utils.Since(currentTaskStarted), currentWorkItem, Utils.Since(currentWorkItemStarted));
+            if (task != null) 
+                return string.Format("Executing Task Id={0} Status={1} for {2} on {3}.",
+                    task.Id, task.Status, Utils.Since(currentTaskStarted), GetWorkItemStatus(detailed));
 
             if (workItem != null)
-                return string.Format("Executing Work Item {0} for {1}", workItem, Utils.Since(currentWorkItemStarted));
+                return string.Format("Executing {0}.", GetWorkItemStatus(detailed));
 
             var becomeIdle = currentWorkItemStarted < currentTaskStarted ? currentTaskStarted : currentWorkItemStarted;
             return string.Format("Idle for {0}", Utils.Since(becomeIdle));
+        }
+
+        private string GetWorkItemStatus(bool detailed)
+        {
+            IWorkItem workItem = currentWorkItem;
+            if (workItem == null) return String.Empty;
+
+            string str = string.Format("WorkItem={0} Executing for {1}. ", workItem, Utils.Since(currentWorkItemStarted));
+            if (detailed && workItem.ItemType == WorkItemType.WorkItemGroup)
+            {
+                WorkItemGroup group = workItem as WorkItemGroup;
+                if (group != null)
+                {
+                    str += string.Format("WorkItemGroup Details: {0}", group.DumpStatus());
+                }
+            }
+            return str;
         }
 
         internal readonly int WorkerThreadStatisticsNumber;
@@ -171,17 +188,16 @@ namespace Orleans.Runtime.Scheduler
                             try
                             {
                                 RuntimeContext.SetExecutionContext(todo.SchedulingContext, scheduler);
+                                CurrentWorkItem = todo;
+#if TRACK_DETAILED_STATS
                                 if (todo.ItemType != WorkItemType.WorkItemGroup)
                                 {
-                                    // for WorkItemGroup we will track CurrentWorkItem inside WorkItemGroup. 
-                                    CurrentWorkItem = todo;
-#if TRACK_DETAILED_STATS
                                     if (StatisticsCollector.CollectTurnsStats)
                                     {
                                         SchedulerStatisticsGroup.OnThreadStartsTurnExecution(WorkerThreadStatisticsNumber, todo.SchedulingContext);
                                     }
-#endif
                                 }
+#endif
                                 todo.Execute();
                             }
                             catch (ThreadAbortException ex)
@@ -320,7 +336,7 @@ namespace Orleans.Runtime.Scheduler
             return String.Format("<{0}, ManagedThreadId={1}, {2}>",
                 Name,
                 ManagedThreadId,
-                GetThreadStatus());
+                GetThreadStatus(false));
         }
 
         internal void CheckForLongTurns()
@@ -340,7 +356,7 @@ namespace Orleans.Runtime.Scheduler
             // only create a new thread once per slow thread!
             Log.Warn(ErrorCode.SchedulerTurnTooLong2, string.Format(
                 "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}; creating a new worker thread",
-                Name, ManagedThreadId, GetThreadStatus()));
+                Name, ManagedThreadId, GetThreadStatus(true)));
             Cts.Cancel();
             pool.CreateNewThread();
             // Consider: mark the activation running a long turn to reduce it's time quantum
@@ -352,7 +368,7 @@ namespace Orleans.Runtime.Scheduler
 
             Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
                 "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
-                Name, ManagedThreadId, GetThreadStatus()));
+                Name, ManagedThreadId, GetThreadStatus(true)));
             return false;
         }
 
@@ -361,12 +377,10 @@ namespace Orleans.Runtime.Scheduler
             if (CurrentTask != null)
             {
                 return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
-            }else
-            {
-                // If there is no active Task, check current wokr item, if any.
-                bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
-                return frozenWorkItem;
-            }
+            } 
+            // If there is no active Task, check current wokr item, if any.
+            bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+            return frozenWorkItem;
         }
     }
 }

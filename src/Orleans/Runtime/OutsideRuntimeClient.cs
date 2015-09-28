@@ -844,7 +844,7 @@ namespace Orleans
             throw new InvalidOperationException("GetSiloStatus can only be called on the silo.");
         }
 
-        public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context)
+        public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
             await Task.Run(asyncFunction); // No grain context on client - run on .NET thread pool
         }

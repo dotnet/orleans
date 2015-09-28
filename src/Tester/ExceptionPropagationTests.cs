@@ -21,29 +21,24 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.IO;
 using System.Threading.Tasks;
-using Microsoft.Framework.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [DeploymentItem("OrleansStartupConfigurationForTesting.xml")]
+    using System;
+
+    /// <summary>
+    /// Tests that exceptions are correctly propagated.
+    /// </summary>
     [TestClass]
-    public class DependencyInjectionGrainTests : UnitTestSiloHost
+    public class ExceptionPropagationTests : UnitTestSiloHost
     {
-        public DependencyInjectionGrainTests()
-            : base(new TestingSiloOptions
-            {
-                StartPrimary = true,
-                StartSecondary = false,
-                SiloConfigFile = new FileInfo("OrleansStartupConfigurationForTesting.xml")
-            })
+        public ExceptionPropagationTests()
+            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
         {
         }
 
@@ -59,22 +54,25 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        public async Task DiTests_SimpleDiGrainGetGrain()
+        [ExpectedException(typeof(Exception), AllowDerivedTypes = true)]
+        public async Task TaskCancelationPropagation()
         {
-            ISimpleDIGrain grain = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId());
-            long ignored = await grain.GetTicksFromService();
-        }
-    }
+            IExceptionGrain grain = this.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            var actualException = default(Exception);
+            try
+            {
+                await grain.Cancelled();
+            }
+            catch (Exception exception)
+            {
+                actualException = exception;
+            }
 
-    public class TestStartup
-    {
-        public IServiceProvider ConfigureServices(IServiceCollection services)
-        {
-            services.AddSingleton<IInjectedService, InjectedService>();
-
-            services.AddTransient<SimpleDIGrain>();
-
-            return services.BuildServiceProvider();
+            Assert.IsNotNull(actualException, "Expected grain call to throw a cancellation exception.");
+            Assert.IsTrue(actualException is AggregateException);
+            Assert.AreEqual(
+                typeof(TaskCanceledException),
+                ((AggregateException)actualException).InnerException.GetType());
         }
     }
 }

@@ -230,7 +230,7 @@ namespace Orleans.Streams
                                     throw exc;
                                 }
                             }
-                        }, TaskContinuationOptions.OnlyOnFaulted);
+                        }, TaskContinuationOptions.ExecuteSynchronously);
                     tasks.Add(addSubscriberPromise);
                 }
 

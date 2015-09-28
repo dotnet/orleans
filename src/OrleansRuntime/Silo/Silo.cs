@@ -26,24 +26,20 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Runtime;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Framework.DependencyInjection;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Management;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Providers;
-using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
@@ -105,8 +101,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders;
-        
-        private IServiceProvider services = new DefaultServiceProvider();
+        private readonly IServiceProvider services;
         
         internal readonly string Name;
         internal readonly string SiloIdentity;
@@ -129,19 +124,7 @@ namespace Orleans.Runtime
             get { return allSiloProviders.AsReadOnly();  }
         }
 
-        internal IServiceProvider Services
-        {
-            get { return services; }
-            set
-            {
-                if (value == null)
-                {
-                    throw new ArgumentNullException("value");
-                }
-
-                services = value;
-            }
-        }
+        internal IServiceProvider Services { get { return services; } }
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress { get { return messageCenter.MyAddress; } }
@@ -232,9 +215,7 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            var serviceCollection = RegisterSystemTypes();
-
-            HandleStartup(serviceCollection);
+            services = ConfigureStartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -330,96 +311,6 @@ namespace Orleans.Runtime
             TestHookup = new TestHookups(this);
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
-        }
-
-        private IServiceCollection RegisterSystemTypes()
-        {
-            //
-            // Register the system classes and grains in this method.
-            //
-
-            IServiceCollection serviceCollection = new ServiceCollection();
-
-            serviceCollection.AddTransient<ManagementGrain>();
-            serviceCollection.AddTransient<GrainBasedMembershipTable>();
-            serviceCollection.AddTransient<GrainBasedReminderTable>();
-            serviceCollection.AddTransient<PubSubRendezvousGrain>();
-            serviceCollection.AddTransient<MemoryStorageGrain>();
-
-            return serviceCollection;
-        }
-
-        private void HandleStartup(IServiceCollection serviceCollection)
-        {
-            if (String.IsNullOrWhiteSpace(nodeConfig.StartupTypeName))
-            {
-                return;
-            }
-
-            var startupType = System.Type.GetType(nodeConfig.StartupTypeName);
-
-            if (startupType == null)
-            {
-                throw new InvalidOperationException(string.Format("Can not locate the type specified in the configuration file: '{0}'.", nodeConfig.StartupTypeName));
-            }
-
-            var servicesMethod = FindConfigureServicesDelegate(startupType);
-
-            var instance = default(object);
-
-            if ((servicesMethod != null && !servicesMethod.MethodInfo.IsStatic))
-            {
-                instance = Activator.CreateInstance(startupType);
-
-                services = servicesMethod.Build(instance, serviceCollection);
-            }
-        }
-
-        private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
-        {
-            var servicesMethod = FindMethod(startupType, "ConfigureServices", typeof(IServiceProvider), required: false);
-
-            return servicesMethod == null ? null : new ConfigureServicesBuilder(servicesMethod);
-        }
-
-        private static MethodInfo FindMethod(Type startupType, string methodName, Type returnType = null, bool required = true)
-        {
-            var methods = startupType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
-            var selectedMethods = methods.Where(method => method.Name.Equals(methodName)).ToList();
-
-            if (selectedMethods.Count > 1)
-            {
-                throw new InvalidOperationException(string.Format("Having multiple overloads of method '{0}' is not supported.", methodName));
-            }
-
-            var methodInfo = selectedMethods.FirstOrDefault();
-
-            if (methodInfo == null)
-            {
-                if (required)
-                {
-                    throw new InvalidOperationException(string.Format("A method named '{0}' in the type '{1}' could not be found.",
-                        methodName,
-                        startupType.FullName));
-                }
-
-                return null;
-            }
-
-            if (returnType != null && methodInfo.ReturnType != returnType)
-            {
-                if (required)
-                {
-                    throw new InvalidOperationException(string.Format("The '{0}' method in the type '{1}' must have a return type of '{2}'.",
-                        methodInfo.Name,
-                        startupType.FullName,
-                        returnType.Name));
-                }
-
-                return null;
-            }
-
-            return methodInfo;
         }
 
         private void CreateSystemTargets()
@@ -1088,14 +979,6 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             return localGrainDirectory.ToString();
-        }
-
-        private class DefaultServiceProvider : IServiceProvider
-        {
-            public object GetService(Type serviceType)
-            {
-                return Activator.CreateInstance(serviceType);
-            }
         }
     }
 
