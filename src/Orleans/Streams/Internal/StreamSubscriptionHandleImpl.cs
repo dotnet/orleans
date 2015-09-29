@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams.Internal;
 
 namespace Orleans.Streams
 {
@@ -60,7 +61,7 @@ namespace Orleans.Streams
             this.observer = observer;
             this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
-            expectedToken = token;
+            expectedToken = token != null ? new StreamDeliveryStartSequenceToken(token) : null;
         }
 
         public void Invalidate()
@@ -99,13 +100,6 @@ namespace Orleans.Streams
                 await NextItem(itemTuple.Item1, itemTuple.Item2);
             }
 
-            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
-            if (expectedToken != null)
-            {
-                if (!expectedToken.Equals(handshakeToken))
-                    return expectedToken;
-            }
-
             expectedToken = batch.SequenceToken;
 
             return null;
@@ -120,13 +114,6 @@ namespace Orleans.Streams
             }
 
             await NextItem(item, currentToken);
-
-            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
-            if (expectedToken != null)
-            {
-                if (!expectedToken.Equals(handshakeToken))
-                    return expectedToken;
-            }
 
             expectedToken = currentToken;
 
