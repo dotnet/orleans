@@ -4,7 +4,7 @@ Orleans - Distributed Actor Model
 ![Orleans logo](https://github.com/dotnet/orleans/blob/gh-pages/Icons/Orleans/OrleansSDK_128x.png)
 
 
-[![Build status](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/)
+[![Build status](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/innerloop/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/innerloop)
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
 [![Issue Stats](http://www.issuestats.com/github/dotnet/orleans/badge/pr)](http://www.issuestats.com/github/dotnet/orleans)
 [![Issue Stats](http://www.issuestats.com/github/dotnet/orleans/badge/issue)](http://www.issuestats.com/github/dotnet/orleans)
@@ -21,7 +21,7 @@ Installation
 =======
 The stable production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-The latest clean development branch build from CI is located: [here](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/lastStableBuild/Azure/)
+The latest clean development branch build from CI is located: [here](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/innerloop/lastStableBuild/artifact/)
 
 Alternatively, you can clone the sources from GitHub, and run the Build.cmd script to build Binaries locally. 
 Then just xcopy Binaries\Release\* or reference Binaries\NuGet.Packages\* or install Binaries\Release\orleans_setup.msi.
