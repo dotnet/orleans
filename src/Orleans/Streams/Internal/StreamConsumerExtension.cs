@@ -33,11 +33,11 @@ namespace Orleans.Streams
 {
     internal interface IStreamSubscriptionHandle
     {
-        Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken handshakeToken);
-        Task<StreamSequenceToken> DeliverBatch(IBatchContainer item, StreamSequenceToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverBatch(IBatchContainer item, StreamHandshakeToken handshakeToken);
         Task CompleteStream();
         Task ErrorInStream(Exception exc);
-        StreamSequenceToken GetSequenceToken();
+        StreamHandshakeToken GetSequenceToken();
     }
 
     /// <summary>
@@ -89,7 +89,7 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out ignore);
         }
 
-        public Task<StreamSequenceToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamSequenceToken handshakeToken)
+        public Task<StreamHandshakeToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for subscription {1}", item.Value, subscriptionId);
 
@@ -101,10 +101,10 @@ namespace Orleans.Streams
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return Task.FromResult<StreamSequenceToken>(null);
+            return Task.FromResult(default(StreamHandshakeToken));
         }
 
-        public Task<StreamSequenceToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch, StreamSequenceToken handshakeToken)
+        public Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
@@ -116,7 +116,7 @@ namespace Orleans.Streams
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return Task.FromResult(default(StreamSequenceToken));
+            return Task.FromResult(default(StreamHandshakeToken));
         }
 
         public Task CompleteStream(GuidId subscriptionId)
@@ -149,7 +149,7 @@ namespace Orleans.Streams
             return TaskDone.Done;
         }
 
-        public Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId)
+        public Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId)
         {
             IStreamSubscriptionHandle observer;
             return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
