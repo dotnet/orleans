@@ -62,7 +62,7 @@ namespace Orleans.Streams
         {
             unchecked
             {
-                return Token != null ? Token.GetHashCode() : 0;
+                return (GetType().GetHashCode() * 397) ^ (Token != null ? Token.GetHashCode() : 0);
             }
         }
     }
