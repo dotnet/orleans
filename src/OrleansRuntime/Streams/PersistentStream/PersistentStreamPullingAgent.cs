@@ -28,6 +28,7 @@ using System.Threading.Tasks;
 
 using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Streams.Internal;
 
 namespace Orleans.Streams
 {
@@ -270,7 +271,7 @@ namespace Orleans.Streams
                     if (requestedToken != null)
                     {
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, requestedToken);
+                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, StreamDeliveryStartSequenceToken.GetToken(requestedToken));
                     }
                     else
                     {
@@ -559,7 +560,7 @@ namespace Orleans.Streams
             {
                 consumerData.LastToken = newToken;
                 consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
-                    consumerData.StreamId.Namespace, newToken);
+                    consumerData.StreamId.Namespace, StreamDeliveryStartSequenceToken.GetToken(newToken));
             }
             else
             {
