@@ -26,13 +26,10 @@ using System;
 namespace Orleans.Streams
 {
     [Serializable]
-    public class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
+    internal class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
     {
         public StreamSequenceToken Token { get; private set; }
-
-        [Serializable] private class StartToken : StreamHandshakeToken { }
-        [Serializable] private class DeliveryToken : StreamHandshakeToken { }
-
+        
         public static StreamHandshakeToken CreateStartToken(StreamSequenceToken token)
         {
             if (token == null) return default(StreamHandshakeToken);
@@ -69,4 +66,10 @@ namespace Orleans.Streams
             }
         }
     }
+
+    [Serializable]
+    internal class StartToken : StreamHandshakeToken { }
+    
+    [Serializable]
+    internal class DeliveryToken : StreamHandshakeToken { }
 }
