@@ -115,6 +115,7 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />

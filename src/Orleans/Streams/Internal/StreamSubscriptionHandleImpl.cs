@@ -37,7 +37,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private IAsyncObserver<T> observer;
         [NonSerialized]
-        private StreamSequenceToken expectedToken;
+        private StreamHandshakeToken expectedToken;
 
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
@@ -60,7 +60,7 @@ namespace Orleans.Streams
             this.observer = observer;
             this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
-            expectedToken = token;
+            expectedToken = StreamHandshakeToken.CreateStartToken(token);
         }
 
         public void Invalidate()
@@ -69,7 +69,7 @@ namespace Orleans.Streams
             observer = null;
         }
 
-        public StreamSequenceToken GetSequenceToken()
+        public StreamHandshakeToken GetSequenceToken()
         {
             return expectedToken;
         }
@@ -86,7 +86,7 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch, StreamSequenceToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
             if (expectedToken != null)
             {
@@ -99,19 +99,12 @@ namespace Orleans.Streams
                 await NextItem(itemTuple.Item1, itemTuple.Item2);
             }
 
-            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
-            if (expectedToken != null)
-            {
-                if (!expectedToken.Equals(handshakeToken))
-                    return expectedToken;
-            }
-
-            expectedToken = batch.SequenceToken;
+            expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
 
             return null;
         }
 
-        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             if (expectedToken != null)
             {
@@ -128,7 +121,7 @@ namespace Orleans.Streams
                     return expectedToken;
             }
 
-            expectedToken = currentToken;
+            expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
 
             return null;
         }
