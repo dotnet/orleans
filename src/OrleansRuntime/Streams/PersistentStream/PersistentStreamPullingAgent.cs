@@ -461,13 +461,17 @@ namespace Orleans.Streams
                     consumerData.Cursor == null) return;
                 
                 consumerData.State = StreamConsumerDataState.Active;
-                while (consumerData.Cursor != null && consumerData.Cursor.MoveNext())
+                while (consumerData.Cursor != null)
                 {
                     IBatchContainer batch = null;
                     Exception exceptionOccured = null;
                     try
                     {
                         Exception ignore;
+                        if (!consumerData.Cursor.MoveNext())
+                        {
+                            break;
+                        }
                         batch = consumerData.Cursor.GetCurrent(out ignore);
                     }
                     catch (Exception exc)
