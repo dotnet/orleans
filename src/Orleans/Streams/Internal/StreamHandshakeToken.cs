@@ -36,13 +36,13 @@ namespace Orleans.Streams
         public static StreamHandshakeToken CreateStartToken(StreamSequenceToken token)
         {
             if (token == null) return default(StreamHandshakeToken);
-            return new StartToken { Token = token };
+            return new StartToken {Token = token};
         }
 
         public static StreamHandshakeToken CreateDeliveyToken(StreamSequenceToken token)
         {
             if (token == null) return default(StreamHandshakeToken);
-            return new DeliveryToken { Token = token };
+            return new DeliveryToken {Token = token};
         }
 
         public bool Equals(StreamHandshakeToken other)
