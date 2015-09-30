@@ -39,7 +39,7 @@ namespace UnitTests.GrainInterfaces
 
         Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse);
 
-        Task<Dictionary<StreamSubscriptionHandle<int>, int>> GetNumberConsumed();
+        Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed();
 
         Task ClearNumberConsumed();
 
