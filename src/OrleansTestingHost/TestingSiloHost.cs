@@ -356,6 +356,16 @@ namespace Orleans.TestingHost
             return null;
         }
 
+        public virtual void AdjustForTest(ClusterConfiguration config)
+        {
+            config.AdjustForTestEnvironment();
+        }
+
+        public virtual void AdjustForTest(ClientConfiguration config)
+        {
+            config.AdjustForTestEnvironment();
+        }
+
         #region Private methods
 
         private async Task InitializeAsync(TestingSiloOptions options, TestingClientOptions clientOptions)
@@ -472,15 +482,14 @@ namespace Orleans.TestingHost
                 {
                     clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
                 }
-                clientOptions.ConfigMutator(clientConfig);
-                clientConfig.AdjustForTestEnvironment();
+                AdjustForTest(clientConfig);
 
                 GrainClient.Initialize(clientConfig);
                 GrainFactory = GrainClient.GrainFactory;
             }
         }
 
-        private static SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
@@ -524,9 +533,6 @@ namespace Orleans.TestingHost
                 config.Globals.DataConnectionString = options.DataConnectionString;
             }
 
-            options.ConfigMutator(config);
-            config.AdjustForTestEnvironment();
-
             _livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
             
             string siloName;
@@ -555,6 +561,8 @@ namespace Orleans.TestingHost
             config.Globals.ExpectedClusterSize = 2;
 
             config.Overrides[siloName] = nodeConfig;
+
+            AdjustForTest(config);
 
             WriteLog("Starting a new silo in app domain {0} with config {1}", siloName, config.ToString(siloName));
             AppDomain appDomain;

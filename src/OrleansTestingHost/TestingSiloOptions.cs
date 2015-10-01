@@ -21,7 +21,6 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
 using System.IO;
 using Orleans.Runtime.Configuration;
 
@@ -47,7 +46,6 @@ namespace Orleans.TestingHost
         public bool ParallelStart { get; set; }
         public GlobalConfiguration.ReminderServiceProviderType ReminderServiceType { get; set; }
         public string DataConnectionString { get; set; }
-        public Action<ClusterConfiguration> ConfigMutator { get; set; }
 
         public TestingSiloOptions()
         {
@@ -63,7 +61,6 @@ namespace Orleans.TestingHost
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
             SiloConfigFile = new FileInfo(DEFAULT_SILO_CONFIG_FILE);
             ParallelStart = false;
-            ConfigMutator = configuration => { };
         }
 
         public TestingSiloOptions Copy()
@@ -84,7 +81,6 @@ namespace Orleans.TestingHost
                 ReminderServiceType = ReminderServiceType,
                 DataConnectionString = DataConnectionString,
                 ParallelStart = ParallelStart,
-                ConfigMutator = ConfigMutator,
             };
         }
     }
