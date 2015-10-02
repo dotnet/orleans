@@ -114,7 +114,7 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        public async Task Stop()
+        public async Task Close()
         {
             var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
             if (siloRuntime != null)

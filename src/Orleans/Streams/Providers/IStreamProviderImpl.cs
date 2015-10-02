@@ -29,6 +29,5 @@ namespace Orleans.Streams
     public interface IStreamProviderImpl : IStreamProvider, IProvider
     {
         Task Start();
-        Task Stop();
     }
 }
