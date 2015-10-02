@@ -4,6 +4,33 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+# [v1.0.10](https://github.com/dotnet/orleans/releases/tag/v1.0.10) September 22nd 2015
+
+### Release notes
+
+#### General:
+* No SDK msi anymore, only NuGets from now on
+* Removed support for grain state interfaces and code generation of state classes
+* Removed code generated  MyGrainFactory.GetGrain()  factory methods
+* StorageProvider  attribute is now optional
+* Membership and reminder table implementations were made pluggable
+* Improvements to  ObserverSubscriptionManager  
+* Strong guarantee for specified max number of  StatelessWorker  activations per silo
+* General purpose interface for sending run time control commands to providers
+* Named event to trigger silo shutdown
+
+#### Streaming:
+* Support for multiple  ImplicitSubscription  attributes for streams
+* Support for rewinding of implicit stream subscriptions
+* Propagate request context via persistent streams
+* More options for stream Queue Balancers
+* Delayed repartitioning of stream queues
+* Improved cleanup of client stream producers/consumers when client shuts down
+* Config option and management grain API for controlling start/stop state of stream pulling agents
+* Azure Queue stream provider fixed to guarantees at least once delivery
+* Numerous bug fixes and improvements, mostly to streaming
+
+
 # [v1.0.9](https://github.com/dotnet/orleans/releases/tag/v1.0.9) July 15th  2015
 
 ### This release includes several significant API changes that require adjustments in existing code created with v1.0.8 or earlier versions of Orleans  ###
