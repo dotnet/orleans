@@ -83,34 +83,34 @@ In the case of the latter, you will have to create a Azure storage account and e
 
 With one of those enabled, we're ready to tackle the grain code.
 
-Note: The built-in storage provider classes `Orleans.Storage.MemoryStorage` and `Orleans.Storage.AzureTableStorage` are in the  _OrleansProviders.dll_ assembly, so make sure that DLL is referenced in your silo worker role project with _CopyLocal='True'_.
+Note: The built-in storage provider classes `Orleans.Storage.MemoryStorage` and `Orleans.Storage.AzureTableStorage` are in the  _OrleansProviders.dll_ and _OrleansAzureUtils.dll_ assemblies respectively, so make sure those assemblies are referenced in your silo worker role project with _CopyLocal='True'_.
 
 ## Declaring State
 
 Identifying that a grain should use persistent state takes three steps: 
 
-1. declaring an interface for the state, 
+1. declaring a class for the state, 
 2. changing the grain base class, and 
 3. identifying the storage provider.
 
-The first step, declaring an interface, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
+The first step, declaring a state class, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
 
 For employees, we want to persist all the state:
 
 ``` csharp
-public interface IEmployeeState : IGrainState
+public class  EmployeeState : GrainState
 {
-    int Level { get; set; }
-    IManager Manager { get; set; }
+    public int Level { get; set; }
+    public IManager Manager { get; set; }
 }
 ```
 
 and for managers, we must store the direct reports, but the `_me` reference may continue to be created during activation.
 
 ``` csharp
-public interface IManagerState : IGrainState
+public class ManagerState : GrainState
 {
-    List<IEmployee> Reports { get; set; }
+    public List<IEmployee> Reports { get; set; }
 }
 ```
 
@@ -120,7 +120,7 @@ Then, we change the grain class declaration to identify the state interface and 
 
 ``` csharp
 [StorageProvider(ProviderName = "AzureStore")]
-public class Employee : Orleans.Grain<IEmployeeState>, Interfaces.IEmployee
+public class Employee : Orleans.Grain<EmployeeState>, Interfaces.IEmployee
 ```
 
 and
@@ -128,7 +128,7 @@ and
 
 ``` csharp
 [StorageProvider(ProviderName="AzureStore")]
-public class Manager : Orleans.Grain<IManagerState>, IManager
+public class Manager : Orleans.Grain<ManagerState>, IManager
 ```
 
 At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file. 
@@ -153,7 +153,7 @@ The question that remains is when the persistent state gets saved to the storage
 
 One choice that the Orleans designers could have made would be to have the runtime save state after every method invocation, but that turns out to be undesirable because it is far too conservative -- not all invocations will actually modify the state on all invocations, and some will never modify it. Rather than employing a complex system to evaluate state differentials after each method, Orleans asks the grain developer to add the necessary logic to determine whether state needs to be saved or not. 
 
-Saving the state using the storage provider is easily accomplished by calling `State.WriteStateAsync()`. 
+Saving the state using the storage provider is easily accomplished by calling `base.WriteStateAsync()`. 
 
 Thus, the final version of the `Promote()` and `SetManager()` methods looks like this:
 
@@ -161,13 +161,13 @@ Thus, the final version of the `Promote()` and `SetManager()` methods looks like
 public Task Promote(int newLevel)
 {
     State.Level = newLevel;
-    return State.WriteStateAsync();
+    return base.WriteStateAsync();
 }
 
 public Task SetManager(IManager manager)
 {
     State.Manager = manager;
-    return State.WriteStateAsync();
+    return base.WriteStateAsync();
 }
 ```
 
@@ -185,7 +185,7 @@ public async Task AddDirectReport(IEmployee employee)
                         data.From.ToString(),
                         data.Message);
 
-    await State.WriteStateAsync();
+    await base.WriteStateAsync();
 }
 ```
 
