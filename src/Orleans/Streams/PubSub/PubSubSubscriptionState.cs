@@ -29,13 +29,23 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
+        internal enum SubscriptionStates
+        {
+            Active,
+            Faulted,
+        }
+
+        // IMPORTANT!!!!!
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         public GuidId SubscriptionId;
         public StreamId Stream;
-        public IStreamConsumerExtension Consumer;
-        public StreamSequenceToken StreamSequenceToken;
-        public IStreamFilterPredicateWrapper FilterWrapper; // Serialized func info
+        public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public object filterWrapper; // Serialized func info
+        public SubscriptionStates state;
+
+        public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
+
 
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
@@ -43,34 +53,33 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
-            StreamSequenceToken token,
             IStreamFilterPredicateWrapper filterWrapper)
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
-            Consumer = streamConsumer;
-            StreamSequenceToken = token;
-            FilterWrapper = filterWrapper;
+            consumerReference = streamConsumer as GrainReference;
+            this.filterWrapper = filterWrapper;
+            state = SubscriptionStates.Active;
         }
 
-        public IStreamFilterPredicateWrapper Filter { get { return FilterWrapper; } }
+        public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
 
         internal void AddFilter(IStreamFilterPredicateWrapper newFilter)
         {
-            if (FilterWrapper == null)
+            if (filterWrapper == null)
             {
                 // No existing filter - add single
-                FilterWrapper = newFilter;
+                filterWrapper = newFilter;
             }
-            else if (FilterWrapper is OrFilter)
+            else if (filterWrapper is OrFilter)
             {
                 // Existing multi-filter - add new filter to it
-                ((OrFilter) FilterWrapper).AddFilter(newFilter);
+                ((OrFilter)filterWrapper).AddFilter(newFilter);
             }
             else
             {
                 // Exsiting single filter - convert to multi-filter
-                FilterWrapper = new OrFilter(FilterWrapper, newFilter);
+                filterWrapper = new OrFilter(Filter, newFilter);
             }
         }
 
@@ -82,6 +91,8 @@ namespace Orleans.Streams
         }
         public bool Equals(PubSubSubscriptionState other)
         {
+            if ((object)other == null)
+                return false;
             // Note: PubSubSubscriptionState is a struct, so 'other' can never be null.
             return Equals(other.SubscriptionId);
         }
@@ -114,8 +125,15 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return string.Format("PubSubSubscriptionState:SubscriptionId={0},StreamId={1},Consumer={2},SequenceToken={3}.",
-                SubscriptionId, Stream, Consumer, StreamSequenceToken);
+            return string.Format("PubSubSubscriptionState:SubscriptionId={0},StreamId={1},Consumer={2}.",
+                SubscriptionId, Stream, Consumer);
         }
+
+        public void Fault()
+        {
+            state = SubscriptionStates.Faulted;
+        }
+
+        public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
     }
 }

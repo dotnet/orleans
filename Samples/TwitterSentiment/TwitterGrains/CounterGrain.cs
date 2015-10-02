@@ -33,17 +33,17 @@ namespace TwitterGrains
     /// <summary>
     /// interface defining the persistent state for the counter grain
     /// </summary>
-    public interface ICounterState : IGrainState
+    public class CounterState : GrainState
     {
         /// <summary>
         /// total number of hashtag grain activations
         /// </summary>
-        int Counter { get; set; }
+        public int Counter { get; set; }
     }
 
     [StorageProvider(ProviderName = "store1")]
     [Reentrant]
-    public class CounterGrain : Orleans.Grain<ICounterState>, ICounter
+    public class CounterGrain : Grain<CounterState>, ICounter
     {
         /// <summary>
         /// Add one to the activation count
@@ -54,7 +54,7 @@ namespace TwitterGrains
             this.State.Counter += 1;
 
             // as an optimisation, only write out the state for every 100 increments 
-            if (this.State.Counter % 100 == 0) await State.WriteStateAsync();
+            if (this.State.Counter % 100 == 0) await WriteStateAsync();
         }
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace TwitterGrains
         public async Task ResetCounter()
         {
             this.State.Counter = 0;
-            await this.State.WriteStateAsync();
+            await this.WriteStateAsync();
         }
 
         /// <summary>

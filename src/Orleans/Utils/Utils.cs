@@ -200,7 +200,7 @@ namespace Orleans.Runtime
         /// <returns>An integer hash for the string.</returns>
         public static int CalculateIdHash(string text)
         {
-            SHA256 sha = new SHA256CryptoServiceProvider(); // This is one implementation of the abstract class SHA1.
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
             int hash = 0;
             try
             {
@@ -217,6 +217,32 @@ namespace Orleans.Runtime
                 sha.Dispose();
             }
             return hash;
+        }
+
+        /// <summary>
+        /// Calculates a Guid hash value based on the consistent identity a string.
+        /// </summary>
+        /// <param name="text">The string to hash.</param>
+        /// <returns>An integer hash for the string.</returns>
+        internal static Guid CalculateGuidHash(string text)
+        {
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
+            byte[] hash = new byte[16];
+            try
+            {
+                byte[] data = Encoding.Unicode.GetBytes(text);
+                byte[] result = sha.ComputeHash(data);
+                for (int i = 0; i < result.Length; i ++)
+                {
+                    byte tmp =  (byte)(hash[i % 16] ^ result[i]);
+                    hash[i%16] = tmp;
+                }
+            }
+            finally
+            {
+                sha.Dispose();
+            }
+            return new Guid(hash);
         }
 
         public static bool TryFindException(Exception original, Type targetType, out Exception target)
@@ -251,7 +277,7 @@ namespace Orleans.Runtime
             return false;
         }
 
-        public static void SafeExecute(Action action, TraceLogger logger = null, string caller = null)
+        public static void SafeExecute(Action action, Logger logger = null, string caller = null)
         {
             SafeExecute(action, logger, caller==null ? (Func<string>)null : () => caller);
         }
@@ -259,7 +285,7 @@ namespace Orleans.Runtime
         // a function to safely execute an action without any exception being thrown.
         // callerGetter function is called only in faulty case (now string is generated in the success case).
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public static void SafeExecute(Action action, TraceLogger logger, Func<string> callerGetter)
+        public static void SafeExecute(Action action, Logger logger, Func<string> callerGetter)
         {
             try
             {
@@ -274,11 +300,14 @@ namespace Orleans.Runtime
                         string caller = null;
                         if (callerGetter != null)
                         {
-                            caller = callerGetter();
+                            try
+                            {
+                                caller = callerGetter();
+                            }catch (Exception) { }
                         }
                         foreach (var e in exc.FlattenAggregate())
                         {
-                            logger.Warn(ErrorCode.Runtime_Error_100325, String.Format("Ignoring {0} exception thrown from an action called by {1}.", e.GetType().FullName, caller ?? String.Empty), exc);
+                            logger.Warn((int)ErrorCode.Runtime_Error_100325, String.Format("Ignoring {0} exception thrown from an action called by {1}.", e.GetType().FullName, caller ?? String.Empty), exc);
                         }
                     }
                 }
@@ -321,7 +350,7 @@ namespace Orleans.Runtime
             else
             {
                 throw new InvalidCastException(string.Format(
-                    "Connet convert type {0} to type List<{1}>", 
+                    "Cannot convert type {0} to type List<{1}>",
                     TypeUtils.GetFullName(data.GetType()),
                     TypeUtils.GetFullName(typeof(T))));
             }
@@ -346,7 +375,7 @@ namespace Orleans.Runtime
             // LoaderExceptions property in order to make it meaningful.
             var all = new List<Exception> { rtle };
             all.AddRange(rtle.LoaderExceptions);
-            throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenence.", all);
+            throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenience.", all);
         }
 
         /// <summary>

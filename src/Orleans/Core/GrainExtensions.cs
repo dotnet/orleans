@@ -70,7 +70,7 @@ namespace Orleans
                 throw new ArgumentNullException("grain", "Cannot pass null as an argument to AsReference");
             }
 
-            return GrainFactory.Cast<TGrainInterface>(grain.AsWeaklyTypedReference());
+            return RuntimeClient.Current.InternalGrainFactory.Cast<TGrainInterface>(grain.AsWeaklyTypedReference());
         }
 
         /// <summary>
@@ -80,7 +80,7 @@ namespace Orleans
         /// <param name="grain">The grain to cast.</param>
         public static TGrainInterface Cast<TGrainInterface>(this IAddressable grain)
         {
-            return GrainFactory.Cast<TGrainInterface>(grain);
+            return RuntimeClient.Current.InternalGrainFactory.Cast<TGrainInterface>(grain);
         }
 
         internal static GrainId GetGrainId(IAddressable grain)

@@ -125,7 +125,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ReadStateAsync"/>
-        public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
 
@@ -134,12 +134,15 @@ namespace Orleans.Storage
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
             IDictionary<string, object> state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
-            grainState.SetAll(state);
+            if (state != null)
+            {
+                grainState.SetAll(state);
+            }
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#WriteStateAsync"/>
-        public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
             var data = grainState.AsDictionary();
@@ -159,7 +162,7 @@ namespace Orleans.Storage
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ClearStateAsync"/>
-        public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
             string eTag = grainState.Etag; // TOD: Should this be 'null' for always Delete?

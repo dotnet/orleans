@@ -102,6 +102,9 @@ namespace Orleans.Runtime
 
         public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
         {
+            if (fullName == null)
+                fullName = _ => true; // default to full type names
+
             if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName, language), t, t.GetGenericArguments(), fullName, language);
 
             if (t.IsArray)
@@ -156,14 +159,25 @@ namespace Orleans.Runtime
         public static string GetParameterizedTemplateName(Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
-                fullName = tt => false;
+                fullName = tt => true;
 
             return GetParameterizedTemplateName(t, fullName, applyRecursively, language);
         }
 
         public static string GetParameterizedTemplateName(Type t, Func<Type, bool> fullName, bool applyRecursively = false, Language language = Language.CSharp)
         {
-            return t.IsGenericType ? GetParameterizedTemplateName(GetSimpleTypeName(t, fullName), t, applyRecursively, fullName, language) : t.FullName;
+            if (t.IsGenericType)
+            {
+                return GetParameterizedTemplateName(GetSimpleTypeName(t, fullName), t, applyRecursively, fullName, language);
+            }
+            else
+            {
+                if(fullName != null && fullName(t)==true)
+                {
+                    return t.FullName;
+                }
+            }
+            return t.Name;
         }
 
         public static string GetParameterizedTemplateName(string baseName, Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
@@ -210,11 +224,13 @@ namespace Orleans.Runtime
             return i <= 0 ? typeName : typeName.Substring(0, i);
         }
 
+        private static string[] typeSeparator = new string[] { "],[" };
         public static Type[] GenericTypeArgs(string className)
         {
             var typeArgs = new List<Type>();
             var genericTypeDef = GenericTypeArgsString(className).Replace("[]", "##"); // protect array arguments
-            string[] genericArgs = genericTypeDef.Split('[', ']');
+            string[] genericArgs = genericTypeDef.Split(typeSeparator, StringSplitOptions.RemoveEmptyEntries);
+
             foreach (string genericArg in genericArgs)
             {
                 string typeArg = genericArg.Trim('[', ']');
@@ -368,16 +384,6 @@ namespace Orleans.Runtime
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));        
         }
 
-        public static bool IsGrainStateType(Type type)
-        {
-            var generalType = typeof(GrainState);
-            if (type.Assembly.ReflectionOnly)
-            {
-                generalType = ToReflectionOnlyType(generalType);
-            }
-            return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(GrainStateAttribute));
-        }
-            
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);

@@ -54,6 +54,16 @@ if (!$configXml -or $configXml -eq "")
 	return
 }
 
+if ($configXml.Deployment.Program)
+{
+	$exeName = $configXml.Deployment.Program.ExeName
+	if (!$exeName)
+	{
+		$exeName = "OrleansHost"
+	}
+}
+Echo "Program executable = $exeName"
+
 if (!$networkInstance)
 {
 	$networkInstance = "corp"
@@ -141,13 +151,13 @@ for ($sampleCount = 0; $sampleCount -lt $samplesToLog; $sampleCount++)
 	$machineNumber = 0;
 	foreach($machineName in $machineNames)
 	{
-		$memoryUsage = GetCounterData $machineName "Process(OrleansHost)\Working Set"
+		$memoryUsage = GetCounterData $machineName "Process($exeName)\Working Set"
 		if($memoryUsage.GetType().Name -ne "String") 
 		{
 			$memoryUsage /= $bytesInAMegabyte
 		}
 		
-		$cpuUsage = GetCounterData $machineName "Process(OrleansHost)\% Processor Time" $true
+		$cpuUsage = GetCounterData $machineName "Process($exeName)\% Processor Time" $true
 		if(($cpuUsage.GetType().Name -ne "String") -and ($cpuUsage -ne 0))
 		{
 			$cpuUsage /= $machineProcessorCounts[$machineNumber]			

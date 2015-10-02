@@ -29,6 +29,7 @@ using System.Text;
 using System.Net;
 using System.Xml;
 using Orleans.Providers;
+using Orleans.Runtime.Storage.Relational;
 using Orleans.Streams;
 using Orleans.Storage;
 
@@ -73,6 +74,8 @@ namespace Orleans.Runtime.Configuration
             /// <summary>Apache ZooKeeper is used to store membership information. 
             /// This option can be used in production.</summary>
             ZooKeeper,
+            /// <summary>Use custom provider from third-party assembly</summary>
+            Custom
         }
 
         /// <summary>
@@ -95,6 +98,8 @@ namespace Orleans.Runtime.Configuration
             MockTable,
             /// <summary>Reminder Service is disabled.</summary>
             Disabled,
+            /// <summary>Use custom Reminder Service from third-party assembly</summary>
+            Custom
         }
 
         /// <summary>
@@ -197,9 +202,42 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public string DeploymentId { get; set; }
         /// <summary>
-        /// Connection string for Azure Storage or SQL Server or Apache ZooKeeper.
+        /// Connection string for the underlying data provider for liveness and reminders. eg. Azure Storage, ZooKeeper, SQL Server, ect.
+        /// In order to override this value for reminders set <see cref="DataConnectionStringForReminders"/>
         /// </summary>
         public string DataConnectionString { get; set; }
+
+        /// <summary>
+        /// When using ADO, identifies the underlying data provider for liveness and reminders. This three-part naming syntax is also used 
+        /// when creating a new factory and for identifying the provider in an application configuration file so that the provider name, 
+        /// along with its associated connection string, can be retrieved at run time. https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx
+        /// In order to override this value for reminders set <see cref="AdoInvariantForReminders"/> 
+        /// </summary>
+        public string AdoInvariant { get; set; }
+
+        /// <summary>
+        /// Set this property to override <see cref="DataConnectionString"/> for reminders.
+        /// </summary>
+        public string DataConnectionStringForReminders
+        {
+            get
+            {
+                return string.IsNullOrWhiteSpace(dataConnectionStringForReminders) ? DataConnectionString : dataConnectionStringForReminders;
+            }
+            set { dataConnectionStringForReminders = value; }
+        }
+
+        /// <summary>
+        /// Set this property to override <see cref="AdoInvariant"/> for reminders.
+        /// </summary>
+        public string AdoInvariantForReminders
+        {
+            get
+            {
+                return string.IsNullOrWhiteSpace(adoInvariantForReminders) ? AdoInvariant : adoInvariantForReminders;
+            }
+            set { adoInvariantForReminders = value; }
+        }
 
         internal TimeSpan CollectionQuantum { get; set; }
 
@@ -256,6 +294,16 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
+        /// Assembly to use for custom MembershipTable implementation
+        /// </summary>
+        public string MembershipTableAssembly { get; set; }
+
+        /// <summary>
+        /// Assembly to use for custom ReminderTable implementation
+        /// </summary>
+        public string ReminderTableAssembly { get; set; }
+
+        /// <summary>
         /// The ReminderServiceType attribute controls the type of the reminder service implementation used by silos.
         /// </summary>
         private ReminderServiceProviderType reminderServiceType;
@@ -310,7 +358,7 @@ namespace Orleans.Runtime.Configuration
 
 
         /// <summary>
-        /// Determines if SqlServer should be used for storage of Membership and Reminders info.
+        /// Determines if ADO should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to SqlServer, false otherwise.
         /// </summary>
         internal bool UseSqlSystemStore
@@ -380,6 +428,8 @@ namespace Orleans.Runtime.Configuration
         private const bool DEFAULT_USE_VIRTUAL_RING_BUCKETS = true;
         private const int DEFAULT_NUM_VIRTUAL_RING_BUCKETS = 30;
         private static readonly TimeSpan DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT = TimeSpan.FromMilliseconds(50);
+        private string dataConnectionStringForReminders;
+        private string adoInvariantForReminders;
 
         internal GlobalConfiguration()
             : base(true)
@@ -403,6 +453,9 @@ namespace Orleans.Runtime.Configuration
             DeploymentId = Environment.UserName;
             DataConnectionString = "";
 
+            // Assume the ado invariant is for sql server storage if not explicitly specified
+            AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+            
             CollectionQuantum = DEFAULT_COLLECTION_QUANTUM;
 
             CacheSize = DEFAULT_CACHE_SIZE;
@@ -463,7 +516,9 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("   SystemStore:").AppendLine();
             // Don't print connection credentials in log files, so pass it through redactment filter
             string connectionStringForLog = ConfigUtilities.RedactConnectionStringInfo(DataConnectionString);
-            sb.AppendFormat("      ConnectionString: {0}", connectionStringForLog).AppendLine();
+            sb.AppendFormat("      SystemStore ConnectionString: {0}", connectionStringForLog).AppendLine();
+            string remindersConnectionStringForLog = ConfigUtilities.RedactConnectionStringInfo(DataConnectionStringForReminders);
+            sb.AppendFormat("      Reminders ConnectionString: {0}", remindersConnectionStringForLog).AppendLine();
             sb.Append(Application.ToString()).AppendLine();
             sb.Append("   PlacementStrategy: ").AppendLine();
             sb.Append("      ").Append("   Default Placement Strategy: ").Append(DefaultPlacementStrategy).AppendLine();
@@ -600,6 +655,27 @@ namespace Orleans.Runtime.Configuration
                                     : ReminderServiceProviderType.Disabled);
                             }
                         }
+                        if (child.HasAttribute("MembershipTableAssembly"))
+                        {
+                            MembershipTableAssembly = child.GetAttribute("MembershipTableAssembly");
+                            if (LivenessType != LivenessProviderType.Custom)
+                                throw new FormatException("SystemStoreType should be \"Custom\" when MembershipTableAssembly is specified");
+                            if (MembershipTableAssembly.EndsWith(".dll"))
+                                throw new FormatException("Use fully qualified assembly name for \"MembershipTableAssembly\"");
+                        }
+                        if (child.HasAttribute("ReminderTableAssembly"))
+                        {
+                            ReminderTableAssembly = child.GetAttribute("ReminderTableAssembly");
+                            if (ReminderServiceType != ReminderServiceProviderType.Custom)
+                                throw new FormatException("ReminderServiceType should be \"Custom\" when ReminderTableAssembly is specified");
+                            if (ReminderTableAssembly.EndsWith(".dll"))
+                                throw new FormatException("Use fully qualified assembly name for \"ReminderTableAssembly\"");
+                        }
+                        if (LivenessType == LivenessProviderType.Custom && string.IsNullOrEmpty(MembershipTableAssembly))
+                            throw new FormatException("MembershipTableAssembly should be set when SystemStoreType is \"Custom\"");
+                        if (ReminderServiceType == ReminderServiceProviderType.Custom && String.IsNullOrEmpty(ReminderTableAssembly))
+                            throw new FormatException("ReminderTableAssembly should be set when ReminderServiceType is \"Custom\"");
+
                         if (child.HasAttribute("ServiceId"))
                         {
                             ServiceId = ConfigUtilities.ParseGuid(child.GetAttribute("ServiceId"),
@@ -616,6 +692,15 @@ namespace Orleans.Runtime.Configuration
                             {
                                 throw new FormatException("SystemStore.DataConnectionString cannot be blank");
                             }
+                        }
+                        if (child.HasAttribute(Constants.ADO_INVARIANT_NAME))
+                        {
+                            var adoInvariant = child.GetAttribute(Constants.ADO_INVARIANT_NAME);
+                            if (String.IsNullOrWhiteSpace(adoInvariant))
+                            {
+                                throw new FormatException("SystemStore.AdoInvariant cannot be blank");
+                            }
+                            AdoInvariant = adoInvariant;
                         }
                         if (child.HasAttribute("MaxStorageBusyRetries"))
                         {

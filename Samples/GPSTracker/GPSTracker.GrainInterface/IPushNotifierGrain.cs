@@ -21,14 +21,13 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using GPSTracker.Common;
 using System.Threading.Tasks;
+using GPSTracker.Common;
 using Orleans;
-using Orleans.Concurrency;
 
 namespace GPSTracker.GrainInterface
 {
-    public interface IPushNotifierGrain : Orleans.IGrain
+    public interface IPushNotifierGrain : IGrainWithIntegerKey
     {
         Task SendMessage(VelocityMessage message);
     }

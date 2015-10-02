@@ -41,7 +41,7 @@ namespace OrleansXO.WorkerRole
 
             silo = new AzureSilo();
 
-            return silo.Start(RoleEnvironment.DeploymentId, RoleEnvironment.CurrentRoleInstance); 
+            return silo.Start(); 
         }
 
         public override void OnStop() { silo.Stop(); }

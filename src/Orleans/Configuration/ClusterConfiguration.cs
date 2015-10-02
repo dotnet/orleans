@@ -68,7 +68,7 @@ namespace Orleans.Runtime.Configuration
         public IDictionary<string, NodeConfiguration> Overrides { get; private set; }
 
         private Dictionary<string, string> overrideXml;
-        private readonly Dictionary<string, List<Action>> listeners;
+        private readonly Dictionary<string, List<Action>> listeners = new Dictionary<string, List<Action>>();
         internal bool IsRunningAsUnitTest { get; set; }
 
         /// <summary>
@@ -76,7 +76,6 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public ClusterConfiguration()
         {
-            listeners = new Dictionary<string, List<Action>>();
             Init();
         }
 
@@ -219,15 +218,10 @@ namespace Orleans.Runtime.Configuration
 
         public void LoadFromFile(string fileName)
         {
-            TextReader input = File.OpenText(fileName);
-            try
+            using (TextReader input = File.OpenText(fileName))
             {
                 Load(input);
                 SourceFile = fileName;
-            }
-            finally
-            {
-                input.Close();
             }
         }
 

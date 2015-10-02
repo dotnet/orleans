@@ -244,10 +244,10 @@ namespace Orleans
         #endregion
 
         #region Interface Casting
-        private static readonly ConcurrentDictionary<Type, Func<IAddressable, object>> casters
+        private readonly ConcurrentDictionary<Type, Func<IAddressable, object>> casters
             = new ConcurrentDictionary<Type, Func<IAddressable, object>>();
 
-        internal static TGrainInterface Cast<TGrainInterface>(IAddressable grain)
+        internal TGrainInterface Cast<TGrainInterface>(IAddressable grain)
         {
             var interfaceType = typeof(TGrainInterface);
             Func<IAddressable, object> caster;
@@ -269,33 +269,40 @@ namespace Orleans
 
         #region SystemTargets
 
-        private static readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
-                    new Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>>();
+        private readonly Dictionary<Tuple<GrainId,Type>, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
+                    new Dictionary<Tuple<GrainId, Type>, Dictionary<SiloAddress, ISystemTarget>>();
 
-        internal static TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
+        internal TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
             where TGrainInterface : ISystemTarget
         {
             Dictionary<SiloAddress, ISystemTarget> cache;
+            Tuple<GrainId, Type> key = Tuple.Create(grainId, typeof(TGrainInterface));
 
             lock (typedSystemTargetReferenceCache)
             {
-                if (typedSystemTargetReferenceCache.ContainsKey(grainId))
-                    cache = typedSystemTargetReferenceCache[grainId];
+                if (typedSystemTargetReferenceCache.ContainsKey(key))
+                    cache = typedSystemTargetReferenceCache[key];
                 else
                 {
                     cache = new Dictionary<SiloAddress, ISystemTarget>();
-                    typedSystemTargetReferenceCache[grainId] = cache;
+                    typedSystemTargetReferenceCache[key] = cache;
                 }
             }
+
+            ISystemTarget reference;
             lock (cache)
             {
                 if (cache.ContainsKey(destination))
-                    return (TGrainInterface)cache[destination];
-
-                var reference = Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
-                cache[destination] = reference;
-                return reference;
+                {
+                    reference = cache[destination];
+                }
+                else
+                {
+                    reference = Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, null, destination));
+                    cache[destination] = reference; // Store for next time
+                }
             }
+            return (TGrainInterface) reference;
         }
 
         #endregion

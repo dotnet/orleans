@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace Orleans.Core
+namespace Orleans
 {
     public interface IGrainFactory
     {

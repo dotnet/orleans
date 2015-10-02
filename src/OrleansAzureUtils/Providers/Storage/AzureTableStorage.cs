@@ -153,7 +153,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -176,7 +176,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -207,7 +207,7 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IStorageProvider.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -247,7 +247,7 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal void ConvertToStorageFormat(IGrainState grainState, GrainStateEntity entity)
+        internal void ConvertToStorageFormat(GrainState grainState, GrainStateEntity entity)
         {
             // Dehydrate
             var dataValues = grainState.AsDictionary();
@@ -289,7 +289,7 @@ namespace Orleans.Storage
         /// </summary>
         /// <param name="grainState">The grain state data to be deserialized in to</param>
         /// <param name="entity">The Azure table entity the stored data</param>
-        internal void ConvertFromStorageFormat(IGrainState grainState, GrainStateEntity entity)
+        internal void ConvertFromStorageFormat(GrainState grainState, GrainStateEntity entity)
         {
             Dictionary<string, object> dataValues = null;
             try
@@ -338,19 +338,8 @@ namespace Orleans.Storage
 
         private string GetKeyString(GrainReference grainReference)
         {
-            var key = new StringBuilder( string.Format("{0}_{1}", serviceId, grainReference.ToKeyString()));
-
-            // Remove any characters that can't be used in Azure PartitionKey values
-            // http://www.jamestharpe.com/web-development/azure-table-service-character-combinations-disallowed-in-partitionkey-rowkey/
-            key.Replace('/','_');   // Forward slash
-            key.Replace('\\', '_'); // Backslash
-            key.Replace('#', '_');  // Pound sign
-            key.Replace('?', '_');  // Question mark
-
-            if (key.Length >= 1024)
-                throw new ArgumentException(string.Format("Key length {0} is too long to be an Azure table key. Key={1}", key.Length, key));
-            
-            return key.ToString();
+            var key = String.Format("{0}_{1}", serviceId, grainReference.ToKeyString());
+            return AzureStorageUtils.SanitizeTableProperty(key);
         }
 
 

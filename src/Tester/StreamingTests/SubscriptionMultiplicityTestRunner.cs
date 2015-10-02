@@ -21,6 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System.ComponentModel.Design;
+using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
@@ -50,7 +52,7 @@ namespace UnitTests.StreamingTests
             this.logger = logger;
         }
 
-        public async Task MultipleSubscriptionTest(Guid streamGuid, string streamNamespace)
+        public async Task MultipleParallelSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
             var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
@@ -75,7 +77,43 @@ namespace UnitTests.StreamingTests
             await consumer.StopConsuming(secondSubscriptionHandle);
         }
 
-        public async Task AddAndRemoveSubscriptionTest(Guid streamGuid, string streamNamespace)
+        public async Task MultipleLinearSubscriptionTest(Guid streamGuid, string streamNamespace)
+        {
+            // get producer and consumer
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
+
+            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+
+            // setup one subscription and send messsages
+            StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+
+            await producer.StartPeriodicProducing();
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+            await producer.StopPeriodicProducing();
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+
+            // clear counts
+            await consumer.ClearNumberConsumed();
+            await producer.ClearNumberProduced();
+            // remove first subscription and send messages
+            await consumer.StopConsuming(firstSubscriptionHandle);
+
+            // setup second subscription and send messages
+            StreamSubscriptionHandle<int> secondSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+
+            await producer.StartPeriodicProducing();
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+            await producer.StopPeriodicProducing();
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+
+            // remove second subscription
+            await consumer.StopConsuming(secondSubscriptionHandle);
+        }
+
+        public async Task MultipleSubscriptionTest_AddRemove(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
             var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
@@ -245,22 +283,68 @@ namespace UnitTests.StreamingTests
             Assert.AreEqual(0, actualSubscriptions.Count, "Subscription Count");
         }
 
+        public async Task TwoIntermitentStreamTest(Guid streamGuid)
+        {
+            const string streamNamespace1 = "streamNamespace1";
+            const string streamNamespace2 = "streamNamespace2";
+
+            // send events on first stream /////////////////////////////
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
+
+            await producer.BecomeProducer(streamGuid, streamNamespace1, streamProviderName);
+
+            StreamSubscriptionHandle<int> handle = await consumer.BecomeConsumer(streamGuid, streamNamespace1, streamProviderName);
+
+            await producer.StartPeriodicProducing();
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+            await producer.StopPeriodicProducing();
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+
+            // send some events on second stream /////////////////////////////
+            var producer2 = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer2 = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
+
+            await producer2.BecomeProducer(streamGuid, streamNamespace2, streamProviderName);
+
+            StreamSubscriptionHandle<int> handle2 = await consumer2.BecomeConsumer(streamGuid, streamNamespace2, streamProviderName);
+
+            await producer2.StartPeriodicProducing();
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+            await producer2.StopPeriodicProducing();
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer2, consumer2, 1, lastTry), Timeout);
+
+            // send some events on first stream again /////////////////////////////
+            await producer.StartPeriodicProducing();
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+            await producer.StopPeriodicProducing();
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
+
+            await consumer.StopConsuming(handle);
+            await consumer2.StopConsuming(handle2);
+        }
+
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int consumerCount, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
             if (assertIsTrue)
             {
+                Assert.IsTrue(numConsumed.Values.All(v => v.Item2 == 0), "Errors");
                 Assert.IsTrue(numProduced > 0, "Events were not produced");
                 Assert.AreEqual(consumerCount, numConsumed.Count, "Incorrect number of consumers");
-                foreach (int consumed in numConsumed.Values)
+                foreach (int consumed in numConsumed.Values.Select(v => v.Item1))
                 {
                     Assert.AreEqual(numProduced, consumed, "Produced and consumed counts do not match");
                 }
             }
             else if (numProduced <= 0 || // no events produced?
                      consumerCount != numConsumed.Count || // subscription counts are wrong?
-                     numConsumed.Values.Any(consumedCount => consumedCount != numProduced)) // consumed events don't match produced events for any subscription?
+                     numConsumed.Values.Any(consumedCount => consumedCount.Item1 != numProduced) ||// consumed events don't match produced events for any subscription?
+                     numConsumed.Values.Any(v => v.Item2 != 0)) // stream errors
             {
                 if (numProduced <= 0)
                 {
@@ -271,18 +355,19 @@ namespace UnitTests.StreamingTests
                     logger.Info("consumerCount != numConsumed.Count: Incorrect number of consumers. consumerCount = {0}, numConsumed.Count = {1}",
                         consumerCount, numConsumed.Count);
                 }
-                foreach (int consumed in numConsumed.Values)
+                foreach (var consumed in numConsumed)
                 {
-                    if (numProduced != consumed)
+                    if (numProduced != consumed.Value.Item1)
                     {
                         logger.Info("numProduced != consumed: Produced and consumed counts do not match. numProduced = {0}, consumed = {1}",
-                            numProduced, consumed);
+                            numProduced, consumed.Key.HandleId + " -> " + consumed.Value);
                             //numProduced, Utils.DictionaryToString(numConsumed));
                     }
                 }
                 return false;
             }
-            logger.Info("All counts are equal. numProduced = {0}, consumerCount = {1}", numProduced, consumerCount); //Utils.DictionaryToString(numConsumed));
+            logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, 
+                Utils.EnumerableToString(numConsumed, kvp => kvp.Key.HandleId.ToString() + "->" +  kvp.Value.ToString()));
             return true;
         }
     }

@@ -252,11 +252,22 @@ namespace Orleans.Runtime
                             // Consider: need to reschedule to what is the remaining time for ShouldBeKeptAlive, not the full CollectionAgeLimit.
                             ScheduleCollection(activation);
                         }
-                        else if (!activation.IsInactive || !activation.IsStale(now))
+                        else if (!activation.IsInactive)
                         {
                             // This is essentialy a bug, an active activation should not be in the last bucket.
                             logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_2,
-                                "ActivationCollector found a non stale or active activation in it's last bucket. This is violation of ActivationCollector invariants. For now going to defer it's collection. Activation: {0}",
+                                "ActivationCollector found an active activation in it's last bucket. This is violation of ActivationCollector invariants. " +
+                                "For now going to defer it's collection. Activation: {0}",
+                                activation.ToDetailedString());
+                            ScheduleCollection(activation);
+                        }
+                        else if (!activation.IsStale(now))
+                        {
+                            // This is essentialy a bug, a non stale activation should not be in the last bucket.
+                            logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_3,
+                                "ActivationCollector found a non stale activation in it's last bucket. This is violation of ActivationCollector invariants. Now: {0}" +
+                                "For now going to defer it's collection. Activation: {1}",
+                                TraceLogger.PrintDate(now),
                                 activation.ToDetailedString());
                             ScheduleCollection(activation);
                         }

@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Platform>AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{792818EF-B3F8-4CE2-9886-4808713B15C4}</ProjectGuid>
@@ -93,6 +93,8 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Providers\Streams\PersistentStreams\AzureTableStorageStreamFailureHandler.cs" />
+    <Compile Include="Providers\Streams\PersistentStreams\StreamDeliveryFailureEntity.cs" />
     <Compile Include="Storage\AzureBasedMembershipTable.cs" />
     <Compile Include="Storage\AzureBasedReminderTable.cs" />
     <Compile Include="Hosting\AzureConfigUtils.cs" />

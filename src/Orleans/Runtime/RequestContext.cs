@@ -122,24 +122,20 @@ namespace Orleans.Runtime
             return retValue;
         }
 
-        internal static void ImportFromMessage(Message msg)
+        public static void Import(Dictionary<string, object> contextData)
         {
-            var contextData = msg.RequestContextData;
-            var values = contextData != null
-                ? contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
-                : new Dictionary<string, object>();
-
             if (PropagateActivityId)
             {
                 object activityIdObj;
-                if (!values.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj))
+                if (contextData == null || !contextData.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj))
                 {
                     activityIdObj = Guid.Empty;
                 }
                 Trace.CorrelationManager.ActivityId = (Guid) activityIdObj;
             }
-            if (values.Count > 0)
+            if (contextData != null && contextData.Count > 0)
             {
+                var values = contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 // We have some data, so store RC data into LogicalCallContext
                 SetContextData(values);
             }
@@ -151,7 +147,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal static void ExportToMessage(Message msg)
+        public static Dictionary<string, object> Export()
         {
             Dictionary<string, object> values = GetContextData();
 
@@ -167,10 +163,11 @@ namespace Orleans.Runtime
                 }
             }
             if (values != null && values.Count != 0)
-                msg.RequestContextData = values.ToDictionary(kvp => kvp.Key, kvp => SerializationManager.DeepCopy(kvp.Value));
+                return values.ToDictionary(kvp => kvp.Key, kvp => SerializationManager.DeepCopy(kvp.Value));
+            return null;
         }
 
-        internal static void Clear()
+        public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
             CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);

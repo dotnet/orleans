@@ -408,7 +408,7 @@ namespace Orleans.Runtime
         {
             FileInfo file = GetLogFile(logName);
             string logText;
-            using (var f = new StreamReader(file.FullName))
+            using (var f = new StreamReader(File.OpenRead(file.FullName)))
             {
                 logText = f.ReadToEnd();
             }
@@ -568,7 +568,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="format">A standard format string, suitable for String.Format.</param>
         /// <param name="args">Any arguments to the format string.</param>
-        ////[Obsolete("Use method Info(logCode,format,args) instead")]
         public override void Info(string format, params object[] args)
         {
             Log(0, Severity.Info, format, args, null);

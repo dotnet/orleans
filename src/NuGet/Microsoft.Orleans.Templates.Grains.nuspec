@@ -29,8 +29,10 @@
     <file src="Orleans.Grains.props" target="build\Microsoft.Orleans.Templates.Grains.props" />
 
     <file src="ClientGenerator.exe" target="tools" />
+    <file src="ClientGenerator.pdb" target="tools" />
     <file src="ClientGenerator.exe.config" target="tools" />
     <file src="Orleans.dll" target="tools" />
+    <file src="Orleans.pdb" target="tools" />
 
     <file src="EmptyFile.cs" target="content\Properties\orleans.codegen.cs" />
   </files>

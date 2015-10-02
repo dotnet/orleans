@@ -39,16 +39,19 @@ namespace Orleans.TestingHost
 {
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 
+    /// 
     /// Runs a Primary and Secondary silo in seperate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process if required for particular test cases.
     /// </summary>
     /// <remarks>
-    /// Add the following attributes to any derived test classes, 
-    /// to ensure the config files are included in the test set.
+    /// Make sure the following files are included in any test projects that use <c>TestingSiloHost</c>, 
+    /// and ensure "Copy if Newer" is set to ensure the config files are included in the test set.
     /// <code>
-    /// [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    /// [DeploymentItem("ClientConfigurationForTesting.xml")]
+    /// OrleansConfigurationForTesting.xml
+    /// ClientConfigurationForTesting.xml
     /// </code>
+    /// Also make sure that your test project references your test grains and test grain interfaces 
+    /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
     public abstract class TestingSiloHost
     {
@@ -135,9 +138,17 @@ namespace Orleans.TestingHost
                 {
                     throw new TimeoutException("Timeout during test initialization", ex);
                 }
-                throw new AggregateException(
+                // IMPORTANT:
+                // Do NOT re-throw the original exception here, also not as an internal exception inside AggregateException
+                // Due to the way MS tests works, if the original exception is an Orleans exception,
+                // it's assembly might not be loaded yet in this phase of the test.
+                // As a result, we will get "MSTest: Unit Test Adapter threw exception: Type is not resolved for member XXX"
+                // and will loose the oroginal exception. This makes debugging tests super hard!
+                // The root cause has to do with us initializing our tests from Test constructor and not from TestInitialize method.
+                // More details: http://dobrzanski.net/2010/09/20/mstest-unit-test-adapter-threw-exception-type-is-not-resolved-for-member/
+                throw new Exception(
                     string.Format("Exception during test initialization: {0}",
-                        TraceLogger.PrintException(ex)), ex);
+                        TraceLogger.PrintException(baseExc)));
             }
         }
 
@@ -294,6 +305,16 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Start a Secondary silo with a given instanceCounter 
+        /// (allows to set the port number as before or new, depending on the scenario).
+        /// </summary>
+        public void StartSecondarySilo(TestingSiloOptions secondarySiloOptions, int instanceCounter)
+        {
+            secondarySiloOptions.PickNewDeploymentId = false;
+            Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, instanceCounter);
+        }
+
+        /// <summary>
         /// Do a semi-graceful Stop of the specified silo.
         /// </summary>
         /// <param name="instance">Silo to be stopped.</param>
@@ -322,14 +343,13 @@ namespace Orleans.TestingHost
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
-        /// <param name="stopGracefully">Whether the silo should be immediately Killed, or graceful Stop.</param>
-        public SiloHandle RestartSilo(SiloHandle instance, bool stopGracefully = true)
+        public SiloHandle RestartSilo(SiloHandle instance)
         {
             if (instance != null)
             {
                 var options = instance.Options;
                 var type = instance.Silo.Type;
-                StopOrleansSilo(instance, stopGracefully);
+                StopOrleansSilo(instance, true);
                 instance = StartOrleansSilo(type, options, InstanceCounter++);
                 return instance;
             }
@@ -459,7 +479,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        private static SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
@@ -497,6 +517,11 @@ namespace Orleans.TestingHost
             }
 
             config.Globals.LivenessType = options.LivenessType;
+            config.Globals.ReminderServiceType = options.ReminderServiceType;
+            if (!String.IsNullOrEmpty(options.DataConnectionString))
+            {
+                config.Globals.DataConnectionString = options.DataConnectionString;
+            }
 
             config.AdjustForTestEnvironment();
 

@@ -23,7 +23,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Data.Services.Common;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -222,7 +221,7 @@ namespace Orleans.AzureUtils
         public List<Uri> FindAllGatewayProxyEndpoints()
         {
             IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = FindAllGatewaySilos();
-            return gatewaySiloInstances.Select(ToGatewayUri).ToList();
+            return gatewaySiloInstances.Select(ConvertToGatewayUri).ToList();
         }
 
         /// <summary>
@@ -230,32 +229,44 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="gateway">The input silo instance</param>
         /// <returns></returns>
-        private static Uri ToGatewayUri(SiloInstanceTableEntry gateway)
+        private static Uri ConvertToGatewayUri(SiloInstanceTableEntry gateway)
         {
             int proxyPort = 0;
             if (!string.IsNullOrEmpty(gateway.ProxyPort))
                 int.TryParse(gateway.ProxyPort, out proxyPort);
 
-            return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", gateway.Address, proxyPort, gateway.Generation));
+            int gen = 0;
+            if (!string.IsNullOrEmpty(gateway.Generation))
+                int.TryParse(gateway.Generation, out gen);
+
+            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort), gen);
+            return address.ToGatewayUri();
         }
 
         private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()
         {
-            logger.Info(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0} ...", this.DeploymentId);
+            if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
             const string zeroPort = "0";
 
-            Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
-                instance.PartitionKey == this.DeploymentId
-                && instance.Status == INSTANCE_STATUS_ACTIVE
-                && instance.ProxyPort != zeroPort;
+            try
+            {
+                Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
+                    instance.PartitionKey == this.DeploymentId
+                    && instance.Status == INSTANCE_STATUS_ACTIVE
+                    && instance.ProxyPort != zeroPort;
 
-            var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
-                                .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+                var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
+                                    .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
 
-            List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
+                List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
-            logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos.", gatewaySiloInstances.Count);
-            return gatewaySiloInstances;
+                logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);
+                return gatewaySiloInstances;
+            }catch(Exception exc)
+            {
+                logger.Error(ErrorCode.Runtime_Error_100331, string.Format("Error searching for active gateway silos for deployment {0} ", this.DeploymentId), exc);
+                throw;
+            }
         }
 
         public async Task<string> DumpSiloInstanceTable()

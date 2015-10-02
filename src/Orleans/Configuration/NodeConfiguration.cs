@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Configuration
     /// Individual node-specific silo configuration parameters.
     /// </summary>
     [Serializable]
-    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration, ILimitsConfiguration
+    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration
     {
         private readonly DateTime creationTimestamp;
         private string siloName;
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Configuration
             set
             {
                 siloName = value;
-                ConfigUtilities.SetTraceFileName(this, SiloName, creationTimestamp);
+                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
             }
         }
 
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The values for various silo limits.
         /// </summary>
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        public LimitManager LimitManager { get; private set; }
 
         private string traceFilePattern;
         /// <summary>
@@ -177,7 +177,7 @@ namespace Orleans.Runtime.Configuration
             set
             {
                 traceFilePattern = value;
-                ConfigUtilities.SetTraceFileName(this, this.SiloName, this.creationTimestamp);
+                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
             }
         }
         /// <summary>
@@ -193,6 +193,10 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public int BulkMessageLimit { get; set; }
 
+        /// <summary>
+        /// Specifies the name of the Startup class in the configuration file.
+        /// </summary>
+        public string StartupTypeName { get; set; }
 
         public string StatisticsProviderName { get; set; }
         /// <summary>
@@ -240,6 +244,8 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// </summary>
         public bool UseNagleAlgorithm { get; set; }
+
+        public string SiloShutdownEventName { get; set; }
 
         internal const string DEFAULT_NODE_NAME = "default";
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
@@ -289,7 +295,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = true;
             StatisticsCollectionLevel = DEFAULT_STATS_COLLECTION_LEVEL;
 
-            LimitValues = new Dictionary<string, LimitValue>();
+            LimitManager = new LimitManager();
 
             MinDotNetThreadPoolSize = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
 
@@ -337,7 +343,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = other.StatisticsWriteLogStatisticsToTable;
             StatisticsCollectionLevel = other.StatisticsCollectionLevel;
 
-            LimitValues = new Dictionary<string, LimitValue>(other.LimitValues); // Shallow copy
+            LimitManager = new LimitManager(other.LimitManager); // Shallow copy
 
             Subnet = other.Subnet;
 
@@ -345,6 +351,8 @@ namespace Orleans.Runtime.Configuration
             Expect100Continue = other.Expect100Continue;
             DefaultConnectionLimit = other.DefaultConnectionLimit;
             UseNagleAlgorithm = other.UseNagleAlgorithm;
+
+            StartupTypeName = other.StartupTypeName;
         }
 
         public override string ToString()
@@ -384,30 +392,12 @@ namespace Orleans.Runtime.Configuration
             sb.Append("      ").AppendFormat("   .NET ServicePointManager - DefaultConnectionLimit={0} Expect100Continue={1} UseNagleAlgorithm={2}", DefaultConnectionLimit, Expect100Continue, UseNagleAlgorithm).AppendLine();
             sb.Append("   Load Shedding Enabled: ").Append(LoadSheddingEnabled).AppendLine();
             sb.Append("   Load Shedding Limit: ").Append(LoadSheddingLimit).AppendLine();
+            sb.Append("   SiloShutdownEventName: ").Append(SiloShutdownEventName).AppendLine();
             sb.Append("   Debug: ").AppendLine();
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-
-            if (LimitValues.Count > 0)
-            {
-                sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitValues.Values)
-                    sb.AppendFormat("       {0}", limit).AppendLine();
-            }
-
+            sb.Append(LimitManager);
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// Returns the value of silo limit.
-        /// </summary>
-        /// <param name="limitName">The name of the limit return.</param>
-        /// <returns>Limit value</returns>
-        public LimitValue GetLimit(string limitName)
-        {
-            LimitValue limit;
-            LimitValues.TryGetValue(limitName, out limit);
-            return limit;
         }
 
         internal void Load(XmlElement root)
@@ -514,7 +504,13 @@ namespace Orleans.Runtime.Configuration
                         ConfigUtilities.ParseStatistics(this, child, SiloName);
                         break;
                     case "Limits":
-                        ConfigUtilities.ParseLimitValues(this, child, SiloName);
+                        ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
+                        break;
+                    case "Startup":
+                        if (child.HasAttribute("Type"))
+                        {
+                            StartupTypeName = child.GetAttribute("Type");
+                        }
                         break;
                 }
             }

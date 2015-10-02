@@ -30,7 +30,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    internal class SimpleMessageStreamProducer<T> : IAsyncBatchObserver<T>, IStreamControl
+    internal class SimpleMessageStreamProducer<T> : IInternalAsyncBatchObserver<T>
     {
         private readonly StreamImpl<T>                  stream;
         private readonly string                         streamProviderName;
@@ -56,7 +56,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
-            pubSub = providerRuntime.PubSub(StreamPubSubType.GrainBased);
+            pubSub = providerRuntime.PubSub(SimpleMessageStreamProvider.DEFAULT_STREAM_PUBSUB_TYPE);
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
             IsRewindable = isRewindable;

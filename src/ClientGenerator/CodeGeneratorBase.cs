@@ -1,25 +1,28 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+﻿// Project Orleans Cloud Service SDK ver. 1.0
+//  
+// Copyright (c) .NET Foundation
+// 
+// All rights reserved.
+//  
+// MIT License
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 using System;
 using System.CodeDom;
@@ -32,7 +35,6 @@ using System.Reflection;
 using System.Text;
 using Microsoft.CSharp;
 using Microsoft.VisualBasic;
-
 using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
@@ -175,34 +177,7 @@ namespace Orleans.CodeGeneration
                 new CodeAttributeDeclaration(new CodeTypeReference(typeof(DebuggerNonUserCodeAttribute))));
         }
         
-        /// <summary>
-        /// Finds the Persistent interface given the grain class
-        /// </summary>
-        /// <param name="sourceType">source grain type</param>
-        /// <returns>Persistent interface </returns>
-        protected static Type GetPersistentInterface(Type sourceType)
-        {
-            if (!typeof (Grain).IsAssignableFrom(sourceType)) return null;
-
-            Type persistentInterface = null;
-            Type baseType = sourceType.BaseType;
-
-            if (baseType == null || baseType == typeof (Grain)) return null;
-
-            // go up till we find the base classe that derives directly from Grain
-            while (!(baseType.BaseType == typeof (Grain)))
-                baseType = baseType.BaseType;
-
-            // Now we have a base class that derives from Grain,
-            // make sure it is generic and actually the Grain<T>
-            if (baseType.IsGenericType && baseType.Name.StartsWith(typeof(Grain).Name) 
-                && baseType.Namespace == typeof(Grain).Namespace)
-            {
-                // the argument is type of peristent interface
-                persistentInterface = baseType.GetGenericArguments()[0];
-            }
-            return persistentInterface;
-        }protected virtual string GetInvokerImpl(GrainInterfaceData si, CodeTypeDeclaration invokerClass, Type grainType, GrainInterfaceInfo grainInterfaceInfo, bool isClient)
+        protected virtual string GetInvokerImpl(GrainInterfaceData si, CodeTypeDeclaration invokerClass, Type grainType, GrainInterfaceInfo grainInterfaceInfo, bool isClient)
         {
             throw new NotImplementedException("InvokerGeneratorBasics.GetInvokerImpl");
         }
@@ -345,7 +320,7 @@ namespace Orleans.CodeGeneration
             {
                 var xFullName = TypeUtils.GetFullName(x.InterfaceType);
                 var yFullName = TypeUtils.GetFullName(y.InterfaceType);
-                return String.CompareOrdinal(xFullName, yFullName) == 0;
+                return string.CompareOrdinal(xFullName, yFullName) == 0;
             }
 
             public int GetHashCode(InterfaceInfo obj)

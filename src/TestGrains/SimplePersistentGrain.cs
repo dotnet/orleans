@@ -39,33 +39,22 @@ namespace UnitTests.Grains
 {
     public class SimplePersistentGrain_State : GrainState
     {
-        public SimplePersistentGrain_State()
-            : base(typeof(SimplePersistentGrain).FullName) 
-            // TODO: GrainState takes name of the grain type here, which is probably a mistake
-            // since multiple grain classes can use the same state object interface/class.
-            // Need to figure out the right story for mapping grain classes to storage entity types (tables).
-        {}
-
         public int A { get; set; }
         public int B { get; set; }
-    }
-
-    public interface ISimplePersistentGrain_State : IGrainState
-    {
-        int A { get; set; }
-        int B { get; set; }
     }
 
     /// <summary>
     /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
-    [StorageProvider(ProviderName = "MemoryStore")]
     public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimplePersistentGrain
     {
+        private Logger logger;
         private Guid version;
 
         public override Task OnActivateAsync()
         {
+            logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimplePersistentGrain).Name, base.IdentityString, base.RuntimeIdentity));
+            logger.Info("Activate.");
             version = Guid.NewGuid();
             return base.OnActivateAsync();
         }
@@ -113,61 +102,17 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(version);
         }
-    }
 
-    [StorageProvider(ProviderName = "MemoryStore")]
-    public class SimpleInterfacePersistentGrain : Grain<ISimplePersistentGrain_State>, ISimplePersistentGrain
-    {
-        private Guid version;
-
-        public override Task OnActivateAsync()
+        public Task<object> GetRequestContext()
         {
-            version = Guid.NewGuid();
-            return base.OnActivateAsync();
-        }
-        public Task SetA(int a)
-        {
-            State.A = a;
-            return WriteStateAsync();
+            var info = RequestContext.Get("GrainInfo");
+            return Task.FromResult(info);
         }
 
-        public Task SetA(int a, bool deactivate)
+        public Task SetRequestContext(int data)
         {
-            if (deactivate)
-                DeactivateOnIdle();
-            return SetA(a);
-        }
-
-        public Task SetB(int b)
-        {
-            State.B = b;
-            return WriteStateAsync();
-        }
-
-        public Task IncrementA()
-        {
-            State.A++;
-            return WriteStateAsync();
-        }
-
-        public Task<int> GetAxB()
-        {
-            return Task.FromResult(State.A * State.B);
-        }
-
-        public Task<int> GetAxB(int a, int b)
-        {
-            return Task.FromResult(a * b);
-        }
-
-        public Task<int> GetA()
-        {
-            return Task.FromResult(State.A);
-        }
-
-        public Task<Guid> GetVersion()
-        {
-            return Task.FromResult(version);
+            RequestContext.Set("GrainInfo", data);
+            return TaskDone.Done;
         }
     }
 }

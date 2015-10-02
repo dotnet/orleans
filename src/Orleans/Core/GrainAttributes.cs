@@ -34,7 +34,7 @@ namespace Orleans
         /// that may significantly improve the performance of your application.
         /// </para>
         /// </summary>
-        [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+        [AttributeUsage(AttributeTargets.Method)]
         internal sealed class ReadOnlyAttribute : Attribute
         {
         }
@@ -68,12 +68,30 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Class)]
         public sealed class StatelessWorkerAttribute : Attribute
         {
+            /// <summary>
+            /// Maximal number of local StatelessWorkers in a single silo.
+            /// </summary>
+            public int MaxLocalWorkers { get; private set; }
+
+            public StatelessWorkerAttribute(int maxLocalWorkers)
+            {
+                MaxLocalWorkers = maxLocalWorkers;
+            }
+
+            public StatelessWorkerAttribute()
+            {
+                MaxLocalWorkers = -1;
+            }
         }
 
         /// <summary>
         /// The AlwaysInterleaveAttribute attribute is used to mark methods that can interleave with any other method type, including write (non ReadOnly) requests.
         /// </summary>
-        [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+        /// <remarks>
+        /// Note that this attribute is applied to method declaration in the grain interface, 
+        /// and not to the method in the implementation class itself.
+        /// </remarks>
+        [AttributeUsage(AttributeTargets.Method)]
         public sealed class AlwaysInterleaveAttribute : Attribute
         {
         }
@@ -233,7 +251,7 @@ namespace Orleans
             Both
         };
 
-        private readonly FactoryTypes factoryType = FactoryTypes.Grain;
+        private readonly FactoryTypes factoryType;
 
         public FactoryAttribute(FactoryTypes factoryType)
         {
@@ -281,7 +299,7 @@ namespace Orleans
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
         internal string Namespace { get; private set; }

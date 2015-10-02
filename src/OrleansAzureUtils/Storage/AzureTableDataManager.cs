@@ -93,10 +93,6 @@ namespace Orleans.AzureUtils
 
                 Logger.Info(ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
-                await InitializeTableSchemaFromEntity(tableRef);
-
-                Logger.Info(ErrorCode.AzureTable_36, "Initialized schema for Azure storage table {0}", TableName);
-
                 CloudTableClient tableOperationsClient = GetCloudTableOperationsClient();
                 tableReference = tableOperationsClient.GetTableReference(TableName);
             }
@@ -737,83 +733,6 @@ namespace Orleans.AzureUtils
             }
         }
 
-        // Based on: http://blogs.msdn.com/b/cesardelatorre/archive/2011/03/12/typical-issue-one-of-the-request-inputs-is-not-valid-when-working-with-the-wa-development-storage.aspx
-        private async Task InitializeTableSchemaFromEntity(CloudTable tableRef)
-        {
-            const string operation = "InitializeTableSchemaFromEntity";
-            var startTime = DateTime.UtcNow;
-
-            ITableEntity entity = new T();
-            entity.PartitionKey = Guid.NewGuid().ToString();
-            entity.RowKey = Guid.NewGuid().ToString();
-            Array.ForEach(
-                entity.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance),
-                p =>
-                {
-                    if ((p.Name == "PartitionKey") || (p.Name == "RowKey") || (p.Name == "Timestamp")) return;
-
-                    if (p.PropertyType == typeof(string))
-                    {
-                        p.SetValue(entity, Guid.NewGuid().ToString(),
-                                   null);
-                    }
-                    else if (p.PropertyType == typeof(DateTime))
-                    {
-                        p.SetValue(entity, startTime, null);
-                    }
-                });
-
-            try
-            {
-                // WAS:
-                // svc.AddObject(TableName, entity);
-                // SaveChangesOptions.None,
-
-                try
-                {
-                    await Task<TableResult>.Factory.FromAsync(
-                        tableRef.BeginExecute,
-                        tableRef.EndExecute,
-                        TableOperation.Insert(entity),
-                        null);
-                }
-                catch (Exception exc)
-                {
-                    CheckAlertWriteError(operation + "-Create", entity, null, exc);
-                    throw;
-                }
-
-                try
-                {
-                    // WAS:
-                    // svc.DeleteObject(entity);
-                    // SaveChangesOptions.None,
-
-                    await Task<TableResult>.Factory.FromAsync(
-                        tableRef.BeginExecute,
-                        tableRef.EndExecute,
-                        TableOperation.Delete(entity),
-                        null);
-                }
-                catch (Exception exc)
-                {
-                    CheckAlertWriteError(operation + "-Delete", entity, null, exc);
-                    throw;
-                }
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
-        }
-
-        private bool IsServerBusy(Exception exc)
-        {
-            bool serverBusy = AzureStorageUtils.IsServerBusy(exc);
-            if (serverBusy) numServerBusy.Increment();
-            return serverBusy;
-        }
-
         private void CheckAlertWriteError(string operation, object data1, string data2, Exception exc)
         {
             HttpStatusCode httpStatusCode;
@@ -840,11 +759,6 @@ namespace Orleans.AzureUtils
             {
                 Logger.Warn(ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }
-        }
-
-        private static Type ResolveEntityType(string name)
-        {
-            return typeof(T);
         }
 
         #endregion

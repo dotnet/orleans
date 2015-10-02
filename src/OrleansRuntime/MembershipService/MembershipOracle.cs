@@ -57,6 +57,7 @@ namespace Orleans.Runtime.MembershipService
         public SiloStatus CurrentStatus { get { return membershipOracleData.CurrentStatus; } } // current status of this silo.
 
         public string SiloName { get { return membershipOracleData.SiloName; } }
+        public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
 
         internal MembershipOracle(Silo silo, IMembershipTable membershipTable)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
@@ -75,14 +76,11 @@ namespace Orleans.Runtime.MembershipService
 
         #region ISiloStatusOracle Members
 
-        public async Task Start(bool waitForTableToInit)
+        public async Task Start()
         {
             try
             {
                 logger.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + TraceLogger.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
-
-                if (waitForTableToInit)
-                    await WaitForTableToInit();
 
                 // randomly delay the startup, so not all silos write to the table at once.
                 // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;
@@ -334,50 +332,6 @@ namespace Orleans.Runtime.MembershipService
         }
 
         #endregion
-
-        private async Task WaitForTableToInit()
-        {
-            var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
-            // This is a quick temporary solution to enable primary node to start fully before secondaries.
-            // Secondary silos waits untill GrainBasedMembershipTable is created. 
-            for (int i = 0; i < 100; i++)
-            {
-                bool needToWait = false;
-                try
-                {
-                    MembershipTableData table = await membershipTableProvider.ReadAll().WithTimeout(timespan);
-                    if (table.Members.Any(tuple => tuple.Item1.IsPrimary))
-                    {
-                        logger.Info(ErrorCode.MembershipTableGrainInit1, 
-                            "-Connected to membership table provider and also found primary silo registered in the table.");
-                        return;
-                    }
-                    
-                    logger.Info(ErrorCode.MembershipTableGrainInit2, 
-                        "-Connected to membership table provider but did not find primary silo registered in the table. Going to try again for a {0}th time.", i);
-                }
-                catch (Exception exc)
-                {
-                    var type = exc.GetBaseException().GetType();
-                    if (type == typeof(TimeoutException) || type == typeof(OrleansException))
-                    {
-                        logger.Info(ErrorCode.MembershipTableGrainInit3, 
-                            "-Waiting for membership table provider to initialize. Going to sleep for {0} and re-try to reconnect.", timespan);
-                        needToWait = true;
-                    }
-                    else
-                    {
-                        logger.Info(ErrorCode.MembershipTableGrainInit4, "-Membership table provider failed to initialize. Giving up.");
-                        throw;
-                    }
-                }
-
-                if (needToWait)
-                {
-                    await Task.Delay(timespan);
-                }
-            }
-        }
 
         #region Table update/insert processing
 
@@ -1159,7 +1113,7 @@ namespace Orleans.Runtime.MembershipService
 
         private static IMembershipService GetOracleReference(SiloAddress silo)
         {
-            return GrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
+            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
         }
     }
 }

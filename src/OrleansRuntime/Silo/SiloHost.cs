@@ -27,7 +27,7 @@ using System.Net;
 using System.Runtime;
 using System.Threading;
 using System.Globalization;
-
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 
@@ -98,6 +98,7 @@ namespace Orleans.Runtime.Host
         private TraceLogger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
+        private EventWaitHandle shutdownEvent;
         private bool disposed;
 
         /// <summary>
@@ -143,14 +144,6 @@ namespace Orleans.Runtime.Host
             try
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
-
-                logger.Info( ErrorCode.SiloInitializing, "Initializing Silo {0} on host={1} CPU count={2} running .NET version='{3}' Is .NET 4.5={4} OS version='{5}'",
-                    Name, Environment.MachineName, Environment.ProcessorCount, Environment.Version, ConfigUtilities.IsNet45OrNewer(), Environment.OSVersion);
-
-                logger.Info(ErrorCode.SiloGcSetting, "Silo running with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
-                if (!GCSettings.IsServerGC)
-                    logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\"> and <configuration>-<runtime>-<gcConcurrent enabled=\"false\"/>");
-                
                 orleans = new Silo(Name, Type, Config);
             }
             catch (Exception exc)
@@ -182,12 +175,36 @@ namespace Orleans.Runtime.Host
                 
                 if (orleans != null)
                 {
+                    var shutdownEventName = Config.Defaults.SiloShutdownEventName ?? Name + "-Shutdown";
+                    logger.Info(ErrorCode.SiloShutdownEventName, "Silo shutdown event name: {0}", shutdownEventName);
+
+                    bool createdNew;
+                    shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, shutdownEventName, out createdNew);
+                    if (!createdNew)
+                    {
+                        logger.Info(ErrorCode.SiloShutdownEventOpened, "Opened existing shutdown event. Setting the event {0}", shutdownEventName);
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.SiloShutdownEventCreated, "Created and set shutdown event {0}", shutdownEventName);
+                    }
+
+                    // Start silo
                     orleans.Start();
+
+                    // Wait for the shutdown event, and trigger a graceful shutdown if we receive it.
+
+                    var shutdownThread = new Thread( o =>
+                        {
+                            shutdownEvent.WaitOne();
+                            logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
+                            orleans.Shutdown();
+                        });
+                    shutdownThread.Start();
                     
                     var startupEventName = Name;
                     logger.Info(ErrorCode.SiloStartupEventName, "Silo startup event name: {0}", startupEventName);
 
-                    bool createdNew;
                     startupEvent = new EventWaitHandle(true, EventResetMode.ManualReset, startupEventName, out createdNew);
                     if (!createdNew)
                     {
@@ -264,7 +281,7 @@ namespace Orleans.Runtime.Host
 
         /// <summary>
         /// Set the DeploymentId for this silo, 
-        /// as well as the Azure connection string to use the silo system data, 
+        /// as well as the connection string to use the silo system data, 
         /// such as the cluster membership table..
         /// </summary>
         /// <param name="deploymentId">DeploymentId this silo is part of.</param>

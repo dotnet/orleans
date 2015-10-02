@@ -66,17 +66,24 @@ namespace UnitTests.StreamingTests
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
-        public async Task AQMultipleSubscriptionTest()
+        public async Task AQMultipleParallelSubscriptionTest()
         {
-            logger.Info("************************ AQMultipleSubscriptionTest *********************************");
-            await runner.MultipleSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            logger.Info("************************ AQMultipleParallelSubscriptionTest *********************************");
+            await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
-        public async Task AQAddAndRemoveSubscriptionTest()
+        public async Task AQMultipleLinearSubscriptionTest()
         {
-            logger.Info("************************ AQAddAndRemoveSubscriptionTest *********************************");
-            await runner.AddAndRemoveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            logger.Info("************************ AQMultipleLinearSubscriptionTest *********************************");
+            await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        public async Task AQMultipleSubscriptionTest_AddRemove()
+        {
+            logger.Info("************************ AQMultipleSubscriptionTest_AddRemove *********************************");
+            await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
@@ -99,5 +106,13 @@ namespace UnitTests.StreamingTests
             logger.Info("************************ AQActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        public async Task AQTwoIntermitentStreamTest()
+        {
+            logger.Info("************************ AQTwoIntermitentStreamTest *********************************");
+            await runner.TwoIntermitentStreamTest(Guid.NewGuid());
+        }
+        
     }
 }

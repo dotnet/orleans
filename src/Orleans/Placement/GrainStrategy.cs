@@ -48,10 +48,6 @@ namespace Orleans.Runtime
         /// </summary>
         public static PlacementStrategy ActivationCountBasedPlacement;
         /// <summary>
-        /// Use a local activation, create if not present or all busy
-        /// </summary>
-        public static PlacementStrategy StatelessWorkerPlacement;
-        /// <summary>
         /// Use a graph partitioning algorithm
         /// </summary>
         internal static PlacementStrategy GraphPartitionPlacement;
@@ -63,9 +59,6 @@ namespace Orleans.Runtime
             PreferLocalPlacement = Orleans.Runtime.PreferLocalPlacement.Singleton;
 
             ActivationCountBasedPlacement = Orleans.Runtime.ActivationCountBasedPlacement.Singleton;
-
-            StatelessWorkerPlacement = new StatelessWorkerPlacement(0);
-
         }
     }
 }

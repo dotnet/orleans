@@ -1,32 +1,34 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+﻿// Project Orleans Cloud Service SDK ver. 1.0
+//  
+// Copyright (c) .NET Foundation
+// 
+// All rights reserved.
+//  
+// MIT License
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 using System;
-using System.Collections.Generic;
 using System.CodeDom;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-
 using Orleans.Runtime;
 using Orleans.Serialization;
 
@@ -61,7 +63,7 @@ namespace Orleans.CodeGeneration.Serialization
             container.Imports.Add(new CodeNamespaceImport("System.Collections.Generic"));
             container.Imports.Add(new CodeNamespaceImport("System.Reflection"));
             container.Imports.Add(new CodeNamespaceImport("Orleans.Serialization"));
-            if (!String.IsNullOrEmpty(t.Namespace))
+            if (!string.IsNullOrEmpty(t.Namespace))
             {
                 container.Imports.Add(new CodeNamespaceImport(t.Namespace));
             }
@@ -265,7 +267,7 @@ namespace Orleans.CodeGeneration.Serialization
                 var fldType = fld.FieldType;
                 if (TypeUtilities.IsTypeIsInaccessibleForSerialization(fldType, t.Module, grainAssembly))
                 {
-                    ConsoleText.WriteStatus("Skipping generation of serializer for {0} because one of it's field {1} is of a private/internal type.", t.FullName, fld.Name);
+                    ConsoleText.WriteStatus("Skipping generation of serializer for {0} because one of it's field {1} is of a private/internal type {2}.", t.FullName, fld.Name, fldType);
                     return; // We cannot deserialize a class with a field of non-public type. Need to add a proper reporting here.
                 }
 
@@ -527,8 +529,7 @@ namespace Orleans.CodeGeneration.Serialization
                 ser.Statements.Add(new CodeVariableDeclarationStatement(typeof(MethodInfo), "f",
                     new CodeMethodInvokeExpression(new CodeVariableReferenceExpression("t"), "GetMethod", new CodePrimitiveExpression("Serializer"))));
                 ser.Statements.Add(new CodeVariableDeclarationStatement(typeof(object[]), "args",
-                    new CodeArrayCreateExpression(typeof(object), new CodeExpression[] { new CodeArgumentReferenceExpression("input"), 
-                        new CodeArgumentReferenceExpression("stream"), new CodeArgumentReferenceExpression("expected")})));
+                    new CodeArrayCreateExpression(typeof(object), new CodeArgumentReferenceExpression("input"), new CodeArgumentReferenceExpression("stream"), new CodeArgumentReferenceExpression("expected"))));
                 ser.Statements.Add(new CodeMethodInvokeExpression(new CodeVariableReferenceExpression("f"), "Invoke", new CodePrimitiveExpression(),
                         new CodeVariableReferenceExpression("args")));
 
@@ -547,8 +548,7 @@ namespace Orleans.CodeGeneration.Serialization
                 deser.Statements.Add(new CodeVariableDeclarationStatement(typeof(MethodInfo), "f",
                     new CodeMethodInvokeExpression(new CodeVariableReferenceExpression("t"), "GetMethod", new CodePrimitiveExpression("Deserializer"))));
                 deser.Statements.Add(new CodeVariableDeclarationStatement(typeof(object[]), "args",
-                    new CodeArrayCreateExpression(typeof(object), new CodeExpression[] { new CodeArgumentReferenceExpression("expected"), 
-                        new CodeArgumentReferenceExpression("stream")})));
+                    new CodeArrayCreateExpression(typeof(object), new CodeArgumentReferenceExpression("expected"), new CodeArgumentReferenceExpression("stream"))));
                 deser.Statements.Add(new CodeMethodReturnStatement(
                     new CodeMethodInvokeExpression(new CodeVariableReferenceExpression("f"), "Invoke", new CodePrimitiveExpression(),
                         new CodeVariableReferenceExpression("args"))));
@@ -581,7 +581,7 @@ namespace Orleans.CodeGeneration.Serialization
         {
             public int Compare(FieldInfo x, FieldInfo y)
             {
-                return String.Compare(x.Name, y.Name, StringComparison.Ordinal);
+                return string.Compare(x.Name, y.Name, StringComparison.Ordinal);
             }
         }
 
@@ -602,10 +602,10 @@ namespace Orleans.CodeGeneration.Serialization
                 return true;
 
             if (hasCustomDeserializer)
-                throw new OrleansException(String.Format("Class {0} has a custom deserializer but no custom serializer", t));
+                throw new OrleansException(string.Format("Class {0} has a custom deserializer but no custom serializer", t));
 
             if (hasCustomSerializer)
-                throw new OrleansException(String.Format("Class {0} has a custom serializer but no custom deserializer", t));
+                throw new OrleansException(string.Format("Class {0} has a custom serializer but no custom deserializer", t));
 
             return false;
         }
@@ -617,7 +617,7 @@ namespace Orleans.CodeGeneration.Serialization
 
         private static void ImportFieldNamespaces(Type t, CodeNamespaceImportCollection imports)
         {
-            if (!String.IsNullOrEmpty(t.Namespace))
+            if (!string.IsNullOrEmpty(t.Namespace))
             {
                 imports.Add(new CodeNamespaceImport(t.Namespace));
             }

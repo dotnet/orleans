@@ -23,5 +23,6 @@
   </metadata>
   <files>
     <file src="OrleansRuntime.dll" target="lib\net45" />
+    <file src="OrleansRuntime.pdb" target="lib\net45" />
   </files>
 </package>

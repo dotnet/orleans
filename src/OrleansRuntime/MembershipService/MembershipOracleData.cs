@@ -203,7 +203,6 @@ namespace Orleans.Runtime.MembershipService
 
                 Status = myStatus,
                 ProxyPort = (nodeConf.IsGatewayNode ? nodeConf.ProxyGatewayEndpoint.Port : 0),
-                IsPrimary = nodeConf.IsPrimaryNode,
 
                 RoleName = roleName,
                 

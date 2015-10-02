@@ -1,25 +1,28 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+// Project Orleans Cloud Service SDK ver. 1.0
+//  
+// Copyright (c) .NET Foundation
+// 
+// All rights reserved.
+//  
+// MIT License
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 using System;
 using System.CodeDom;
@@ -29,10 +32,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
-
 using Orleans.CodeGeneration.Serialization;
 using Orleans.Runtime;
-
 
 namespace Orleans.CodeGeneration
 {
@@ -45,11 +46,11 @@ namespace Orleans.CodeGeneration
         [Serializable]
         internal class CodeGenOptions
         {
-            public bool ServerGen = false;
+            public bool ServerGen;
             public FileInfo InputLib;
             public FileInfo SigningKey;
 
-            public bool LanguageConflict = false;
+            public bool LanguageConflict;
             public Language? TargetLanguage;
 
             public List<string> ReferencedAssemblies = new List<string>();
@@ -78,7 +79,7 @@ namespace Orleans.CodeGeneration
         [Serializable]
         internal class GrainClientGeneratorFlags
         {
-            internal static bool Verbose = true;
+            internal static bool Verbose = false;
             internal static bool FailOnPathNotFound = false;
         }
 
@@ -123,11 +124,6 @@ namespace Orleans.CodeGeneration
 
                 // Call a method 
                 return generator.CreateGrainClient(options);
-            }
-            catch (Exception ex)
-            {
-                ConsoleText.WriteError("ERROR -- Client code-gen FAILED -- Exception caught -- ", ex);
-                throw;
             }
             finally
             {
@@ -322,10 +318,10 @@ namespace Orleans.CodeGeneration
             var processedGrainTypes = new List<string>();
             bool success = true;
 
-            ConsoleText.WriteStatus("Orleans-CodeGen - Adding grain namespaces ");
+            ConsoleText.WriteStatus("Orleans-CodeGen - Adding grain namespaces from input Assembly " + inputAssembly.GetName());
             foreach (var type in inputAssembly.GetTypes())
             {
-                if (!options.ServerGen && !type.IsNested && !type.IsGenericParameter && type.IsSerializable)
+                if (!type.IsNested && !type.IsGenericParameter && type.IsSerializable)
                     SerializerGenerationManager.RecordTypeToGenerate(type);
 
                 if (!options.ServerGen && GrainInterfaceData.IsGrainInterface(type))
@@ -341,7 +337,7 @@ namespace Orleans.CodeGeneration
                     catch (GrainInterfaceData.RulesViolationException rve)
                     {
                         foreach (var v in rve.Violations)
-                            ConsoleText.WriteError(string.Format("Error: {0}", v));
+                            NamespaceGenerator.ReportError(v);
 
                         success = false;
                     }
@@ -353,7 +349,6 @@ namespace Orleans.CodeGeneration
                     try
                     {
                         var grainInterfaceData = GrainInterfaceData.FromGrainClass(type, options.TargetLanguage.Value);
-                        grainNamespace.AddStateClass(grainInterfaceData);
                     }
                     catch (GrainInterfaceData.RulesViolationException rve)
                     {
@@ -361,7 +356,7 @@ namespace Orleans.CodeGeneration
                         //Question: Should we instead throw compile errors?
                         //Question: What warning number should we use? Standard C# warning/error numbers are listed here: https://msdn.microsoft.com/en-us/library/ms228296(v=vs.90).aspx                        
                         foreach (var v in rve.Violations)
-                            ConsoleText.WriteUsage(string.Format("Warning CS0184 : {0}", v));
+                            NamespaceGenerator.ReportWarning(string.Format("CS0184 : {0}", v));
                     }
                 }
             }
@@ -469,7 +464,7 @@ namespace Orleans.CodeGeneration
             // add referrenced named spaces
             foreach (string referredNamespace in grainNamespace.ReferencedNamespaces)
                 if (referredNamespace != referenceNameSpace.Name)
-                    if (!String.IsNullOrEmpty(referredNamespace))
+                    if (!string.IsNullOrEmpty(referredNamespace))
                     {
                         referenceNameSpace.Imports.Add(new CodeNamespaceImport(referredNamespace));
                     }
@@ -618,7 +613,7 @@ namespace Orleans.CodeGeneration
                 foreach (string imp in options.Imports)
                     compilerParams.CompilerOptions += string.Format(" /imports:{0} ", imp);
 
-            compilerParams.CompilerOptions += string.Format(" /define:EXCLUDE_CODEGEN ");
+            compilerParams.CompilerOptions += " /define:EXCLUDE_CODEGEN ";
 
             using (CodeDomProvider codeProvider = CodeGeneratorBase.GetCodeProvider(options.TargetLanguage.Value, true))
             {
@@ -630,7 +625,7 @@ namespace Orleans.CodeGeneration
                 foreach (CompilerError error in results.Errors)
                 {
                     Console.WriteLine(error.ToString());
-                    errorsString += String.Format("{0} Line {1},{2} - {3} {4} -- {5}",
+                    errorsString += string.Format("{0} Line {1},{2} - {3} {4} -- {5}",
                         error.FileName,
                         error.Line,
                         error.Column,
@@ -639,7 +634,7 @@ namespace Orleans.CodeGeneration
                         error.ErrorText)
                     + Environment.NewLine;
                 }
-                String errMsg = String.Format(
+                string errMsg = string.Format(
                     "Error: ClientGenerator could not compile and generate " + options.TargetLanguage.Value
                     + " -- encountered " + results.Errors.Count + " compilation warnings/errors."
                     + Environment.NewLine + "ErrorList = "
@@ -681,7 +676,7 @@ namespace Orleans.CodeGeneration
                     string arg = a.Trim('"').Trim().Trim('"');
                     if (GrainClientGeneratorFlags.Verbose)
                         Console.WriteLine("Orleans-CodeGen - arg #{0}={1}", i++, arg);
-                    if (String.IsNullOrEmpty(arg) || String.IsNullOrWhiteSpace(arg))
+                    if (string.IsNullOrEmpty(arg) || string.IsNullOrWhiteSpace(arg))
                         continue;
 
                     if (arg.StartsWith("/"))
@@ -818,7 +813,7 @@ namespace Orleans.CodeGeneration
 
                 if (!options.TargetLanguage.HasValue)
                 {
-                    ConsoleText.WriteError("Error: unable to determine source code language to use for code generation.");
+                    NamespaceGenerator.ReportError("Unable to determine source code language to use for code generation.");
                     return 2;
                 }
 
@@ -831,7 +826,7 @@ namespace Orleans.CodeGeneration
 
                 if (string.IsNullOrEmpty(options.CodeGenFile))
                 {
-                    ConsoleText.WriteError(string.Format("Error: no codegen file. Add a file '{0}' to your project",
+                    NamespaceGenerator.ReportError(string.Format("No codegen file. Add a file '{0}' to your project",
                         (options.TargetLanguage == Language.CSharp) ? Path.Combine("Properties", "orleans.codegen.cs") :
                         (options.TargetLanguage == Language.FSharp) ? Path.Combine("GeneratedFiles", "orleans.codegen.fs") 
                                                                     : Path.Combine("GeneratedFiles", "orleans.codegen.vb")));
@@ -878,7 +873,7 @@ namespace Orleans.CodeGeneration
             }
             catch (Exception ex)
             {
-                ConsoleText.WriteError("ERROR -- Code-gen FAILED -- ", ex);
+                NamespaceGenerator.ReportError("-- Code-gen FAILED -- ", ex);
                 return 3;
             }
         }

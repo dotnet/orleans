@@ -30,6 +30,7 @@ using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using System.Collections.Generic;
 
 namespace UnitTests.General
 {
@@ -132,6 +133,23 @@ namespace UnitTests.General
             Assert.AreEqual(3.4f, floatResult2);
             Assert.AreEqual("5.6", stringResult);
         }
+
+        /// Can instantiate grains that implement generic interfaces with generic type parameters
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
+        public async Task GenericGrainTests_GenericInterfaceWithGenericParametersGetGrain()
+        {
+
+            var grain = GetGrain<ISimpleGenericGrain<List<float>>>();
+            var list = new List<float>();
+            list.Add(0.1f);
+            await grain.Set(list);
+
+            var result = await grain.Get();
+
+            Assert.AreEqual(1, result.Count);
+            Assert.AreEqual(0.1f, result[0]);
+        }
+
 
         /// Multiple GetGrain requests with the same id return the same generic grain specialization
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -523,7 +541,7 @@ namespace UnitTests.General
             Assert.AreEqual(msg4, received, "Echo");
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Generics")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_Echo_Chain_5()
         {
             const string msg5 = "Hello from EchoGenericChainGrain-5";
@@ -534,7 +552,7 @@ namespace UnitTests.General
             Assert.AreEqual(msg5, received, "Echo");
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Generics")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_Echo_Chain_6()
         {
             const string msg6 = "Hello from EchoGenericChainGrain-6";

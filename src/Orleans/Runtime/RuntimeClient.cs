@@ -38,26 +38,5 @@ namespace Orleans.Runtime
         /// of the appropriate type depending on whether caller is running inside or outside silo.
         /// </summary>
         internal static IRuntimeClient Current { get; set; }
-
-        internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
-        {
-            var message = new Message(
-                Message.Categories.Application,
-                (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request)
-            {
-                Id = CorrelationId.GetNext(),
-                InterfaceId = request.InterfaceId,
-                MethodId = request.MethodId,
-                IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
-                IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                BodyObject = request
-            };
-            
-            if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
-                message.IsAlwaysInterleave = true;
-
-            RequestContext.ExportToMessage(message);
-            return message;
-        }
     }
 }

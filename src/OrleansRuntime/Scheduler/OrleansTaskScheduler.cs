@@ -43,6 +43,8 @@ namespace Orleans.Runtime.Scheduler
         internal WorkQueue RunQueue { get; private set; }
         internal WorkerPool Pool { get; private set; }
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
+        // This is the maximum number of pending work items for a single activation before we write a warning log.
+        internal LimitValue MaxPendingItemsLimit { get; private set; }
         internal TimeSpan DelayWarningThreshold { get; private set; }
         
         public static OrleansTaskScheduler Instance { get; private set; }
@@ -51,25 +53,26 @@ namespace Orleans.Runtime.Scheduler
         
 
         public OrleansTaskScheduler(int maxActiveThreads)
-            : this(maxActiveThreads, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), 
-            NodeConfiguration.INJECT_MORE_WORKER_THREADS)
+            : this(maxActiveThreads, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100),
+            NodeConfiguration.INJECT_MORE_WORKER_THREADS, LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {
         }
 
         public OrleansTaskScheduler(GlobalConfiguration globalConfig, NodeConfiguration config)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
-                    config.TurnWarningLengthThreshold, config.InjectMoreWorkerThreads)
+                    config.TurnWarningLengthThreshold, config.InjectMoreWorkerThreads, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {
         }
 
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
-            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads)
+            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit)
         {
             Instance = this;
             DelayWarningThreshold = delayWarningThreshold;
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
             applicationTurnsStopped = false;
+            MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
             RunQueue = new WorkQueue();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
@@ -270,11 +273,25 @@ namespace Orleans.Runtime.Scheduler
         // public for testing only -- should be private, otherwise
         public WorkItemGroup GetWorkItemGroup(ISchedulingContext context)
         {
-            WorkItemGroup workGroup = null;
-            if (context != null)
-                workgroupDirectory.TryGetValue(context, out workGroup);
-            
-            return workGroup;
+            if (context == null)
+                return null;
+           
+            WorkItemGroup workGroup;
+            if(workgroupDirectory.TryGetValue(context, out workGroup))
+                return workGroup;
+
+            var error = String.Format("QueueWorkItem was called on a non-null context {0} but there is no valid WorkItemGroup for it.", context);
+            logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
+            throw new InvalidSchedulingContextException(error);
+        }
+
+        internal void CheckSchedulingContextValidity(ISchedulingContext context)
+        {
+            if (context == null)
+            {
+                throw new InvalidSchedulingContextException("CheckSchedulingContextValidity was called on a null SchedulingContext.");
+            }
+            GetWorkItemGroup(context); // GetWorkItemGroup throws for Invalid context
         }
 
         public TaskScheduler GetTaskScheduler(ISchedulingContext context)

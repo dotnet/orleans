@@ -19,14 +19,11 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
-      
-      <dependency id="WindowsAzure.Storage" version="4.2.0.0" />
-      <dependency id="Microsoft.WindowsAzure.ConfigurationManager" version="2.0.0.0" />
-      <dependency id="Newtonsoft.Json" version="5.0.8" />
     </dependencies>
   </metadata>
   <files>
     <file src="OrleansProviders.dll" target="lib\net45" />
-    <file src="SQLServer\CreateTables.sql" target="lib\net45\SQLServer" />
+    <file src="OrleansProviders.pdb" target="lib\net45" />
+    <file src="SQLServer\CreateOrleansTables_SqlServer.sql" target="lib\net45\SQLServer" />
   </files>
 </package>

@@ -72,6 +72,11 @@ namespace Orleans.Providers
             return statisticsProviderLoader.GetProvider(name, true);
         }
 
+        public IList<IProvider> GetProviders()
+        {
+            return statisticsProviderLoader.GetProviders();
+        }
+
         // used only for testing
         internal async Task LoadEmptyProviders()
         {
@@ -98,6 +103,11 @@ namespace Orleans.Providers
         public Guid ServiceId
         {
             get { return runtime.ServiceId; }
+        }
+
+        public string SiloIdentity
+        {
+            get { return runtime.SiloIdentity; }
         }
     }
 }

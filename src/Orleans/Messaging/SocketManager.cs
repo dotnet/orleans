@@ -97,7 +97,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    s.Close();
+                    s.Dispose();
                 }
                 catch (Exception)
                 {
@@ -230,7 +230,7 @@ namespace Orleans.Runtime
 
             try
             {
-                s.Close();
+                s.Dispose();
             }
             catch (Exception)
             {

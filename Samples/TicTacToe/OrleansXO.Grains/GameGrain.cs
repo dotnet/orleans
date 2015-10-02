@@ -147,11 +147,11 @@ namespace OrleansXO.Grains
                 // collect tasks up, so we await both notifications at the same time
                 var promises = new List<Task>();
                 // inform this player of outcome
-                var playerGrain = PlayerGrainFactory.GetGrain(ListOfPlayers[indexNextPlayerToMove]);
+                var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(ListOfPlayers[indexNextPlayerToMove]);
                 promises.Add(playerGrain.LeaveGame(this.GetPrimaryKey(), win ? GameOutcome.Win : GameOutcome.Draw));
 
                 // inform other player of outcome
-                playerGrain = PlayerGrainFactory.GetGrain(ListOfPlayers[(indexNextPlayerToMove + 1) % 2]);
+                playerGrain = GrainFactory.GetGrain<IPlayerGrain>(ListOfPlayers[(indexNextPlayerToMove + 1) % 2]);
                 promises.Add(playerGrain.LeaveGame(this.GetPrimaryKey(), win ? GameOutcome.Lose : GameOutcome.Draw));
                 await Task.WhenAll(promises);
                 return this.GameState;
@@ -185,7 +185,7 @@ namespace OrleansXO.Grains
             var promises = new List<Task<string>>();
             foreach (var p in this.ListOfPlayers.Where(p => p != player))
             {
-                promises.Add(PlayerGrainFactory.GetGrain(p).GetUsername());
+                promises.Add(GrainFactory.GetGrain<IPlayerGrain>(p).GetUsername());
             }
             await Task.WhenAll(promises);
 

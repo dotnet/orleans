@@ -32,7 +32,7 @@ Module Module1
 
         GrainClient.Initialize("DevTestClientConfiguration.xml")
 
-        Dim grain = GrainFactory.GetGrain(Of IHello)(0)
+        Dim grain = GrainClient.GrainFactory.GetGrain(Of IHello)(0)
 
         Console.WriteLine(vbNewLine & vbNewLine & "{0}" & vbNewLine & vbNewLine, grain.SayHello("Good morning!").Result)
 

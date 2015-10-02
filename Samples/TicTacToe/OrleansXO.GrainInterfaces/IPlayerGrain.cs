@@ -30,7 +30,7 @@ using Orleans;
 
 namespace OrleansXO.GrainInterfaces
 {
-    public interface IPlayerGrain : IGrain
+    public interface IPlayerGrain : IGrainWithGuidKey
     {
         // get a list of all active games
 

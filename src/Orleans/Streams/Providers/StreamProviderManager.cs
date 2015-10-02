@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
@@ -45,19 +46,38 @@ namespace Orleans.Streams
             await appStreamProviders.InitProviders(providerRuntime);
         }
 
-        internal async Task StartStreamProviders()
+        internal Task StartStreamProviders()
         {
+            List<Task> tasks = new List<Task>();
             var providers = appStreamProviders.GetProviders();
             foreach (IStreamProviderImpl streamProvider in providers)
             {
                 var provider = streamProvider;
-                await provider.Start();   
+                tasks.Add(provider.Start());   
             }
+            return Task.WhenAll(tasks);
+        }
+
+        internal Task StopStreamProviders()
+        {
+            List<Task> tasks = new List<Task>();
+            var providers = appStreamProviders.GetProviders();
+            foreach (IStreamProviderImpl streamProvider in providers)
+            {
+                var provider = streamProvider;
+                tasks.Add(provider.Stop());
+            }
+            return Task.WhenAll(tasks);
         }
 
         public IEnumerable<IStreamProvider> GetStreamProviders()
         {
             return appStreamProviders.GetProviders();
+        }
+
+        public IList<IProvider> GetProviders()
+        {
+            return appStreamProviders.GetProviders().Cast<IProvider>().ToList();
         }
 
         public IProvider GetProvider(string name)

@@ -150,6 +150,7 @@ namespace Orleans.Runtime
 
         // This is the maximum amount of time we expect a request to continue processing
         private static TimeSpan maxRequestProcessingTime;
+        private static NodeConfiguration nodeConfiguration;
         public readonly TimeSpan CollectionAgeLimit;
         private IGrainMethodInvoker lastInvoker;
 
@@ -158,10 +159,11 @@ namespace Orleans.Runtime
         private HashSet<GrainTimer> timers;
         private readonly TraceLogger logger;
 
-        public static void Init(ClusterConfiguration config)
+        public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
             // Consider adding a config parameter for this
             maxRequestProcessingTime = config.Globals.ResponseTimeout.Multiply(5);
+            nodeConfiguration = nodeConfig;
         }
 
         public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, IActivationCollector collector, TimeSpan ageLimit)
@@ -254,7 +256,7 @@ namespace Orleans.Runtime
                 GrainInstanceType = grainInstance.GetType();
 
                 // Don't ever collect system grains or reminder table grain or memory store grains.
-                bool doNotCollect = typeof(IReminderTable).IsAssignableFrom(GrainInstanceType) || typeof(IMemoryStorageGrain).IsAssignableFrom(GrainInstanceType);
+                bool doNotCollect = typeof(IReminderTableGrain).IsAssignableFrom(GrainInstanceType) || typeof(IMemoryStorageGrain).IsAssignableFrom(GrainInstanceType);
                 if (doNotCollect)
                 {
                     this.collector = null;
@@ -286,7 +288,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            await streamDirectory.Cleanup();
+            await streamDirectory.Cleanup(true, false);
         }
 
         #region IActivationData
@@ -394,7 +396,8 @@ namespace Orleans.Runtime
         public PlacementStrategy PlacedUsing { get; private set; }
 
         // currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
-        internal bool IsMultiActivationGrain { get { return PlacedUsing is StatelessWorkerPlacement; } }
+        internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }
+
 
         public Message Running { get; private set; }
 
@@ -438,14 +441,14 @@ namespace Orleans.Runtime
             currentRequestStartTime = DateTime.MinValue;
         }
 
-        private long currentlyExecutingCount;
+        private long inFlightCount;
         private long enqueuedOnDispatcherCount;
 
         /// <summary>
         /// Number of messages that are actively being processed [as opposed to being in the Waiting queue].
         /// In most cases this will be 0 or 1, but for Reentrant grains can be >1.
         /// </summary>
-        public long CurrentlyExecutingCount { get { return Interlocked.Read(ref currentlyExecutingCount); } }
+        public long InFlightCount { get { return Interlocked.Read(ref inFlightCount); } }
 
         /// <summary>
         /// Number of messages that are being received [as opposed to being in the scheduler queue or actively processed].
@@ -453,10 +456,10 @@ namespace Orleans.Runtime
         public long EnqueuedOnDispatcherCount { get { return Interlocked.Read(ref enqueuedOnDispatcherCount); } }
 
         /// <summary>Increment the number of in-flight messages currently being processed.</summary>
-        public void IncrementInFlightCount() { Interlocked.Increment(ref currentlyExecutingCount); }
+        public void IncrementInFlightCount() { Interlocked.Increment(ref inFlightCount); }
         
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
-        public void DecrementInFlightCount() { Interlocked.Decrement(ref currentlyExecutingCount); }
+        public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
         /// <summary>Increment the number of messages currently in the prcess of being received.</summary>
         public void IncrementEnqueuedOnDispatcherCount() { Interlocked.Increment(ref enqueuedOnDispatcherCount); }
@@ -551,7 +554,7 @@ namespace Orleans.Runtime
             lock (this)
             {
                 long numInDispatcher = EnqueuedOnDispatcherCount;
-                long numActive = CurrentlyExecutingCount;
+                long numActive = InFlightCount;
                 long numWaiting = WaitingCount;
                 return (int)(numInDispatcher + numActive + numWaiting);
             }
@@ -565,11 +568,11 @@ namespace Orleans.Runtime
                 string limitName = CodeGeneration.GrainInterfaceData.IsStatelessWorker(GrainInstanceType)
                     ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER
                     : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
-                maxEnqueuedRequestsLimit = LimitManager.GetLimit(limitName); // Cache for next time
+                maxEnqueuedRequestsLimit = nodeConfiguration.LimitManager.GetLimit(limitName); // Cache for next time
                 return maxEnqueuedRequestsLimit;
             }
-            
-            return LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
+
+            return nodeConfiguration.LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
         }
 
         public Message PeekNextWaitingMessage()
@@ -759,7 +762,7 @@ namespace Orleans.Runtime
                 {
                     sb.AppendFormat("   Processing message: {0}", Running);
                 }
-                
+
                 if (waiting!=null && waiting.Count > 0)
                 {
                     sb.AppendFormat("   Messages queued within ActivationData: {0}", PrintWaitingQueue());
@@ -778,18 +781,23 @@ namespace Orleans.Runtime
                  State);
         }
 
-        internal string ToDetailedString()
+        internal string ToDetailedString(bool includeExtraDetails = false)
         {
-            return String.Format("[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} CurrentlyExecutingCount={7} NumRunning={8}]",
-                 Silo.ToLongString(),
-                 Grain.ToDetailedString(),
-                 ActivationId,
-                 GetActivationInfoString(),
-                 State,                         // 4
-                 WaitingCount,                  // 5 NonReentrancyQueueSize
-                 EnqueuedOnDispatcherCount,     // 6 EnqueuedOnDispatcher
-                 CurrentlyExecutingCount,       // 7 CurrentlyExecutingCount
-                 numRunning);                   // 8 NumRunning
+            return
+                String.Format(
+                    "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
+                    Silo.ToLongString(),
+                    Grain.ToDetailedString(),
+                    ActivationId,
+                    GetActivationInfoString(),
+                    State,                          // 4
+                    WaitingCount,                   // 5 NonReentrancyQueueSize
+                    EnqueuedOnDispatcherCount,      // 6 EnqueuedOnDispatcher
+                    InFlightCount,                  // 7 InFlightCount
+                    numRunning,                     // 8 NumRunning
+                    GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
+                    CollectionAgeLimit,             // 10 CollectionAgeLimit
+                    (includeExtraDetails && Running != null) ? " CurrentlyExecuting=" + Running : "");  // 11: Running
         }
 
         public string Name
@@ -816,9 +824,9 @@ namespace Orleans.Runtime
 
         private string GetActivationInfoString()
         {
-            var multi = IsMultiActivationGrain ? " MultiActivationGrain" : String.Empty;
-            return GrainInstanceType == null ? multi : 
-                String.Format(" #GrainType={0}{1}", GrainInstanceType.FullName, multi);
+            var placement = PlacedUsing != null ? PlacedUsing.GetType().Name : String.Empty;
+            return GrainInstanceType == null ? placement :
+                String.Format(" #GrainType={0} Placement={1}", GrainInstanceType.FullName, placement);
         }
 
         #endregion

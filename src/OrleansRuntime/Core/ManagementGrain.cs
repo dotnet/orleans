@@ -214,13 +214,30 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
+        public Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
+        {
+            return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider(providerTypeFullName, providerName, command, arg),
+                String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
+        }
+
+        private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)
+        {
+            var silos = await GetHosts(true);
+            logger.Info("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+
+            var actionPromises = new List<Task<object>>();
+            foreach (SiloAddress siloAddress in silos.Keys.ToArray())
+                actionPromises.Add(action(GetSiloControlReference(siloAddress)));
+
+            return await Task.WhenAll(actionPromises);
+        }
 
         private async Task<IMembershipTable> GetMembershipTable()
         {
             if (membershipTable == null)
             {
                 var factory = new MembershipFactory();
-                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType);
+                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType, Silo.CurrentSilo.GlobalConfig.MembershipTableAssembly);
 
                 await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
                     TraceLogger.GetLogger(membershipTable.GetType().Name));
@@ -311,7 +328,7 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return Orleans.GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
         }
     }
 }

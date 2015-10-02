@@ -4,6 +4,7 @@
     <Package Name="Orleans Runtime" Type="System" Path="..\Binaries\OrleansServer" />
     <!-- Package Name="App" Type="Application" Path="App Folder" / -->
   </Packages>
+  <Program ExeName="OrleansHost" />
   <RuntimeConfiguration Path=".\OrleansConfiguration.xml" />
   <Nodes>
     <Node HostName="MACHINE1" NodeName="Primary" />

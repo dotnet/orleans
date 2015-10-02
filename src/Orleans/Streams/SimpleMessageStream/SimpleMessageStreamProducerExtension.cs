@@ -141,7 +141,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
 
         // Called by rendezvous when new remote subsriber subscribes to this stream.
-        public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
             if (logger.IsVerbose)
             {
@@ -219,7 +219,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                             continue;
                     }
 
-                    Task task = remoteConsumer.DeliverItem(subscriptionKvp.Key, immutableItem, null);
+                    Task task = remoteConsumer.DeliverItem(subscriptionKvp.Key, immutableItem, null, null);
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }

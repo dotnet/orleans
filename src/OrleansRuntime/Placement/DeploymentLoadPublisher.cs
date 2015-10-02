@@ -71,7 +71,7 @@ namespace Orleans.Runtime
                 // Randomize PublishStatistics timer,
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
                 var randomTimerOffset = random.NextTimeSpan(statisticsRefreshTime);
-                var t = GrainTimer.FromTaskCallback(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime);
+                var t = GrainTimer.FromTaskCallback(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
                 t.Start();
             }
             await RefreshStatistics();
@@ -91,7 +91,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        tasks.Add(GrainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
+                        tasks.Add(InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
                             Constants.DeploymentLoadPublisherSystemTargetId, siloAddress)
                             .UpdateRuntimeStatistics(silo.SiloAddress, myStats));
                     }
@@ -137,7 +137,7 @@ namespace Orleans.Runtime
                     foreach (var siloAddress in members)
                     {
                         var capture = siloAddress;
-                        Task task = GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
+                        Task task = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
                                 .GetRuntimeStatistics()
                                 .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
                                     {

@@ -66,21 +66,29 @@ if (!$targetDirectory)
 	WriteHostSafe -foregroundColor "Red" -text "            of the <TargetLocation> element in the deployment config file." 
 }
 
-
+if ($configXml.Deployment.Program)
+{
+	$exeName = $configXml.Deployment.Program.ExeName
+	if (!$exeName)
+	{
+		$exeName = "OrleansHost"
+	}
+}
+Echo "Program executable = $exeName"
 
 
 "Removing Orleans from {0} machines" -f $machines.Count
 foreach ($machine in $machines) 
 {
 	# TODO: Test to see if the machine is accessible.
-	# Stop all instances of OrleansHost down on the target computer.
-	Echo "Stopping OrleansHost on $machine ..."
+	# Stop all instances of server process on the target computer.
+	Echo "Stopping $exeName on $machine ..."
 	StopOrleans $machine
 
 	# TODO: Confirm that the loop expression can actually return a value.
 	# TODO: Add a way to break out of the loop.
 	#Wait until the processes shut down.
-	while (IsProcessRunning OrleansHost $machine)
+	while (IsProcessRunning $exeName $machine)
 	{
 		Echo "Waiting for Orleans to shut down..."
 		Start-Sleep -Seconds 5

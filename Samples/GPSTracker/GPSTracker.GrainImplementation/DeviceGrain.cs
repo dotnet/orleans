@@ -43,7 +43,7 @@ namespace GPSTracker.GrainImplementation
             if (null == this.LastMessage || this.LastMessage.Latitude != message.Latitude || this.LastMessage.Longitude != message.Longitude)
             {
                 // only sent a notification if the position has changed
-                var notifier = PushNotifierGrainFactory.GetGrain(0);
+                var notifier = GrainFactory.GetGrain<IPushNotifierGrain>(0);
                 var speed = GetSpeed(this.LastMessage, message);
 
                 // record the last message

@@ -33,7 +33,7 @@ namespace Orleans.Samples.Presence.GrainInterfaces
     /// <summary>
     /// Interface to an individual player that may or may not be in a game at any point in time
     /// </summary>
-    public interface IPlayerGrain : IGrain
+    public interface IPlayerGrain : IGrainWithGuidKey
     {
         Task<IGameGrain> GetCurrentGame();
 
