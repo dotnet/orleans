@@ -24,12 +24,12 @@ Company|Link|Notes
 ---------|------|-------
 Gassumo  | <a href="http://gassumo.com" target="_blank">www.gassumo.com</a>|
 Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>|
-Microsoft Research  |  <a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
-NašeÚkoly.CZ    |<a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
-Trustev    |<a href="http://www.trustev.com/" target="_blank">www.trustev.com</a>|
-Mailcloud Limited |<a href="http://www.mailcloud.com/" target="_blank">http://www.mailcloud.com/</a>|
-Gigya |<a href="http://gigya.com/" target="_blank">http://gigya.com/</a>|
-
+Microsoft Research  | <a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
+NašeÚkoly.CZ    | <a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
+Trustev    | <a href="http://www.trustev.com/" target="_blank">www.trustev.com</a>|
+Mailcloud Limited | <a href="http://www.mailcloud.com/" target="_blank">http://www.mailcloud.com/</a>|
+Gigya | <a href="http://gigya.com/" target="_blank">http://gigya.com/</a>|
+Honeywell | <a href="http://honeywell.com/" target="_blank">http://honeywell.com/</a>|
 
 ## Projects and Applications
 
