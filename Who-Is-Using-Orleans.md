@@ -23,7 +23,7 @@ This list is for companies that are using Orleans.
 Company|Link|Notes
 ---------|------|-------
 Gassumo  | <a href="http://gassumo.com" target="_blank">www.gassumo.com</a>|
-Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>|
+Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>| Microsoft Studios (Halo, Age of Empires, BigPark, others), Skype, Azure, others 
 Microsoft Research  | <a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
 NašeÚkoly.CZ    | <a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
 Trustev    | <a href="http://www.trustev.com/" target="_blank">www.trustev.com</a>|
