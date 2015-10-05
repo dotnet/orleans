@@ -22,14 +22,13 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans
 {
-    using System.Diagnostics.CodeAnalysis;
-
     /// <summary>
     /// Utility functions for dealing with Task's.
     /// </summary>
@@ -43,15 +42,19 @@ namespace Orleans
         /// </summary>
         /// <param name="task">The task to be ignored.</param>
         [SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "ignored")]
-        public static async void Ignore(this Task task)
+        public static void Ignore(this Task task)
         {
-            try
+            if (task.IsCompleted)
             {
-                await task;
+                var ignored = task.Exception;
             }
-            catch (Exception)
+            else
             {
-                var ignored = task.Exception; // Observe exception
+                task.ContinueWith(
+                    t => { var ignored = t.Exception; },
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
             }
         }
 
