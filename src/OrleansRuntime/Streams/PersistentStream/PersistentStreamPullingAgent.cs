@@ -55,6 +55,7 @@ namespace Orleans.Streams
         private IDisposable timer;
 
         internal readonly QueueId QueueId;
+        private bool IsShutdown { get { return timer == null; } }
 
 
         internal PersistentStreamPullingAgent(
@@ -170,14 +171,6 @@ namespace Orleans.Streams
                 Utils.SafeExecute(tmp.Dispose);
             }
 
-            var unregisterTasks = new List<Task>();
-            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
-            foreach (var streamId in pubSubCache.Keys)
-            {
-                logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
-                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
-            }
-
             try
             {
                 var task = OrleansTaskExtentions.SafeExecute(() => receiver.Shutdown(config.InitQueueTimeout));
@@ -191,6 +184,16 @@ namespace Orleans.Streams
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
             }
 
+            var unregisterTasks = new List<Task>();
+            var meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
+            foreach (var tuple in pubSubCache)
+            {
+                tuple.Value.DisposeAll(logger);
+                var streamId = tuple.Key;
+                logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
+                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
+            }
+
             try
             {
                 await Task.WhenAll(unregisterTasks);
@@ -200,6 +203,7 @@ namespace Orleans.Streams
                 logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_08,
                     "Failed to unregister myself as stream producer to some streams taht used to be in my responsibility.", exc);
             }
+            pubSubCache.Clear();
         }
 
         public Task AddSubscriber(
@@ -225,6 +229,8 @@ namespace Orleans.Streams
             StreamSequenceToken cacheToken,
             IStreamFilterPredicateWrapper filter)
         {
+            if (IsShutdown) return;
+
             StreamConsumerCollection streamDataCollection;
             if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
             {
@@ -263,8 +269,7 @@ namespace Orleans.Streams
 
                     if (requestedToken != null)
                     {
-                        if (consumerData.Cursor != null) 
-                            consumerData.Cursor.Dispose();
+                        consumerData.SafeDisposeCursor(logger);
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, requestedToken);
                     }
                     else
@@ -307,11 +312,13 @@ namespace Orleans.Streams
 
         public void RemoveSubscriber_Impl(GuidId subscriptionId, StreamId streamId)
         {
+            if (IsShutdown) return;
+
             StreamConsumerCollection streamData;
             if (!pubSubCache.TryGetValue(streamId, out streamData)) return;
 
             // remove consumer
-            bool removed = streamData.RemoveConsumer(subscriptionId);
+            bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed && logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
             
             if (streamData.Count == 0)
@@ -323,13 +330,13 @@ namespace Orleans.Streams
             try
             {
                 var myQueueId = (QueueId)(state);
-                if (timer == null) return; // timer was already removed, last tick
+                if (IsShutdown) return; // timer was already removed, last tick
                 
                 IQueueAdapterReceiver rcvr = receiver;
                 int maxCacheAddCount = queueCache != null ? queueCache.MaxAddCount : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
-                while (timer != null) // timer will be set to null when we are asked to shudown. 
+                while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
                 {
                     var now = DateTime.UtcNow;
                     // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
@@ -398,9 +405,12 @@ namespace Orleans.Streams
         {
             if (pubSubCache.Count == 0) return;
             var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, config.StreamInactivityPeriod))
-                         .Select(pair => pair.Key)
                          .ToList();
-            toRemove.ForEach(key => pubSubCache.Remove(key));
+            toRemove.ForEach(tuple =>
+            {                
+                pubSubCache.Remove(tuple.Key);
+                tuple.Value.DisposeAll(logger);
+            });
         }
 
         private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken, DateTime now)
@@ -451,19 +461,23 @@ namespace Orleans.Streams
                     consumerData.Cursor == null) return;
                 
                 consumerData.State = StreamConsumerDataState.Active;
-                while (consumerData.Cursor != null && consumerData.Cursor.MoveNext())
+                while (consumerData.Cursor != null)
                 {
                     IBatchContainer batch = null;
                     Exception exceptionOccured = null;
                     try
                     {
                         Exception ignore;
+                        if (!consumerData.Cursor.MoveNext())
+                        {
+                            break;
+                        }
                         batch = consumerData.Cursor.GetCurrent(out ignore);
                     }
                     catch (Exception exc)
                     {
                         exceptionOccured = exc;
-                        if (consumerData.Cursor != null) consumerData.Cursor.Dispose();
+                        consumerData.SafeDisposeCursor(logger);
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, null);
                     }
 

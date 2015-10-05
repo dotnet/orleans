@@ -51,6 +51,11 @@ namespace Orleans.Providers.Streams.Common
             return new EventSequenceToken(sequenceNumber + 1, eventIndex);
         }
 
+        public long GetSequenceNumber()
+        {
+            return sequenceNumber;
+        }
+
         public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
         {
             return new EventSequenceToken(sequenceNumber, eventInd);

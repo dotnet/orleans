@@ -58,7 +58,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             return TaskDone.Done;
         }
 
-        public Task Stop()
+        public Task Close()
         {
             return TaskDone.Done;
         }

@@ -25,7 +25,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Providers;
@@ -55,14 +54,14 @@ namespace Orleans.Runtime.Storage
             return storageProviderLoader.InitProviders(providerRuntime);
         }
 
-        internal void UnloadStorageProviders()
+        public Task CloseProviders()
         {
-            foreach (var provider in storageProviderLoader.GetProviders())
+            List<Task> tasks = new List<Task>();
+            foreach (var provider in GetProviders())
             {
-                var disp = provider as IDisposable;
-                if (disp != null)
-                    disp.Dispose();
+                tasks.Add(provider.Close());
             }
+            return Task.WhenAll(tasks);
         }
 
         public int GetNumLoadedProviders()

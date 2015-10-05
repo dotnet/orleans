@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Runtime;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
@@ -40,12 +41,12 @@ using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
-using System.Runtime;
 
 
 namespace Orleans.Runtime
@@ -86,6 +87,7 @@ namespace Orleans.Runtime
         private readonly MembershipFactory membershipFactory;
         private StorageProviderManager storageProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
+        private BootstrapProviderManager bootstrapProviderManager;
         private readonly LocalReminderServiceFactory reminderFactory;
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
@@ -100,7 +102,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders;
-        
+        private readonly IServiceProvider services;
         
         internal readonly string Name;
         internal readonly string SiloIdentity;
@@ -122,6 +124,8 @@ namespace Orleans.Runtime
         {
             get { return allSiloProviders.AsReadOnly();  }
         }
+
+        internal IServiceProvider Services { get { return services; } }
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress { get { return messageCenter.MyAddress; } }
@@ -211,6 +215,9 @@ namespace Orleans.Runtime
                 // Re-establish reference to shared local key store in this app domain
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
+
+            services = ConfigureStartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
 
@@ -514,7 +521,7 @@ namespace Orleans.Runtime
                     .WaitWithThrow(initTimeout);
                 if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 
-                var bootstrapProviderManager = new BootstrapProviderManager();
+                bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
                     () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations),
                     providerManagerSystemTarget.SchedulingContext)
@@ -702,16 +709,35 @@ namespace Orleans.Runtime
                 // 7:
                 SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
+                // The order of closing providers might be importan: Stats, streams, boostrap, storage.
+                // Stats first since no one depends on it.
+                // Storage should definitely be last since other providers ma ybe using it, potentilay indirectly.
+                // Streams and Bootstrap - the order is less clear. Seems like Bootstrap may indirecly depend on Streams, but not the other way around.
                 // 8:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => statisticsProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+                // 9:
                 SafeExecute(() =>
                 {                
                     var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
-                    scheduler.QueueTask(() => siloStreamProviderManager.StopStreamProviders(), providerManagerSystemTarget.SchedulingContext)
+                    scheduler.QueueTask(() => siloStreamProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
                             .WaitWithThrow(initTimeout);
                 });
-
-                // 9:
-                SafeExecute(storageProviderManager.UnloadStorageProviders);
+                // 10:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => bootstrapProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+                // 11:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => storageProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
             }
             finally
             {

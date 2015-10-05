@@ -277,7 +277,7 @@ namespace Orleans.Runtime
             return false;
         }
 
-        public static void SafeExecute(Action action, TraceLogger logger = null, string caller = null)
+        public static void SafeExecute(Action action, Logger logger = null, string caller = null)
         {
             SafeExecute(action, logger, caller==null ? (Func<string>)null : () => caller);
         }
@@ -285,7 +285,7 @@ namespace Orleans.Runtime
         // a function to safely execute an action without any exception being thrown.
         // callerGetter function is called only in faulty case (now string is generated in the success case).
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public static void SafeExecute(Action action, TraceLogger logger, Func<string> callerGetter)
+        public static void SafeExecute(Action action, Logger logger, Func<string> callerGetter)
         {
             try
             {
@@ -300,11 +300,14 @@ namespace Orleans.Runtime
                         string caller = null;
                         if (callerGetter != null)
                         {
-                            caller = callerGetter();
+                            try
+                            {
+                                caller = callerGetter();
+                            }catch (Exception) { }
                         }
                         foreach (var e in exc.FlattenAggregate())
                         {
-                            logger.Warn(ErrorCode.Runtime_Error_100325, String.Format("Ignoring {0} exception thrown from an action called by {1}.", e.GetType().FullName, caller ?? String.Empty), exc);
+                            logger.Warn((int)ErrorCode.Runtime_Error_100325, String.Format("Ignoring {0} exception thrown from an action called by {1}.", e.GetType().FullName, caller ?? String.Empty), exc);
                         }
                     }
                 }

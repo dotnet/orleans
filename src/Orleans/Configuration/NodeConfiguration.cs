@@ -193,6 +193,10 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public int BulkMessageLimit { get; set; }
 
+        /// <summary>
+        /// Specifies the name of the Startup class in the configuration file.
+        /// </summary>
+        public string StartupTypeName { get; set; }
 
         public string StatisticsProviderName { get; set; }
         /// <summary>
@@ -240,6 +244,8 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// </summary>
         public bool UseNagleAlgorithm { get; set; }
+
+        public string SiloShutdownEventName { get; set; }
 
         internal const string DEFAULT_NODE_NAME = "default";
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
@@ -345,6 +351,8 @@ namespace Orleans.Runtime.Configuration
             Expect100Continue = other.Expect100Continue;
             DefaultConnectionLimit = other.DefaultConnectionLimit;
             UseNagleAlgorithm = other.UseNagleAlgorithm;
+
+            StartupTypeName = other.StartupTypeName;
         }
 
         public override string ToString()
@@ -384,6 +392,7 @@ namespace Orleans.Runtime.Configuration
             sb.Append("      ").AppendFormat("   .NET ServicePointManager - DefaultConnectionLimit={0} Expect100Continue={1} UseNagleAlgorithm={2}", DefaultConnectionLimit, Expect100Continue, UseNagleAlgorithm).AppendLine();
             sb.Append("   Load Shedding Enabled: ").Append(LoadSheddingEnabled).AppendLine();
             sb.Append("   Load Shedding Limit: ").Append(LoadSheddingLimit).AppendLine();
+            sb.Append("   SiloShutdownEventName: ").Append(SiloShutdownEventName).AppendLine();
             sb.Append("   Debug: ").AppendLine();
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
@@ -496,6 +505,12 @@ namespace Orleans.Runtime.Configuration
                         break;
                     case "Limits":
                         ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
+                        break;
+                    case "Startup":
+                        if (child.HasAttribute("Type"))
+                        {
+                            StartupTypeName = child.GetAttribute("Type");
+                        }
                         break;
                 }
             }

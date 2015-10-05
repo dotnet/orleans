@@ -48,17 +48,12 @@ namespace Orleans.Streams
             return consumerData;
         }
 
-        public bool RemoveConsumer(GuidId subscriptionId)
+        public bool RemoveConsumer(GuidId subscriptionId, Logger logger)
         {
             StreamConsumerData consumer;
             if (!queueData.TryGetValue(subscriptionId, out consumer)) return false;
 
-            if (consumer.Cursor != null)
-            {
-                // kill cursor activity and ensure it does not start again on this consumer data.
-                consumer.Cursor.Dispose();
-                consumer.Cursor = null; 
-            }
+            consumer.SafeDisposeCursor(logger);
             return queueData.Remove(subscriptionId);
         }
 
@@ -76,6 +71,16 @@ namespace Orleans.Streams
         {
             return queueData.Values;
         }
+
+        public void DisposeAll(Logger logger)
+        {
+            foreach (StreamConsumerData consumer in queueData.Values)
+            {
+                consumer.SafeDisposeCursor(logger);
+            }
+            queueData.Clear();
+        }
+
 
         public int Count
         {

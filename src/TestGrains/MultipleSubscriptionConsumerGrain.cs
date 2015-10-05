@@ -34,7 +34,7 @@ namespace UnitTests.Grains
 {
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {
-        private readonly Dictionary<StreamSubscriptionHandle<int>, Counter> consumedMessageCounts;
+        private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter,Counter>> consumedMessageCounts;
         private Logger logger;
         private int consumerCount = 0;
 
@@ -55,7 +55,7 @@ namespace UnitTests.Grains
 
         public MultipleSubscriptionConsumerGrain()
         {
-            consumedMessageCounts = new Dictionary<StreamSubscriptionHandle<int>, Counter>();
+            consumedMessageCounts = new Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter, Counter>>();
         }
 
         public override Task OnActivateAsync()
@@ -71,6 +71,7 @@ namespace UnitTests.Grains
 
             // new counter for this subscription
             var count = new Counter();
+            var error = new Counter();
 
             // get stream
             IStreamProvider streamProvider = GetStreamProvider(providerToUse);
@@ -80,20 +81,11 @@ namespace UnitTests.Grains
             consumerCount++;
             // subscribe
             StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync(
-                (e, t) =>
-                {
-                    logger.Info("Got next event {0} on handle {1}", e, countCapture);
-                    string contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
-                    if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
-                    {
-                        throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
-                    }
-                    count.Increment();
-                    return TaskDone.Done;
-                });
+                (e, t) => OnNext(e, t, countCapture, count),
+                e => OnError(e, countCapture, error));
 
             // track counter
-            consumedMessageCounts.Add(handle, count);
+            consumedMessageCounts.Add(handle, Tuple.Create(count,error));
 
             // return handle
             return handle;
@@ -106,29 +98,21 @@ namespace UnitTests.Grains
                 throw new ArgumentNullException("handle");
 
             // new counter for this subscription
-            Counter count;
-            if(!consumedMessageCounts.TryGetValue(handle, out count))
+            Tuple<Counter,Counter> counters;
+            if (!consumedMessageCounts.TryGetValue(handle, out counters))
             {
-                count = new Counter();
+                counters = Tuple.Create(new Counter(), new Counter());
             }
 
             int countCapture = consumerCount;
             consumerCount++;
             // subscribe
-            StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync((e, t) =>
-            {
-                logger.Info("Got next event {0} on newhandle {1}", e, countCapture);
-                string contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
-                if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
-                {
-                    throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
-                }
-                count.Increment();
-                return TaskDone.Done;
-            });
+            StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync(
+                (e, t) => OnNext(e, t, countCapture, counters.Item1),
+                e => OnError(e, countCapture, counters.Item2));
 
             // track counter
-            consumedMessageCounts[newhandle] = count;
+            consumedMessageCounts[newhandle] = counters;
 
             // return handle
             return newhandle;
@@ -157,20 +141,21 @@ namespace UnitTests.Grains
             return stream.GetAllSubscriptionHandles();
         }
 
-        public Task<Dictionary<StreamSubscriptionHandle<int>, int>> GetNumberConsumed()
+        public Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed()
         {
             logger.Info(String.Format("ConsumedMessageCounts = \n{0}", 
-                Utils.EnumerableToString(consumedMessageCounts, kvp => String.Format("Consumer: {0} -> count: {1}", kvp.Key.HandleId.ToString(), kvp.Value.Value.ToString()))));
+                Utils.EnumerableToString(consumedMessageCounts, kvp => String.Format("Consumer: {0} -> count: {1}", kvp.Key.HandleId.ToString(), kvp.Value.ToString()))));
 
-            return Task.FromResult(consumedMessageCounts.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Value));
+            return Task.FromResult(consumedMessageCounts.ToDictionary(kvp => kvp.Key, kvp => Tuple.Create(kvp.Value.Item1.Value, kvp.Value.Item2.Value)));
         }
 
         public Task ClearNumberConsumed()
         {
             logger.Info("ClearNumberConsumed");
-            foreach (Counter count in consumedMessageCounts.Values)
+            foreach (var counters in consumedMessageCounts.Values)
             {
-                count.Clear();
+                counters.Item1.Clear();
+                counters.Item2.Clear();
             }
             return TaskDone.Done;
         }
@@ -184,6 +169,25 @@ namespace UnitTests.Grains
         public override Task OnDeactivateAsync()
         {
             logger.Info("OnDeactivateAsync");
+            return TaskDone.Done;
+        }
+
+        private Task OnNext(int e, StreamSequenceToken token, int countCapture, Counter count)
+        {
+            logger.Info("Got next event {0} on handle {1}", e, countCapture);
+            var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
+            if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
+            {
+                throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
+            }
+            count.Increment();
+            return TaskDone.Done;
+        }
+
+        private Task OnError(Exception e, int countCapture, Counter error)
+        {
+            logger.Info("Got exception {0} on handle {1}", e.ToString(), countCapture);
+            error.Increment();
             return TaskDone.Done;
         }
     }

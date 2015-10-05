@@ -78,7 +78,7 @@ namespace UnitTests.StreamingTests
             await producer.Produce();
 
             var count = await consumer.GetNumberConsumed();
-            Assert.AreEqual(count[subscriptionHandle], 1, "Consumer grain has not received stream message");
+            Assert.AreEqual(count[subscriptionHandle].Item1, 1, "Consumer grain has not received stream message");
 
             //TODO: trigger deactivation programmatically
             await Task.Delay(TimeSpan.FromMilliseconds(130000)); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
@@ -91,7 +91,7 @@ namespace UnitTests.StreamingTests
 
             // consumer grain should continue to receive stream messages:
             count = await consumer.GetNumberConsumed();
-            Assert.AreEqual(count[subscriptionHandle], 2, "Consumer did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
+            Assert.AreEqual(count[subscriptionHandle].Item1, 2, "Consumer did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
         }
         public async Task DeactivationTest_ClientConsumer(Guid streamGuid, string streamNamespace)
         {

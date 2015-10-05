@@ -173,7 +173,8 @@ namespace Orleans
                (x, y) =>
                {
                    if (x.Item1.Status.Equals(SiloStatus.Dead)) return 1; // put Deads at the end
-                   return 1;
+                   if (y.Item1.Status.Equals(SiloStatus.Dead)) return -1; // put Deads at the end
+                   return String.Compare(x.Item1.InstanceName, y.Item1.InstanceName, StringComparison.Ordinal);
                });
             Members = list.AsReadOnly();
             Version = version;
@@ -222,7 +223,7 @@ namespace Orleans
                 dead,
                 otherCounts,
                 Version,
-                Utils.EnumerableToString(Members, (tuple) => tuple.Item1.ToFullString()));
+                Utils.EnumerableToString(Members, tuple => tuple.Item1.ToFullString()));
         }
 
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
@@ -230,10 +231,10 @@ namespace Orleans
         {
             var dead = new Dictionary<string, Tuple<MembershipEntry, string>>();
             // pick only latest Dead for each instance
-            foreach (var next in this.Members.Where(item => item.Item1.Status == SiloStatus.Dead))
+            foreach (var next in Members.Where(item => item.Item1.Status == SiloStatus.Dead))
             {
                 var name = next.Item1.InstanceName;
-                Tuple<MembershipEntry, string> prev = null;
+                Tuple<MembershipEntry, string> prev;
                 if (!dead.TryGetValue(name, out prev))
                 {
                     dead[name] = next;
@@ -247,8 +248,8 @@ namespace Orleans
             }
             //now add back non-dead
             List<Tuple<MembershipEntry, string>> all = dead.Values.ToList();
-            all.AddRange(this.Members.Where(item => item.Item1.Status != SiloStatus.Dead));
-            return new MembershipTableData(all, this.Version);
+            all.AddRange(Members.Where(item => item.Item1.Status != SiloStatus.Dead));
+            return new MembershipTableData(all, Version);
         }
     }
 
@@ -271,7 +272,7 @@ namespace Orleans
 
         public List<Tuple<SiloAddress, DateTime>> SuspectTimes { get; set; }
 
-        private static readonly List<Tuple<SiloAddress, DateTime>> emptyList = new List<Tuple<SiloAddress, DateTime>>(0);
+        private static readonly List<Tuple<SiloAddress, DateTime>> EmptyList = new List<Tuple<SiloAddress, DateTime>>(0);
 
         // partialUpdate arrivies via gossiping with other oracles. In such a case only take the status.
         internal void Update(MembershipEntry updatedSiloEntry)
@@ -295,7 +296,7 @@ namespace Orleans
         internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(TimeSpan expiration)
         {
             if (SuspectTimes == null)
-                return emptyList;
+                return EmptyList;
             DateTime now = DateTime.UtcNow;
             return SuspectTimes.FindAll(voter =>
                 {
@@ -326,7 +327,7 @@ namespace Orleans
 
         public override string ToString()
         {
-            return string.Format("SiloAddress={0} Status={1}", SiloAddress.ToLongString(), Status);
+            return string.Format("SiloAddress={0} InstanceName={1} Status={2}", SiloAddress.ToLongString(), InstanceName, Status);
         }
 
         internal string ToFullString(bool full = false)
@@ -340,21 +341,21 @@ namespace Orleans
             List<DateTime> timestamps = SuspectTimes == null
                 ? null
                 : SuspectTimes.Select(tuple => tuple.Item2).ToList();
-            return string.Format("[SiloAddress={0} Status={1} HostName={2} ProxyPort={3} " +
-                                 "RoleName={4} InstanceName={5} UpdateZone={6} FaultZone={7} StartTime = {8} IAmAliveTime = {9} {10} {11}]",
+            return string.Format("[SiloAddress={0} InstanceName={1} Status={2} HostName={3} ProxyPort={4} " +
+                                 "RoleName={5} UpdateZone={6} FaultZone={7} StartTime = {8} IAmAliveTime = {9} {10} {11}]",
                 SiloAddress.ToLongString(),
+                InstanceName,
                 Status,
                 HostName,
                 ProxyPort,
                 RoleName,
-                InstanceName,
                 UpdateZone,
                 FaultZone,
                 TraceLogger.PrintDate(StartTime),
                 TraceLogger.PrintDate(IAmAliveTime),
                 suspecters == null
                     ? ""
-                    : "Suspecters = " + Utils.EnumerableToString(suspecters, (SiloAddress sa) => sa.ToLongString()),
+                    : "Suspecters = " + Utils.EnumerableToString(suspecters, sa => sa.ToLongString()),
                 timestamps == null
                     ? ""
                     : "SuspectTimes = " + Utils.EnumerableToString(timestamps, TraceLogger.PrintDate)
