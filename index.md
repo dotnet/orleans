@@ -15,8 +15,6 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Prerequisites](Prerequisites)**
 
-* **[Installation of the SDK](Installation)**
-
 * **[Orleans NuGet Packages](NuGets)**
 
 * **[What's new in Orleans?](What's-new-in-Orleans)** 
