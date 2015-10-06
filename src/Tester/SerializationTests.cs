@@ -31,6 +31,8 @@ using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using System.Collections.Generic;
+using Orleans.TestingHost;
+using System.Runtime.Serialization;
 
 namespace UnitTests.General
 {
@@ -108,7 +110,8 @@ namespace UnitTests.General
             Assert.AreEqual(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
         }
 
-        class TestTypeA
+        [Serializable]
+        internal class TestTypeA
         {
             public ICollection<TestTypeA> Collection { get; set; }
         }
@@ -150,15 +153,17 @@ namespace UnitTests.General
             }
         }
 
-		[Ignore]
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [ExpectedException(typeof(SerializationException))]
         public void SerializationTests_RecursiveSerialization()
         {
             TestTypeA input = new TestTypeA();
             input.Collection = new HashSet<TestTypeA>();
             input.Collection.Add(input);
 
-            TestTypeA output = SerializationManager.RoundTripSerializationForTesting(input);
+            TestTypeA output1 = TestingUtils.RoundTripDotNetSerializer(input);
+
+            TestTypeA output2 = SerializationManager.RoundTripSerializationForTesting(input);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
