@@ -137,14 +137,14 @@ The Orleans Provider Manager framework provides a mechanism to specify & registe
     <OrleansConfiguration xmlns="urn:orleans">
       <Globals>
         <StorageProviders>
-           <Provider Type="Orleans.Storage.DevStorage" Name="DevStore" />
+           <Provider Type="Orleans.Storage.MemoryStorage" Name="DevStore" />
            <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"    
               DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1" />
            <Provider Type="Orleans.Storage.AzureTableStorage" Name="store2" 
              DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2"  />
         </StorageProviders>
 
-Note: storage provider types `Orleans.Storage.AzureTableStorage` and `Orleans.Storage.DevStorage` are two standard storage providers built in to the Orleans runtime.
+Note: storage provider types `Orleans.Storage.AzureTableStorage` and `Orleans.Storage.MemoryStorage` are two standard storage providers built in to the Orleans runtime.
 
 If there is no `[StorageProvider]` attribute specified for a `Grain<T>` grain class, then a provider named `Default` will be searched for instead. 
 If not found then this is treated as a missing storage provider.
