@@ -16,8 +16,8 @@ The server configuration should look like this:
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
       <SystemStore SystemStoreType ="SqlServer" 
-                 DeploymentId="..." 
-                 DataConnectionString="..." />
+                 DeploymentId="OrleansTest" 
+                 DataConnectionString="Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True" AdoInvariant="System.Data.SqlClient" />
   </Globals>
 </OrleansConfiguration>
 ```
@@ -27,12 +27,12 @@ The client configuration should look like this:
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
       <SystemStore SystemStoreType ="SqlServer" 
-                 DeploymentId="..." 
-                 DataConnectionString="..." />
+                 DeploymentId="OrleansTest" 
+                 DataConnectionString="Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True" AdoInvariant="System.Data.SqlClient" />
 </ClientConfiguration>
 ```
 
-Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file MembershipTableCreate.sql in the Binaries\OrleansServer folder which establishes the necessary tables with the right schema. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.
+Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file [CreateOrleansTables_*](https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/SQLServer/CreateOrleansTables_SqlServer.sql)(where asterisk denotes database vendor) in the Binaries\OrleansServer folder which establishes the necessary database objects. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.
 
 ### SQL Metrics and Statistics tables
 
@@ -47,7 +47,7 @@ The server configuration should look like this:
 <OrleansConfiguration xmlns="urn:orleans">
      <Globals>
          <StatisticsProviders>
-             <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="MySQLStatsProvider" ConnectionString="..." />
+             <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="MySQLStatsProvider" ConnectionString="Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True" />
          </StatisticsProviders>
      </Globals>
      <Defaults>
@@ -61,7 +61,7 @@ The client configuration should look like this:
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
       <StatisticsProviders>
-         <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="SQL" ConnectionString="..." />
+         <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="SQL" ConnectionString="Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True" />
       </StatisticsProviders>
       <Statistics ProviderType="MySQLStatsProvider" WriteLogStatisticsToTable="true"/>
 </ClientConfiguration>
