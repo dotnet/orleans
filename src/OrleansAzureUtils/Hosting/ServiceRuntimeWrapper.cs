@@ -182,14 +182,14 @@ namespace Orleans.Runtime.Host
 
         public void SubscribeForStoppingNotifcation(object handlerObject, EventHandler<object> handler)
         {
-            var handlerDelegate = Delegate.CreateDelegate(stoppingEvent.EventHandlerType, handlerObject, handler.GetMethodInfo());
+            var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
             stoppingEventAdd.Invoke(null, new object[] { handlerDelegate });
             
         }
 
         public void UnsubscribeFromStoppingNotifcation(object handlerObject, EventHandler<object> handler)
         {
-            var handlerDelegate = Delegate.CreateDelegate(stoppingEvent.EventHandlerType, handlerObject, handler.GetMethodInfo());
+            var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
             stoppingEventRemove.Invoke(null, new[] { handlerDelegate });
         }
 
