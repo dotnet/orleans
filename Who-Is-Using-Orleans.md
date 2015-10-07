@@ -30,6 +30,7 @@ Trustev    | <a href="http://www.trustev.com/" target="_blank">www.trustev.com</
 Mailcloud Limited | <a href="http://www.mailcloud.com/" target="_blank">http://www.mailcloud.com/</a>|
 Gigya | <a href="http://gigya.com/" target="_blank">http://gigya.com/</a>|
 Honeywell | <a href="http://honeywell.com/" target="_blank">http://honeywell.com/</a>|
+Mesh Systems | <a href="http://www.mesh-systems.com/" target="_blank">http://www.mesh-systems.com/</a> | MESHVista Smart Cloud IoT Platform leverages Orleans for back-end services monitoring device state and business logic
 
 ## Projects and Applications
 
