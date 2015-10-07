@@ -18,19 +18,20 @@ Feel free to send us a pull request on GitHub to add your company / project to t
 
 ## Companies
 
-This list is for companies that are using Orleans.
+This list is of companies that are using Orleans.
 
 Company|Link|Notes
 ---------|------|-------
 Gassumo  | <a href="http://gassumo.com" target="_blank">www.gassumo.com</a>|
-Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>| Microsoft Studios (Halo, Age of Empires, BigPark, others), Skype, Azure, others 
+Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>| _Skype_, _Azure_, others 
+Microsoft Studios | <a href="http://www.microsoft.com/games/mgsgamecatalog/" target="_blank">http://www.microsoft.com/games/mgsgamecatalog/</a>| _343 Studios_ (_Halo_), _Age of Empires_, _BigPark_, _Black Tusk_, others
 Microsoft Research  | <a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
 NašeÚkoly.CZ    | <a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
 Trustev    | <a href="http://www.trustev.com/" target="_blank">www.trustev.com</a>|
 Mailcloud Limited | <a href="http://www.mailcloud.com/" target="_blank">http://www.mailcloud.com/</a>|
 Gigya | <a href="http://gigya.com/" target="_blank">http://gigya.com/</a>|
 Honeywell | <a href="http://honeywell.com/" target="_blank">http://honeywell.com/</a>|
-Mesh Systems | <a href="http://www.mesh-systems.com/" target="_blank">http://www.mesh-systems.com/</a> | MESHVista Smart Cloud IoT Platform leverages Orleans for back-end services monitoring device state and business logic
+Mesh Systems | <a href="http://www.mesh-systems.com/" target="_blank">http://www.mesh-systems.com/</a> | _MESHVista Smart Cloud IoT Platform_ leverages Orleans for back-end services monitoring device state and business logic
 
 ## Projects and Applications
 
