@@ -111,6 +111,42 @@ IAsyncStream<T> stream = streamProvider.GetStream<T>(this.GetPrimaryKey(), "MySt
 StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObserver<T>);  
 ```
 
+### Writing Subscription Logic<a name="Writing-Subscription-Logic"></a>
+
+Below are the guidlines on how to write a subscription logic for varios caes: explicit and implicit subscription, rewinabdle and non-rewindable streams. The main difference between explicit and implicit subscription is that for implicit the grain always has exactly one implicit subscription for every stream namespace, there is no way to create multiple subsriptions (there is no subscription multiplicity) and the grain logic always only needs to attach the processing logic. That also means that for implicit subscriptions there is never a need to Resume a subsription.
+On the other hand, for explicit subscription, one needs to resume his subscription, otherwise if the grain subsribes again it will result in the grain being explicitly subscribed multipe times.
+
+
+**Implicit Subscriptions:**
+
+For implicit case the grain needs to subsribe in order to attach the processing logic. This should be done in the grain's `OnActivateAsync` method. The grain should simply execute `await stream.SubscribeAsync(OnNext ...)` in its `OnActivateAsync` method. That will cause this particular activation to attachs the `OnNext` function to process that stream. The grain can optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this implicit subscriptions to start consuming from that token. There is never a need for implicit subscription to call `ResumeAsync`.
+
+```C#
+    public async override Task OnActivateAsync()
+    {
+        var streamProvider = GetStreamProvider(PROVIDER_NAME);
+        var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
+        await x.SubscribeAsync(OnNextAsync)
+    }
+```
+
+**Explicit Subscriptions:**
+
+Grain that wants to explicitly subscribe first has to call `SubscribeAsync` in some place in its code, in order to subsribe. This causes tthe subsriptionot be established as well as attaches the processig logic.
+Now imagine a case when the grain got deactivated and reactiavted. The grain is still explicitly subscribed, but no processig logic is attached. The garin needs to re-atatch the procesijg lgioc. To do that, the garin first needs t find out what subsrioptin it has, by calling `stream.GetAllSubscriptionHandles()`. The the garin has to  execute `ResumeAsync` on each subscrioption handle, in its `OnActivateAsync`. The grain can optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this implicit subscriptions to start consuming from that token.
+
+```C#
+    public async override Task OnActivateAsync()
+    {
+        var streamProvider = GetStreamProvider(PROVIDER_NAME);
+        var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
+        var subscriptionHandles = await stream.GetAllSubscriptionHandles();
+        if (!subscriptionHandles.IsNullOrEmpty())
+            subscriptionHandles.ForEach(async x => await x.ResumeAsync(OnNextAsync));
+    }
+```
+
+
 ### Stream Order and Sequence Tokens<a name="Stream-Order-and-Sequence-Tokens"></a>
 
 The order of events delivery between an individual producer and an individual consumer depends on a stream provider.
