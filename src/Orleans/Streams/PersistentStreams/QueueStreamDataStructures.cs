@@ -42,7 +42,7 @@ namespace Orleans.Streams
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
         public IQueueCacheCursor Cursor;
         public IStreamFilterPredicateWrapper Filter;
-        public StreamSequenceToken LastToken;
+        public StreamHandshakeToken LastToken;
 
         public StreamConsumerData(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
