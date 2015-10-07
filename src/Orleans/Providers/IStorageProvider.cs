@@ -41,10 +41,6 @@ namespace Orleans.Storage
         /// <seealso cref="Logger"/>
         Logger Log { get; }
 
-        /// <summary>Close function for this storage provider instance.</summary>
-        /// <returns>Completion promise for the Close operation on this provider.</returns>
-        Task Close();
-
         /// <summary>Read data function for this storage provider instance.</summary>
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
         /// <param name="grainReference">Grain reference object for this grain.</param>

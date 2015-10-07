@@ -32,6 +32,7 @@ namespace Orleans.Runtime
     {
         private IGrainMethodInvoker lastInvoker;
         private readonly SchedulingContext schedulingContext;
+        private Message running;
         
         protected SystemTarget(GrainId grainId, SiloAddress silo) 
             : this(grainId, silo, false)
@@ -65,11 +66,13 @@ namespace Orleans.Runtime
 
         public void HandleNewRequest(Message request)
         {
+            running = request;
             InsideRuntimeClient.Current.Invoke(this, this, request).Ignore();
         }
 
         public void HandleResponse(Message response)
         {
+            running = response;
             InsideRuntimeClient.Current.ReceiveResponse(response);
         }
 
@@ -100,6 +103,11 @@ namespace Orleans.Runtime
                  Silo,
                  GrainId,
                  ActivationId);
+        }
+
+        public string ToDetailedString()
+        {
+            return String.Format("{0} CurrentlyExecuting={1}", ToString(), running != null ? running.ToString() : "null");
         }
     }
 }

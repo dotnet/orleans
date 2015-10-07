@@ -762,7 +762,7 @@ namespace Orleans.Runtime
                 {
                     sb.AppendFormat("   Processing message: {0}", Running);
                 }
-                
+
                 if (waiting!=null && waiting.Count > 0)
                 {
                     sb.AppendFormat("   Messages queued within ActivationData: {0}", PrintWaitingQueue());
@@ -781,11 +781,11 @@ namespace Orleans.Runtime
                  State);
         }
 
-        internal string ToDetailedString()
+        internal string ToDetailedString(bool includeExtraDetails = false)
         {
             return
                 String.Format(
-                    "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}]",
+                    "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
                     Silo.ToLongString(),
                     Grain.ToDetailedString(),
                     ActivationId,
@@ -796,7 +796,8 @@ namespace Orleans.Runtime
                     InFlightCount,                  // 7 InFlightCount
                     numRunning,                     // 8 NumRunning
                     GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
-                    CollectionAgeLimit);            // 10 CollectionAgeLimit
+                    CollectionAgeLimit,             // 10 CollectionAgeLimit
+                    (includeExtraDetails && Running != null) ? " CurrentlyExecuting=" + Running : "");  // 11: Running
         }
 
         public string Name

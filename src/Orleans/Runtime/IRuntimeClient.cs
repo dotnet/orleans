@@ -80,7 +80,7 @@ namespace Orleans.Runtime
 
         Task<List<IGrainReminder>> GetReminders();
 
-        Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context);
+        Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName);
 
         void Reset();
 

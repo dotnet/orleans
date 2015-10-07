@@ -57,7 +57,6 @@
     <Compile Include="SQLServer\SqlStatisticsPublisher.cs" />
     <Compile Include="Storage\HierarchicalKeyStore.cs" />
     <Compile Include="Storage\MemoryStorage.cs" />
-    <Compile Include="Storage\MemoryStorageGrain.cs" />
     <Compile Include="Storage\MemoryStorageWithLatency.cs" />
     <Compile Include="Storage\ShardedStorageProvider.cs" />
   </ItemGroup>

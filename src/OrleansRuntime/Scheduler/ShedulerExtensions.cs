@@ -70,6 +70,26 @@ namespace Orleans.Runtime.Scheduler
             return resolver.Task;
         }
 
+        internal static Task QueueNamedTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, ISchedulingContext targetContext, string activityName = null)
+        {
+            var resolver = new TaskCompletionSource<bool>();
+            Func<Task> asyncFunc =
+                async () =>
+                {
+                    try
+                    {
+                        await taskFunc();
+                        resolver.TrySetResult(true);
+                    }
+                    catch (Exception exc)
+                    {
+                        resolver.TrySetException(exc);
+                    }
+                };
+            scheduler.QueueWorkItem(new ClosureWorkItem(() => asyncFunc().Ignore(), () => activityName), targetContext);
+            return resolver.Task;
+        }
+
         internal static Task QueueAction(this OrleansTaskScheduler scheduler, Action action, ISchedulingContext targetContext)
         {
             var resolver = new TaskCompletionSource<bool>();

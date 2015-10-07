@@ -67,7 +67,10 @@ namespace Orleans.Providers.SqlServer
             queryConstants = await database.InitializeOrleansQueriesAsync(); 
         }
 
-
+        public Task Close()
+        {
+            return TaskDone.Done;
+        }
 
         public void AddConfiguration(string deployment, string hostName, string client, IPAddress address)
         {

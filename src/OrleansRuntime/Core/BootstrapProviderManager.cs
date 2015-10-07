@@ -58,6 +58,15 @@ namespace Orleans.Runtime
         }
 
 
+        public Task CloseProviders()
+        {
+            List<Task> tasks = new List<Task>();
+            foreach (var provider in GetProviders())
+            {
+                tasks.Add(provider.Close());
+            }
+            return Task.WhenAll(tasks);
+        }
 
         private class PluginManager<T> : IProviderManager where T : class, IProvider
         {

@@ -34,29 +34,29 @@ using Orleans.Providers;
 
 namespace Orleans.Samples.Chirper.Grains
 {
-    public interface IChirperAccountState : IGrainState
+    public class ChirperAccountState : GrainState
     {
         /// <summary>The list of publishers who this user is following</summary>
-        Dictionary<ChirperUserInfo, IChirperPublisher> Subscriptions { get; set; }
+        public Dictionary<ChirperUserInfo, IChirperPublisher> Subscriptions { get; set; }
 
         /// <summary>The list of subscribers who are following this user</summary>
-        Dictionary<ChirperUserInfo, IChirperSubscriber> Followers { get; set; }
+        public Dictionary<ChirperUserInfo, IChirperSubscriber> Followers { get; set; }
 
         /// <summary>Chirp messages recently received by this user</summary>
-        Queue<ChirperMessage> RecentReceivedMessages { get; set; }
+        public Queue<ChirperMessage> RecentReceivedMessages { get; set; }
 
         /// <summary>Chirp messages recently published by this user</summary>
-        Queue<ChirperMessage> MyPublishedMessages { get; set; }
+        public Queue<ChirperMessage> MyPublishedMessages { get; set; }
 
-        long UserId { get; set; }
+        public long UserId { get; set; }
 
         /// <summary>Alias / username for this actor / user</summary>
-        string UserAlias { get; set;  }
+        public string UserAlias { get; set; }
     }
 
     [Reentrant]
     [StorageProvider(ProviderName = "MemoryStore")]
-    public class ChirperAccount : Grain<IChirperAccountState>, IChirperAccount
+    public class ChirperAccount : Grain<ChirperAccountState>, IChirperAccount
     {
         /// <summary>Size for the recently received message cache</summary>
         private int ReceivedMessagesCacheSize;
@@ -181,14 +181,14 @@ namespace Orleans.Samples.Chirper.Grains
         public async Task FollowUserId(long userId)
         {
             if (logger.IsVerbose) logger.Verbose("{0} FollowUserId({1}).", Me, userId);
-            IChirperPublisher userToFollow = ChirperPublisherFactory.GetGrain(userId);
+            IChirperPublisher userToFollow = GrainFactory.GetGrain<IChirperPublisher>(userId);
             string alias = await userToFollow.GetUserAlias();
             await FollowUser(userId, alias, userToFollow);
         }
         public async Task UnfollowUserId(long userId)
         {
             if (logger.IsVerbose) logger.Verbose("{0} UnfollowUserId({1}).", Me, userId);
-            IChirperPublisher userToUnfollow = ChirperPublisherFactory.GetGrain(userId);
+            IChirperPublisher userToUnfollow = GrainFactory.GetGrain<IChirperPublisher>(userId);
             string alias = await userToUnfollow.GetUserAlias();
             await UnfollowUser(userId, alias, userToUnfollow);
         }
