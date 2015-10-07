@@ -24,7 +24,7 @@ Company|Link|Notes
 ---------|------|-------
 Gassumo  | <a href="http://gassumo.com" target="_blank">www.gassumo.com</a>|
 Microsoft  | <a href="http://www.microsoft.com" target="_blank">www.microsoft.com</a>| _Skype_, _Azure_, others 
-Microsoft Studios | <a href="http://www.microsoft.com/games/mgsgamecatalog/" target="_blank">http://www.microsoft.com/games/mgsgamecatalog/</a>| _343 Studios_ (_Halo_), _Age of Empires_, _BigPark_, _Black Tusk_, others
+Microsoft Studios | <a href="http://www.xbox.com/en-US/games/xbox-one/" target="_blank">http://www.xbox.com/en-US/games/xbox-one/</a>| _343 Studios_ (_Halo_), _Age of Empires_, _BigPark_, _Black Tusk_, others
 Microsoft Research  | <a href="http://research.microsoft.com" target="_blank">research.microsoft.com</a>|
 NašeÚkoly.CZ    | <a href="http://naseukoly.cz" target="_blank">www.naseukoly.cz</a>|
 Trustev    | <a href="http://www.trustev.com/" target="_blank">www.trustev.com</a>|
