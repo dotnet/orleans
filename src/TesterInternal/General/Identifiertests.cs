@@ -32,6 +32,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.TestingHost;
 
 namespace UnitTests.General
 {
@@ -522,10 +523,10 @@ namespace UnitTests.General
             GrainReference roundTripped = RoundTripGrainReferenceToKey(grainRef);
             Assert.AreEqual(grainRef, roundTripped, "GrainReference.ToKeyString");
 
-            roundTripped = RoundTripGrainReferenceOrleansSerializer(grainRef);
+            roundTripped = SerializationManager.RoundTripSerializationForTesting(grainRef);
             Assert.AreEqual(grainRef, roundTripped, "GrainReference.OrleansSerializer");
 
-            roundTripped = RoundTripGrainReferenceDotNetSerializer(grainRef);
+            roundTripped = TestingUtils.RoundTripDotNetSerializer(grainRef);
             Assert.AreEqual(grainRef, roundTripped, "GrainReference.DotNetSerializer");
         }
 
@@ -533,25 +534,6 @@ namespace UnitTests.General
         {
             string str = input.ToKeyString();
             GrainReference output = GrainReference.FromKeyString(str);
-            return output;
-        }
-
-        private GrainReference RoundTripGrainReferenceOrleansSerializer(GrainReference input)
-        {
-            BinaryTokenStreamWriter writer = new BinaryTokenStreamWriter();
-            GrainReference.SerializeGrainReference(input, writer, typeof(GrainReference));
-            BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
-            GrainReference output = (GrainReference)GrainReference.DeserializeGrainReference(typeof(GrainReference), reader);
-            return output;
-        }
-
-        private GrainReference RoundTripGrainReferenceDotNetSerializer(GrainReference input)
-        {
-            IFormatter formatter = new BinaryFormatter();
-            MemoryStream stream = new MemoryStream(new byte[1000], true);
-            formatter.Serialize(stream, input);
-            stream.Position = 0;
-            GrainReference output = (GrainReference)formatter.Deserialize(stream);
             return output;
         }
     }
