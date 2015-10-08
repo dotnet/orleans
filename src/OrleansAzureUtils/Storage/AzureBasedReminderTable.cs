@@ -89,7 +89,7 @@ namespace Orleans.Runtime.ReminderService
                     var error = String.Format( "Read a reminder entry for wrong Service id. Read {0}, but my service id is {1}. Going to discard it.",
                         tableEntry, serviceIdStr);
                     logger.Warn(ErrorCode.AzureTable_ReadWrongReminder, error);
-                    throw new ApplicationException(error);
+                    throw new OrleansException(error);
                 }
             }
         }

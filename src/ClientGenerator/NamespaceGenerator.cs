@@ -392,7 +392,7 @@ namespace Orleans.CodeGeneration
 
                 var errorMsg = string.Format("Unexpected number of arguments {0} for generic type {1} used as a return type. Only Type<T> are supported as generic return types of grain methods.", genericArguments.Length, type);
                 ReportError(errorMsg);
-                throw new ApplicationException(errorMsg);
+                throw new ArgumentException(errorMsg, "type");
             }
 
             return GetGenericTypeName(type, flag);
