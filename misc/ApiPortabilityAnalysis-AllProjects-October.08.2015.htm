@@ -1,0 +1,1712 @@
+<!DOCTYPE html><html xmlns:msxsl="urn:schemas-microsoft-com:xslt">
+	<head>
+		<meta content="en-us" http-equiv="Content-Language" /><meta content="text/html; charset=utf-16" http-equiv="Content-Type" /><title _locID="PortabilityAnalysis0">
+			.NET Portability Report
+		</title><style>
+			/* Body style, for the entire document */
+body
+{
+    background: #F3F3F4;
+    color: #1E1E1F;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    padding: 0;
+    margin: 0;
+}
+
+/* Header1 style, used for the main title */
+h1
+{
+    padding: 10px 0px 10px 10px;
+    font-size: 21pt;
+    background-color: #E2E2E2;
+    border-bottom: 1px #C1C1C2 solid; 
+    color: #201F20;
+    margin: 0;
+    font-weight: normal;
+}
+
+/* Header2 style, used for "Overview" and other sections */
+h2
+{
+    font-size: 18pt;
+    font-weight: normal;
+    padding: 15px 0 5px 0;
+    margin: 0;
+}
+
+/* Header3 style, used for sub-sections, such as project name */
+h3
+{
+    font-weight: normal;
+    font-size: 15pt;
+    margin: 0;
+    padding: 15px 0 5px 0;
+    background-color: transparent;
+}
+
+/* Color all hyperlinks one color */
+a
+{
+    color: #1382CE;
+}
+
+/* Table styles */ 
+table
+{
+    border-spacing: 0 0;
+    border-collapse: collapse;
+    font-size: 10pt;
+}
+
+table th
+{
+    background: #E7E7E8;
+    text-align: left;
+    text-decoration: none;
+    font-weight: normal;
+    padding: 3px 6px 3px 6px;
+}
+
+table td
+{
+    vertical-align: top;
+    padding: 3px 6px 5px 5px;
+    margin: 0px;
+    border: 1px solid #E7E7E8;
+    background: #F7F7F8;
+}
+
+/* Local link is a style for hyperlinks that link to file:/// content, there are lots so color them as 'normal' text until the user mouse overs */
+.localLink
+{
+    color: #1E1E1F;
+    background: #EEEEED;
+    text-decoration: none;
+}
+
+.localLink:hover
+{
+    color: #1382CE;
+    background: #FFFF99;
+    text-decoration: none;
+}
+
+/* Center text, used in the over views cells that contain message level counts */ 
+.textCentered
+{
+    text-align: center;
+}
+
+/* The message cells in message tables should take up all avaliable space */
+.messageCell
+{
+    width: 100%;
+}
+
+/* Padding around the content after the h1 */ 
+#content 
+{
+    padding: 0px 12px 12px 12px; 
+}
+
+/* The overview table expands to width, with a max width of 97% */ 
+#overview table
+{
+    width: auto;
+    max-width: 75%; 
+}
+
+/* The messages tables are always 97% width */
+#messages table
+{
+    width: 97%;
+}
+
+/* All Icons */
+.IconSuccessEncoded, .IconInfoEncoded, .IconWarningEncoded, .IconErrorEncoded
+{
+    min-width:18px;
+    min-height:18px; 
+    background-repeat:no-repeat;
+    background-position:center;
+}
+
+/* Success icon encoded */
+.IconSuccessEncoded
+{
+    /* Note: Do not delete the comment below. It is used to verify the correctness of the encoded image resource below before the product is released */
+    /* [---XsltValidateInternal-Base64EncodedImage:IconSuccess#Begin#background-image: url(data:image/png;base64,#Separator#);#End#] */
+    background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABPElEQVR4Xp1Tv0vDUBi8FqeA4NpBcBLcWnQSApncOnTo4FSnjP0DsnXpH5CxiwbHDg4Zuj4oOEXiJgiC4FDcCkLWmIMc1Pfw+eMgQ77v3Xf3Pe51YKGqqisAEwCR1TIAsiAIblSo6xrdHeJR85Xle3mdmCQKb0PsfqyxxzM8K15HZADl/H5+sHpZwYfxyRjTs+kWwKBx8yoHd2mRiuzF8mkJniWH/13u3Fjrs/EdhsdDFHGB/DLXEJBDLh1MWPAhPo1BLB4WX5yQywHR+m3tVe/t97D52CB/ziG0nIgD/qDuYg8WuCcVZ2YGwlJ3YDugkpR/VNcAEx6GEKhERSr71FuO4YCM4XBdwKvecjIlkSnsO0Hyp/GxSeJAdzBKzpOtnPwyyiPdAZhpZptT04tU+zk7s8czeges//s5C5+CwqrR4/gw+AAAAABJRU5ErkJggg==);
+}
+
+/* Information icon encoded */
+.IconInfoEncoded
+{
+    /* Note: Do not delete the comment below. It is used to verify the correctness of the encoded image resource below before the product is released */
+    /* [---XsltValidateInternal-Base64EncodedImage:IconInformation#Begin#background-image: url(data:image/png;base64,#Separator#);#End#] */
+    background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABHElEQVR4Xs2TsUoDQRRF7wwoziokjZUKadInhdhukR9YP8DMX1hYW+QvdsXa/QHBbcXC7W0CamWTQnclFutceIQJwwaWNLlwm5k5d94M76mmaeCrrmsLYOocY12FcxZFUeozCqKqqgYA8uevv1H6VuPxcwlfk5N92KHBxfFeCSAxxswlYAW/Xr989x/mv9gkhtyMDhcAxgzRsp7flj8B/HF1RsMXq+NZMkopaHe7lbKxQUEIGbKsYNoGn969060hZBkQex/W8oRQwsQaW2o3Ago2SVcJUzAgY3N0lTCZZm+zPS8HB51gMmS1DEYyOz9acKO1D8JWTlafKIMxdhvlfdyT94Vv5h7P8Ky7nQzACmhvKq3zk3PjW9asz9D/1oigecsioooAAAAASUVORK5CYII=);
+}
+
+/* Warning icon encoded */
+.IconWarningEncoded
+{
+    /* Note: Do not delete the comment below. It is used to verify the correctness of the encoded image resource below before the product is released */
+    /* [---XsltValidateInternal-Base64EncodedImage:IconWarning#Begin#background-image: url(data:image/png;base64,#Separator#);#End#] */
+    background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAx0lEQVR4XpWSMQ7CMAxFf4xAyBMLCxMrO8dhaBcuwdCJS3RJBw7SA/QGTCxdWJgiQYWKXJWKIXHIlyw5lqr34tQgEOdcBsCOx5yZK3hCCKdYXneQkh4pEfqzLfu+wVDSyyzFoJjfz9NB+pAF+eizx2Vruts0k15mPgvS6GYvpVtQhB61IB/dk6AF6fS4Ben0uIX5odtFe8Q/eW1KvFeH4e8khT6+gm5B+t3juyDt7n0jpe+CANTd+oTUjN/U3yVaABnSUjFz/gFq44JaVSCXeQAAAABJRU5ErkJggg==);
+}
+
+/* Error icon encoded */
+.IconErrorEncoded
+{
+    /* Note: Do not delete the comment below. It is used to verify the correctness of the encoded image resource below before the product is released */
+    /* [---XsltValidateInternal-Base64EncodedImage:IconError#Begin#background-image: url(data:image/png;base64,#Separator#);#End#] */
+    background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABQElEQVR4XqWTvUoEQRCE6wYPZUA80AfwAQz23uCMjA7MDRQEIzPBVEyNTQUFIw00vcQTTMzuAh/AxEQQT8HF/3G/oGGnEUGuoNnd6qoZuqltyKEsyzVJq5I6rnUp6SjGeGhESikzzlc1eL7opfuVbrqbU1Zw9NCgtQMaZpY0eNnaaL2fHusvTK5vKu7sjSS1Y4y3QUA6K3e3Mau5UFDyMP7tYF9o8cAHZv68vipoIJg971PZIZ5HiwdvYGGvFVFHmGmZ2MxwmQYPXubPl9Up0tfoMQGetXd6mRbvhBw+boZ6WF7Mbv1+GsHRk0fQmPAH1GfmZirbCfDJ61tw3Px8/8pZsPAG4jlVhcPgZ7adwNWBB68lkRQWFiTgFlbnLY3DGGM7izIJIyT/jjIvEJw6fdJTc6krDzh6aMwMP9bvDH4ADSsa9uSWVJkAAAAASUVORK5CYII=);
+}
+		</style>
+	</head><body>
+		<h1 _locid="PortabilityReport">
+			.NET Portability Report
+		</h1><div id="content">
+			<h2 _locid="SummaryTitle">
+				<a name="Summary"></a>Summary
+			</h2><div id="summary">
+				<table>
+					<tbody>
+						<tr>
+							<th>Assembly</th><th>.NET Core 5.0</th>
+						</tr><tr>
+							<td><strong><a href="#Orleans">Orleans</a></strong></td><td class="textCentered">91.36%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansAzureUtils">OrleansAzureUtils</a></strong></td><td class="textCentered">98.45%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansCounterControl">OrleansCounterControl</a></strong></td><td class="textCentered">96.23%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansEventSourcing">OrleansEventSourcing</a></strong></td><td class="textCentered">100%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansHost">OrleansHost</a></strong></td><td class="textCentered">96.7%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansManager">OrleansManager</a></strong></td><td class="textCentered">99.42%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansProviders">OrleansProviders</a></strong></td><td class="textCentered">98.37%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansRuntime">OrleansRuntime</a></strong></td><td class="textCentered">95.78%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansTestingHost">OrleansTestingHost</a></strong></td><td class="textCentered">87.32%</td>
+						</tr><tr>
+							<td><strong><a href="#OrleansZooKeeperUtils">OrleansZooKeeperUtils</a></strong></td><td class="textCentered">100%</td>
+						</tr>
+					</tbody>
+				</table>
+			</div><div id="details">
+				<a name="Orleans"></a><h3>
+					Orleans
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.CodeDom.CodeTypeParameterCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Add(System.CodeDom.CodeTypeParameter)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Management.ManagementObject</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.DataRow</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Item(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.IDataParameter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Direction(System.Data.ParameterDirection)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_ParameterName(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_DbType(System.Data.DbType)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Value(System.Object)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.AppDomain</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDomain</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ApplyPolicy(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">add_DomainUnload(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_SetupInformation</td><td class="IconErrorEncoded"></td><td>Remove usage of AppDomain.  Use alternate means for managing configuration information.</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyGetAssemblies</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Unload(System.AppDomain)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ProcessExit(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAssemblies</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstanceFromAndUnwrap(System.String,System.String,System.Boolean,System.Reflection.BindingFlags,System.Reflection.Binder,System.Object[],System.Globalization.CultureInfo,System.Object[])</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateDomain(System.String,System.Security.Policy.Evidence,System.AppDomainSetup)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyLoad(System.AssemblyLoadEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Type</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsGenericType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsGenericType</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsGenericType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsSerializable</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsSerializable</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsPrimitive</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsPrimitive</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetConstructor(System.Reflection.BindingFlags,System.Reflection.Binder,System.Type[],System.Reflection.ParameterModifier[])</td><td class="IconErrorEncoded"></td><td>Use GetConstructor(Type[]) to search for public constructors by parameter type or filter the results of GetConstructors(BindingFlags) using LINQ for other queries.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMethod(System.String,System.Reflection.BindingFlags,System.Reflection.Binder,System.Type[],System.Reflection.ParameterModifier[])</td><td class="IconErrorEncoded"></td><td>Use GetMethod(string, Type[]) to search for public methods by name and parameter type or filter the results of GetMethods(BindingFlags) using LINQ for other queries.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ContainsGenericParameters</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().ContainsGenericParameters</td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyGetType(System.String,System.Boolean,System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsEnum</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsEnum</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNestedPrivate</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNestedPrivate</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsAbstract</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsAbstract</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNestedFamily</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNestedFamily</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNotPublic</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNotPublic</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Module</td><td class="IconErrorEncoded"></td><td>Use System.Reflection.AssemblyExtensions.GetModules(),  iterate over returned collection.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNestedPublic</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNestedPublic</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_GenericParameterAttributes</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetGenericParameterConstraints</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().GetGenericParameterConstraints()</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Assembly</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().Assembly</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_UnderlyingSystemType</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetInterfaceMap(System.Type)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsGenericTypeDefinition</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsGenericTypeDefinition</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_BaseType</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().BaseType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsInterface</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsInterface</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetTypeCode(System.Type)</td><td class="IconErrorEncoded"></td><td>Use Type or RuntimeTypeHandle instead.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsValueType</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsValueType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsClass</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsClass</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Transactions.TransactionOptions</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Timeout(System.TimeSpan)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_IsolationLevel(System.Transactions.IsolationLevel)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Xml.XmlTextWriter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.IO.TextWriter)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.AssemblyLoadEventArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_LoadedAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.FormatterServices</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetUninitializedObject(System.Type)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.InternalDataCollectionBase</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetEnumerator</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.SerializableAttribute</td><td class="IconErrorEncoded"></td><td>Remove this attribute</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.PerformanceCounter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String,System.String,System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String,System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CounterName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">NextValue</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_RawValue</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_RawValue(System.Int64)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.PerformanceCounterCategory</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Exists(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetInstanceNames</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCounters(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Delete(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Create(System.String,System.String,System.Diagnostics.PerformanceCounterCategoryType,System.Diagnostics.CounterCreationDataCollection)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Transactions.TransactionManager</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_MaximumTimeout</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Management.ManagementObjectCollection.ManagementObjectEnumerator</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Current</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">MoveNext</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Management.ManagementObjectCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetEnumerator</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.Assembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCustomAttributes(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadWithPartialName(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetExecutingAssembly</td><td class="IconErrorEncoded"></td><td>typeof(CurrentType).GetTypeInfo().Assembly</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CodeBase</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetEntryAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ReflectionOnly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Location</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoad(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetTypes</td><td class="IconErrorEncoded"></td><td>Use Assembly.DefinedTypes</td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstance(System.String)</td><td class="IconErrorEncoded"></td><td>Use System.Activator.CreateInstance(Assembly.GetType()) on type you are interested in.</td>
+						</tr><tr>
+							<td style="padding-left:2em">Load(System.String)</td><td class="IconErrorEncoded"></td><td>use Assembly.Load(new AssemblyName(string))</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetType(System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td>Use Assembly.GetType(string), throw if you receive null return value.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCallingAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.Common.DbProviderFactories</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFactory(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFactoryClasses</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.Formatters.Binary.BinaryFormatter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Deserialize(System.IO.Stream)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Binder(System.Runtime.Serialization.SerializationBinder)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Serialize(System.IO.Stream,System.Object)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Net.Dns</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetHostAddresses(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Environment</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Is64BitOperatingSystem</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_MachineName</td><td class="IconErrorEncoded"></td><td>Remove, or use Environment.GetEnvironmentVariable("COMPUTERNAME")</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_UserName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder,System.Environment.SpecialFolderOption)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Version</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CommandLine</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCommandLineArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_OSVersion</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">Exit(System.Int32)</td><td class="IconErrorEncoded"></td><td>Use Environment.FailFast(string, Exception)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDirectory</td><td class="IconErrorEncoded"></td><td>Use Directory.GetCurrentDirectory()</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.IDbDataParameter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Size(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.IDataRecord</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Item(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetBoolean(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetOrdinal(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">IsDBNull(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetValue(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.OperatingSystem</td><td class="IconErrorEncoded"></td><td>Do not use.  Couple behavior to feature availability, not OS version or Platform.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Xml.XmlNode</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">SelectNodes(System.String,System.Xml.XmlNamespaceManager)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.DataTable</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Rows</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.CustomAttributeData</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCustomAttributes(System.Reflection.MemberInfo)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.AssemblyName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAssemblyName(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Exception</td><td class="IconErrorEncoded"></td><td>False positive (GetType() from Object is sufficient)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetType</td><td class="IconErrorEncoded"></td><td>False positive (GetType() from Object is sufficient)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetObjectData(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)</td><td class="IconErrorEncoded"></td><td>Remove.  Getting rid of other usage of SerializationInfo will remove the need for this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)</td><td class="IconErrorEncoded"></td><td>Remove.  Ctor overload taking SerializationInfo is not applicable in new surface area</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Management.ManagementObjectSearcher</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Get</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.Trace</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CorrelationManager</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Threading.ThreadPool</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAvailableThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMinThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">SetMinThreads(System.Int32,System.Int32)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMaxThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.ISerializable</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.CodeDom.CodeTypeReference</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.AssemblyLoadEventHandler</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Object,System.IntPtr)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.SerializationBinder</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.DebuggableAttribute</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsJITTrackingEnabled</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.CodeDom.CodeTypeParameter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_HasConstructorConstraint(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Constraints</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Management.PropertyDataCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Item(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.ResolveEventHandler</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Object,System.IntPtr)</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Transactions.TransactionScope</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Transactions.TransactionScopeOption,System.Transactions.TransactionOptions)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.StackTrace</td><td class="IconErrorEncoded"></td><td>Currently there is no workaround, but we are working on it. Please check back.</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td>Currently there is no workaround, but we are working on it. Please check back.</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.IDataReader</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Threading.Thread</td><td class="IconErrorEncoded"></td><td>This is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td style="padding-left:2em">ResetAbort</td><td class="IconErrorEncoded"></td><td>This is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td style="padding-left:2em">Abort(System.Object)</td><td class="IconErrorEncoded"></td><td>This is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.IDbCommand</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateParameter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Parameters</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.ConsoleTraceListener</td><td class="IconErrorEncoded"></td><td>useErrorStream ? new TextWriterTraceListener(Console.Error) : new TextWriterTraceListener(Console.Out)</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.CodeDom.CodeTypeReferenceCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Add(System.CodeDom.CodeTypeReference)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Add(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Remoting.Messaging.CallContext</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">LogicalGetData(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">FreeNamedDataSlot(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">LogicalSetData(System.String,System.Object)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.String</td><td class="IconErrorEncoded"></td><td>Use CultureInfo.TextInfo.ToLower(String) instead</td>
+						</tr><tr>
+							<td style="padding-left:2em">ToLower(System.Globalization.CultureInfo)</td><td class="IconErrorEncoded"></td><td>Use CultureInfo.TextInfo.ToLower(String) instead</td>
+						</tr><tr>
+							<td style="padding-left:2em">ToString(System.IFormatProvider)</td><td class="IconErrorEncoded"></td><td>Remove usage (does nothing)</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Threading.ThreadAbortException</td><td class="IconErrorEncoded"></td><td>Do not use: exception cannot be caught since it is not thrown by framework, never throw this type. Thread.Abort is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ExceptionState</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.SerializationInfo</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td style="padding-left:2em">AddValue(System.String,System.Object,System.Type)</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetBoolean(System.String)</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td style="padding-left:2em">AddValue(System.String,System.Object)</td><td class="IconErrorEncoded"></td><td>Remove serialization constructors on custom Exception types</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetString(System.String)</td><td class="IconErrorEncoded"></td><td>Remove serialization constructors on custom Exception types</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetValue(System.String,System.Type)</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.UriTypeConverter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.MarshalByRefObject</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Transactions.TransactionScopeOption</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.DataRowCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.ParameterModifier</td><td class="IconErrorEncoded"></td><td>Use an overload that does not take a ParameterModifier array.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Activator</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstance(System.Type,System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.Binder</td><td class="IconErrorEncoded"></td><td>Use an overload that does not take a Binder.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.CorrelationManager</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ActivityId</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_ActivityId(System.Guid)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Delegate</td><td class="IconErrorEncoded"></td><td>Use System.Reflection.RuntimeReflectionExtensions.GetMethodInfo</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Method</td><td class="IconErrorEncoded"></td><td>Use System.Reflection.RuntimeReflectionExtensions.GetMethodInfo</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Transactions.IsolationLevel</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Console</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Title(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReadKey</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Management.PropertyData</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Value</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Environment.SpecialFolderOption</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Management.ManagementBaseObject</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Properties</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.ResolveEventArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_RequestingAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Name</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.IDataParameterCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.Process</td><td class="IconErrorEncoded"></td><td>Use System.Diagnostics.Process.SafeHandle</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Handle</td><td class="IconErrorEncoded"></td><td>Use System.Diagnostics.Process.SafeHandle</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Environment.SpecialFolder</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a><a name="OrleansAzureUtils"></a><h3>
+					OrleansAzureUtils
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Missing assemblies</th>
+						</tr><tr>
+							<td>Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed</td>
+						</tr><tr>
+							<td>Microsoft.WindowsAzure.Storage, Version=4.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35</td>
+						</tr>
+					</tbody>
+				</table><a>&nbsp</a><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.AppDomain</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDomain</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ApplyPolicy(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">add_DomainUnload(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_SetupInformation</td><td class="IconErrorEncoded"></td><td>Remove usage of AppDomain.  Use alternate means for managing configuration information.</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyGetAssemblies</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Unload(System.AppDomain)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ProcessExit(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAssemblies</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstanceFromAndUnwrap(System.String,System.String,System.Boolean,System.Reflection.BindingFlags,System.Reflection.Binder,System.Object[],System.Globalization.CultureInfo,System.Object[])</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateDomain(System.String,System.Security.Policy.Evidence,System.AppDomainSetup)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyLoad(System.AssemblyLoadEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Web.HttpServerUtility</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">MapPath(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.Assembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCustomAttributes(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadWithPartialName(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetExecutingAssembly</td><td class="IconErrorEncoded"></td><td>typeof(CurrentType).GetTypeInfo().Assembly</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CodeBase</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetEntryAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ReflectionOnly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Location</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoad(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetTypes</td><td class="IconErrorEncoded"></td><td>Use Assembly.DefinedTypes</td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstance(System.String)</td><td class="IconErrorEncoded"></td><td>Use System.Activator.CreateInstance(Assembly.GetType()) on type you are interested in.</td>
+						</tr><tr>
+							<td style="padding-left:2em">Load(System.String)</td><td class="IconErrorEncoded"></td><td>use Assembly.Load(new AssemblyName(string))</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetType(System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td>Use Assembly.GetType(string), throw if you receive null return value.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCallingAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.EventInfo</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetRemoveMethod</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAddMethod</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Exception</td><td class="IconErrorEncoded"></td><td>False positive (GetType() from Object is sufficient)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetType</td><td class="IconErrorEncoded"></td><td>False positive (GetType() from Object is sufficient)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetObjectData(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)</td><td class="IconErrorEncoded"></td><td>Remove.  Getting rid of other usage of SerializationInfo will remove the need for this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)</td><td class="IconErrorEncoded"></td><td>Remove.  Ctor overload taking SerializationInfo is not applicable in new surface area</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Web.HttpContext</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Current</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Server</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Web.Hosting.HostingEnvironment</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">MapPath(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a><a name="OrleansCounterControl"></a><h3>
+					OrleansCounterControl
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.Reflection.Assembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCustomAttributes(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadWithPartialName(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetExecutingAssembly</td><td class="IconErrorEncoded"></td><td>typeof(CurrentType).GetTypeInfo().Assembly</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CodeBase</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetEntryAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ReflectionOnly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Location</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoad(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetTypes</td><td class="IconErrorEncoded"></td><td>Use Assembly.DefinedTypes</td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstance(System.String)</td><td class="IconErrorEncoded"></td><td>Use System.Activator.CreateInstance(Assembly.GetType()) on type you are interested in.</td>
+						</tr><tr>
+							<td style="padding-left:2em">Load(System.String)</td><td class="IconErrorEncoded"></td><td>use Assembly.Load(new AssemblyName(string))</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetType(System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td>Use Assembly.GetType(string), throw if you receive null return value.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCallingAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Console</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Title(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReadKey</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.ConsoleKeyInfo</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a><a name="OrleansHost"></a><h3>
+					OrleansHost
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.Environment</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Is64BitOperatingSystem</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_MachineName</td><td class="IconErrorEncoded"></td><td>Remove, or use Environment.GetEnvironmentVariable("COMPUTERNAME")</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_UserName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder,System.Environment.SpecialFolderOption)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Version</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CommandLine</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCommandLineArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_OSVersion</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">Exit(System.Int32)</td><td class="IconErrorEncoded"></td><td>Use Environment.FailFast(string, Exception)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDirectory</td><td class="IconErrorEncoded"></td><td>Use Directory.GetCurrentDirectory()</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a><a name="OrleansManager"></a><h3>
+					OrleansManager
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.Environment</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Is64BitOperatingSystem</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_MachineName</td><td class="IconErrorEncoded"></td><td>Remove, or use Environment.GetEnvironmentVariable("COMPUTERNAME")</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_UserName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder,System.Environment.SpecialFolderOption)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Version</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CommandLine</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCommandLineArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_OSVersion</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">Exit(System.Int32)</td><td class="IconErrorEncoded"></td><td>Use Environment.FailFast(string, Exception)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDirectory</td><td class="IconErrorEncoded"></td><td>Use Directory.GetCurrentDirectory()</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a><a name="OrleansProviders"></a><h3>
+					OrleansProviders
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.Runtime.Serialization.FormatterServices</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetUninitializedObject(System.Type)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.MarshalByRefObject</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a><a name="OrleansRuntime"></a><h3>
+					OrleansRuntime
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Missing assemblies</th>
+						</tr><tr>
+							<td>Microsoft.Framework.DependencyInjection, Version=1.0.0.0, Culture=neutral, PublicKeyToken=38575508bf0a2155</td>
+						</tr><tr>
+							<td>Microsoft.Framework.DependencyInjection.Abstractions, Version=1.0.0.0, Culture=neutral, PublicKeyToken=38575508bf0a2155</td>
+						</tr>
+					</tbody>
+				</table><a>&nbsp</a><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.AppDomain</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDomain</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ApplyPolicy(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">add_DomainUnload(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_SetupInformation</td><td class="IconErrorEncoded"></td><td>Remove usage of AppDomain.  Use alternate means for managing configuration information.</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyGetAssemblies</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Unload(System.AppDomain)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ProcessExit(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAssemblies</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstanceFromAndUnwrap(System.String,System.String,System.Boolean,System.Reflection.BindingFlags,System.Reflection.Binder,System.Object[],System.Globalization.CultureInfo,System.Object[])</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateDomain(System.String,System.Security.Policy.Evidence,System.AppDomainSetup)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyLoad(System.AssemblyLoadEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Type</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsGenericType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsGenericType</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsGenericType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsSerializable</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsSerializable</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsPrimitive</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsPrimitive</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetConstructor(System.Reflection.BindingFlags,System.Reflection.Binder,System.Type[],System.Reflection.ParameterModifier[])</td><td class="IconErrorEncoded"></td><td>Use GetConstructor(Type[]) to search for public constructors by parameter type or filter the results of GetConstructors(BindingFlags) using LINQ for other queries.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMethod(System.String,System.Reflection.BindingFlags,System.Reflection.Binder,System.Type[],System.Reflection.ParameterModifier[])</td><td class="IconErrorEncoded"></td><td>Use GetMethod(string, Type[]) to search for public methods by name and parameter type or filter the results of GetMethods(BindingFlags) using LINQ for other queries.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ContainsGenericParameters</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().ContainsGenericParameters</td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyGetType(System.String,System.Boolean,System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsEnum</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsEnum</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNestedPrivate</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNestedPrivate</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsAbstract</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsAbstract</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNestedFamily</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNestedFamily</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNotPublic</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNotPublic</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Module</td><td class="IconErrorEncoded"></td><td>Use System.Reflection.AssemblyExtensions.GetModules(),  iterate over returned collection.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsNestedPublic</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsNestedPublic</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_GenericParameterAttributes</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetGenericParameterConstraints</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().GetGenericParameterConstraints()</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Assembly</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().Assembly</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_UnderlyingSystemType</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetInterfaceMap(System.Type)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsGenericTypeDefinition</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsGenericTypeDefinition</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_BaseType</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().BaseType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsInterface</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsInterface</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetTypeCode(System.Type)</td><td class="IconErrorEncoded"></td><td>Use Type or RuntimeTypeHandle instead.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsValueType</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsValueType</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_IsClass</td><td class="IconErrorEncoded"></td><td>.GetTypeInfo().IsClass</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Xml.XmlTextWriter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.IO.TextWriter)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.CounterCreationDataCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">AddRange(System.Diagnostics.CounterCreationData[])</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.AssemblyLoadEventArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_LoadedAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.FormatterServices</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetUninitializedObject(System.Type)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.PerformanceCounter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String,System.String,System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String,System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CounterName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">NextValue</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_RawValue</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_RawValue(System.Int64)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.PerformanceCounterCategory</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Exists(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetInstanceNames</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCounters(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Delete(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Create(System.String,System.String,System.Diagnostics.PerformanceCounterCategoryType,System.Diagnostics.CounterCreationDataCollection)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Configuration.Install.InstallContext</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">LogMessage(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Configuration.Install.Installer</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Context</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Installers</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Net.ServicePointManager</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Expect100Continue(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_DefaultConnectionLimit(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_UseNagleAlgorithm(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.Assembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCustomAttributes(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadWithPartialName(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetExecutingAssembly</td><td class="IconErrorEncoded"></td><td>typeof(CurrentType).GetTypeInfo().Assembly</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CodeBase</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetEntryAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ReflectionOnly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Location</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyLoad(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetTypes</td><td class="IconErrorEncoded"></td><td>Use Assembly.DefinedTypes</td>
+						</tr><tr>
+							<td style="padding-left:2em">LoadFrom(System.String)</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstance(System.String)</td><td class="IconErrorEncoded"></td><td>Use System.Activator.CreateInstance(Assembly.GetType()) on type you are interested in.</td>
+						</tr><tr>
+							<td style="padding-left:2em">Load(System.String)</td><td class="IconErrorEncoded"></td><td>use Assembly.Load(new AssemblyName(string))</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetType(System.String,System.Boolean)</td><td class="IconErrorEncoded"></td><td>Use Assembly.GetType(string), throw if you receive null return value.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCallingAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Environment</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Is64BitOperatingSystem</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_MachineName</td><td class="IconErrorEncoded"></td><td>Remove, or use Environment.GetEnvironmentVariable("COMPUTERNAME")</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_UserName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder,System.Environment.SpecialFolderOption)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Version</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CommandLine</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCommandLineArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_OSVersion</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">Exit(System.Int32)</td><td class="IconErrorEncoded"></td><td>Use Environment.FailFast(string, Exception)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDirectory</td><td class="IconErrorEncoded"></td><td>Use Directory.GetCurrentDirectory()</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.OperatingSystem</td><td class="IconErrorEncoded"></td><td>Do not use.  Couple behavior to feature availability, not OS version or Platform.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Exception</td><td class="IconErrorEncoded"></td><td>False positive (GetType() from Object is sufficient)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetType</td><td class="IconErrorEncoded"></td><td>False positive (GetType() from Object is sufficient)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetObjectData(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)</td><td class="IconErrorEncoded"></td><td>Remove.  Getting rid of other usage of SerializationInfo will remove the need for this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)</td><td class="IconErrorEncoded"></td><td>Remove.  Ctor overload taking SerializationInfo is not applicable in new surface area</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.ComponentModel.RunInstallerAttribute</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Threading.ThreadPool</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAvailableThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMinThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">SetMinThreads(System.Int32,System.Int32)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMaxThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.ISerializable</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.AssemblyLoadEventHandler</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Object,System.IntPtr)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.ResolveEventHandler</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Object,System.IntPtr)</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.CounterCreationData</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String,System.String,System.Diagnostics.PerformanceCounterType)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.StackTrace</td><td class="IconErrorEncoded"></td><td>Currently there is no workaround, but we are working on it. Please check back.</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td>Currently there is no workaround, but we are working on it. Please check back.</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.PerformanceCounterInstaller</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_CategoryName(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Counters</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_CategoryType(System.Diagnostics.PerformanceCounterCategoryType)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Threading.Thread</td><td class="IconErrorEncoded"></td><td>This is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td style="padding-left:2em">ResetAbort</td><td class="IconErrorEncoded"></td><td>This is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td style="padding-left:2em">Abort(System.Object)</td><td class="IconErrorEncoded"></td><td>This is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Configuration.Install.InstallerCollection</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Add(System.Configuration.Install.Installer)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Data.InvalidExpressionException</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.String</td><td class="IconErrorEncoded"></td><td>Use CultureInfo.TextInfo.ToLower(String) instead</td>
+						</tr><tr>
+							<td style="padding-left:2em">ToLower(System.Globalization.CultureInfo)</td><td class="IconErrorEncoded"></td><td>Use CultureInfo.TextInfo.ToLower(String) instead</td>
+						</tr><tr>
+							<td style="padding-left:2em">ToString(System.IFormatProvider)</td><td class="IconErrorEncoded"></td><td>Remove usage (does nothing)</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Threading.ThreadAbortException</td><td class="IconErrorEncoded"></td><td>Do not use: exception cannot be caught since it is not thrown by framework, never throw this type. Thread.Abort is only reliable in SQL Server.  Elsewhere, don't use it.</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ExceptionState</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.UnhandledExceptionEventArgs</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ExceptionObject</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.SerializationInfo</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td style="padding-left:2em">AddValue(System.String,System.Object,System.Type)</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetBoolean(System.String)</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td style="padding-left:2em">AddValue(System.String,System.Object)</td><td class="IconErrorEncoded"></td><td>Remove serialization constructors on custom Exception types</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetString(System.String)</td><td class="IconErrorEncoded"></td><td>Remove serialization constructors on custom Exception types</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetValue(System.String,System.Type)</td><td class="IconErrorEncoded"></td><td>either 1) Delete Serialization info from exceptions (since this can't be remoted) or 2) Use a different serialization technology if not for exceptions.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.MarshalByRefObject</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.SystemException</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.PerformanceCounterCategoryType</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Delegate</td><td class="IconErrorEncoded"></td><td>Use System.Reflection.RuntimeReflectionExtensions.GetMethodInfo</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Method</td><td class="IconErrorEncoded"></td><td>Use System.Reflection.RuntimeReflectionExtensions.GetMethodInfo</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.PerformanceCounterType</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.UnhandledExceptionEventHandler</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Object,System.IntPtr)</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.ResolveEventArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_RequestingAssembly</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Name</td><td class="IconErrorEncoded"></td><td>Use AssemblyLoadContext</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a><a name="OrleansTestingHost"></a><h3>
+					OrleansTestingHost
+				</h3><table>
+					<tbody>
+						<tr>
+							<th>Target type</th><th>.NET Core 5.0</th><th>Recommended changes</th>
+						</tr><tr>
+							<td>System.Runtime.Remoting.RemotingException</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.AppDomain</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove Usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDomain</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">remove_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ApplyPolicy(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">add_DomainUnload(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_SetupInformation</td><td class="IconErrorEncoded"></td><td>Remove usage of AppDomain.  Use alternate means for managing configuration information.</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ReflectionOnlyAssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">ReflectionOnlyGetAssemblies</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Unload(System.AppDomain)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_UnhandledException(System.UnhandledExceptionEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyResolve(System.ResolveEventHandler)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_ProcessExit(System.EventHandler)</td><td class="IconErrorEncoded"></td><td>Use object with finalizer stored in static variable, or use app-model specific unload notifications (e.g. Application.Suspending event for modern apps)</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAssemblies</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateInstanceFromAndUnwrap(System.String,System.String,System.Boolean,System.Reflection.BindingFlags,System.Reflection.Binder,System.Object[],System.Globalization.CultureInfo,System.Object[])</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">CreateDomain(System.String,System.Security.Policy.Evidence,System.AppDomainSetup)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">add_AssemblyLoad(System.AssemblyLoadEventHandler)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Net.ServicePointManager</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Expect100Continue(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_DefaultConnectionLimit(System.Int32)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_UseNagleAlgorithm(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.Formatters.Binary.BinaryFormatter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Deserialize(System.IO.Stream)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_Binder(System.Runtime.Serialization.SerializationBinder)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Serialize(System.IO.Stream,System.Object)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Environment</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Is64BitOperatingSystem</td><td class="IconErrorEncoded"></td><td>Use Marshal.SizeOf(new IntPtr()) if needed</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_MachineName</td><td class="IconErrorEncoded"></td><td>Remove, or use Environment.GetEnvironmentVariable("COMPUTERNAME")</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_UserName</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetFolderPath(System.Environment.SpecialFolder,System.Environment.SpecialFolderOption)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_Version</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CommandLine</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetCommandLineArgs</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">get_OSVersion</td><td class="IconErrorEncoded"></td><td>Do not use.  Choose action based feature availability, not OS / Platform</td>
+						</tr><tr>
+							<td style="padding-left:2em">Exit(System.Int32)</td><td class="IconErrorEncoded"></td><td>Use Environment.FailFast(string, Exception)</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CurrentDirectory</td><td class="IconErrorEncoded"></td><td>Use Directory.GetCurrentDirectory()</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.AppDomainSetup</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">set_ApplicationBase(System.String)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ConfigurationFile</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ShadowCopyDirectories</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_ConfigurationFile(System.String)</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ShadowCopyFiles</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_CachePath(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_ShadowCopyFiles(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_CachePath</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_ShadowCopyDirectories(System.String)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Threading.ThreadPool</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetAvailableThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMinThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">SetMinThreads(System.Int32,System.Int32)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td style="padding-left:2em">GetMaxThreads(System.Int32@,System.Int32@)</td><td class="IconErrorEncoded"></td><td>Change code to not depend on the size of the ThreadPool for functionality.  Portable code needs to be able to run correctly on multiple different ThreadPool implementations, not all of which support this method.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.ProcessStartInfo</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_ErrorDialog(System.Boolean)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">set_WindowStyle(System.Diagnostics.ProcessWindowStyle)</td><td class="IconErrorEncoded"></td><td>Remove ShellExecute usage (Can Pinvoke if needed)</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Runtime.Serialization.IFormatter</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Deserialize(System.IO.Stream)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td style="padding-left:2em">Serialize(System.IO.Stream,System.Object)</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.UnhandledExceptionEventArgs</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td style="padding-left:2em">get_ExceptionObject</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.MarshalByRefObject</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor</td><td class="IconErrorEncoded"></td><td>Remove usage</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Diagnostics.ProcessWindowStyle</td><td class="IconErrorEncoded"></td><td>Remove ShellExecute usage (Can Pinvoke if needed)</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Reflection.Binder</td><td class="IconErrorEncoded"></td><td>Use an overload that does not take a Binder.</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Security.Policy.Evidence</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.UnhandledExceptionEventHandler</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td style="padding-left:2em">#ctor(System.Object,System.IntPtr)</td><td class="IconErrorEncoded"></td><td>Avoid usage of the UnhandledException Event, handle exceptions directly at scope of method being called</td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr><tr>
+							<td>System.Environment.SpecialFolder</td><td class="IconErrorEncoded"></td><td></td>
+						</tr><tr>
+							<td>&nbsp</td><td>&nbsp</td><td>&nbsp</td>
+						</tr>
+					</tbody>
+				</table><a href="#Summary">Back to summary</a>
+			</div>
