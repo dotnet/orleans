@@ -59,3 +59,15 @@ Orleans currently does not support updating grain code on the fly. To upgrade to
 ## Can I persist a grain’s state to the Azure cache service?
 
 This can be done though a storage provider for Azure Cache. We don’t have one but you can easily build your own.
+
+## Can I Connect to Orleans silos from the public internet?
+
+Orleans is Designed to be hosted as the back-end part of a service and you are suposed to create a front-end in your servers which clients connect to. It can be a http based Web API project, a socket server, a signalR server or anything else which you require.
+
+## What happens if a silo fails before my grain call returns a response for my call?
+
+You'll receive a TimeOut exception which you can catch and retry, then the grain will be created on an available silo and you're service will continue to work.
+
+## What happens if a grain call takes too much time to execute?
+
+Since Orleans uses a cooperative multi-tasking model, it will not get the CPU automatically from any grain but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking.
