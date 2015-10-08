@@ -269,7 +269,7 @@ namespace Orleans.Runtime.Host
 					host.WaitForOrleansSiloShutdown();
 			}
 			else
-				throw new ApplicationException("Silo failed to start correctly - aborting");
+				throw new Exception("Silo failed to start correctly - aborting");
 		}
     }
 }
