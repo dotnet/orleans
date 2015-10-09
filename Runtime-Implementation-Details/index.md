@@ -12,4 +12,4 @@ title: Runtime Implemention Details
 
 ### [Relational Storage](Relational-Storage)
 
-### [Load Balancing]](Load-Balancing)
+### [Load Balancing](Load-Balancing)
