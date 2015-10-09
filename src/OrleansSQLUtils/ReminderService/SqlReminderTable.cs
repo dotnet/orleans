@@ -30,7 +30,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class SqlReminderTable: IReminderTable
+    public class SqlReminderTable: IReminderTable
     {
         private string serviceId;
         private string deploymentId;

@@ -32,7 +32,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class SqlMembershipTable: IMembershipTable, IGatewayListProvider
+    public class SqlMembershipTable: IMembershipTable, IGatewayListProvider
     {
         private string deploymentId;        
         private TimeSpan maxStaleness;

@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Storage.Relational
     /// <summary>
     /// A holder for well known, vendor specific connector class invariant names.
     /// </summary>
-    public static class AdoNetInvariants
+    public static partial class AdoNetInvariants
     {
         /// <summary>
         /// Microsoft SQL Server invariant name string.
