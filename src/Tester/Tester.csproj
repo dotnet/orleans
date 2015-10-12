@@ -88,6 +88,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConcreteStateClassTests.cs" />
+    <Compile Include="DeactivationTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
