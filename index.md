@@ -15,7 +15,7 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Prerequisites](Prerequisites)**
 
-* **[Orleans Tools for Visual Studio](https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4)**
+* **[Orleans Tools for Visual Studio](https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4)** or alternatively **[ETG.Orleans.Templates.VSIX](https://visualstudiogallery.msdn.microsoft.com/b61c87e7-0655-4a6e-8e4f-84192950e08c)** from BigPark
 
 * **[Orleans NuGet Packages](NuGets)**
 
