@@ -166,7 +166,7 @@ namespace Orleans.Streams
             PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
             if (pubSubState == null)
             {
-                pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer, filter);
+                pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer, null);
                 State.Consumers.Add(pubSubState);
             }
 
