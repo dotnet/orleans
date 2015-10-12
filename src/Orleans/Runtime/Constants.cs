@@ -43,7 +43,7 @@ namespace Orleans.Runtime
         public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
 
         public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
-        public const string InvariantNameSqlServer = "System.Data.SqlClient";
+        public const string INVARIANT_NAME_SQL_SERVER = "System.Data.SqlClient";
 
         public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils";
 

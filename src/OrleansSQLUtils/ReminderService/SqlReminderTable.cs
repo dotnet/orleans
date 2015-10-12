@@ -22,15 +22,15 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage.Relational;
-using Orleans.Runtime.Storage.Relational.Management;
 using System;
 using System.Threading.Tasks;
+using Orleans.SqlUtils;
+using Orleans.SqlUtils.Management;
 
 
 namespace Orleans.Runtime.ReminderService
 {
-    public class SqlReminderTable: IReminderTable
+    internal class SqlReminderTable: IReminderTable
     {
         private string serviceId;
         private string deploymentId;

@@ -144,7 +144,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCounterControl", "Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansEventSourcing", "OrleansEventSourcing\OrleansEventSourcing.csproj", "{CF7EE78B-39E1-4660-BEAF-0E2606098F8C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansSQLUtils", "OrleansSQLUtils\OrleansSQLUtils.csproj", "{47E9AE37-4EAE-48D5-A778-2C80E9A6375F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansSqlUtils", "OrleansSQLUtils\OrleansSqlUtils.csproj", "{47E9AE37-4EAE-48D5-A778-2C80E9A6375F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
