@@ -51,7 +51,7 @@ namespace Orleans.Streams
             foreach (var kvp in implicitSubscriptions)
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
-                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value, null));
+                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value));
             }
             return Task.FromResult(result);
         }
