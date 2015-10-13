@@ -28,6 +28,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.TestingHost;
 
 namespace UnitTests.OrleansRuntime
 {
@@ -47,7 +48,7 @@ namespace UnitTests.OrleansRuntime
             SiloAddress primaryDirectoryForGrain = SiloAddress.NewLocalAddress(6789);
            
             Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
-            Catalog.DuplicateActivationException output = RoundTripDotNetSerializer(original);
+            Catalog.DuplicateActivationException output = TestingUtils.RoundTripDotNetSerializer(original);
 
             Assert.AreEqual(original.Message, output.Message);
             Assert.AreEqual(original.ActivationToUse, output.ActivationToUse);
@@ -66,16 +67,6 @@ namespace UnitTests.OrleansRuntime
             Assert.AreEqual(original.Message, output.Message);
             Assert.AreEqual(original.ActivationToUse, output.ActivationToUse);
             Assert.AreEqual(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
-        }
-
-        private static T RoundTripDotNetSerializer<T>(T input)
-        {
-            IFormatter formatter = new BinaryFormatter();
-            MemoryStream stream = new MemoryStream(new byte[10000], true);
-            formatter.Serialize(stream, input);
-            stream.Position = 0;
-            T output = (T)formatter.Deserialize(stream);
-            return output;
         }
     }
 }

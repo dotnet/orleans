@@ -253,24 +253,24 @@ namespace Orleans.Streams
             StreamConsumerData consumerData,
             StreamSequenceToken cacheToken)
         {
-            StreamSequenceToken requestedToken = null;
+            StreamHandshakeToken requestedHandshakeToken = null;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
                 Exception exceptionOccured = null;
                 try
                 {
-                    requestedToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                    requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                          i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          (exception, i) => true,
                          config.MaxEventDeliveryTime,
                          DefaultBackoffProvider);
 
-                    if (requestedToken != null)
+                    if (requestedHandshakeToken != null)
                     {
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, requestedToken);
+                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, requestedHandshakeToken.Token);
                     }
                     else
                     {
@@ -284,11 +284,11 @@ namespace Orleans.Streams
                 }
                 if (exceptionOccured != null)
                 {
-                    bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, false, null, requestedToken);
+                    bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, false, null, requestedHandshakeToken != null ? requestedHandshakeToken.Token : null);
                     if (faultedSubscription) return false;
                 }
             }
-            consumerData.LastToken = requestedToken; // use what ever the consumer asked for as LastToken for next handshake (even if he asked for null).
+            consumerData.LastToken = requestedHandshakeToken; // use what ever the consumer asked for as LastToken for next handshake (even if he asked for null).
             // if we don't yet have a cursor (had errors in the handshake or data not available exc), get a cursor at the event that triggered that consumer subscription.
             if (consumerData.Cursor == null && queueCache != null)
             {
@@ -538,8 +538,8 @@ namespace Orleans.Streams
 
         private async Task DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
-            StreamSequenceToken prevToken = consumerData.LastToken;
-            Task<StreamSequenceToken> batchDeliveryTask;
+            StreamHandshakeToken prevToken = consumerData.LastToken;
+            Task<StreamHandshakeToken> batchDeliveryTask;
 
             bool isRequestContextSet = batch.ImportRequestContext();
             try
@@ -554,16 +554,16 @@ namespace Orleans.Streams
                     RequestContext.Clear();
                 }
             }
-            StreamSequenceToken newToken = await batchDeliveryTask;
+            StreamHandshakeToken newToken = await batchDeliveryTask;
             if (newToken != null)
             {
                 consumerData.LastToken = newToken;
                 consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
-                    consumerData.StreamId.Namespace, newToken);
+                    consumerData.StreamId.Namespace, newToken.Token);
             }
             else
             {
-                consumerData.LastToken = batch.SequenceToken; // this is the currently delivered token
+                consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
             }
 
         }

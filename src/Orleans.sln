@@ -104,8 +104,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{DD5D35C0
 		Build\Build.Versions.txt = Build\Build.Versions.txt
 		Build\GlobalAssemblyInfo.cs = Build\GlobalAssemblyInfo.cs
 		Build\License.rtf = Build\License.rtf
-		Build\OrleansSetup.wixproj = Build\OrleansSetup.wixproj
-		Build\OrleansSetup.wxs = Build\OrleansSetup.wxs
 		Build\PostBuild.cmd = Build\PostBuild.cmd
 		Build\Version.txt = Build\Version.txt
 	EndProjectSection

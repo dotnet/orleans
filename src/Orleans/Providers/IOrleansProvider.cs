@@ -48,12 +48,9 @@ namespace Orleans.Providers
         /// <returns>Completion promise Task for the inttialization work for this provider</returns>
         Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config);
 
-        // For now, I've decided to keep Close in the per-provider interface and not as part of the common IProvider interface.
-        // There is currently no central place where Close can / would be called. 
-        // It might eventually be provided by xProviderManager classes in certain cases, 
-        //  for example: if they detect silo shutdown in progress.
-
-        //Task Close();
+        /// <summary>Close function for this provider instance.</summary>
+        /// <returns>Completion promise for the Close operation on this provider.</returns>
+        Task Close();
     }
     #pragma warning restore 1574
 
