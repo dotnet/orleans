@@ -19,12 +19,35 @@ Orleans has been used extensively running in Microsoft Azure by several Microsof
 
 Installation
 =======
+
+Installation is performed via NuGet. There are several packages, one for each different project type (interfaces, grains, silo, and client).
+
+In the grain interfaces project:
+```
+PM> Install-Package Microsoft.Orleans.Templates.Interfaces
+```
+In the grain implementations project:
+```
+PM> Install-Package Microsoft.Orleans.Templates.Grains
+```
+In the server (silo) project:
+```
+PM> Install-Package Microsoft.Orleans.Server
+```
+In the client project:
+```
+PM> Install-Package Microsoft.Orleans.Client
+```
+
+### Official Builds
 The stable production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
 The latest clean development branch build from CI is located: [here](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/innerloop/lastStableBuild/artifact/)
 
-Alternatively, you can clone the sources from GitHub, and run the Build.cmd script to build Binaries locally. 
-Then just xcopy Binaries\Release\* or reference Binaries\NuGet.Packages\* or install Binaries\Release\orleans_setup.msi.
+### Building From Source
+Clone the sources and run the `Build.cmd` script to build the binaries locally.
+
+Then reference the required assemblies from `Binaries\Release\*` or the NuGet packages from `Binaries\NuGet.Packages\*`.
 
 Documentation 
 =======
