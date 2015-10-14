@@ -31,39 +31,35 @@ namespace Orleans.Providers.Streams.Common
     [Serializable]
     public class EventSequenceToken : StreamSequenceToken
     {
-        private readonly long sequenceNumber;
-        private readonly int eventIndex;
+        public long SequenceNumber { get; set; }
+        
+        public int EventIndex { get; set; }
 
         public EventSequenceToken(long seqNumber)
         {
-            sequenceNumber = seqNumber;
-            eventIndex = 0;
+            SequenceNumber = seqNumber;
+            EventIndex = 0;
         }
 
         internal EventSequenceToken(long seqNumber, int eventInd)
         {
-            sequenceNumber = seqNumber;
-            eventIndex = eventInd;
+            SequenceNumber = seqNumber;
+            EventIndex = eventInd;
         }
 
         public EventSequenceToken NextSequenceNumber()
         {
-            return new EventSequenceToken(sequenceNumber + 1, eventIndex);
-        }
-
-        public long GetSequenceNumber()
-        {
-            return sequenceNumber;
+            return new EventSequenceToken(SequenceNumber + 1, EventIndex);
         }
 
         public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
         {
-            return new EventSequenceToken(sequenceNumber, eventInd);
+            return new EventSequenceToken(SequenceNumber, eventInd);
         }
 
         internal static long Distance(EventSequenceToken first, EventSequenceToken second)
         {
-            return first.sequenceNumber - second.sequenceNumber;
+            return first.SequenceNumber - second.SequenceNumber;
         }
 
         public override bool Equals(object obj)
@@ -74,8 +70,8 @@ namespace Orleans.Providers.Streams.Common
         public override bool Equals(StreamSequenceToken other)
         {
             var token = other as EventSequenceToken;
-            return token != null && (token.sequenceNumber == sequenceNumber &&
-                                     token.eventIndex == eventIndex);
+            return token != null && (token.SequenceNumber == SequenceNumber &&
+                                     token.EventIndex == EventIndex);
         }
 
         public override int CompareTo(StreamSequenceToken other)
@@ -87,19 +83,19 @@ namespace Orleans.Providers.Streams.Common
             if (token == null)
                 throw new ArgumentOutOfRangeException("other");
             
-            int difference = sequenceNumber.CompareTo(token.sequenceNumber);
-            return difference != 0 ? difference : eventIndex.CompareTo(token.eventIndex);
+            int difference = SequenceNumber.CompareTo(token.SequenceNumber);
+            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
         }
 
         public override int GetHashCode()
         {
             // why 397?
-            return (eventIndex * 397) ^ sequenceNumber.GetHashCode();
+            return (EventIndex * 397) ^ SequenceNumber.GetHashCode();
         }
 
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "[EventSequenceToken: SeqNum={0}, EventIndex={1}]", sequenceNumber, eventIndex);
+            return string.Format(CultureInfo.InvariantCulture, "[EventSequenceToken: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);
         }
     }
 }
