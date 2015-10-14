@@ -10,7 +10,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using Orleans.Runtime.Storage.Relational;
+using Orleans.SqlUtils;
 using UnitTests.General;
 
 namespace UnitTests.MembershipTests

@@ -26,10 +26,8 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Transactions;
 
-
-namespace Orleans.Runtime.Storage.Relational.Management
+namespace Orleans.SqlUtils.Management
 {
     /// <summary>
     /// Contains some relational database management extension methods.
@@ -95,25 +93,6 @@ namespace Orleans.Runtime.Storage.Relational.Management
 
             return await Task.FromResult(queryConstants);
         }
-
-
-        /// <summary>
-        /// Creates a transaction scope in which the storage operates.
-        /// </summary>
-        /// <param name="storage">The storage object.</param>
-        /// <returns>Returns a default transaction scope for the given storage.</returns>
-        /// <remarks>Does not set <c>System.Transactions.TransactionScopeAsyncFlowOption.Enabled">TransactionScopeAsyncFlowOption</c>as it is .NET 4.5.1.
-        /// This is required to support transaction scopes in async-await type of flows.</remarks>
-        public static TransactionScope CreateTransactionScope(this IRelationalStorage storage)
-        {
-            //By default transaction scope is set to serializable and a timeout for one minute.
-            //The timeout is regardless of what has been set on the command object itself and
-            //the query would be rolled back in the end. These defaults are more usable and
-            //can be customized per database.            
-            var transactionOptions = new TransactionOptions { IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted, Timeout = TransactionManager.MaximumTimeout };
-            return new TransactionScope(TransactionScopeOption.Required, transactionOptions);
-        }
-
 
         /// <summary>
         /// Creates a new instance of the storage based on the old connection string by changing the database name.

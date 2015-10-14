@@ -22,7 +22,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.IO;
 using System.Net;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -96,6 +99,16 @@ namespace Orleans.TestingHost
             // We did not complete before the timeout, we fire and forget to ensure we observe any exceptions that may occur
             taskToComplete.Ignore();
             throw new TimeoutException(message);
+        }
+
+        public static T RoundTripDotNetSerializer<T>(T input)
+        {
+            IFormatter formatter = new BinaryFormatter();
+            MemoryStream stream = new MemoryStream(new byte[100000], true);
+            formatter.Serialize(stream, input);
+            stream.Position = 0;
+            T output = (T)formatter.Deserialize(stream);
+            return output;
         }
     }
 }

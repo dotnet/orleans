@@ -26,8 +26,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// Contains some convenience methods to use in conjunction with <see cref="IRelationalStorage">IRelationalStorage</see> and <see cref="RelationalStorage">GenericRelationalStorage</see>.
@@ -89,7 +88,7 @@ namespace Orleans.Runtime.Storage.Relational
         /// <typeparam name="TValue">The type of the value to request.</typeparam>
         /// <param name="record">The record from which to retrieve the value.</param>
         /// <param name="fieldName">The name of the field to retrieve.</param>
-        /// <param name="@default">The default value if value in position is <see cref="System.DBNull"/>.</param>
+        /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
@@ -106,7 +105,7 @@ namespace Orleans.Runtime.Storage.Relational
         /// <typeparam name="TValue">The type of the value to request.</typeparam>
         /// <param name="record">The record from which to retrieve the value.</param>
         /// <param name="ordinal">The ordinal of the fieldname.</param>
-        /// <param name="@default">The default value if value in position is <see cref="System.DBNull"/>.</param>
+        /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>        

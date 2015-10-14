@@ -23,13 +23,13 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage.Relational.Management;
-using Orleans.Runtime.Storage.Relational;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Orleans.SqlUtils;
+using Orleans.SqlUtils.Management;
 
 
 namespace Orleans.Providers.SqlServer
@@ -67,7 +67,10 @@ namespace Orleans.Providers.SqlServer
             queryConstants = await database.InitializeOrleansQueriesAsync(); 
         }
 
-
+        public Task Close()
+        {
+            return TaskDone.Done;
+        }
 
         public void AddConfiguration(string deployment, string hostName, string client, IPAddress address)
         {

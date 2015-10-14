@@ -45,6 +45,10 @@ namespace Orleans.Providers.Streams.Common
         StopAgents,
         GetAgentsState,
         GetNumberRunningAgents,
+        AdapterCommandStartRange = 10000,
+        AdapterCommandEndRange = AdapterCommandStartRange + 9999,
+        AdapterFactoryCommandStartRange = AdapterCommandEndRange + 1,
+        AdapterFactoryCommandEndRange = AdapterFactoryCommandStartRange + 9999,
     }
 
     /// <summary>
@@ -114,7 +118,7 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        public async Task Stop()
+        public async Task Close()
         {
             var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
             if (siloRuntime != null)
@@ -147,10 +151,25 @@ namespace Orleans.Providers.Streams.Common
 
         public Task<object> ExecuteCommand(int command, object arg)
         {
+            if (command >= (int)PersistentStreamProviderCommand.AdapterCommandStartRange &&
+                command <= (int)PersistentStreamProviderCommand.AdapterCommandEndRange &&
+                queueAdapter is IControllable)
+            {
+                return ((IControllable)queueAdapter).ExecuteCommand(command, arg);
+            }
+
+            if (command >= (int)PersistentStreamProviderCommand.AdapterFactoryCommandStartRange &&
+                command <= (int)PersistentStreamProviderCommand.AdapterFactoryCommandEndRange &&
+                adapterFactory is IControllable)
+            {
+                return ((IControllable)adapterFactory).ExecuteCommand(command, arg);
+            }
+            
             if (pullingAgentManager != null)
             {
                 return pullingAgentManager.ExecuteCommand((PersistentStreamProviderCommand)command, arg);
             }
+
             logger.Warn(0, String.Format("Got command {0} with arg {1}, but PullingAgentManager is not initialized yet. Ignoring the command.", 
                 (PersistentStreamProviderCommand)command, arg != null ? arg.ToString() : "null"));
             throw new ArgumentException("PullingAgentManager is not initialized yet.");

@@ -24,8 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// Utility functions to work with relational storage.

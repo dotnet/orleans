@@ -58,14 +58,12 @@ namespace Orleans.Streams
             return Task.WhenAll(tasks);
         }
 
-        internal Task StopStreamProviders()
+        internal Task CloseProviders()
         {
             List<Task> tasks = new List<Task>();
-            var providers = appStreamProviders.GetProviders();
-            foreach (IStreamProviderImpl streamProvider in providers)
+            foreach (IStreamProviderImpl streamProvider in appStreamProviders.GetProviders())
             {
-                var provider = streamProvider;
-                tasks.Add(provider.Stop());
+                tasks.Add(streamProvider.Close());
             }
             return Task.WhenAll(tasks);
         }

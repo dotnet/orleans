@@ -71,9 +71,7 @@
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
-    <Reference Include="System.Data" />
     <Reference Include="System.Management" />
-    <Reference Include="System.Transactions" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -112,6 +110,7 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />

@@ -87,6 +87,7 @@ namespace Orleans.Runtime
         private readonly MembershipFactory membershipFactory;
         private StorageProviderManager storageProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
+        private BootstrapProviderManager bootstrapProviderManager;
         private readonly LocalReminderServiceFactory reminderFactory;
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
@@ -520,7 +521,7 @@ namespace Orleans.Runtime
                     .WaitWithThrow(initTimeout);
                 if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 
-                var bootstrapProviderManager = new BootstrapProviderManager();
+                bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
                     () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations),
                     providerManagerSystemTarget.SchedulingContext)
@@ -708,16 +709,35 @@ namespace Orleans.Runtime
                 // 7:
                 SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
+                // The order of closing providers might be importan: Stats, streams, boostrap, storage.
+                // Stats first since no one depends on it.
+                // Storage should definitely be last since other providers ma ybe using it, potentilay indirectly.
+                // Streams and Bootstrap - the order is less clear. Seems like Bootstrap may indirecly depend on Streams, but not the other way around.
                 // 8:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => statisticsProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+                // 9:
                 SafeExecute(() =>
                 {                
                     var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
-                    scheduler.QueueTask(() => siloStreamProviderManager.StopStreamProviders(), providerManagerSystemTarget.SchedulingContext)
+                    scheduler.QueueTask(() => siloStreamProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
                             .WaitWithThrow(initTimeout);
                 });
-
-                // 9:
-                SafeExecute(storageProviderManager.UnloadStorageProviders);
+                // 10:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => bootstrapProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+                // 11:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => storageProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
             }
             finally
             {

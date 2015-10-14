@@ -104,8 +104,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{DD5D35C0
 		Build\Build.Versions.txt = Build\Build.Versions.txt
 		Build\GlobalAssemblyInfo.cs = Build\GlobalAssemblyInfo.cs
 		Build\License.rtf = Build\License.rtf
-		Build\OrleansSetup.wixproj = Build\OrleansSetup.wixproj
-		Build\OrleansSetup.wxs = Build\OrleansSetup.wxs
 		Build\PostBuild.cmd = Build\PostBuild.cmd
 		Build\Version.txt = Build\Version.txt
 	EndProjectSection
@@ -144,7 +142,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCounterControl", "Or
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansEventSourcing", "OrleansEventSourcing\OrleansEventSourcing.csproj", "{CF7EE78B-39E1-4660-BEAF-0E2606098F8C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansSQLUtils", "OrleansSQLUtils\OrleansSQLUtils.csproj", "{47E9AE37-4EAE-48D5-A778-2C80E9A6375F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansSqlUtils", "OrleansSQLUtils\OrleansSqlUtils.csproj", "{47E9AE37-4EAE-48D5-A778-2C80E9A6375F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

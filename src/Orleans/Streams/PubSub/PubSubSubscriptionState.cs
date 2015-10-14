@@ -52,13 +52,11 @@ namespace Orleans.Streams
         public PubSubSubscriptionState(
             GuidId subscriptionId,
             StreamId streamId,
-            IStreamConsumerExtension streamConsumer,
-            IStreamFilterPredicateWrapper filterWrapper)
+            IStreamConsumerExtension streamConsumer)
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
             consumerReference = streamConsumer as GrainReference;
-            this.filterWrapper = filterWrapper;
             state = SubscriptionStates.Active;
         }
 

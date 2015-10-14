@@ -23,16 +23,16 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage.Relational;
-using Orleans.Runtime.Storage.Relational.Management;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.SqlUtils;
+using Orleans.SqlUtils.Management;
 
 
 namespace Orleans.Runtime.MembershipService
 {
-    public class SqlMembershipTable: IMembershipTable, IGatewayListProvider
+    internal class SqlMembershipTable: IMembershipTable, IGatewayListProvider
     {
         private string deploymentId;        
         private TimeSpan maxStaleness;
