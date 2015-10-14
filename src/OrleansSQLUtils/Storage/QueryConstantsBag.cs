@@ -25,7 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// This class holds a bag of operational constants Orleans uses, such as queries.

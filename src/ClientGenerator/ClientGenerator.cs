@@ -577,8 +577,8 @@ namespace Orleans.CodeGeneration
                 var info = new ProcessStartInfo(options.FSharpCompilerPath)
                 {
                     Arguments = cmdLine,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false,
                     UseShellExecute = false,
                     WorkingDirectory = options.WorkingDirectory
                 };

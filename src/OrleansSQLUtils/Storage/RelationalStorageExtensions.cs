@@ -27,8 +27,7 @@ using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// Convenienience functions to work with objects of type <see cref="IRelationalStorage"/>.

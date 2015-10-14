@@ -71,9 +71,7 @@
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
-    <Reference Include="System.Data" />
     <Reference Include="System.Management" />
-    <Reference Include="System.Transactions" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -102,9 +100,6 @@
     <Compile Include="Messaging\Response.cs" />
     <Compile Include="Providers\IControllable.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
-    <Compile Include="RelationalStorage\AdoNetInvariants.cs" />
-    <Compile Include="RelationalStorage\QueryConstantsBag.cs" />
-    <Compile Include="RelationalStorage\RelationalVendorConstants.cs" />
     <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
@@ -121,16 +116,6 @@
     <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
-    <Compile Include="RelationalStorage\DbExtensions.cs" />
-    <Compile Include="RelationalStorage\DictionaryExtensions.cs" />
-    <Compile Include="RelationalStorage\RelationalStorage.cs" />
-    <Compile Include="RelationalStorage\IRelationalStorage.cs" />
-    <Compile Include="RelationalStorage\QueryKeys.cs" />
-    <Compile Include="RelationalStorage\OrleansRelationalExtensions.cs" />
-    <Compile Include="RelationalStorage\RelationalManagementExtensions.cs" />
-    <Compile Include="RelationalStorage\RelationalStorageExtensions.cs" />
-    <Compile Include="RelationalStorage\RelationalStorageUtilities.cs" />
-    <Compile Include="RelationalStorage\SqlFormatProvider.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
@@ -155,7 +140,6 @@
     <Compile Include="Configuration\IStatisticsConfiguration.cs" />
     <Compile Include="Configuration\ApplicationConfiguration.cs" />
     <Compile Include="IDs\TypeCodeMapper.cs" />
-    <Compile Include="Messaging\SqlMembershipTable.cs" />
     <Compile Include="Providers\ILocalDataStore.cs" />
     <Compile Include="Streams\Core\AsyncObservableExtensions.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionHandleExtensions.cs" />

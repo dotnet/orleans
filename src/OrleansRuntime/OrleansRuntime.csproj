@@ -123,7 +123,6 @@
     <Compile Include="Startup\ConfigureServicesBuilder.cs" />
     <Compile Include="Storage\IStorageProviderManager.cs" />
     <Compile Include="Silo\SiloHost.cs" />
-    <Compile Include="ReminderService\SqlReminderTable.cs" />
     <Compile Include="Scheduler\TaskSchedulerUtils.cs" />
     <Compile Include="Silo\SiloProviderRuntime.cs" />
     <Compile Include="ReminderService\GrainBasedReminderTable.cs" />
