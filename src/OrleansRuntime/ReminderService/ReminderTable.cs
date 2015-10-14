@@ -46,7 +46,7 @@ namespace Orleans.Runtime.ReminderService
                             serviceType));
 
                 case GlobalConfiguration.ReminderServiceProviderType.SqlServer:
-                    Singleton = new SqlReminderTable();
+                    Singleton = AssemblyLoader.LoadAndCreateInstance<IReminderTable>(Constants.ORLEANS_SQL_UTILS_DLL, logger);
                     return;
 
                 case GlobalConfiguration.ReminderServiceProviderType.AzureTable:

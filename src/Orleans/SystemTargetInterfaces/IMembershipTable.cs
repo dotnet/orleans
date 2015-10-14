@@ -274,6 +274,15 @@ namespace Orleans
 
         private static readonly List<Tuple<SiloAddress, DateTime>> EmptyList = new List<Tuple<SiloAddress, DateTime>>(0);
 
+        public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
+        {
+            if (SuspectTimes == null)
+                SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
+
+            var suspector = new Tuple<SiloAddress, DateTime>(suspectingSilo, suspectingTime);
+            SuspectTimes.Add(suspector);
+        }
+
         // partialUpdate arrivies via gossiping with other oracles. In such a case only take the status.
         internal void Update(MembershipEntry updatedSiloEntry)
         {
@@ -308,15 +317,6 @@ namespace Orleans
 
                     return now.Subtract(otherVoterTime) < expiration;
                 });
-        }
-
-        internal void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
-        {
-            if (SuspectTimes == null)
-                SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
-
-            var suspector = new Tuple<SiloAddress, DateTime>(suspectingSilo, suspectingTime);
-            SuspectTimes.Add(suspector);
         }
 
         internal void TryUpdateStartTime(DateTime startTime)

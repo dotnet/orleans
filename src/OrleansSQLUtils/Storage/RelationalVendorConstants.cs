@@ -21,37 +21,29 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
-    /// Utility functions to work with relational storage.
+    /// These are keys for vendor dependent constants.
     /// </summary>
-    public static class RelationalStorageUtilities
+    public static class RelationalVendorConstants
     {
         /// <summary>
-        /// Removes <em>GO</em> batch separators from the script and returns a series of scripts.
+        /// The character that indicates a parameter.
         /// </summary>
-        /// <param name="sqlScript">The script from which to remove the separators.</param>
-        /// <returns>Scripts without separators.</returns>
-        public static IEnumerable<string> RemoveBatchSeparators(string sqlScript)
-        {
-            return sqlScript.Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries);
-        }
+        /// <remarks>Vendor specific.</remarks>
+        public const string ParameterIndicatorKey = "ParameterIndicator";
 
-        
         /// <summary>
-        /// Creates an instance of a database of type <see cref="IRelationalStorage"/>.
+        /// The character that indicates a start escape key for columns and tables that are reserved words.
         /// </summary>
-        /// <param name="invariantName">The invariant name of the connector for this database.</param>
-        /// <param name="connectionString">The connection string this database should use for database operations.</param>
-        /// <returns></returns>
-        public static IRelationalStorage CreateGenericStorageInstance(string invariantName, string connectionString)
-        {
-            return RelationalStorage.CreateInstance(invariantName, connectionString);            
-        }
+        /// <remarks>Vendor specific.</remarks>
+        public const string StartEscapeIndicatorKey = "StartEscapeIndicator";
+
+        /// <summary>
+        /// The character that indicates an end escape key for columns and tables that are reserved words.
+        /// </summary>
+        /// <remarks>Vendor specific.</remarks>
+        public const string EndEscapeIndicatorKey = "EndEscapeIndicator";
     }
 }

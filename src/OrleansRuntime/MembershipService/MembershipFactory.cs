@@ -68,7 +68,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
             {
-                membershipTable = new SqlMembershipTable();
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, logger);
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
             {

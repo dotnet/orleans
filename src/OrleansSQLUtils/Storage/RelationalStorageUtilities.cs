@@ -21,29 +21,36 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-namespace Orleans.Runtime.Storage.Relational
+using System;
+using System.Collections.Generic;
+
+namespace Orleans.SqlUtils
 {
     /// <summary>
-    /// These are keys for vendor dependent constants.
+    /// Utility functions to work with relational storage.
     /// </summary>
-    public static class RelationalVendorConstants
+    public static class RelationalStorageUtilities
     {
         /// <summary>
-        /// The character that indicates a parameter.
+        /// Removes <em>GO</em> batch separators from the script and returns a series of scripts.
         /// </summary>
-        /// <remarks>Vendor specific.</remarks>
-        public const string ParameterIndicatorKey = "ParameterIndicator";
+        /// <param name="sqlScript">The script from which to remove the separators.</param>
+        /// <returns>Scripts without separators.</returns>
+        public static IEnumerable<string> RemoveBatchSeparators(string sqlScript)
+        {
+            return sqlScript.Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries);
+        }
 
+        
         /// <summary>
-        /// The character that indicates a start escape key for columns and tables that are reserved words.
+        /// Creates an instance of a database of type <see cref="IRelationalStorage"/>.
         /// </summary>
-        /// <remarks>Vendor specific.</remarks>
-        public const string StartEscapeIndicatorKey = "StartEscapeIndicator";
-
-        /// <summary>
-        /// The character that indicates an end escape key for columns and tables that are reserved words.
-        /// </summary>
-        /// <remarks>Vendor specific.</remarks>
-        public const string EndEscapeIndicatorKey = "EndEscapeIndicator";
+        /// <param name="invariantName">The invariant name of the connector for this database.</param>
+        /// <param name="connectionString">The connection string this database should use for database operations.</param>
+        /// <returns></returns>
+        public static IRelationalStorage CreateGenericStorageInstance(string invariantName, string connectionString)
+        {
+            return RelationalStorage.CreateInstance(invariantName, connectionString);            
+        }
     }
 }

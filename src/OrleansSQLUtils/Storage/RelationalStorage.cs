@@ -25,12 +25,11 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
-using System.Threading.Tasks;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// A general purpose class to work with a given relational database and ADO.NET provider.

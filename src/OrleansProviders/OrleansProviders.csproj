@@ -54,7 +54,6 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="SQLServer\SqlStatisticsPublisher.cs" />
     <Compile Include="Storage\HierarchicalKeyStore.cs" />
     <Compile Include="Storage\MemoryStorage.cs" />
     <Compile Include="Storage\MemoryStorageWithLatency.cs" />
