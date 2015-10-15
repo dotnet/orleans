@@ -33,7 +33,7 @@ namespace Orleans.Streams
 {
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private static readonly IBackoffProvider DefaultBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+        private static readonly Func<IBackoffProvider> DefaultBackoffProvider = () => new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
         private const int StreamInactivityCheckFrequency = 10;
 
         private readonly string streamProviderName;
@@ -265,7 +265,7 @@ namespace Orleans.Streams
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          (exception, i) => true,
                          config.MaxEventDeliveryTime,
-                         DefaultBackoffProvider);
+                         DefaultBackoffProvider());
 
                     if (requestedHandshakeToken != null)
                     {
@@ -509,7 +509,7 @@ namespace Orleans.Streams
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !(exception is DataNotAvailableException),
                                 config.MaxEventDeliveryTime,
-                                DefaultBackoffProvider);
+                                DefaultBackoffProvider());
                         }
                     }
                     catch (Exception exc)
