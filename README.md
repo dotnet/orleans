@@ -53,6 +53,37 @@ Documentation
 =======
 Documentation is located [here][Orleans Documentation]
 
+Example
+=======
+
+Create an interface for your grain:
+```c#
+public interface IHello : Orleans.IGrainWithIntegerKey
+{
+  Task<string> SayHello(string greeting);
+}
+```
+
+Provide an implementation of that interface:
+```c#
+public class HelloGrain : Orleans.Grain, IHello
+{
+  Task<string> SayHello(string greeting)
+  {
+    return Task.FromResult($"You said: '{greeting}', I say: Hello!");
+  }
+}
+```
+
+Call the grain from your Web service (or anywhere else):
+```c#
+// Get a reference to the IHello grain with id '0'.
+var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
+
+// Send a greeting to the grain an await the response.
+Console.WriteLine(await friend.SayHello("Good morning, my friend!"));
+```
+
 Contributing To This Project
 =======
 
