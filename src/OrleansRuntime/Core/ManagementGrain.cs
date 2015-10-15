@@ -186,9 +186,9 @@ namespace Orleans.Runtime.Management
             }
             
             using(var sw = new StringWriter())
-            { 
-                using(var xw = new XmlTextWriter(sw))
-                { 
+            {
+                using(XmlWriter xw = XmlWriter.Create(sw))
+                {
                     document.WriteTo(xw);
                     var xml = sw.ToString();
                     // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
