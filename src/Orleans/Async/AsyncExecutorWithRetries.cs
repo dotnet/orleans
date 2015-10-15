@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Configuration;
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
@@ -168,7 +169,7 @@ namespace Orleans
                     }
                     else
                     {
-                        TimeSpan delay = onSuccessBackOff.Next();
+                        TimeSpan delay = onSuccessBackOff.Next(counter);
                         await Task.Delay(delay);
                         return await ExecuteWithRetriesHelper(function, callCounter, maxNumSuccessTries, maxNumErrorTries, maxExecutionTime, startExecutionTime, retryValueFilter, retryExceptionFilter, onSuccessBackOff, onErrorBackOff);
                     }
@@ -196,7 +197,7 @@ namespace Orleans
                     }
                     else
                     {
-                        TimeSpan delay = onErrorBackOff.Next();
+                        TimeSpan delay = onErrorBackOff.Next(counter);
                         await Task.Delay(delay);
                         return await ExecuteWithRetriesHelper(function, callCounter, maxNumSuccessTries, maxNumErrorTries, maxExecutionTime, startExecutionTime, retryValueFilter, retryExceptionFilter, onSuccessBackOff, onErrorBackOff);
                     }
@@ -211,9 +212,12 @@ namespace Orleans
     // For instance, ConstantBackoff variation that always waits for a fixed timespan, 
     // or a RateLimitingBackoff that keeps makes sure that some minimum time period occurs between calls to some API 
     // (especially useful if you use the same instance for multiple potentially simultaneous calls to ExecuteWithRetries).
+    // Implementations should be imutable.
+    // If mutable state is needed, extend the next function to pass the state from the caller.
+    // example: TimeSpan Next(int attempt, object state, out object newState);
     internal interface IBackoffProvider
     {
-        TimeSpan Next();
+        TimeSpan Next(int attempt);
     }
 
     internal class FixedBackoff : IBackoffProvider
@@ -225,7 +229,7 @@ namespace Orleans
             fixedDelay = delay;
         }
 
-        public TimeSpan Next()
+        public TimeSpan Next(int attempt)
         {
             return fixedDelay;
         }
@@ -237,7 +241,6 @@ namespace Orleans
         private readonly TimeSpan maxDelay;
         private readonly TimeSpan step;
         private readonly SafeRandom random;
-        private long backoffFactor;
 
         public ExponentialBackoff(TimeSpan minDelay, TimeSpan maxDelay, TimeSpan step)
         {
@@ -249,17 +252,16 @@ namespace Orleans
             this.minDelay = minDelay;
             this.maxDelay = maxDelay;
             this.step = step;
-            this.backoffFactor = 1;
             this.random = new SafeRandom();
         }
 
-        public TimeSpan Next()
+        public TimeSpan Next(int attempt)
         {
-            long curr = backoffFactor;
             TimeSpan currMax;
             try
             {
-                currMax = minDelay + step.Multiply(curr); // may throw OverflowException
+                long multiple = checked(1 << attempt);
+                currMax = minDelay + step.Multiply(multiple); // may throw OverflowException
                 if (currMax <= TimeSpan.Zero)
                     throw new OverflowException();
             }
@@ -268,16 +270,6 @@ namespace Orleans
                 currMax = maxDelay;
             }
             currMax = StandardExtensions.Min(currMax, maxDelay);
-            if (currMax < maxDelay) // keep counting only if we did not alraedy reach maxDelay.
-            {
-                try
-                {
-                    curr = checked(curr * 2);
-                }
-                catch (OverflowException) { } // if overflows, stop incrementing and just keep the old value.
-
-                backoffFactor = curr; // now ExponentialBackoff is thread safe. Not serialized (simultanous calls are not guaranteed to be serialized one by one), but thread safe.
-            }
 
             if (minDelay >= currMax) throw new ArgumentOutOfRangeException(String.Format("minDelay {0}, currMax = {1}", minDelay, currMax));
             return random.NextTimeSpan(minDelay, currMax);
