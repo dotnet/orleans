@@ -72,7 +72,7 @@
     <Compile Include="GeneratedSyntax.cs" />
     <Compile Include="SerializerGenerationManager.cs" />
     <Compile Include="SerializerGenerator.cs" />
-    <Compile Include="CodeGenerator.cs" />
+    <Compile Include="RoslynCodeGenerator.cs" />
     <Compile Include="CodeGenerationException.cs" />
     <Compile Include="CodeGeneratorCommon.cs" />
     <Compile Include="GrainMethodInvokerGenerator.cs" />

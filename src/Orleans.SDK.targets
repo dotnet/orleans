@@ -68,7 +68,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
   <Target Name="OrleansClientPreprocessing"
           AfterTargets="BeforeCompile;ResolveReferences"
           BeforeTargets="CoreCompile"
-          Condition="'$(OrleansProjectType)'=='Client'"
+          Condition="'$(OrleansProjectType)'=='Client' And '$(OrleansCodeGenPrecompile)'!='true'"
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
     <Message Text="[OrleansClientPreprocessing] - Project=$(ProjectName)" Importance="high"/>
@@ -86,6 +86,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
       ContinueOnError="true" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
     </PropertyGroup>
     <Message Text="[OrleansClientPreprocessing] - Code-gen args file=$(ArgsFile)"/>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/nomerge"/>
@@ -104,6 +105,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')"/>
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
     <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"' />
   </Target>
 
@@ -111,7 +114,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
   <Target Name="OrleansServerObjProcessing"
           AfterTargets="BeforeCompile;ResolveReferences"
           BeforeTargets="CoreCompile"
-          Condition="'$(OrleansProjectType)'=='Server'"
+          Condition="'$(OrleansProjectType)'=='Server' And '$(OrleansCodeGenPrecompile)'!='true'"
           Inputs="@(Compile);@(ReferencePath);$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)"
           Outputs="$(ProjectDir)$(IntermediateOutputPath)orleans.codegen.timpestamp">
     <Message Text="[OrleansServerObjProcessing] - Creating Server for Project=$(ProjectName)" Importance="high"/>
@@ -128,6 +131,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
       ContinueOnError="true" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
     </PropertyGroup>
     <Message Text="[OrleansServerObjProcessing] - Code-gen args file=$(ArgsFile)"/>
     <Message Text="[OrleansServerObjProcessing] - DefineConstants=$(DefineConstants)"/>
@@ -147,6 +151,9 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')"/>
+
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
     <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"'
           Outputs='$(IntermediateOutputPath)$(TargetName)$(TargetExt)' />
   </Target>

@@ -10,7 +10,7 @@
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
     <summary>
-      Runtime code generation support for Microsoft Orleans.
+      Microsoft Orleans code generator.
     </summary>
     <description>
       Runtime and compile-time code generation support for Microsoft Orleans.

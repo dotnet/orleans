@@ -189,7 +189,7 @@ namespace Orleans.Runtime
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
             
-            CodeGenerator.Instance.GenerateAndLoadForAllAssemblies();
+            RoslynCodeGenerator.Instance.GenerateAndLoadForAllAssemblies();
             SerializationManager.Initialize(globalConfig.UseStandardSerializer);
             initTimeout = globalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
@@ -854,7 +854,7 @@ namespace Orleans.Runtime
             /// <param name="collection">The collection to populate.</param>
             public void UpdateGeneratedAssemblies(GeneratedAssemblies collection)
             {
-                var generatedAssemblies = CodeGenerator.Instance.GetGeneratedAssemblies();
+                var generatedAssemblies = RoslynCodeGenerator.Instance.GetGeneratedAssemblies();
                 foreach (var asm in generatedAssemblies)
                 {
                     collection.Add(asm.Key, asm.Value);
@@ -994,7 +994,7 @@ namespace Orleans.Runtime
                 /// <param name="cachedAssembly">The generated assembly.</param>
                 public void AddCachedAssembly(string targetAssemblyName, byte[] cachedAssembly)
                 {
-                    CodeGenerator.AddCachedAssembly(targetAssemblyName, cachedAssembly);
+                    RoslynCodeGenerator.AddCachedAssembly(targetAssemblyName, cachedAssembly);
                 }
             }
         }
