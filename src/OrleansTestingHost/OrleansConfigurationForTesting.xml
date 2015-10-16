@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
-    <StorageProviders>
+    <StorageProviders>      
+      <Provider Type="Orleans.EventSourcing.Storage.MemoryStorage" Name="EventMemoryStore" />
       <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />
       <Provider Type="Orleans.Storage.MemoryStorage" Name="Default" />
       <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" />-->

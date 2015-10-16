@@ -27,7 +27,7 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonState : JournaledGrainState<PersonState>
+    public class PersonState : JournaledGrainState
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }

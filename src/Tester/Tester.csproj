@@ -79,6 +79,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConcreteStateClassTests.cs" />
+    <Compile Include="EventSourcingTests\GrainTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
@@ -136,6 +137,10 @@
     <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Orleans.EventSourcing\OrleansEventSourcing.csproj">
+      <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
+      <Name>OrleansEventSourcing</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>

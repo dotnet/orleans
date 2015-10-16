@@ -32,13 +32,13 @@ namespace Orleans.EventSourcing
     /// <summary>
     /// Base class for event-sourced grain state classes.
     /// </summary>
-    public abstract class JournaledGrainState<TGrainState> : GrainState
-        where TGrainState : JournaledGrainState<TGrainState>
+    public abstract class JournaledGrainState : GrainState
     {
         private List<object> events = new List<object>();
 
+        public int Version { get; private set; }
+
         protected JournaledGrainState()
-            : base(typeof(TGrainState).FullName)
         {
         }
 
@@ -46,8 +46,6 @@ namespace Orleans.EventSourcing
         {
             get { return events.AsReadOnly(); }
         }
-
-        public int Version { get; private set; }
 
         public void AddEvent<TEvent>(TEvent @event)
             where TEvent : class
@@ -59,12 +57,12 @@ namespace Orleans.EventSourcing
             Version++;
         }
 
-        public override void SetAll(IDictionary<string, object> values)
+        internal void ApplyEvent<TEvent>(TEvent @event)
+            where TEvent : class
         {
-            base.SetAll(values);
+            StateTransition(@event);
 
-            foreach (var @event in Events)
-                StateTransition(@event);
+            Version++;
         }
 
         private void StateTransition<TEvent>(TEvent @event)
@@ -80,6 +78,15 @@ namespace Orleans.EventSourcing
             {
                 OnMissingStateTransition(@event);
             }
+        }
+
+        public override IDictionary<string, object> AsDictionary()
+        {
+            return new Dictionary<string, object>();
+        }
+
+        public override void SetAll(IDictionary<string, object> values)
+        {
         }
 
         protected virtual void OnMissingStateTransition(object @event)

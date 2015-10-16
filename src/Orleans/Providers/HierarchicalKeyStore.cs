@@ -30,7 +30,7 @@ using System.Text;
 
 namespace Orleans.Storage
 {
-    internal class HierarchicalKeyStore : MarshalByRefObject, ILocalDataStore
+    public class HierarchicalKeyStore : MarshalByRefObject, ILocalDataStore
     {
         public string Etag { get; private set; }
 
@@ -226,7 +226,7 @@ namespace Orleans.Storage
             return results;
         }
 
-        internal static string MakeStoreKey(IEnumerable<Tuple<string, string>> keys)
+        public static string MakeStoreKey(IEnumerable<Tuple<string, string>> keys)
         {
             var sb = new StringBuilder();
             bool first = true;
