@@ -110,6 +110,7 @@
     </Compile>
     <Compile Include="ReminderService\MockReminderTable.cs" />
     <Compile Include="Scheduler\ITaskScheduler.cs" />
+    <Compile Include="Storage\IJournaledStorageProviderManager.cs" />
     <Compile Include="Storage\IStorageProviderManager.cs" />
     <Compile Include="Silo\SiloHost.cs" />
     <Compile Include="ReminderService\SqlReminderTable.cs" />
@@ -165,6 +166,7 @@
     <Compile Include="Scheduler\WorkItemType.cs" />
     <Compile Include="Scheduler\WorkQueue.cs" />
     <Compile Include="Silo\SiloControl.cs" />
+    <Compile Include="Storage\JournaledStorageProviderManager.cs" />
     <Compile Include="Storage\StorageProviderManager.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingManager.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingAgent.cs" />

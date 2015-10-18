@@ -900,6 +900,34 @@ namespace Orleans.Runtime.Configuration
         public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
         {
             return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
-        } 
+        }
+
+        /// <summary>
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is journaled storage provider
+        /// </summary>
+        /// <typeparam name="T">Non-abstract type which implements <see cref="IJournaledStorageProvider"/> storage</typeparam>
+        /// <param name="providerName">Name of the journaled storage provider</param>
+        /// <param name="properties">Properties that will be passed to journaled storage provider upon initialization</param>
+        public void RegisterJournaledStorageProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IJournaledStorageProvider
+        {
+            Type providerType = typeof(T);
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(IJournaledStorageProvider).IsAssignableFrom(providerType))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IJournaledStorageProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.JOURNALED_STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given journaled storage provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the journaled storage provider type</param>
+        /// <param name="providerName">Name of the journaled storage provider</param>
+        /// <param name="properties">Properties that will be passed to the journaled storage provider upon initialization </param>
+        public void RegisterJournaledStorageProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.JOURNALED_STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
     }
 }

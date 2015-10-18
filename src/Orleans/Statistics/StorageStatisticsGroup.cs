@@ -103,5 +103,54 @@ namespace Orleans.Runtime
         {
             StorageClearErrors.Increment();
         }
+
+        internal static void OnStorageRead(IJournaledStorageProvider storage, string grainType, GrainReference grain, TimeSpan latency)
+        {
+            StorageReadTotal.Increment();
+            if (latency > TimeSpan.Zero)
+            {
+                StorageReadLatency.AddSample(latency);
+            }
+        }
+        internal static void OnStorageWrite(IJournaledStorageProvider storage, string grainType, GrainReference grain, TimeSpan latency)
+        {
+            StorageWriteTotal.Increment();
+            if (latency > TimeSpan.Zero)
+            {
+                StorageWriteLatency.AddSample(latency);
+            }
+        }
+        internal static void OnStorageActivate(IJournaledStorageProvider storage, string grainType, GrainReference grain, TimeSpan latency)
+        {
+            StorageActivateTotal.Increment();
+            if (latency > TimeSpan.Zero)
+            {
+                StorageReadLatency.AddSample(latency);
+            }
+        }
+        internal static void OnStorageReadError(IJournaledStorageProvider storage, string grainType, GrainReference grain)
+        {
+            StorageReadErrors.Increment();
+        }
+        internal static void OnStorageWriteError(IJournaledStorageProvider storage, string grainType, GrainReference grain)
+        {
+            StorageWriteErrors.Increment();
+        }
+        internal static void OnStorageActivateError(IJournaledStorageProvider storage, string grainType, GrainReference grain)
+        {
+            StorageActivateErrors.Increment();
+        }
+        internal static void OnStorageDelete(IJournaledStorageProvider storage, string grainType, GrainReference grain, TimeSpan latency)
+        {
+            StorageClearTotal.Increment();
+            if (latency > TimeSpan.Zero)
+            {
+                StorageClearLatency.AddSample(latency);
+            }
+        }
+        internal static void OnStorageDeleteError(IJournaledStorageProvider storage, string grainType, GrainReference grain)
+        {
+            StorageClearErrors.Increment();
+        }
     }
 }

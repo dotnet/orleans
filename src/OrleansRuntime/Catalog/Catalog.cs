@@ -30,6 +30,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Orleans.Core;
+using Orleans.EventSourcing;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
@@ -144,6 +145,7 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
         private IStorageProviderManager storageProviderManager;
+        private IJournaledStorageProviderManager journaledStorageProviderManager;
         private Dispatcher dispatcher;
         private readonly TraceLogger logger;
         private int collectionNumber;
@@ -211,6 +213,11 @@ namespace Orleans.Runtime
         internal void SetStorageManager(IStorageProviderManager storageManager)
         {
             storageProviderManager = storageManager;
+        }
+
+        internal void SetStorageManager(IJournaledStorageProviderManager storageManager)
+        {
+            journaledStorageProviderManager = storageManager;
         }
 
         internal void Start()
@@ -645,11 +652,23 @@ namespace Orleans.Runtime
             grain.Runtime = grainRuntime;
             grain.Data = data;
 
+            if(grain is IJournaledGrain)
+                SetupJournaledGrainState(grain, data);
+            else
+                SetupGrainState(grain, data, grainTypeData);
+
+            activations.IncrementGrainCounter(grainClassName);
+
+            if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
+        }
+
+        private void SetupGrainState(Grain grain, ActivationData data, GrainTypeData grainTypeData)
+        {
             Type stateObjectType = grainTypeData.StateObjectType;
             GrainState state;
             if (stateObjectType != null)
             {
-                state = (GrainState) Activator.CreateInstance(stateObjectType);
+                state = (GrainState)Activator.CreateInstance(stateObjectType);
                 state.InitState(null);
             }
             else
@@ -657,9 +676,9 @@ namespace Orleans.Runtime
                 state = null;
             }
 
-            lock (data)
+            lock (grain.Data)
             {
-                grain.Identity = data.Identity;
+                grain.Identity = grain.Data.Identity;
                 data.SetGrainInstance(grain);
 
                 if (state != null)
@@ -670,10 +689,19 @@ namespace Orleans.Runtime
                     data.GrainInstance.Storage = new GrainStateStorageBridge(data.GrainTypeName, data.GrainInstance, data.StorageProvider);
                 }
             }
+        }
 
-            activations.IncrementGrainCounter(grainClassName);
+        private void SetupJournaledGrainState(Grain grain, ActivationData data)
+        {
+            lock (grain.Data)
+            {
+                grain.Identity = grain.Data.Identity;
+                data.SetGrainInstance(grain);
 
-            if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
+                SetupJournaledStorageProvider(data);
+                data.GrainInstance.Storage = new GrainStateJournaledStorageBridge(data.GrainTypeName, data.GrainInstance, data.JournaledStorageProvider);
+                data.GrainInstance.Storage.ReadStateAsync().Wait();
+            }
         }
 
         private void SetupStorageProvider(ActivationData data)
@@ -716,6 +744,51 @@ namespace Orleans.Runtime
             if (logger.IsVerbose2)
             {
                 string msg = string.Format("Assigned storage provider with Name={0} to grain type {1}",
+                    storageProviderName, grainTypeName);
+                logger.Verbose2(ErrorCode.Provider_CatalogStorageProviderAllocated, msg);
+            }
+        }
+
+        private void SetupJournaledStorageProvider(ActivationData data)
+        {
+            var grainTypeName = data.GrainInstanceType.FullName;
+
+            // Get the storage provider name, using the default if not specified.
+            var attrs = data.GrainInstanceType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
+            var attr = attrs.FirstOrDefault() as StorageProviderAttribute;
+            var storageProviderName = attr != null ? attr.ProviderName : Constants.DEFAULT_STORAGE_PROVIDER_NAME;
+
+            IJournaledStorageProvider provider;
+            if (storageProviderManager == null || storageProviderManager.GetNumLoadedProviders() == 0)
+            {
+                var errMsg = string.Format("No journaled storage providers found loading grain type {0}", grainTypeName);
+                logger.Error(ErrorCode.Provider_CatalogNoStorageProvider_1, errMsg);
+                throw new BadProviderConfigException(errMsg);
+            }
+            if (string.IsNullOrWhiteSpace(storageProviderName))
+            {
+                // Use default storage provider
+                provider = journaledStorageProviderManager.GetDefaultProvider();
+            }
+            else
+            {
+                // Look for MemoryStore provider as special case name
+                bool caseInsensitive = Constants.MEMORY_STORAGE_PROVIDER_NAME.Equals(storageProviderName, StringComparison.OrdinalIgnoreCase);
+                journaledStorageProviderManager.TryGetProvider(storageProviderName, out provider, caseInsensitive);
+                if (provider == null)
+                {
+                    var errMsg = string.Format(
+                        "Cannot find jurnaled storage provider with Name={0} for grain type {1}", storageProviderName,
+                        grainTypeName);
+                    logger.Error(ErrorCode.Provider_CatalogNoStorageProvider_2, errMsg);
+                    throw new BadProviderConfigException(errMsg);
+                }
+            }
+            data.JournaledStorageProvider = provider;
+
+            if (logger.IsVerbose2)
+            {
+                string msg = string.Format("Assigned journaled storage provider with Name={0} to grain type {1}",
                     storageProviderName, grainTypeName);
                 logger.Verbose2(ErrorCode.Provider_CatalogStorageProviderAllocated, msg);
             }

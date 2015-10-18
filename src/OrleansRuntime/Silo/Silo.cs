@@ -85,6 +85,7 @@ namespace Orleans.Runtime
         private readonly SiloStatisticsManager siloStatistics;
         private readonly MembershipFactory membershipFactory;
         private StorageProviderManager storageProviderManager;
+        private JournaledStorageProviderManager journaledStorageProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
         private readonly LocalReminderServiceFactory reminderFactory;
         private IReminderService reminderService;
@@ -114,6 +115,7 @@ namespace Orleans.Runtime
         internal ISiloStatusOracle LocalSiloStatusOracle { get { return membershipOracle; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
         internal IStorageProviderManager StorageProviderManager { get { return storageProviderManager; } }
+        internal IJournaledStorageProviderManager JournaledStorageProviderManager { get { return journaledStorageProviderManager; } }
         internal IProviderManager StatisticsProviderManager { get { return statisticsProviderManager; } }
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
@@ -455,6 +457,15 @@ namespace Orleans.Runtime
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
+            journaledStorageProviderManager = new JournaledStorageProviderManager(grainFactory);
+            scheduler.QueueTask(
+                () => journaledStorageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
+                providerManagerSystemTarget.SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+            catalog.SetStorageManager(journaledStorageProviderManager);
+            allSiloProviders.AddRange(journaledStorageProviderManager.GetProviders());
+            if (logger.IsVerbose) { logger.Verbose("Journaled Storage provider manager created successfully."); }
+
             // Load and init stream providers before silo becomes active
             var siloStreamProviderManager = (StreamProviderManager) grainRuntime.StreamProviderManager;
             scheduler.QueueTask(
@@ -712,6 +723,7 @@ namespace Orleans.Runtime
 
                 // 9:
                 SafeExecute(storageProviderManager.UnloadStorageProviders);
+                SafeExecute(journaledStorageProviderManager.UnloadStorageProviders);
             }
             finally
             {

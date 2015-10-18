@@ -32,7 +32,6 @@ using System.Threading.Tasks;
 
 using Orleans.Runtime;
 using Orleans.Providers;
-using Orleans.EventSourcing.Providers;
 using Orleans.Storage;
 
 namespace Orleans.EventSourcing.Storage

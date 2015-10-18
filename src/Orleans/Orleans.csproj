@@ -94,6 +94,10 @@
     <Compile Include="Core\GrainStateStorageBridge.cs" />
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IStorage.cs" />
+    <Compile Include="EventSourcing\GrainStateJournaledStorageBridge.cs" />
+    <Compile Include="EventSourcing\IJournaledGrain.cs" />
+    <Compile Include="EventSourcing\JournaledGrain.cs" />
+    <Compile Include="EventSourcing\JournaledGrainState.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
@@ -102,6 +106,7 @@
     <Compile Include="Messaging\Response.cs" />
     <Compile Include="Providers\HierarchicalKeyStore.cs" />
     <Compile Include="Providers\IControllable.cs" />
+    <Compile Include="Providers\IJournaledStorageProvider.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
     <Compile Include="RelationalStorage\AdoNetInvariants.cs" />
     <Compile Include="RelationalStorage\QueryConstantsBag.cs" />

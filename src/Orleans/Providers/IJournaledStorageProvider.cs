@@ -7,7 +7,7 @@ using Orleans.EventSourcing;
 using Orleans.Providers;
 using Orleans.Runtime;
 
-namespace Orleans.EventSourcing.Providers
+namespace Orleans.Storage
 {
     public interface IJournaledStorageProvider : IProvider
     {

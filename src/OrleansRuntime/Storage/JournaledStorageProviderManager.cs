@@ -33,25 +33,25 @@ using Orleans.Storage;
 
 namespace Orleans.Runtime.Storage
 {
-    internal class StorageProviderManager : IStorageProviderManager, IStorageProviderRuntime
+    internal class JournaledStorageProviderManager : IJournaledStorageProviderManager, IStorageProviderRuntime
     {
-        private ProviderLoader<IStorageProvider> storageProviderLoader;
+        private ProviderLoader<IJournaledStorageProvider> storageProviderLoader;
         private IProviderRuntime providerRuntime;
 
-        public StorageProviderManager(IGrainFactory grainFactory)
+        public JournaledStorageProviderManager(IGrainFactory grainFactory)
         {
             GrainFactory = grainFactory;
         }
 
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
-            storageProviderLoader = new ProviderLoader<IStorageProvider>();
+            storageProviderLoader = new ProviderLoader<IJournaledStorageProvider>();
             providerRuntime = SiloProviderRuntime.Instance;
 
-            if (!configs.ContainsKey(ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME))
+            if (!configs.ContainsKey(ProviderCategoryConfiguration.JOURNALED_STORAGE_PROVIDER_CATEGORY_NAME))
                 return TaskDone.Done;
 
-            storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME].Providers, this);
+            storageProviderLoader.LoadProviders(configs[ProviderCategoryConfiguration.JOURNALED_STORAGE_PROVIDER_CATEGORY_NAME].Providers, this);
             return storageProviderLoader.InitProviders(providerRuntime);
         }
 
@@ -68,7 +68,7 @@ namespace Orleans.Runtime.Storage
             return storageProviderLoader.GetNumLoadedProviders();
         }
 
-        public IList<IStorageProvider> GetProviders()
+        public IList<IJournaledStorageProvider> GetProviders()
         {
             return storageProviderLoader.GetProviders();
         }
@@ -100,12 +100,12 @@ namespace Orleans.Runtime.Storage
             return providers.Select(p => p.GetType().FullName).ToList();
         }
 
-        public IStorageProvider GetDefaultProvider()
+        public IJournaledStorageProvider GetDefaultProvider()
         {
             return storageProviderLoader.GetDefaultProvider(Constants.DEFAULT_STORAGE_PROVIDER_NAME);
         }
 
-        public bool TryGetProvider(string name, out IStorageProvider provider, bool caseInsensitive = false)
+        public bool TryGetProvider(string name, out IJournaledStorageProvider provider, bool caseInsensitive = false)
         {
             return storageProviderLoader.TryGetProvider(name, out provider, caseInsensitive);
         }
@@ -118,7 +118,7 @@ namespace Orleans.Runtime.Storage
         // used only for testing
         internal Task LoadEmptyStorageProviders(IProviderRuntime providerRtm)
         {
-            storageProviderLoader = new ProviderLoader<IStorageProvider>();
+            storageProviderLoader = new ProviderLoader<IJournaledStorageProvider>();
             providerRuntime = providerRtm;
 
             storageProviderLoader.LoadProviders(new Dictionary<string, IProviderConfiguration>(), this);
@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Storage
         }
 
         // used only for testing
-        internal async Task AddAndInitProvider(string name, IStorageProvider provider, IProviderConfiguration config=null)
+        internal async Task AddAndInitProvider(string name, IJournaledStorageProvider provider, IProviderConfiguration config=null)
         {
             await provider.Init(name, this, config);
             storageProviderLoader.AddProvider(name, provider, config);

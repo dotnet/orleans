@@ -57,7 +57,7 @@ namespace Orleans.EventSourcing
             Version++;
         }
 
-        internal void ApplyEvent<TEvent>(TEvent @event)
+        public void ApplyEvent<TEvent>(TEvent @event)
             where TEvent : class
         {
             StateTransition(@event);
