@@ -66,7 +66,7 @@ Orleans is designed to be hosted as the back-end part of a service and you are s
 
 ## What happens if a silo fails before my grain call returns a response for my call?
 
-You'll receive a `TimeoutException` which you can catch and retry or do anything else which makes sense in your application logic, then the grain will be created on an available silo when you do the next call to it. Actually there is a delay between the time that your silo fails and Orleans cluster detect it which is configurable. In this transition period all of your calls to the grain will fail but after the detection of the failure the grain will be created on another silo and it will start to work so it will be eventually available. More info can be found [here](runtime-implementation-details/cluster-management)
+You'll receive a `TimeoutException` which you can catch and retry or do anything else which makes sense in your application logic, then the grain will be created on an available silo when you do the next call to it. Actually there is a delay between the time that your silo fails and Orleans cluster detect it which is configurable. In this transition period all of your calls to the grain will fail but after the detection of the failure the grain will be created on another silo and it will start to work so it will be eventually available. More info can be found [here](Runtime-Implementation-Details/Cluster-Management)
 
 ## What happens if a grain call takes too much time to execute?
 
