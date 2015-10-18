@@ -285,7 +285,7 @@ namespace Orleans.Runtime.Configuration
         {
             int unitSize;
             string numberInput;
-            var trimmedInput = input.Trim().ToLower(CultureInfo.InvariantCulture);
+            var trimmedInput = input.Trim().ToLowerInvariant();
             if (trimmedInput.EndsWith("ms", StringComparison.Ordinal))
             {
                 unitSize = 1;
