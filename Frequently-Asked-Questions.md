@@ -66,8 +66,8 @@ Orleans is designed to be hosted as the back-end part of a service and you are s
 
 ## What happens if a silo fails before my grain call returns a response for my call?
 
-You'll receive a `TimeoutException` which you can catch and retry, then the grain will be created on an available silo and you're service will continue to work.
+You'll receive a `TimeoutException` which you can catch and retry, then the grain will be created on an available silo and you're service will continue to work. Actually there is a delay between the time that your silo fails and Orleans detect it which is configurable. In this transition time all of your calls to the grain will fail but after the detection the grain will be created on another silo and it will start to work so it will be eventually available.
 
 ## What happens if a grain call takes too much time to execute?
 
-Since Orleans uses a cooperative multi-tasking model, it will not get the CPU automatically from any grain but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking.
+Since Orleans uses a cooperative multi-tasking model, it will not preempt the execution of a grain automatically but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking. You should keep in mind that grain calls should not execute any long running tasks like IO synchronously and should not block on other tasks to complete. All waiting should be done asynchronously using the await keyword or other awaiting mechanisms. Grains should return as soon as possible to let other grains to execute for maximum throughput.
