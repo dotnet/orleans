@@ -28,7 +28,6 @@ using System.Threading.Tasks;
 
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Messaging
 {
@@ -48,7 +47,7 @@ namespace Orleans.Messaging
                     break;
 
                 case ClientConfiguration.GatewayProviderType.SqlServer:
-                    listProvider = new SqlMembershipTable();
+                    listProvider = AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_SQL_UTILS_DLL, logger);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Custom:

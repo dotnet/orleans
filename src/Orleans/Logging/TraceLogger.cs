@@ -863,7 +863,7 @@ namespace Orleans.Runtime
             return date.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
         }
 
-        internal static DateTime ParseDate(string dateStr)
+        public static DateTime ParseDate(string dateStr)
         {
             return DateTime.ParseExact(dateStr, DATE_FORMAT, CultureInfo.InvariantCulture);
         }

@@ -57,11 +57,11 @@
       <HintPath>..\packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Framework.DependencyInjection, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="Microsoft.Framework.DependencyInjection">
       <HintPath>..\packages\Microsoft.Framework.DependencyInjection.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Framework.DependencyInjection.Abstractions, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="Microsoft.Framework.DependencyInjection.Abstractions">
       <HintPath>..\packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.Abstractions.dll</HintPath>
       <Private>True</Private>
     </Reference>
@@ -88,6 +88,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConcreteStateClassTests.cs" />
+    <Compile Include="DeactivationTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
@@ -106,6 +107,7 @@
     <Compile Include="ExceptionPropagationTests.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
+    <Compile Include="StreamingTests\ControllableStreamProviderTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
     <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
@@ -115,6 +117,7 @@
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
+    <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
     <Compile Include="UnitTestSiloHost.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -174,6 +177,10 @@
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
       <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansSQLUtils\OrleansSqlUtils.csproj">
+      <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
+      <Name>OrleansSqlUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>

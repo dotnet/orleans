@@ -58,11 +58,6 @@ set STEP=VSIX
 @REM @if ERRORLEVEL 1 GOTO :ErrorStop
 @REM @echo BUILD ok for VSIX package for %PROJ%
 
-set STEP=WIX
-"%MSBUILDEXE%" /m /p:Configuration=%CONFIGURATION% /p:OutputPath=. "%CMDHOME%\Build\OrleansSetup.wixproj"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for WIX package for %PROJ%
-
 @echo ===== Build succeeded for %PROJ% =====
 @GOTO :EOF
 

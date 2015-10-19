@@ -65,7 +65,7 @@ namespace Orleans.Runtime
             pool = bufferPool;
             bufferSize = bufferPool.Size;
             completedBuffers = new List<ArraySegment<byte>>();
-            currentOffset = -1;
+            currentOffset = 0;
             completedLength = 0;
             currentBuffer = null;
         }
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
         {
             pool.Release(ToBytes());
             currentBuffer = null;
-            currentOffset = -1;
+            currentOffset = 0;
         }
 
         public List<ArraySegment<byte>> ToBytes()

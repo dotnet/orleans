@@ -144,7 +144,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Shutdown this storage provider. </summary>
-        /// <see cref="IStorageProvider.Close"/>
+        /// <see cref="IProvider.Close"/>
         public Task Close()
         {
             tableDataManager = null;
