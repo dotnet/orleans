@@ -9,7 +9,7 @@ We use a few simple conventions to ensure a homogeneous style throughout the ful
 
 These standards are being introduced.
 If you have issues with these guidelines then raise an issue or a Pull Request.
-If you find documentation that fails to meet the guidelines, then make a fix and submit a pull request.
+If you find documentation that fails to meet the guidelines, then make a fix and submit a pull request. Also if you are using windows 10 you can go to the store and find free MarkDown editors like [this](https://www.microsoft.com/store/apps/9wzdncrdd2p3)
 
 #Structure
 
