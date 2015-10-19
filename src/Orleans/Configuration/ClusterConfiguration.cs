@@ -441,7 +441,7 @@ namespace Orleans.Runtime.Configuration
                 }
 
                 var candidates = new List<IPAddress>();
-                IPAddress[] nodeIps = Dns.GetHostAddresses(addrOrHost);
+                IPAddress[] nodeIps = Dns.GetHostAddressesAsync(addrOrHost).GetAwaiter().GetResult();
                 foreach (var nodeIp in nodeIps)
                 {
                     if (nodeIp.AddressFamily != family || nodeIp.Equals(loopback)) continue;
