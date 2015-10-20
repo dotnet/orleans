@@ -25,12 +25,11 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
-using System.Threading.Tasks;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// A general purpose class to work with a given relational database and ADO.NET provider.
@@ -196,7 +195,11 @@ namespace Orleans.Runtime.Storage.Relational
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id) => unit, factory, connectionString).ConfigureAwait(continueOnCapturedContext: false)).Item2;
         }
 
-
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="invariantName">Name of the invariant</param>
+        /// <param name="connectionString">Connection string</param>
         protected RelationalStorage(string invariantName, string connectionString)
         {
             factory = DbProviderFactories.GetFactory(invariantName);

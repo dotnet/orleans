@@ -24,8 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Globalization;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// Formats .NET types appropriately for database consumption in non-parameterized queries.
@@ -34,15 +33,14 @@ namespace Orleans.Runtime.Storage.Relational
     {
         private readonly SqlFormatter formatter = new SqlFormatter();
 
-
+        /// <summary>
+        /// Returns an instance of the formatter
+        /// </summary>
+        /// <param name="formatType">Requested format type</param>
+        /// <returns></returns>
         public object GetFormat(Type formatType)
         {
-            if(formatType == typeof(ICustomFormatter))
-            {
-                return formatter;
-            }
-
-            return null;
+            return formatType == typeof(ICustomFormatter) ? formatter : null;
         }
 
 

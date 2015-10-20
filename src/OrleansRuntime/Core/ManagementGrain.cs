@@ -187,9 +187,10 @@ namespace Orleans.Runtime.Management
             
             using(var sw = new StringWriter())
             { 
-                using(var xw = new XmlTextWriter(sw))
+                using(var xw = XmlWriter.Create(sw))
                 { 
                     document.WriteTo(xw);
+                    xw.Flush();
                     var xml = sw.ToString();
                     // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
                     await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);

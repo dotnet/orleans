@@ -123,6 +123,10 @@
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansSQLUtils\OrleansSqlUtils.csproj">
+      <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
+      <Name>OrleansSqlUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
       <Name>OrleansTestingHost</Name>

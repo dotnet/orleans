@@ -144,12 +144,13 @@ namespace Orleans.Runtime.Configuration
 
         private static string WriteXml(XmlElement element)
         {
-            using(var text = new StringWriter())
+            using(var sw = new StringWriter())
             {
-                using(var xml = new XmlTextWriter(text))
+                using(var xw = XmlWriter.Create(sw))
                 { 
-                    element.WriteTo(xml);
-                    return text.ToString();
+                    element.WriteTo(xw);
+                    xw.Flush();
+                    return sw.ToString();
                 }
             }
         }

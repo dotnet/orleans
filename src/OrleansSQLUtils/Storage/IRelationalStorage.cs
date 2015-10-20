@@ -26,8 +26,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// A common interface for all relational databases.

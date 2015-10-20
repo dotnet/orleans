@@ -208,7 +208,7 @@ namespace Orleans
 
                 if (TestOnlyThrowExceptionDuringInit)
                 {
-                    throw new ApplicationException("TestOnlyThrowExceptionDuringInit");
+                    throw new Exception("TestOnlyThrowExceptionDuringInit");
                 }
 
                 config.CheckGatewayProviderSettings();

@@ -23,17 +23,20 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage.Relational.Management;
-using Orleans.Runtime.Storage.Relational;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Orleans.SqlUtils;
+using Orleans.SqlUtils.Management;
 
 
 namespace Orleans.Providers.SqlServer
 {
+    /// <summary>
+    /// Plugin for publishing silos and client statistics to a SQL database.
+    /// </summary>
     public class SqlStatisticsPublisher: IConfigurableStatisticsPublisher, IConfigurableSiloMetricsDataPublisher, IConfigurableClientMetricsDataPublisher, IProvider
     {
         private string deploymentId;
@@ -49,10 +52,18 @@ namespace Orleans.Providers.SqlServer
         private QueryConstantsBag queryConstants;
         private Logger logger;
         
-
+        /// <summary>
+        /// Name of the provider
+        /// </summary>
         public string Name { get; private set; }
 
-
+        /// <summary>
+        /// Initializes publisher
+        /// </summary>
+        /// <param name="name">Provider name</param>
+        /// <param name="providerRuntime">Provider runtime API</param>
+        /// <param name="config">Provider configuration</param>
+        /// <returns></returns>
         public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
@@ -67,11 +78,22 @@ namespace Orleans.Providers.SqlServer
             queryConstants = await database.InitializeOrleansQueriesAsync(); 
         }
 
+        /// <summary>
+        /// Closes provider
+        /// </summary>
+        /// <returns>Resolved task</returns>
         public Task Close()
         {
             return TaskDone.Done;
         }
 
+        /// <summary>
+        /// Adds configuration parameters
+        /// </summary>
+        /// <param name="deployment">Deployment ID</param>
+        /// <param name="hostName">Host name</param>
+        /// <param name="client">Client ID</param>
+        /// <param name="address">IP address</param>
         public void AddConfiguration(string deployment, string hostName, string client, IPAddress address)
         {
             deploymentId = deployment;
@@ -82,7 +104,15 @@ namespace Orleans.Providers.SqlServer
             generation = SiloAddress.AllocateNewGeneration();
         }
 
-
+        /// <summary>
+        /// Adds configuration parameters
+        /// </summary>
+        /// <param name="deployment">Deployment ID</param>
+        /// <param name="silo">Silo name</param>
+        /// <param name="siloId">Silo ID</param>
+        /// <param name="address">Silo address</param>
+        /// <param name="gatewayAddress">Client gateway address</param>
+        /// <param name="hostName">Host name</param>
         public void AddConfiguration(string deployment, bool silo, string siloId, SiloAddress address, IPEndPoint gatewayAddress, string hostName)
         {
             deploymentId = deployment;
@@ -105,7 +135,11 @@ namespace Orleans.Providers.SqlServer
             queryConstants = await database.InitializeOrleansQueriesAsync();
         }
 
-
+        /// <summary>
+        /// Writes metrics to the database
+        /// </summary>
+        /// <param name="metricsData">Metrics data</param>
+        /// <returns>Task for database operation</returns>
         public Task ReportMetrics(IClientPerformanceMetrics metricsData)
         {
             if(logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
@@ -127,7 +161,11 @@ namespace Orleans.Providers.SqlServer
             await database.InitializeOrleansQueriesAsync();
         }
 
-
+        /// <summary>
+        /// Writes silo performance metrics to the database
+        /// </summary>
+        /// <param name="metricsData">Metrics data</param>
+        /// <returns>Task for database operation</returns>
         public Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
             if (logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
@@ -149,6 +187,11 @@ namespace Orleans.Providers.SqlServer
             return TaskDone.Done;
         }
 
+        /// <summary>
+        /// Writes statistics to the database
+        /// </summary>
+        /// <param name="statsCounters">Statistics counters to write</param>
+        /// <returns>Task for database opearation</returns>
         public async Task ReportStats(List<ICounter> statsCounters)
         {
             var siloOrClientName = (isSilo) ? siloName : clientId;

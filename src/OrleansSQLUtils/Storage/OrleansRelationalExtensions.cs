@@ -29,9 +29,9 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
-
-namespace Orleans.Runtime.Storage.Relational
+namespace Orleans.SqlUtils
 {
     /// <summary>
     /// Orleans specific, hand-crafted convenience queries for efficiency.
@@ -179,7 +179,7 @@ namespace Orleans.Runtime.Storage.Relational
         /// Inserts the given statistics counters to the Orleans database.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
-        /// <param name="query">The query to use.</param>
+        /// <param name="queryTemplate">The query to use.</param>
         /// <param name="deploymentId">The deployment ID.</param>
         /// <param name="hostName">The hostname.</param>
         /// <param name="siloOrClientName">The silo or client name.</param>
@@ -274,7 +274,7 @@ namespace Orleans.Runtime.Storage.Relational
         /// <param name="storage">The storage to use.</param>
         /// <param name="query">The query to use.</param>
         /// <param name="serviceId">The service ID.</param>
-        /// <param name="grainref">The grain reference (ID).</param>
+        /// <param name="grainRef">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
         internal static async Task<ReminderTableData> ReadReminderRowsAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef)
         {            
@@ -331,7 +331,8 @@ namespace Orleans.Runtime.Storage.Relational
         /// </summary>
         /// <param name="storage">The storage to use.</param>
         /// <param name="query">The query to use.</param>
-        /// <param name="grainref">The grain reference (ID).</param>
+        /// <param name="serviceId">Service ID.</param>
+        /// <param name="grainRef">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
         internal static async Task<ReminderEntry> ReadReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName)
@@ -362,8 +363,10 @@ namespace Orleans.Runtime.Storage.Relational
         /// <param name="storage">The storage to use.</param>
         /// <param name="query">The query to use.</param>
         /// <param name="serviceId">The service ID.</param>
-        /// <param name="grainref">The grain reference (ID).</param>
+        /// <param name="grainRef">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
+        /// <param name="startTime">Start time of the reminder.</param>
+        /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
         internal static async Task<string> UpsertReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName, DateTime startTime, TimeSpan period)
         {            
@@ -401,6 +404,7 @@ namespace Orleans.Runtime.Storage.Relational
         /// </summary>
         /// <param name="storage"></param>
         /// <param name="query">The query to use.</param>
+        /// <param name="serviceId">Service ID.</param>
         /// <param name="grainRef"></param>
         /// <param name="reminderName"></param>
         /// <param name="etag"></param>
@@ -786,8 +790,6 @@ namespace Orleans.Runtime.Storage.Relational
 
         private static Tuple<MembershipEntry, string, int, string> CreateMembershipEntry(IDataRecord record)
         {
-            //Retrieving by ordinal is slightly (immeasurably?) faster. Perhaps something to refactor.                        
-
             //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
             DateTime? startTime = record.GetValueOrDefault<DateTime?>("StartTime");                                    
             MembershipEntry entry = null;

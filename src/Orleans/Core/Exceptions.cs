@@ -36,7 +36,7 @@ namespace Orleans.Runtime
     /// </remarks>
     [Serializable]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1058:TypesShouldNotExtendCertainBaseTypes")]
-    public class OrleansException : ApplicationException
+    public class OrleansException : Exception
     {
         public OrleansException() : base("Unexpected error.") { }
 

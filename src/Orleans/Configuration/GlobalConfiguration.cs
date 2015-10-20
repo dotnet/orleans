@@ -29,7 +29,6 @@ using System.Text;
 using System.Net;
 using System.Xml;
 using Orleans.Providers;
-using Orleans.Runtime.Storage.Relational;
 using Orleans.Streams;
 using Orleans.Storage;
 
@@ -454,7 +453,7 @@ namespace Orleans.Runtime.Configuration
             DataConnectionString = "";
 
             // Assume the ado invariant is for sql server storage if not explicitly specified
-            AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+            AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
             
             CollectionQuantum = DEFAULT_COLLECTION_QUANTUM;
 
