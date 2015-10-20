@@ -144,7 +144,24 @@ namespace Orleans.Runtime.Scheduler
                     return String.Format("DispatcherTarget{0}", DispatcherTarget);
 
                 default:
-                    return "";
+                    return ContextType.ToString();
+            }
+        }
+        public string DetailedStatus()
+        {
+            switch (ContextType)
+            {
+                case SchedulingContextType.Activation:
+                    return Activation.ToDetailedString(true);
+
+                case SchedulingContextType.SystemTarget:
+                    return SystemTarget.ToDetailedString();
+
+                case SchedulingContextType.SystemThread:
+                    return String.Format("DispatcherTarget{0}", DispatcherTarget);
+
+                default:
+                    return ContextType.ToString();
             }
         }
 
@@ -164,7 +181,7 @@ namespace Orleans.Runtime.Scheduler
                         return String.Format("DispatcherTarget{0}", DispatcherTarget);
 
                     default:
-                        return "";
+                        return ContextType.ToString();
                 }
             }
         }

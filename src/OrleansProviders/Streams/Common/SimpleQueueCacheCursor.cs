@@ -101,7 +101,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (!IsSet)
             {
-                cache.InitializeCursor(this, SequenceToken);
+                cache.InitializeCursor(this, SequenceToken, false);
             }
         }
 

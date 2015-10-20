@@ -200,6 +200,7 @@ namespace Orleans.Runtime.Host
                             logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
                             orleans.Shutdown();
                         });
+                    shutdownThread.IsBackground = true;
                     shutdownThread.Start();
                     
                     var startupEventName = Name;

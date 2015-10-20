@@ -162,11 +162,11 @@ namespace Orleans.Providers.Streams.Common
             }
 
             var cursor = new SimpleQueueCacheCursor(this, streamGuid, streamNamespace, logger);
-            InitializeCursor(cursor, token);
+            InitializeCursor(cursor, token, true);
             return cursor;
         }
 
-        internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken)
+        internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken, bool enforceSequenceToken)
         {
             Log(logger, "InitializeCursor: {0} to sequenceToken {1}", cursor, sequenceToken);
            
@@ -195,8 +195,12 @@ namespace Orleans.Providers.Streams.Common
             // Check to see if offset is too old to be in cache
             if (sequenceToken.Older(lastMessage.Value.SequenceToken))
             {
-                // throw cache miss exception
-                throw new QueueCacheMissException(sequenceToken, cachedMessages.Last.Value.SequenceToken, cachedMessages.First.Value.SequenceToken);
+                if (enforceSequenceToken)
+                {
+                    // throw cache miss exception
+                    throw new QueueCacheMissException(sequenceToken, cachedMessages.Last.Value.SequenceToken, cachedMessages.First.Value.SequenceToken);
+                }
+                sequenceToken = lastMessage.Value.SequenceToken;
             }
 
             // Now the requested sequenceToken is set and is also within the limits of the cache.
@@ -238,7 +242,7 @@ namespace Orleans.Providers.Streams.Common
             //if not set, try to set and then get next
             if (!cursor.IsSet)
             {
-                InitializeCursor(cursor, cursor.SequenceToken);
+                InitializeCursor(cursor, cursor.SequenceToken, false);
                 return cursor.IsSet && TryGetNextMessage(cursor, out batch);
             }
 

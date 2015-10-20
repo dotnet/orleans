@@ -51,7 +51,7 @@ namespace Orleans.Samples.Chirper.Client
             {
                 Orleans.GrainClient.Initialize();
 
-                IChirperAccount account = ChirperAccountFactory.GetGrain(UserId);
+                IChirperAccount account = GrainClient.GrainFactory.GetGrain<IChirperAccount>(UserId);
                 publisher = account;
 
                 List<ChirperMessage> chirps = await account.GetReceivedMessages(10);

@@ -30,6 +30,9 @@ using Newtonsoft.Json.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
+using System.Collections.Generic;
+using Orleans.TestingHost;
+using System.Runtime.Serialization;
 
 namespace UnitTests.General
 {
@@ -105,6 +108,62 @@ namespace UnitTests.General
                 inputUnspecified.ToString(CultureInfo.InvariantCulture),
                 outputUnspecified.ToString(CultureInfo.InvariantCulture));
             Assert.AreEqual(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
+        }
+
+        [Serializable]
+        internal class TestTypeA
+        {
+            public ICollection<TestTypeA> Collection { get; set; }
+        }
+
+        [global::Orleans.CodeGeneration.RegisterSerializerAttribute()]
+        internal class TestTypeASerialization
+        {
+
+            static TestTypeASerialization()
+            {
+                Register();
+            }
+
+            public static object DeepCopier(object original)
+            {
+                TestTypeA input = ((TestTypeA)(original));
+                TestTypeA result = new TestTypeA();
+                Orleans.Serialization.SerializationContext.Current.RecordObject(original, result);
+                result.Collection = ((System.Collections.Generic.ICollection<TestTypeA>)(Orleans.Serialization.SerializationManager.DeepCopyInner(input.Collection)));
+                return result;
+            }
+
+            public static void Serializer(object untypedInput, Orleans.Serialization.BinaryTokenStreamWriter stream, System.Type expected)
+            {
+                TestTypeA input = ((TestTypeA)(untypedInput));
+                Orleans.Serialization.SerializationManager.SerializeInner(input.Collection, stream, typeof(System.Collections.Generic.ICollection<TestTypeA>));
+            }
+
+            public static object Deserializer(System.Type expected, global::Orleans.Serialization.BinaryTokenStreamReader stream)
+            {
+                TestTypeA result = new TestTypeA();
+                result.Collection = ((System.Collections.Generic.ICollection<TestTypeA>)(Orleans.Serialization.SerializationManager.DeserializeInner(typeof(System.Collections.Generic.ICollection<TestTypeA>), stream)));
+                return result;
+            }
+
+            public static void Register()
+            {
+                global::Orleans.Serialization.SerializationManager.Register(typeof(TestTypeA), DeepCopier, Serializer, Deserializer);
+            }
+        }
+
+        [Ignore]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void SerializationTests_RecursiveSerialization()
+        {
+            TestTypeA input = new TestTypeA();
+            input.Collection = new HashSet<TestTypeA>();
+            input.Collection.Add(input);
+
+            TestTypeA output1 = TestingUtils.RoundTripDotNetSerializer(input);
+
+            TestTypeA output2 = SerializationManager.RoundTripSerializationForTesting(input);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

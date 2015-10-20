@@ -42,7 +42,7 @@ namespace Orleans.Streams
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
         public IQueueCacheCursor Cursor;
         public IStreamFilterPredicateWrapper Filter;
-        public StreamSequenceToken LastToken;
+        public StreamHandshakeToken LastToken;
 
         public StreamConsumerData(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
         {
@@ -50,6 +50,23 @@ namespace Orleans.Streams
             StreamId = streamId;
             StreamConsumer = streamConsumer;
             Filter = filter;
+        }
+
+        internal void SafeDisposeCursor(Logger logger)
+        {
+            try
+            {
+                if (Cursor != null)
+                {
+                    // kill cursor activity and ensure it does not start again on this consumer data.
+                    Utils.SafeExecute(Cursor.Dispose, logger,
+                        () => String.Format("Cursor.Dispose on stream {0}, StreamConsumer {1} has thrown exception.", StreamId, StreamConsumer));
+                }
+            }
+            finally
+            {
+                Cursor = null;
+            }
         }
     }
 }

@@ -37,6 +37,7 @@ namespace Orleans.Runtime
         SchedulingContextType ContextType { get; }
         string Name { get; }
         bool IsSystemPriorityContext { get; }
+        string DetailedStatus();
     }
 
     internal static class SchedulingUtils

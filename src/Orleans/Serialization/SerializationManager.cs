@@ -560,11 +560,11 @@ namespace Orleans.Serialization
                                                      {
                                                          var t = obj.GetType();
                                                          var concreteCop = t.GetMethod(copier.Name, deepCopierParams);
-                                                         var cop = (DeepCopier)Delegate.CreateDelegate(typeof(DeepCopier), concreteCop);
+                                                         var cop = (DeepCopier)concreteCop.CreateDelegate(typeof(DeepCopier));
                                                          var concreteSer = t.GetMethod(serializer.Name, serializerParams);
-                                                         var ser = (Serializer)Delegate.CreateDelegate(typeof(Serializer), concreteSer);
+                                                         var ser = (Serializer)concreteSer.CreateDelegate(typeof(Serializer));
                                                          var concreteDeser = t.GetMethod(deserializer.Name, deserializerParams);
-                                                         var deser = (Deserializer)Delegate.CreateDelegate(typeof(Deserializer), concreteDeser);
+                                                         var deser = (Deserializer)concreteDeser.CreateDelegate(typeof(Deserializer));
                                                          Register(obj.GetType(), cop, ser, deser, true);
                                                          return cop(obj);
                                                      },
@@ -572,22 +572,22 @@ namespace Orleans.Serialization
                                                      {
                                                          var t = obj.GetType();
                                                          var concreteCop = t.GetMethod(copier.Name, deepCopierParams);
-                                                         var cop = (DeepCopier)Delegate.CreateDelegate(typeof(DeepCopier), concreteCop);
+                                                         var cop = (DeepCopier)concreteCop.CreateDelegate(typeof(DeepCopier));
                                                          var concreteSer = t.GetMethod(serializer.Name, serializerParams);
-                                                         var ser = (Serializer)Delegate.CreateDelegate(typeof(Serializer), concreteSer);
+                                                         var ser = (Serializer)concreteSer.CreateDelegate(typeof(Serializer));
                                                          var concreteDeser = t.GetMethod(deserializer.Name, deserializerParams);
-                                                         var deser = (Deserializer)Delegate.CreateDelegate(typeof(Deserializer), concreteDeser);
+                                                         var deser = (Deserializer)concreteDeser.CreateDelegate(typeof(Deserializer));
                                                          Register(obj.GetType(), cop, ser, deser, true);
                                                          ser(obj, stream, exp);
                                                      },
                                                      (t, stream) =>
                                                      {
                                                          var concreteCop = t.GetMethod(copier.Name, deepCopierParams);
-                                                         var cop = (DeepCopier)Delegate.CreateDelegate(typeof(DeepCopier), concreteCop);
+                                                         var cop = (DeepCopier)concreteCop.CreateDelegate(typeof(DeepCopier));
                                                          var concreteSer = t.GetMethod(serializer.Name, serializerParams);
-                                                         var ser = (Serializer)Delegate.CreateDelegate(typeof(Serializer), concreteSer);
+                                                         var ser = (Serializer)concreteSer.CreateDelegate(typeof(Serializer));
                                                          var concreteDeser = t.GetMethod(deserializer.Name, deserializerParams);
-                                                         var deser = (Deserializer)Delegate.CreateDelegate(typeof(Deserializer), concreteDeser);
+                                                         var deser = (Deserializer)concreteDeser.CreateDelegate(typeof(Deserializer));
                                                          Register(t, cop, ser, deser, true);
                                                          return deser(t, stream);
                                                      }, true);
@@ -595,9 +595,9 @@ namespace Orleans.Serialization
                                         else
                                         {
                                             Register(type,
-                                                (DeepCopier)Delegate.CreateDelegate(typeof(DeepCopier), copier),
-                                                (Serializer)Delegate.CreateDelegate(typeof(Serializer), serializer),
-                                                (Deserializer)Delegate.CreateDelegate(typeof(Deserializer), deserializer), true);
+                                                (DeepCopier)copier.CreateDelegate(typeof(DeepCopier)),
+                                                (Serializer)serializer.CreateDelegate(typeof(Serializer)),
+                                                (Deserializer)deserializer.CreateDelegate(typeof(Deserializer)), true);
                                         }
                                     }
                                     catch (ArgumentException)
@@ -612,8 +612,8 @@ namespace Orleans.Serialization
                                     try
                                     {
                                         Register(type, null,
-                                            (Serializer)Delegate.CreateDelegate(typeof(Serializer), serializer),
-                                            (Deserializer)Delegate.CreateDelegate(typeof(Deserializer), deserializer), true);
+                                            (Serializer)serializer.CreateDelegate(typeof(Serializer)),
+                                            (Deserializer)deserializer.CreateDelegate(typeof(Deserializer)), true);
                                     }
                                     catch (ArgumentException)
                                     {
@@ -626,7 +626,7 @@ namespace Orleans.Serialization
                                 {
                                     try
                                     {
-                                        Register(type, (DeepCopier)Delegate.CreateDelegate(typeof(DeepCopier), copier), null, null, true);
+                                        Register(type, (DeepCopier)copier.CreateDelegate(typeof(DeepCopier)), null, null, true);
                                     }
                                     catch (ArgumentException)
                                     {

@@ -85,6 +85,16 @@ namespace Orleans.Providers
             await statisticsProviderLoader.InitProviders(runtime);
         }
 
+        public Task CloseProviders()
+        {
+            List<Task> tasks = new List<Task>();
+            foreach (var provider in GetProviders())
+            {
+                tasks.Add(provider.Close());
+            }
+            return Task.WhenAll(tasks);
+        }
+
         // used only for testing
         internal async Task AddAndInitProvider(string name, IProvider provider, IProviderConfiguration config = null)
         {
