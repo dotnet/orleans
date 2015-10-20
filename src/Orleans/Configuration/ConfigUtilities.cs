@@ -32,6 +32,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using System.Runtime;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -345,7 +346,7 @@ namespace Orleans.Runtime.Configuration
             return s;
         }
 
-        internal static IPEndPoint ParseIPEndPoint(XmlElement root, byte[] subnet = null)
+        internal static async Task<IPEndPoint> ParseIPEndPoint(XmlElement root, byte[] subnet = null)
         {
             if (!root.HasAttribute("Address")) throw new FormatException("Missing Address attribute for " + root.LocalName + " element");
             if (!root.HasAttribute("Port")) throw new FormatException("Missing Port attribute for " + root.LocalName + " element");
@@ -360,7 +361,7 @@ namespace Orleans.Runtime.Configuration
                 family = ParseEnum<AddressFamily>(root.GetAttribute("PreferredFamily"),
                     "Invalid preferred addressing family for " + root.LocalName + " element");
             }
-            IPAddress addr = ClusterConfiguration.ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
+            IPAddress addr = await ClusterConfiguration.ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
             int port = ParseInt(root.GetAttribute("Port"), "Invalid Port attribute for " + root.LocalName + " element");
             return new IPEndPoint(addr, port);
         }
