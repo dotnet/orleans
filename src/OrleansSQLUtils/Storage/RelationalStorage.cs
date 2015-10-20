@@ -195,7 +195,11 @@ namespace Orleans.SqlUtils
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id) => unit, factory, connectionString).ConfigureAwait(continueOnCapturedContext: false)).Item2;
         }
 
-
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="invariantName">Name of the invariant</param>
+        /// <param name="connectionString">Connection string</param>
         protected RelationalStorage(string invariantName, string connectionString)
         {
             factory = DbProviderFactories.GetFactory(invariantName);

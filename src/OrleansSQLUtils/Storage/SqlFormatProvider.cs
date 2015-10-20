@@ -33,15 +33,14 @@ namespace Orleans.SqlUtils
     {
         private readonly SqlFormatter formatter = new SqlFormatter();
 
-
+        /// <summary>
+        /// Returns an instance of the formatter
+        /// </summary>
+        /// <param name="formatType">Requested format type</param>
+        /// <returns></returns>
         public object GetFormat(Type formatType)
         {
-            if(formatType == typeof(ICustomFormatter))
-            {
-                return formatter;
-            }
-
-            return null;
+            return formatType == typeof(ICustomFormatter) ? formatter : null;
         }
 
 
