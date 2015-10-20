@@ -30,6 +30,7 @@ using System.IO;
 using System.Xml;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
+using System.Threading.Tasks;
 
 
 namespace Orleans.Runtime.Configuration
@@ -414,7 +415,7 @@ namespace Orleans.Runtime.Configuration
             return sb.ToString();
         }
 
-        internal static IPAddress ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
+        internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
         {
             var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
 
@@ -441,7 +442,7 @@ namespace Orleans.Runtime.Configuration
                 }
 
                 var candidates = new List<IPAddress>();
-                IPAddress[] nodeIps = Dns.GetHostAddresses(addrOrHost);
+                IPAddress[] nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
                 foreach (var nodeIp in nodeIps)
                 {
                     if (nodeIp.AddressFamily != family || nodeIp.Equals(loopback)) continue;
