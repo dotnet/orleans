@@ -242,7 +242,7 @@ namespace Orleans.Runtime.Configuration
                     switch (child.LocalName)
                     {
                         case "Gateway":
-                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child));
+                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child).GetAwaiter().GetResult());
                             if (GatewayProvider == GatewayProviderType.None)
                             {
                                 GatewayProvider = GatewayProviderType.Config;

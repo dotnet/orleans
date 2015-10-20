@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using Orleans.Runtime;
@@ -1103,17 +1104,17 @@ namespace Orleans.Serialization
         #region URIs
 
         [ThreadStatic]
-        static private UriTypeConverter uriConverter;
+        static private TypeConverter uriConverter;
 
         internal static void SerializeUri(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            if (uriConverter == null) uriConverter = new UriTypeConverter();
+            if (uriConverter == null) uriConverter = TypeDescriptor.GetConverter(typeof(Uri));
             stream.Write(uriConverter.ConvertToInvariantString(obj));
         }
 
         internal static object DeserializeUri(Type expected, BinaryTokenStreamReader stream)
         {
-            if (uriConverter == null) uriConverter = new UriTypeConverter();
+            if (uriConverter == null) uriConverter = TypeDescriptor.GetConverter(typeof(Uri));
             return uriConverter.ConvertFromInvariantString(stream.ReadString());
         }
 

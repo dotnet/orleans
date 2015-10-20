@@ -299,6 +299,29 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="DataConnectionStringForReminders" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Overrides the data connection string for reminders storage if differs from DataConnectionString
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="AdoInvariant" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+           When using ADO, identifies the underlying data provider for liveness and reminders. This three-part naming syntax is also used
+           when creating a new factory and for identifying the provider in an application configuration file so that the provider name,
+           along with its associated connection string, can be retrieved at run time. https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="AdoInvariantForReminders" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Overrides the AdoInvariant for reminders storage if differs
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
   </xs:complexType>
 
   <xs:complexType name="LivenessConfiguration">
