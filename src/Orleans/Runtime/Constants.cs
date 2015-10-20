@@ -39,7 +39,9 @@ namespace Orleans.Runtime
         public const string MEMORY_STORAGE_PROVIDER_NAME = "MemoryStore";
         public const string DATA_CONNECTION_STRING_NAME = "DataConnectionString";
         public const string ADO_INVARIANT_NAME = "AdoInvariant";
-
+        public const string DATA_CONNECTION_FOR_REMINDERS_STRING_NAME = "DataConnectionStringForReminders";
+        public const string ADO_INVARIANT_FOR_REMINDERS_NAME = "AdoInvariantForReminders";
+        
         public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
 
         public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";

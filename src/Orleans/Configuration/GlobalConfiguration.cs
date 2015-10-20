@@ -692,6 +692,14 @@ namespace Orleans.Runtime.Configuration
                                 throw new FormatException("SystemStore.DataConnectionString cannot be blank");
                             }
                         }
+                        if (child.HasAttribute(Constants.DATA_CONNECTION_FOR_REMINDERS_STRING_NAME))
+                        {
+                            DataConnectionStringForReminders = child.GetAttribute(Constants.DATA_CONNECTION_FOR_REMINDERS_STRING_NAME);
+                            if (String.IsNullOrWhiteSpace(DataConnectionStringForReminders))
+                            {
+                                throw new FormatException("SystemStore.DataConnectionStringForReminders cannot be blank");
+                            }
+                        }
                         if (child.HasAttribute(Constants.ADO_INVARIANT_NAME))
                         {
                             var adoInvariant = child.GetAttribute(Constants.ADO_INVARIANT_NAME);
@@ -700,6 +708,15 @@ namespace Orleans.Runtime.Configuration
                                 throw new FormatException("SystemStore.AdoInvariant cannot be blank");
                             }
                             AdoInvariant = adoInvariant;
+                        }
+                        if (child.HasAttribute(Constants.ADO_INVARIANT_FOR_REMINDERS_NAME))
+                        {
+                            var adoInvariantForReminders = child.GetAttribute(Constants.ADO_INVARIANT_FOR_REMINDERS_NAME);
+                            if (String.IsNullOrWhiteSpace(adoInvariantForReminders))
+                            {
+                                throw new FormatException("SystemStore.adoInvariantForReminders cannot be blank");
+                            }
+                            AdoInvariantForReminders = adoInvariantForReminders;
                         }
                         if (child.HasAttribute("MaxStorageBusyRetries"))
                         {
@@ -714,7 +731,7 @@ namespace Orleans.Runtime.Configuration
                         break;
 
                     case "SeedNode":
-                        SeedNodes.Add(ConfigUtilities.ParseIPEndPoint(child, Subnet));
+                        SeedNodes.Add(ConfigUtilities.ParseIPEndPoint(child, Subnet).GetAwaiter().GetResult());
                         break;
 
                     case "Messaging":

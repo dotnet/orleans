@@ -331,6 +331,7 @@ namespace Orleans.SqlUtils
         /// </summary>
         /// <param name="storage">The storage to use.</param>
         /// <param name="query">The query to use.</param>
+        /// <param name="serviceId">Service ID.</param>
         /// <param name="grainRef">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
@@ -364,6 +365,8 @@ namespace Orleans.SqlUtils
         /// <param name="serviceId">The service ID.</param>
         /// <param name="grainRef">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
+        /// <param name="startTime">Start time of the reminder.</param>
+        /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
         internal static async Task<string> UpsertReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName, DateTime startTime, TimeSpan period)
         {            
@@ -401,6 +404,7 @@ namespace Orleans.SqlUtils
         /// </summary>
         /// <param name="storage"></param>
         /// <param name="query">The query to use.</param>
+        /// <param name="serviceId">Service ID.</param>
         /// <param name="grainRef"></param>
         /// <param name="reminderName"></param>
         /// <param name="etag"></param>
