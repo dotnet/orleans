@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Configuration
         /// This is a configurable IP address or Hostname.
         /// </summary>
         public string HostNameOrIPAddress { get; set; } 
-        private IPAddress Address { get { return ClusterConfiguration.ResolveIPAddress(HostNameOrIPAddress, Subnet, AddressType); } }
+        private IPAddress Address { get { return ClusterConfiguration.ResolveIPAddress(HostNameOrIPAddress, Subnet, AddressType).GetAwaiter().GetResult(); } }
 
         /// <summary>
         /// The port this silo uses for silo-to-silo communication.
@@ -429,7 +429,7 @@ namespace Orleans.Runtime.Configuration
                         }
                         break;
                     case "ProxyingGateway":
-                        ProxyGatewayEndpoint = ConfigUtilities.ParseIPEndPoint(child, Subnet);
+                        ProxyGatewayEndpoint = ConfigUtilities.ParseIPEndPoint(child, Subnet).GetAwaiter().GetResult();
                         break;
                     case "Scheduler":
                         if (child.HasAttribute("MaxActiveThreads"))
