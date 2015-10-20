@@ -142,20 +142,11 @@ namespace Orleans.CodeGeneration
             {
                 case Language.CSharp:
                 {
-                    var providerOptions = new Dictionary<string, string> { { "CompilerVersion", "v4.0" } };
-                    if (debug)
-                        providerOptions.Add("debug", "full");
-
-                    return new CSharpCodeProvider(providerOptions);
+                    return new Microsoft.CodeDom.Providers.DotNetCompilerPlatform.CSharpCodeProvider();
                 }
                 case Language.VisualBasic:
                 {
-                    var providerOptions = new Dictionary<string, string>();
-                    if (debug)
-                        providerOptions.Add("debug", "full");
-
-                    var prov = new VBCodeProvider(providerOptions);
-                    return prov;
+                  return new Microsoft.CodeDom.Providers.DotNetCompilerPlatform.VBCodeProvider();
                 }
                 default:
                     return null;
