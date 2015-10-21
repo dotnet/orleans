@@ -122,11 +122,11 @@ namespace Orleans
             get { throw new InvalidOperationException("Storage provider only available from inside grain"); }
         }
 
-        internal List<Uri> Gateways
+        internal IList<Uri> Gateways
         {
             get
             {
-                return transport.GatewayManager.ListProvider.GetGateways().ToList();
+                return transport.GatewayManager.ListProvider.GetGateways().GetResult();
             }
         }
 

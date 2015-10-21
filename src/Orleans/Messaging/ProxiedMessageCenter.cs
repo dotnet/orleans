@@ -197,7 +197,7 @@ namespace Orleans.Messaging
                 {
                     int msgNumber = numMessages;
                     numMessages = unchecked(numMessages + 1);
-                    List<Uri> gatewayNames = GatewayManager.GetLiveGateways();
+                    IList<Uri> gatewayNames = GatewayManager.GetLiveGateways();
                     int numGateways = gatewayNames.Count;
                     if (numGateways == 0)
                     {

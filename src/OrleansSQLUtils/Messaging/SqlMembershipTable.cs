@@ -94,16 +94,13 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        public IList<Uri> GetGateways()
+        public Task<IList<Uri>> GetGateways()
         {
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.GetGateways called.");
             try
             {                
                 var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.ActiveGatewaysQuery);
-
-                //The rationale for GetAwaiter().GetResult() instead of .Result
-                //is presented at https://github.com/aspnet/Security/issues/59.                
-                return database.ActiveGatewaysAsync(query, deploymentId).GetAwaiter().GetResult();
+                return database.ActiveGatewaysAsync(query, deploymentId);
             }
             catch(Exception ex)
             {

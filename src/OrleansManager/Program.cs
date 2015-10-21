@@ -270,7 +270,7 @@ namespace OrleansManager
 
         private static List<SiloAddress> GetSiloAddresses()
         {
-            List<Uri> gateways = GrainClient.Gateways;
+            IList<Uri> gateways = GrainClient.Gateways;
             if (gateways.Count >= 1) 
                 return gateways.Select(Utils.ToSiloAddress).ToList();
 

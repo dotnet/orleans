@@ -74,7 +74,7 @@ namespace Orleans.Messaging
 
     internal class StaticGatewayListProvider : IGatewayListProvider
     {
-        private List<Uri> knownGateways;
+        private IList<Uri> knownGateways;
 
 
         #region Implementation of IGatewayListProvider
@@ -82,12 +82,12 @@ namespace Orleans.Messaging
         public Task InitializeGatewayListProvider(ClientConfiguration cfg, TraceLogger traceLogger)
         {
             knownGateways = cfg.Gateways.Select(ep => ep.ToGatewayUri()).ToList();
-            return TaskDone.Done; ;
+            return TaskDone.Done;
         }
 
-        public IList<Uri> GetGateways()
+        public Task<IList<Uri>> GetGateways()
         {
-            return knownGateways;
+            return Task.FromResult(knownGateways);
         }
 
         public TimeSpan MaxStaleness 

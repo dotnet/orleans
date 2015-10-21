@@ -46,7 +46,7 @@ namespace Orleans.AzureUtils
             siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString);
         }
         // no caching
-        public IList<Uri> GetGateways()
+        public Task<IList<Uri>> GetGateways()
         {
             lock (lockable)
             {

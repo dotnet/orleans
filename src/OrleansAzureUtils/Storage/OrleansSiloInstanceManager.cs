@@ -218,9 +218,9 @@ namespace Orleans.AzureUtils
                 .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
         }
 
-        public List<Uri> FindAllGatewayProxyEndpoints()
+        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
         {
-            IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = FindAllGatewaySilos();
+            IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = await FindAllGatewaySilos();
             return gatewaySiloInstances.Select(ConvertToGatewayUri).ToList();
         }
 
@@ -243,7 +243,7 @@ namespace Orleans.AzureUtils
             return address.ToGatewayUri();
         }
 
-        private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()
+        private async Task<IEnumerable<SiloInstanceTableEntry>> FindAllGatewaySilos()
         {
             if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
             const string zeroPort = "0";
@@ -255,9 +255,9 @@ namespace Orleans.AzureUtils
                     && instance.Status == INSTANCE_STATUS_ACTIVE
                     && instance.ProxyPort != zeroPort;
 
-                var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
-                                    .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
-
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query)
+                                    .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+               
                 List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
                 logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);

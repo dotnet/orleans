@@ -43,7 +43,7 @@ namespace Orleans.Messaging
         internal readonly IGatewayListProvider ListProvider;
         private SafeTimer gatewayRefreshTimer;
         private readonly Dictionary<Uri, DateTime> knownDead;
-        private List<Uri> cachedLiveGateways;
+        private IList<Uri> cachedLiveGateways;
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private readonly SafeRandom rand;
@@ -64,7 +64,7 @@ namespace Orleans.Messaging
 
             ListProvider = gatewayListProvider;
 
-            var knownGateways = ListProvider.GetGateways().ToList();
+            var knownGateways = ListProvider.GetGateways().GetResult();
 
             if (knownGateways.Count == 0)
             {
@@ -152,7 +152,7 @@ namespace Orleans.Messaging
         /// <returns></returns>
         public Uri GetLiveGateway()
         {
-            List<Uri> live = GetLiveGateways();
+            IList<Uri> live = GetLiveGateways();
             int count = live.Count;
             if (count > 0)
             {
@@ -167,7 +167,7 @@ namespace Orleans.Messaging
             return null;
         }
 
-        public List<Uri> GetLiveGateways()
+        public IList<Uri> GetLiveGateways()
         {
             // Never takes a lock and returns the cachedLiveGateways list quickly without any operation.
             // Asynchronously starts gateway refresh only when it is empty.
@@ -217,7 +217,7 @@ namespace Orleans.Messaging
                 if (ListProvider == null || !ListProvider.IsUpdatable) return;
 
                 // the listProvider.GetGateways() is not under lock.
-                var currentKnownGateways = ListProvider.GetGateways().ToList();
+                var currentKnownGateways = ListProvider.GetGateways().GetResult();
                 if (logger.IsVerbose)
                 {
                     logger.Verbose("Found {0} knownGateways from Gateway listProvider {1}", currentKnownGateways.Count, Utils.EnumerableToString(currentKnownGateways));

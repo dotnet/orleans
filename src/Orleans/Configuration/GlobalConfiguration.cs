@@ -731,7 +731,7 @@ namespace Orleans.Runtime.Configuration
                         break;
 
                     case "SeedNode":
-                        SeedNodes.Add(ConfigUtilities.ParseIPEndPoint(child, Subnet).GetAwaiter().GetResult());
+                        SeedNodes.Add(ConfigUtilities.ParseIPEndPoint(child, Subnet).GetResult());
                         break;
 
                     case "Messaging":
