@@ -203,9 +203,10 @@ namespace Orleans.Runtime.Host
             return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData));
         }
 
-        public IList<Uri> GetGateways()
+        public async Task<IList<Uri>> GetGateways()
         {
-            return ReadAll().Result.Members.Select(e => e.Item1).
+            var membershipTableData = await ReadAll();
+            return membershipTableData.Members.Select(e => e.Item1).
                                             Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                                             Select(m =>
                                             {

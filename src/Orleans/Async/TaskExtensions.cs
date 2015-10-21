@@ -220,6 +220,13 @@ namespace Orleans
             }
             return resolver.Task;
         }
+
+        //The rationale for GetAwaiter().GetResult() instead of .Result
+        //is presented at https://github.com/aspnet/Security/issues/59.      
+        internal static T GetResult<T>(this Task<T> task)
+        {
+            return task.GetAwaiter().GetResult();
+        }
     }
 }
 

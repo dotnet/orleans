@@ -44,7 +44,7 @@ namespace Orleans.Messaging
         /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
         /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.
         /// </summary>
-        IList<Uri> GetGateways();
+        Task<IList<Uri>> GetGateways();
 
         /// <summary>
         /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned infomation.

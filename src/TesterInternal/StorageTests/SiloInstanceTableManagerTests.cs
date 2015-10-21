@@ -209,12 +209,12 @@ namespace UnitTests.StorageTests
         {
             RegisterSiloInstance();
 
-            var gateways = manager.FindAllGatewayProxyEndpoints();
+            var gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
             Assert.AreEqual(0, gateways.Count, "Number of gateways before Silo.Activate");
 
             manager.ActivateSiloInstance(myEntry);
 
-            gateways = manager.FindAllGatewayProxyEndpoints();
+            gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
             Assert.AreEqual(1, gateways.Count, "Number of gateways after Silo.Activate");
 
             Uri myGateway = gateways.First();

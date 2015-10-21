@@ -370,7 +370,7 @@ namespace Orleans
             return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
         }
 
-        internal static List<Uri> Gateways
+        internal static IList<Uri> Gateways
         {
             get
             {
