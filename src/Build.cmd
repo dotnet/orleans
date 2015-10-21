@@ -17,7 +17,8 @@ if EXIST "%VERSION_FILE%" (
 	@Echo PRODUCT_VERSION=%PRODUCT_VERSION%
 ) else (
     @Echo ERROR: Unable to read version number from file %VERSION_FILE%
-    SET PRODUCT_VERSION=1.0
+REM    SET PRODUCT_VERSION=1.0
+    @Echo version from environment PRODUCT_VERSION = %PRODUCT_VERSION%
 )
 
 if "%builduri%" == "" set builduri=Build.cmd
