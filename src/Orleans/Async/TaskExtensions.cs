@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -130,11 +131,13 @@ namespace Orleans
                 return;
             }
 
-            await Task.WhenAny(taskToComplete, Task.Delay(timeout));
+            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
 
             // We got done before the timeout, or were able to complete before this code ran, return the result
-            if (taskToComplete.IsCompleted)
+            if (taskToComplete == completedTask)
             {
+                timeoutCancellationTokenSource.Cancel();
                 // Await this so as to propagate the exception correctly
                 await taskToComplete;
                 return;
@@ -159,11 +162,13 @@ namespace Orleans
                 return await taskToComplete;
             }
 
-            await Task.WhenAny(taskToComplete, Task.Delay(timeSpan));
+            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeSpan, timeoutCancellationTokenSource.Token));
 
             // We got done before the timeout, or were able to complete before this code ran, return the result
-            if (taskToComplete.IsCompleted)
+            if (taskToComplete == completedTask)
             {
+                timeoutCancellationTokenSource.Cancel();
                 // Await this so as to propagate the exception correctly
                 return await taskToComplete;
             }
