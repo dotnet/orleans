@@ -487,7 +487,7 @@ namespace Orleans.CodeGeneration
         internal static void BuildInputAssembly(CodeGenOptions options)
         {
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating assembly for preprocessing.");
-            var compilerParams = new CompilerParameters {OutputAssembly = options.InputLib.FullName};
+            var compilerParams = new CompilerParameters {OutputAssembly = options.InputLib.FullName, IncludeDebugInformation = true};
 
             var path = options.TargetLanguage == Language.CSharp ? CodeGenFileRelativePathCSharp :
                 options.TargetLanguage == Language.FSharp ? CodeGenFileRelativePathFSharp : CodeGenFileRelativePathVB;
