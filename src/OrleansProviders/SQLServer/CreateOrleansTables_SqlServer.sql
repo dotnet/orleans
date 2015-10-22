@@ -520,6 +520,10 @@ BEGIN
 				[SentMessages] = @sentMessagesCount,
 				[ReceivedMessages] = @receivedMessagesCount,
 				[ConnectedGatewayCount] = @connectedGatewaysCount
+			WHERE
+				[DeploymentId] = @deploymentId
+				AND
+				[ClientId] = @clientId
 		END
 		ELSE
 		BEGIN	
@@ -587,7 +591,11 @@ BEGIN
 				SentMessages = @sentMessagesCount,
 				ReceivedMessages = @receivedMessagesCount,
 				LoadShedding = @isOverloaded,
-				ClientCount = @clientCount;
+				ClientCount = @clientCount
+			WHERE
+				[DeploymentId] = @deploymentId 
+				AND
+				[SiloId] = @siloId
 		END
 		ELSE
 		BEGIN
@@ -1056,6 +1064,10 @@ BEGIN
 				[SentMessages] = @sentMessagesCount,
 				[ReceivedMessages] = @receivedMessagesCount,
 				[ConnectedGatewayCount] = @connectedGatewaysCount
+			WHERE
+				[DeploymentId] = @deploymentId
+				AND
+				[ClientId] = @clientId
 		END
 		ELSE
 		BEGIN	
@@ -1123,7 +1135,11 @@ BEGIN
 				SentMessages = @sentMessagesCount,
 				ReceivedMessages = @receivedMessagesCount,
 				LoadShedding = @isOverloaded,
-				ClientCount = @clientCount;
+				ClientCount = @clientCount
+			WHERE
+				[DeploymentId] = @deploymentId 
+				AND
+				[SiloId] = @siloId
 		END
 		ELSE
 		BEGIN
