@@ -30,10 +30,12 @@ using System.Text;
 
 using Orleans.Providers;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
 
 
 namespace Orleans.Runtime
 {
+    [NonSerializable]
     internal class SiloAssemblyLoader
     {
         private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoader.Silo");

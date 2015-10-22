@@ -873,6 +873,8 @@ namespace Orleans
         Loader_TypeLoadError_3                  = LoaderBase + 19,
         Loader_TypeLoadError_4                  = LoaderBase + 20,
         Loader_LoadAndCreateInstance_Failure    = LoaderBase + 21,
+        Loader_TryLoadAndCreateInstance_Failure = LoaderBase + 22,
+        Loader_TypeLoadError_5                  = LoaderBase + 23,
 
         PlacementBase                               = Runtime + 1800,
         Placement_RuntimeStatisticsUpdateFailure_1  = PlacementBase + 1,
@@ -1056,11 +1058,19 @@ namespace Orleans
         PersistentStreamPullingManager_AlreadyStarted   = PersistentStreamPullingManagerBase + 21,
         PersistentStreamPullingManager_AlreadyStopped   = PersistentStreamPullingManagerBase + 22,
         PersistentStreamPullingManager_PeriodicPrint    = PersistentStreamPullingManagerBase + 23,
-
-
-        AzureServiceRuntimeWrapper = Runtime + 3700,
+        
+        AzureServiceRuntimeWrapper          = Runtime + 3700,
         AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper +1,
-        AzureServiceRuntime_FailedToLoad    = AzureServiceRuntimeWrapper +2,
+        AzureServiceRuntime_FailedToLoad    = AzureServiceRuntimeWrapper + 2,
+
+        CodeGenBase                         = Runtime + 3800,
+        CodeGenCompilationFailed            = CodeGenBase + 1,
+        CodeGenCompilationSucceeded         = CodeGenBase + 2,
+        CodeGenSourceGenerated              = CodeGenBase + 3,
+        CodeGenSerializerGenerator          = CodeGenBase + 4,
+        CodeGenIgnoringTypes                = CodeGenBase + 5,
+        CodeGenDllMissing                   = CodeGenBase + 6,
+        CodeGenSystemTypeRequiresSerializer = CodeGenBase + 7,
     }
 }
 // ReSharper restore InconsistentNaming

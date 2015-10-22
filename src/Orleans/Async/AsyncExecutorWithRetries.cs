@@ -29,6 +29,8 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    using System.Runtime.ExceptionServices;
+
     /// <summary>
     /// This class a convinent utiliity class to execute a certain asyncronous function with retires, 
     /// allowing to specify custom retry filters and policies.
@@ -202,7 +204,8 @@ namespace Orleans
                         return await ExecuteWithRetriesHelper(function, callCounter, maxNumSuccessTries, maxNumErrorTries, maxExecutionTime, startExecutionTime, retryValueFilter, retryExceptionFilter, onSuccessBackOff, onErrorBackOff);
                     }
                 }
-                throw exception;
+
+                ExceptionDispatchInfo.Capture(exception).Throw();
             }
             return result; // this return value is just for the compiler to supress "not all control paths return a value".
         }

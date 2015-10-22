@@ -25,6 +25,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+using Orleans.CodeGeneration;
+
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
@@ -39,3 +41,4 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("ff520b88-06b6-4eae-bd7c-4f51f843f4cc")]
+[assembly: SkipCodeGeneration]

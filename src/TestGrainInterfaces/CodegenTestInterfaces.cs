@@ -29,9 +29,18 @@ using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
+    using Orleans.Concurrency;
+
     public interface ISomeGrain : IGrainWithIntegerKey
     {
         Task Do(Outsider o);
+    }
+
+    [Unordered]
+    public interface ISomeGrainWithInvocationOptions : IGrainWithIntegerKey
+    {
+        [AlwaysInterleave]
+        Task AlwaysInterleave();
     }
 }
 

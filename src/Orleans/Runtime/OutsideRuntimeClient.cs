@@ -173,17 +173,6 @@ namespace Orleans
                 }
                 // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
                 SerializationManager.GetDeserializer(typeof(String));
-                // Ensure that any assemblies that get loaded in the future get recorded
-                AppDomain.CurrentDomain.AssemblyLoad += NewAssemblyHandler;
-
-                // Load serialization info for currently-loaded assemblies
-                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    if (!assembly.ReflectionOnly)
-                    {
-                        SerializationManager.FindSerializationInfo(assembly);
-                    }
-                }
 
                 clientProviderRuntime = new ClientProviderRuntime(grainFactory);
                 statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
@@ -270,16 +259,7 @@ namespace Orleans
 
             AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);
         }
-
-        private static void NewAssemblyHandler(object sender, AssemblyLoadEventArgs args)
-        {
-            var assembly = args.LoadedAssembly;
-            if (!assembly.ReflectionOnly)
-            {
-                SerializationManager.FindSerializationInfo(args.LoadedAssembly); 
-            }
-        }
-
+        
         private void UnhandledException(ISchedulingContext context, Exception exception)
         {
             logger.Error(ErrorCode.Runtime_Error_100007, String.Format("OutsideRuntimeClient caught an UnobservedException."), exception);

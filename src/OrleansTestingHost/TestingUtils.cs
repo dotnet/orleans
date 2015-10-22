@@ -35,31 +35,28 @@ namespace Orleans.TestingHost
     {
         public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout)
         {
-            bool keepGoing = true;
-            int numLoops = 0;
-            // ReSharper disable AccessToModifiedClosure
+            var keepGoing = new[] { true };
             Func<Task> loop =
                 async () =>
                 {
                     do
                     {
-                        numLoops++;
                         // need to wait a bit to before re-checking the condition.
                         await Task.Delay(TimeSpan.FromSeconds(1));
                     }
-                    while (!await predicate(!keepGoing) && keepGoing);
+                    while (!await predicate(!keepGoing[0]) && keepGoing[0]);
                 };
-            // ReSharper restore AccessToModifiedClosure
 
             var task = loop();
             try
             {
-                await Task.WhenAny(new Task[] { task, Task.Delay(timeout) });
+                await Task.WhenAny(task, Task.Delay(timeout));
             }
             finally
             {
-                keepGoing = false;
+                keepGoing[0] = false;
             }
+
             await task;
         }
 
