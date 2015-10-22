@@ -24,5 +24,7 @@
   <files>
     <file src="OrleansRuntime.dll" target="lib\net45" />
     <file src="OrleansRuntime.pdb" target="lib\net45" />
+    <file src="Microsoft.Framework.DependencyInjection.Abstractions.dll" target="lib\net45" />
+    <file src="Microsoft.Framework.DependencyInjection.dll" target="lib\net45" />
   </files>
 </package>
