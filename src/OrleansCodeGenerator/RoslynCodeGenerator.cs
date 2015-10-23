@@ -44,7 +44,7 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// Implements a code generator using the Roslyn C# compiler.
     /// </summary>
-    public class CodeGenerator : IRuntimeCodeGenerator, ISourceCodeGenerator
+    public class RoslynCodeGenerator : IRuntimeCodeGenerator, ISourceCodeGenerator
     {
         /// <summary>
         /// The compiled assemblies.
@@ -60,12 +60,12 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The static instance.
         /// </summary>
-        private static readonly CodeGenerator StaticInstance = new CodeGenerator();
+        private static readonly RoslynCodeGenerator StaticInstance = new RoslynCodeGenerator();
 
         /// <summary>
-        /// Initializes static members of the <see cref="CodeGenerator"/> class.
+        /// Initializes static members of the <see cref="RoslynCodeGenerator"/> class.
         /// </summary>
-        static CodeGenerator()
+        static RoslynCodeGenerator()
         {
             AppDomain.CurrentDomain.AssemblyLoad += (sender, args) => RegisterGeneratedCodeTarget(args.LoadedAssembly);
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -77,7 +77,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Gets the static instance.
         /// </summary>
-        public static CodeGenerator Instance
+        public static RoslynCodeGenerator Instance
         {
             get
             {
@@ -376,11 +376,7 @@ namespace Orleans.CodeGenerator
                     }
 
                     // Generate serializers.
-                    if (!runtime)
-                    {
-                        ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes for types:");
-                    }
-
+                    var first = true;
                     Type toGen;
                     while (SerializerGenerationManager.GetNextTypeToProcess(out toGen))
                     {
@@ -400,6 +396,12 @@ namespace Orleans.CodeGenerator
 
                         if (!runtime)
                         {
+                            if (first)
+                            {
+                                ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes for types:");
+                                first = false;
+                            }
+
                             ConsoleText.WriteStatus(
                                 "\ttype " + toGen.FullName + " in namespace " + toGen.Namespace
                                 + " defined in Assembly " + toGen.Assembly.GetName());
@@ -468,9 +470,19 @@ namespace Orleans.CodeGenerator
             }
         }
 
+        /// <summary>
+        /// Represents a generated assembly.
+        /// </summary>
         private class GeneratedAssembly
         {
+            /// <summary>
+            /// Gets or sets a value indicating whether or not the assembly has been loaded.
+            /// </summary>
             public bool Loaded { get; set; }
+
+            /// <summary>
+            /// Gets or sets a serialized representation of the assembly.
+            /// </summary>
             public byte[] RawBytes { get; set; }
         }
     }
