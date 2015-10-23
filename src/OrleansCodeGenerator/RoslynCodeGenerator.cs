@@ -376,11 +376,7 @@ namespace Orleans.CodeGenerator
                     }
 
                     // Generate serializers.
-                    if (!runtime)
-                    {
-                        ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes for types:");
-                    }
-
+                    var first = true;
                     Type toGen;
                     while (SerializerGenerationManager.GetNextTypeToProcess(out toGen))
                     {
@@ -400,6 +396,12 @@ namespace Orleans.CodeGenerator
 
                         if (!runtime)
                         {
+                            if (first)
+                            {
+                                ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes for types:");
+                                first = false;
+                            }
+
                             ConsoleText.WriteStatus(
                                 "\ttype " + toGen.FullName + " in namespace " + toGen.Namespace
                                 + " defined in Assembly " + toGen.Assembly.GetName());
