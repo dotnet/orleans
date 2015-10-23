@@ -1,4 +1,4 @@
-﻿/*
+/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -520,6 +520,9 @@ BEGIN
 				[SentMessages] = @sentMessagesCount,
 				[ReceivedMessages] = @receivedMessagesCount,
 				[ConnectedGatewayCount] = @connectedGatewaysCount
+			WHERE
+				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
+				AND ([ClientId] = @clientId AND @clientId IS NOT NULL);
 		END
 		ELSE
 		BEGIN	
@@ -587,7 +590,10 @@ BEGIN
 				SentMessages = @sentMessagesCount,
 				ReceivedMessages = @receivedMessagesCount,
 				LoadShedding = @isOverloaded,
-				ClientCount = @clientCount;
+				ClientCount = @clientCount
+			WHERE
+				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
+				AND ([SiloId] = @siloId AND @siloId IS NOT NULL);
 		END
 		ELSE
 		BEGIN
@@ -1056,6 +1062,9 @@ BEGIN
 				[SentMessages] = @sentMessagesCount,
 				[ReceivedMessages] = @receivedMessagesCount,
 				[ConnectedGatewayCount] = @connectedGatewaysCount
+			WHERE
+				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
+				AND ([ClientId] = @clientId AND @clientId IS NOT NULL);
 		END
 		ELSE
 		BEGIN	
@@ -1123,7 +1132,10 @@ BEGIN
 				SentMessages = @sentMessagesCount,
 				ReceivedMessages = @receivedMessagesCount,
 				LoadShedding = @isOverloaded,
-				ClientCount = @clientCount;
+				ClientCount = @clientCount
+			WHERE
+				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
+				AND ([SiloId] = @siloId AND @siloId IS NOT NULL);
 		END
 		ELSE
 		BEGIN
