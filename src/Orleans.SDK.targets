@@ -88,6 +88,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 - Using CodeGenToolExe location=$(CodeGenToolExe)
 " />
     <MakeDir Directories="$(IntermediateOutputPath)Generated"/>
+    <Delete Files="$(ProjectDir)Properties\orleans.codegen.cs" ContinueOnError="true" />
     <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs"
       Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')"
       ForceTouch="true"
