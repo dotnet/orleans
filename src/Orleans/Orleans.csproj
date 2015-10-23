@@ -94,6 +94,13 @@
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="IDs\GuidId.cs" />
+    <Compile Include="Logging\ICloseableLogConsumer.cs" />
+    <Compile Include="Logging\IFlushableLogConsumer.cs" />
+    <Compile Include="Logging\LogWriterBase.cs" />
+    <Compile Include="Logging\LogWriterToConsole.cs" />
+    <Compile Include="Logging\LogWriterToFile.cs" />
+    <Compile Include="Logging\LogWriterToTrace.cs" />
+    <Compile Include="Logging\SimpleLogWriterToFile.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\IncomingMessageBuffer.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
@@ -282,7 +289,6 @@
     <Compile Include="Core\GrainAttributes.cs" />
     <Compile Include="CodeGeneration\GrainFactoryBase.cs" />
     <Compile Include="Runtime\IClientObserverRegistrar.cs" />
-    <Compile Include="Logging\LogWriters.cs" />
     <Compile Include="Logging\ILogConsumer.cs" />
     <Compile Include="CodeGeneration\ActivationAttribute.cs" />
     <Compile Include="Core\IGrainObserver.cs" />

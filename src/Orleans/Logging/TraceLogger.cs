@@ -282,12 +282,16 @@ namespace Orleans.Runtime
                     }
                 }
 
-                if (Trace.Listeners.Count > 0)
-                {
-                    // Plumb in log consumer to write to Trace listeners
-                    var traceLogConsumer = new LogWriterToTrace();
-                    LogConsumers.Add(traceLogConsumer);
-                }
+                //if (Trace.Listeners.Count > 0)
+                //{
+                //    // Plumb in log consumer to write to Trace listeners
+                //    var traceLogConsumer = new LogWriterToTrace();
+                //    LogConsumers.Add(traceLogConsumer);
+                //}
+                //we want this regardless of the number of listeners in the trace.  We want to handle using TraceSources defined in the LogWriterToTrace class
+                var traceLogConsumer = new LogWriterToTrace();
+                LogConsumers.Add(traceLogConsumer);
+
 
                 IsInitialized = true;
             }
