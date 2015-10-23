@@ -162,11 +162,9 @@ namespace Orleans.CodeGeneration
             if (!Directory.Exists(options.SourcesDir)) Directory.CreateDirectory(options.SourcesDir);
 
             // Generate source
-            var suffix = ".codegen.cs";
-
             var outputFileName = Path.Combine(
                 options.SourcesDir,
-                Path.GetFileNameWithoutExtension(options.InputLib.Name) + suffix);
+                Path.GetFileNameWithoutExtension(options.InputLib.Name) + ".codegen.cs");
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", outputFileName);
 
             var codeGenerator = RoslynCodeGenerator.Instance;
