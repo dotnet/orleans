@@ -142,9 +142,15 @@ namespace Orleans.CodeGeneration.Serialization
         {
             Type toGen;
             NamespaceGenerator extraNamespace = null;
-            ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes for types:");
+            var first = true;
             while (GetNextTypeToProcess(out toGen))
             {
+                if (first)
+                {
+                    ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes for types:");
+                    first = false;
+                }
+
                 ConsoleText.WriteStatus("\ttype " + toGen.FullName + " in namespace " + toGen.Namespace + " defined in Assembly " + toGen.Assembly.GetName());
                 NamespaceGenerator typeNamespace;
 

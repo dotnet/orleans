@@ -220,7 +220,7 @@ namespace Orleans.Runtime
             {
                 logger.Warn(ErrorCode.Messaging_Dispatcher_DiscardRejection,
                     "Discarding {0} rejection for message {1}. Exc = {2}",
-                    Enum.GetName(typeof(Message.Directions), message.Direction), message, exc.Message);
+                    Enum.GetName(typeof(Message.Directions), message.Direction), message, exc == null ? "" : exc.Message);
             }
         }
 

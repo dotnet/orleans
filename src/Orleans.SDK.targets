@@ -64,21 +64,31 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     </Otherwise>
   </Choose>
 
+    <!-- This target is run just before Clean for any Orleans project -->
+  <Target Name="OrleansCodeGenerationClean"
+          BeforeTargets="Clean"
+          Condition="'$(OrleansProjectType)'!='' And '$(OrleansCodeGenPrecompile)'!='true'"
+          Inputs="$(ProjectDir)Properties\orleans.codegen.cs"
+          Outputs="AlwaysRun">
+    <Delete Files="$(ProjectDir)Properties\orleans.codegen.cs" ContinueOnError="true" />
+  </Target>
+
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
-  <Target Name="OrleansClientPreprocessing"
+  <Target Name="OrleansCodeGeneration"
           AfterTargets="BeforeCompile;ResolveReferences"
           BeforeTargets="CoreCompile"
-          Condition="'$(OrleansProjectType)'=='Client'"
+          Condition="'$(OrleansProjectType)'!='' And '$(OrleansCodeGenPrecompile)'!='true'"
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
-    <Message Text="[OrleansClientPreprocessing] - Project=$(ProjectName)" Importance="high"/>
-    <Message Text="[OrleansClientPreprocessing] 
+    <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
+    <Message Text="[OrleansCodeGeneration] 
 - CodeGenToolExeDir=$(CodeGenToolExeDir)
 - OrleansReferencesBase=$(OrleansReferencesBase)
 - OrleansSDK=$(OrleansSDK)
 - Using CodeGenToolExe location=$(CodeGenToolExe)
 " />
     <MakeDir Directories="$(IntermediateOutputPath)Generated"/>
+    <Delete Files="$(ProjectDir)Properties\orleans.codegen.cs" ContinueOnError="true" />
     <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs"
       Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')"
       ForceTouch="true"
@@ -86,8 +96,9 @@ Copyright (C) Microsoft Corporation. All rights reserved.
       ContinueOnError="true" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
     </PropertyGroup>
-    <Message Text="[OrleansClientPreprocessing] - Code-gen args file=$(ArgsFile)"/>
+    <Message Text="[OrleansCodeGeneration] - Code-gen args file=$(ArgsFile)"/>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/nomerge"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(SnkFile)"/>
@@ -104,51 +115,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)"/>
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')"/>
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
     <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"' />
   </Target>
-
-  <!-- This target is run just after Compile for an Orleans Grain Implementation Project -->
-  <Target Name="OrleansServerObjProcessing"
-          AfterTargets="BeforeCompile;ResolveReferences"
-          BeforeTargets="CoreCompile"
-          Condition="'$(OrleansProjectType)'=='Server'"
-          Inputs="@(Compile);@(ReferencePath);$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)"
-          Outputs="$(ProjectDir)$(IntermediateOutputPath)orleans.codegen.timpestamp">
-    <Message Text="[OrleansServerObjProcessing] - Creating Server for Project=$(ProjectName)" Importance="high"/>
-    <Message Text="[OrleansServerObjProcessing] 
-- CodeGenToolExeDir=$(CodeGenToolExeDir)
-- OrleansReferencesBase=$(OrleansReferencesBase)
-- OrleansSDK=$(OrleansSDK)
-- Using CodeGenToolExe location=$(CodeGenToolExe)
-"/>
-    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs"
-      Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')"
-      ForceTouch="true"
-      AlwaysCreate="true"
-      ContinueOnError="true" />
-    <PropertyGroup>
-      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
-    </PropertyGroup>
-    <Message Text="[OrleansServerObjProcessing] - Code-gen args file=$(ArgsFile)"/>
-    <Message Text="[OrleansServerObjProcessing] - DefineConstants=$(DefineConstants)"/>
-    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/svr"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(SnkFile)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/fsharp:$(FSharpCompilerPath)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/cwd:$(ProjectDir)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/config:$(Configuration)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionExplicit:$(OptionExplicit)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionCompare:$(OptionCompare)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionStrict:$(OptionStrict)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')"/>
-    <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"'
-          Outputs='$(IntermediateOutputPath)$(TargetName)$(TargetExt)' />
-  </Target>
-
 </Project>

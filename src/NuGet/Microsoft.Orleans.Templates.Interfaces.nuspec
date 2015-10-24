@@ -19,6 +19,7 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansCodeGenerator" version="$version$" />
     </dependencies>
   </metadata>
   <files>
@@ -33,6 +34,12 @@
     <file src="ClientGenerator.exe.config" target="tools" />
     <file src="Orleans.dll" target="tools" />
     <file src="Orleans.pdb" target="tools" />
+    <file src="OrleansCodeGenerator.dll" target="tools" />
+    <file src="OrleansCodeGenerator.pdb" target="tools" />
+    <file src="Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
+    <file src="Microsoft.CodeAnalysis.dll" target="tools" />
+    <file src="System.Reflection.Metadata.dll" target="tools" />
+    <file src="System.Collections.Immutable.dll" target="tools" />
 
     <file src="EmptyFile.cs" target="content\Properties\orleans.codegen.cs" />
   </files>

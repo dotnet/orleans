@@ -22,11 +22,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans
 {
+    using System.Diagnostics.CodeAnalysis;
+
     /// <summary>
     /// Utility functions for dealing with Task's.
     /// </summary>
@@ -39,7 +42,7 @@ namespace Orleans
         /// This will prevent the escalation of this exception to the .NET finalizer thread.
         /// </summary>
         /// <param name="task">The task to be ignored.</param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "ignored")]
+        [SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "ignored")]
         public static async void Ignore(this Task task)
         {
             try
@@ -50,6 +53,42 @@ namespace Orleans
             {
                 var ignored = task.Exception; // Observe exception
             }
+        }
+
+        /// <summary>
+        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task"/>.
+        /// </summary>
+        /// <param name="task">
+        /// The task.
+        /// </param>
+        /// <returns>
+        /// The response.
+        /// </returns>
+        public static Task<object> Box(this Task task)
+        {
+            return task.ContinueWith(
+                antecedent =>
+                {
+                    antecedent.GetAwaiter().GetResult();
+                    return default(object);
+                });
+        }
+
+        /// <summary>
+        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The underlying type of <paramref name="task"/>.
+        /// </typeparam>
+        /// <param name="task">
+        /// The task.
+        /// </param>
+        /// <returns>
+        /// The response.
+        /// </returns>
+        public static Task<object> Box<T>(this Task<T> task)
+        {
+            return task.ContinueWith(antecedent => (object)antecedent.GetAwaiter().GetResult());
         }
     }
 
@@ -130,11 +169,13 @@ namespace Orleans
                 return;
             }
 
-            await Task.WhenAny(taskToComplete, Task.Delay(timeout));
+            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
 
             // We got done before the timeout, or were able to complete before this code ran, return the result
-            if (taskToComplete.IsCompleted)
+            if (taskToComplete == completedTask)
             {
+                timeoutCancellationTokenSource.Cancel();
                 // Await this so as to propagate the exception correctly
                 await taskToComplete;
                 return;
@@ -159,11 +200,13 @@ namespace Orleans
                 return await taskToComplete;
             }
 
-            await Task.WhenAny(taskToComplete, Task.Delay(timeSpan));
+            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeSpan, timeoutCancellationTokenSource.Token));
 
             // We got done before the timeout, or were able to complete before this code ran, return the result
-            if (taskToComplete.IsCompleted)
+            if (taskToComplete == completedTask)
             {
+                timeoutCancellationTokenSource.Cancel();
                 // Await this so as to propagate the exception correctly
                 return await taskToComplete;
             }
