@@ -8,7 +8,7 @@
     <ProjectGuid>{EACE28AE-F301-472A-B633-02B55434871B}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>TestGrains</RootNamespace>
+    <RootNamespace>UnitTests.Grains</RootNamespace>
     <AssemblyName>TestGrains</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -56,6 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CircularStateTestGrain.cs" />
+    <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="EventSourcing\PersonState.cs" />
@@ -91,6 +92,7 @@
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="LivenessTestGrain.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
+    <Compile Include="StreamLifecycleTestGrains.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansEventSourcing\OrleansEventSourcing.csproj">

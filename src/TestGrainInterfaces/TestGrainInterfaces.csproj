@@ -8,7 +8,7 @@
     <ProjectGuid>{3972213F-189B-41D4-90FE-38D513C1106D}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>TestGrainInterfaces</RootNamespace>
+    <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <AssemblyName>TestGrainInterfaces</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -46,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ICircularStateTestGrain.cs" />
+    <Compile Include="IActivateDeactivateWatcherGrain.cs" />
     <Compile Include="IExceptionGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGeneratorTestDerivedDerivedGrain.cs" />
@@ -68,6 +69,7 @@
     <Compile Include="ISimpleGrain.cs" />
     <Compile Include="ISimplePersistentGrain.cs" />
     <Compile Include="ILivenessTestGrain.cs" />
+    <Compile Include="IStreamLifecycleTestGrains.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
