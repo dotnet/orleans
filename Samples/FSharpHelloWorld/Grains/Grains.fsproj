@@ -40,7 +40,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Orleans">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.10\lib\net45\Orleans.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.0.10\lib\net45\Orleans.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Orleans" />

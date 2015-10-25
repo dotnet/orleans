@@ -34,13 +34,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.AspNet.SignalR.Client">
-      <HintPath>..\packages\Microsoft.AspNet.SignalR.Client.2.0.1\lib\net45\Microsoft.AspNet.SignalR.Client.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.AspNet.SignalR.Client.2.0.1\lib\net45\Microsoft.AspNet.SignalR.Client.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.ServiceRuntime">
-      <HintPath>..\packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.4.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.4.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
     </Reference>
     <Reference Include="Orleans">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.0.10\lib\net45\Orleans.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.0.10\lib\net45\Orleans.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
