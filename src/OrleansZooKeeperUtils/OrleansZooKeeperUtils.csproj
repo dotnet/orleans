@@ -54,12 +54,12 @@
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Xml" />
     <Reference Include="ZooKeeperNetEx">
-      <HintPath>..\packages\ZooKeeperNetEx.3.4.6.1006\lib\net45\ZooKeeperNetEx.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\ZooKeeperNetEx.3.4.6.1006\lib\net45\ZooKeeperNetEx.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
