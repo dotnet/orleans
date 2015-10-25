@@ -50,7 +50,6 @@ namespace Orleans.CodeGeneration
 
         public Type Type { get; private set; }
         public bool IsGeneric { get; private set; }
-        public CodeTypeParameterCollection GenericTypeParams { get; private set; }
         public string Name { get; private set; }
         public string Namespace { get; private set; }
         public string TypeName { get; private set; }
@@ -313,7 +312,6 @@ namespace Orleans.CodeGeneration
             if (IsGeneric)
             {
                 Name = TypeUtils.GetParameterizedTemplateName(Type, language: language);
-                GenericTypeParams = TypeUtils.GenericTypeParameters(Type);
             }
             else
             {
