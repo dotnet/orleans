@@ -1111,10 +1111,13 @@ namespace UnitTests.SerializerTests
             c2.CircularTest1List.Add(c1);
             c1.CircularTest2 = c2;
 
-            var deserialized = OrleansSerializationLoop(c1);
-            //Assert.AreEqual(c1, deserialized);
-            deserialized = OrleansSerializationLoop(c1, true);
-            Assert.AreEqual(c1, deserialized);
+            var deserialized = (CircularTest1)OrleansSerializationLoop(c1);
+            Assert.AreEqual(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
+            Assert.AreEqual(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+
+            deserialized = (CircularTest1)OrleansSerializationLoop(c1, true);
+            Assert.AreEqual(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
+            Assert.AreEqual(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
         }
 
         [Serializable]
