@@ -84,6 +84,8 @@ namespace Orleans.Serialization
         {
             var count = stream.ReadInt();
             var list = new List<T>(count);
+            DeserializationContext.Current.RecordObject(list);
+
             for (var i = 0; i < count; i++)
             {
                 list.Add((T)SerializationManager.DeserializeInner(typeof(T), stream));
@@ -151,6 +153,7 @@ namespace Orleans.Serialization
         {
             var count = stream.ReadInt();
             var list = new LinkedList<T>();
+            DeserializationContext.Current.RecordObject(list);
             for (var i = 0; i < count; i++)
             {
                 list.AddLast((T)SerializationManager.DeserializeInner(typeof(T), stream));
@@ -224,6 +227,7 @@ namespace Orleans.Serialization
                 (IEqualityComparer<T>)SerializationManager.DeserializeInner(typeof(IEqualityComparer<T>), stream);
             var count = stream.ReadInt();
             var set = new HashSet<T>(comparer);
+            DeserializationContext.Current.RecordObject(set);
             for (var i = 0; i < count; i++)
             {
                 set.Add((T)SerializationManager.DeserializeInner(typeof(T), stream));
@@ -293,6 +297,7 @@ namespace Orleans.Serialization
         {
             var count = stream.ReadInt();
             var queue = new Queue<T>();
+            DeserializationContext.Current.RecordObject(queue);
             for (var i = 0; i < count; i++)
             {
                 queue.Enqueue((T)SerializationManager.DeserializeInner(typeof(T), stream));
@@ -432,6 +437,7 @@ namespace Orleans.Serialization
             var comparer = (IEqualityComparer<K>)SerializationManager.DeserializeInner(typeof(IEqualityComparer<K>), stream);
             var count = stream.ReadInt();
             var dict = new Dictionary<K, V>(count, comparer);
+            DeserializationContext.Current.RecordObject(dict);
             for (var i = 0; i < count; i++)
             {
                 var key = (K)SerializationManager.DeserializeInner(typeof(K), stream);
@@ -478,6 +484,7 @@ namespace Orleans.Serialization
             var comparer = (IEqualityComparer<string>)SerializationManager.DeserializeInner(typeof(IEqualityComparer<string>), stream);
             var count = stream.ReadInt();
             var dict = new Dictionary<string, object>(count, comparer);
+            DeserializationContext.Current.RecordObject(dict);
             for (var i = 0; i < count; i++)
             {
                 //stream.ReadFullTypeHeader(stringType); // Skip the type header, which will be string
@@ -542,6 +549,7 @@ namespace Orleans.Serialization
             var comparer = (IComparer<K>)SerializationManager.DeserializeInner(typeof(IComparer<K>), stream);
             var count = stream.ReadInt();
             var dict = new SortedDictionary<K, V>(comparer);
+            DeserializationContext.Current.RecordObject(dict);
             for (var i = 0; i < count; i++)
             {
                 var key = (K)SerializationManager.DeserializeInner(typeof(K), stream);
@@ -610,6 +618,7 @@ namespace Orleans.Serialization
             var comparer = (IComparer<K>)SerializationManager.DeserializeInner(typeof(IComparer<K>), stream);
             var count = stream.ReadInt();
             var list = new SortedList<K, V>(count, comparer);
+            DeserializationContext.Current.RecordObject(list);
             for (var i = 0; i < count; i++)
             {
                 var key = (K)SerializationManager.DeserializeInner(typeof(K), stream);
