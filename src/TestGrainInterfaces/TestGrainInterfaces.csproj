@@ -45,7 +45,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ICircularStateTestGrain.cs" />
     <Compile Include="IExceptionGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGeneratorTestDerivedDerivedGrain.cs" />
@@ -114,3 +113,4 @@
   </Target> 
   -->
 </Project>
+

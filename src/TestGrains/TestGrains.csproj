@@ -48,7 +48,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="EventSourcing\PersonState.cs" />
@@ -125,3 +124,4 @@
   <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>
+

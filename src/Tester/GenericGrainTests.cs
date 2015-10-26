@@ -31,7 +31,6 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using System.Collections.Generic;
-using TestGrainInterfaces;
 
 namespace UnitTests.General
 {
@@ -667,14 +666,6 @@ namespace UnitTests.General
             await Task.Delay(TimeSpan.FromSeconds(6));
             var s2 = await grain.GetLastValue();
             Assert.AreEqual(s1, s2);
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Generics"), TestCategory("Serialization")]
-        public async Task Generic_CircularReferenceTest()
-        {
-            var grainId = Guid.NewGuid();
-            var grain = GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));
-            var c1 = await grain.GetState();
         }
     }
 }
