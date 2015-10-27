@@ -234,13 +234,23 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
-    <xs:attribute name="UseStandardSerializer" type="xs:boolean" use="optional">
+    <xs:attribute name="UseStandardSerialize" type="xs:boolean" use="optional">
       <xs:annotation>
         <xs:documentation>
-          The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
+          The UseStandardSerialize attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
           of the custom Orleans serializer.
           This parameter is intended for use only for testing and troubleshooting.
           In production, the custom Orleans serializer should always be used because it performs significantly better.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="BondSchemaAssemblies" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          A semicolon delimited list of assemblies in unique assembly name format.
+          This parameter is intended for use with Bond Serialization/Deserialization in order to pre-load assemblies
+          containing Bond schemas so that serialization and deserialization can be registered with the Orleans serialization
+          manager.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>

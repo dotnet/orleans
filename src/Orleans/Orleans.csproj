@@ -74,6 +74,15 @@
     <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Bond">
+      <HintPath>..\packages\Bond.Runtime.CSharp.3.0.7\lib\net45\Bond.dll</HintPath>
+    </Reference>
+    <Reference Include="Bond.Attributes">
+      <HintPath>..\packages\Bond.Runtime.CSharp.3.0.7\lib\net45\Bond.Attributes.dll</HintPath>
+    </Reference>
+    <Reference Include="Bond.IO">
+      <HintPath>..\packages\Bond.Runtime.CSharp.3.0.7\lib\net45\Bond.IO.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Management" />
@@ -122,6 +131,8 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Serialization\BondInputStream.cs" />
+    <Compile Include="Serialization\BondOutputStream.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Serialization\NonSerializableAttribute.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
@@ -336,6 +347,7 @@
     <Compile Include="Serialization\DeserializationContext.cs" />
     <Compile Include="Serialization\SerializationContext.cs" />
     <Compile Include="Serialization\SerializationManager.cs" />
+    <Compile Include="Serialization\BondSerializer.cs" />
     <Compile Include="Core\Grain.cs" />
     <Compile Include="Runtime\RuntimeClient.cs" />
     <Compile Include="Runtime\GrainReference.cs" />
@@ -369,7 +381,9 @@
     <None Include="..\Orleans.snk">
       <Link>Orleans.snk</Link>
     </None>
-    <None Include="packages.config" />
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
@@ -434,4 +448,3 @@
     <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')" />
   </Target>
 </Project>
-

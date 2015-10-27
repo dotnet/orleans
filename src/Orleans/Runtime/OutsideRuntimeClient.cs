@@ -154,7 +154,7 @@ namespace Orleans
 
             if (!TraceLogger.IsInitialized) TraceLogger.Initialize(config);
             StatisticsCollector.Initialize(config);
-            SerializationManager.Initialize(config.UseStandardSerializer);
+            SerializationManager.Initialize(config.UseStandardSerializer, config.BondSchemaAssemblies);
             logger = TraceLogger.GetLogger("OutsideRuntimeClient", TraceLogger.LoggerType.Runtime);
             appLogger = TraceLogger.GetLogger("Application", TraceLogger.LoggerType.Application);
 

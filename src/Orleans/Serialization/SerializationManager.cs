@@ -40,6 +40,7 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Serialization
 {
     using System.Diagnostics.CodeAnalysis;
+    using Orleans.Serialization.Bond;
 
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
@@ -60,7 +61,7 @@ namespace Orleans.Serialization
         public delegate void Serializer(object raw, BinaryTokenStreamWriter stream, Type expected);
 
         /// <summary>
-        /// Deserializer function.
+        /// Deserialize function.
         /// </summary>
         /// <param name="expected">Expected Type to receive.</param>
         /// <param name="stream">Input stream to be read from.</param>
@@ -135,10 +136,11 @@ namespace Orleans.Serialization
         public static void InitializeForTesting()
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            BondSerializer.Initialize(string.Empty);
             AssemblyProcessor.Initialize();
         }
 
-        internal static void Initialize(bool useStandardSerializer)
+        internal static void Initialize(bool useStandardSerializer, string bondSchemaAssemblies)
         {
             UseStandardSerializer = useStandardSerializer;
             if (StatisticsCollector.CollectSerializationStats)
@@ -173,6 +175,7 @@ namespace Orleans.Serialization
                 FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
             }
 
+            BondSerializer.Initialize(bondSchemaAssemblies);
             AssemblyProcessor.Initialize();
         }
 
@@ -864,6 +867,11 @@ namespace Orleans.Serialization
                 copy = copier(original);
                 SerializationContext.Current.RecordObject(original, copy);
             }
+            else if (BondSerializer.TryCopy(original, out copy))
+            {
+                // only called for late-bound generic bond types.
+                SerializationContext.Current.RecordObject(original, copy);
+            }
             else
             {
                 copy = DeepCopierHelper(t, original);
@@ -1102,6 +1110,11 @@ namespace Orleans.Serialization
             {
                 stream.WriteTypeHeader(t, expected);
                 ser(obj, stream, expected);
+                return;
+            }
+
+            if (BondSerializer.TrySerialize(stream, expected, obj))
+            {
                 return;
             }
 
@@ -1427,6 +1440,13 @@ namespace Orleans.Serialization
             if (deser != null)
             {
                 result = deser(resultType, stream);
+                DeserializationContext.Current.RecordObject(start, result);
+                return result;
+            }
+
+            if (BondSerializer.TryDeserialize(resultType, stream, out result))
+            {
+                // try deserializing late-bound bond types
                 DeserializationContext.Current.RecordObject(start, result);
                 return result;
             }

@@ -28,7 +28,7 @@ namespace UnitTests.SerializerTests
         public void InitializeForTesting()
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            SerializationManager.Initialize(false);
+            SerializationManager.Initialize(false, string.Empty);
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
