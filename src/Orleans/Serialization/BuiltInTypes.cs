@@ -367,12 +367,18 @@ namespace Orleans.Serialization
         {
             var count = stream.ReadInt();
             var list = new List<T>(count);
+            var stack = new Stack<T>(count);
+            DeserializationContext.Current.RecordObject(stack);
             for (var i = 0; i < count; i++)
             {
                 list.Add((T)SerializationManager.DeserializeInner(typeof(T), stream));
             }
-            list.Reverse(); // NOTE: this is required to get things on the stack in the original order
-            var stack = new Stack<T>(list);
+
+            for (var i = count - 1; i >= 0; i--)
+            {
+                stack.Push(list[i]);
+            }
+
             return stack;
         }
 
