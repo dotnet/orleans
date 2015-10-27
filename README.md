@@ -49,7 +49,7 @@ Clone the sources and run the `Build.cmd` script to build the binaries locally.
 
 Then reference the required assemblies from `Binaries\Release\*` or the NuGet packages from `Binaries\NuGet.Packages\*`.
 
-Documentation 
+[Documentation][Orleans Documentation]
 =======
 Documentation is located [here][Orleans Documentation]
 
