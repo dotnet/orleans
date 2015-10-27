@@ -27,12 +27,12 @@ using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
 {
-    internal class DeserializationContext
+    public class DeserializationContext
     {
         [ThreadStatic]
         private static DeserializationContext ctx;
 
-        internal static DeserializationContext Current
+        public static DeserializationContext Current
         {
             get { return ctx ?? (ctx = new DeserializationContext()); }
         }
@@ -47,11 +47,19 @@ namespace Orleans.Serialization
         internal void Reset()
         {
             taggedObjects.Clear();
+            CurrentObjectOffset = 0;
         }
+
+        internal int CurrentObjectOffset { get; set; }
 
         internal void RecordObject(int offset, object obj)
         {
             taggedObjects[offset] = obj;
+        }
+
+        public void RecordObject(object obj)
+        {
+            taggedObjects[CurrentObjectOffset] = obj;
         }
 
         internal object FetchReferencedObject(int offset)

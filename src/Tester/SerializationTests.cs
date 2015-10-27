@@ -143,6 +143,7 @@ namespace UnitTests.General
             public static object Deserializer(System.Type expected, global::Orleans.Serialization.BinaryTokenStreamReader stream)
             {
                 TestTypeA result = new TestTypeA();
+                DeserializationContext.Current.RecordObject(result);
                 result.Collection = ((System.Collections.Generic.ICollection<TestTypeA>)(Orleans.Serialization.SerializationManager.DeserializeInner(typeof(System.Collections.Generic.ICollection<TestTypeA>), stream)));
                 return result;
             }
@@ -153,7 +154,6 @@ namespace UnitTests.General
             }
         }
 
-        [Ignore]
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_RecursiveSerialization()
         {
