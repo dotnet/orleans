@@ -61,7 +61,7 @@ namespace Orleans.Serialization
         public delegate void Serializer(object raw, BinaryTokenStreamWriter stream, Type expected);
 
         /// <summary>
-        /// Deserialize function.
+        /// Deserializer function.
         /// </summary>
         /// <param name="expected">Expected Type to receive.</param>
         /// <param name="stream">Input stream to be read from.</param>
