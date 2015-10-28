@@ -124,7 +124,6 @@ namespace Orleans.Runtime.Configuration
         public int GatewaySenderQueues { get; set; }
         public int ClientSenderBuckets { get; set; }
         public bool UseStandardSerializer { get; set; }
-        public string BondSchemaAssemblies { get; set; }
 
         public int BufferPoolBufferSize { get; set; }
         public int BufferPoolMaxSize { get; set; }
