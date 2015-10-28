@@ -228,5 +228,8 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{0BB483EF-6401-424C-9C4F-5750B300C7FD} = {DD5D35C0-A5FE-41CC-A10D-CAAA37996479}
 	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		EnterpriseLibraryConfigurationToolBinariesPathV6 = packages\EnterpriseLibrary.TransientFaultHandling.6.0.1304.0\lib\portable-net45+win+wp8
+	EndGlobalSection
 EndGlobal
 

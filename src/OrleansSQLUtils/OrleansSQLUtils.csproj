@@ -39,9 +39,23 @@
     </AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.Azure.SqlDatabase.ElasticScale.Client, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Azure.SqlDatabase.ElasticScale.Client.1.1.0\lib\net45\Microsoft.Azure.SqlDatabase.ElasticScale.Client.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Practices.EnterpriseLibrary.TransientFaultHandling, Version=6.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\EnterpriseLibrary.TransientFaultHandling.6.0.1304.0\lib\portable-net45+win+wp8\Microsoft.Practices.EnterpriseLibrary.TransientFaultHandling.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.24.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.24\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -56,6 +70,28 @@
     <Compile Include="Storage\DictionaryExtensions.cs" />
     <Compile Include="Storage\IRelationalStorage.cs" />
     <Compile Include="Storage\OrleansRelationalExtensions.cs" />
+    <Compile Include="Storage\Provider\BatchingOptions.cs" />
+    <Compile Include="Storage\Provider\Exensions.cs" />
+    <Compile Include="Storage\Provider\GrainIdentity.cs" />
+    <Compile Include="Storage\Provider\GrainStateMap.cs" />
+    <Compile Include="Storage\Provider\Guard.cs" />
+    <Compile Include="Storage\Provider\IGrainStateMapFactory.cs" />
+    <Compile Include="Storage\Provider\Instrumentation\InstrumentationContext.cs" />
+    <Compile Include="Storage\Provider\Instrumentation\InstrumentationManager.cs" />
+    <Compile Include="Storage\Provider\LoggerExtensions.cs" />
+    <Compile Include="Storage\Provider\Instrumentation\PerformanceCounterDefinition.cs" />
+    <Compile Include="Storage\Provider\ReadEntry.cs" />
+    <Compile Include="Storage\Provider\ShardBatcher.cs" />
+    <Compile Include="Storage\Provider\SqlColumns.cs" />
+    <Compile Include="Storage\Provider\SqlDataManager.cs" />
+    <Compile Include="Storage\Provider\SqlStorageProvider.cs" />
+    <Compile Include="Storage\Provider\Instrumentation\StorageProvidersInstrumentationInstaller.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Storage\Provider\Instrumentation\StorageProvidersInstrumentationManager.cs" />
+    <Compile Include="Storage\Provider\Instrumentation\TelemetryContext.cs" />
+    <Compile Include="Storage\Provider\Instrumentation\WritablePerformanceCounter.cs" />
+    <Compile Include="Storage\Provider\WriteEntry.cs" />
     <Compile Include="Storage\QueryConstantsBag.cs" />
     <Compile Include="Storage\QueryKeys.cs" />
     <Compile Include="Storage\RelationalManagementExtensions.cs" />
@@ -76,6 +112,12 @@
     <Content Include="CreateOrleansTables_SqlServer.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="packages.config" />
+    <None Include="Storage\Provider\Setup\CreateDatabases.ps1" />
+    <None Include="Storage\Provider\Setup\ShardManagement.psm1" />
+    <None Include="Storage\Provider\Setup\SplitMerge.psm1" />
+    <None Include="Storage\Provider\Setup\SqlDatabaseHelpers.psm1" />
+    <Content Include="Storage\Provider\Setup\SqlSetupShard.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
