@@ -39,14 +39,14 @@ static void Main(string[] args)
         "2eef0ac5-540f-4421-b9a9-79d89400f7ab" 
     };
 
-    var e0 = EmployeeFactory.GetGrain(Guid.Parse(ids[0]));
-    var e1 = EmployeeFactory.GetGrain(Guid.Parse(ids[1]));
-    var e2 = EmployeeFactory.GetGrain(Guid.Parse(ids[2]));
-    var e3 = EmployeeFactory.GetGrain(Guid.Parse(ids[3]));
-    var e4 = EmployeeFactory.GetGrain(Guid.Parse(ids[4]));
+    var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[0]));
+    var e1 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[1]));
+    var e2 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[2]));
+    var e3 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[3]));
+    var e4 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[4]));
 
-    var m0 = ManagerFactory.GetGrain(Guid.Parse(ids[5]));
-    var m1 = ManagerFactory.GetGrain(Guid.Parse(ids[6]));
+    var m0 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[5]));
+    var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[6]));
     ... 
 }
 ```
@@ -83,34 +83,34 @@ In the case of the latter, you will have to create a Azure storage account and e
 
 With one of those enabled, we're ready to tackle the grain code.
 
-Note: The built-in storage provider classes `Orleans.Storage.MemoryStorage` and `Orleans.Storage.AzureTableStorage` are in the  _OrleansProviders.dll_ assembly, so make sure that DLL is referenced in your silo worker role project with _CopyLocal='True'_.
+Note: The built-in storage provider classes `Orleans.Storage.MemoryStorage` and `Orleans.Storage.AzureTableStorage` are in the  _OrleansProviders.dll_ and _OrleansAzureUtils.dll_ assemblies respectively, so make sure those assemblies are referenced in your silo worker role project with _CopyLocal='True'_.
 
 ## Declaring State
 
 Identifying that a grain should use persistent state takes three steps: 
 
-1. declaring an interface for the state, 
+1. declaring a class for the state, 
 2. changing the grain base class, and 
 3. identifying the storage provider.
 
-The first step, declaring an interface, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
+The first step, declaring a state class, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
 
 For employees, we want to persist all the state:
 
 ``` csharp
-public interface IEmployeeState : IGrainState
+public class  EmployeeState : GrainState
 {
-    int Level { get; set; }
-    IManager Manager { get; set; }
+    public int Level { get; set; }
+    public IManager Manager { get; set; }
 }
 ```
 
 and for managers, we must store the direct reports, but the `_me` reference may continue to be created during activation.
 
 ``` csharp
-public interface IManagerState : IGrainState
+public class ManagerState : GrainState
 {
-    List<IEmployee> Reports { get; set; }
+    public List<IEmployee> Reports { get; set; }
 }
 ```
 
@@ -120,7 +120,7 @@ Then, we change the grain class declaration to identify the state interface and 
 
 ``` csharp
 [StorageProvider(ProviderName = "AzureStore")]
-public class Employee : Orleans.Grain<IEmployeeState>, Interfaces.IEmployee
+public class Employee : Orleans.Grain<EmployeeState>, Interfaces.IEmployee
 ```
 
 and
@@ -128,7 +128,7 @@ and
 
 ``` csharp
 [StorageProvider(ProviderName="AzureStore")]
-public class Manager : Orleans.Grain<IManagerState>, IManager
+public class Manager : Orleans.Grain<ManagerState>, IManager
 ```
 
 At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file. 
@@ -153,7 +153,7 @@ The question that remains is when the persistent state gets saved to the storage
 
 One choice that the Orleans designers could have made would be to have the runtime save state after every method invocation, but that turns out to be undesirable because it is far too conservative -- not all invocations will actually modify the state on all invocations, and some will never modify it. Rather than employing a complex system to evaluate state differentials after each method, Orleans asks the grain developer to add the necessary logic to determine whether state needs to be saved or not. 
 
-Saving the state using the storage provider is easily accomplished by calling `State.WriteStateAsync()`. 
+Saving the state using the storage provider is easily accomplished by calling `base.WriteStateAsync()`. 
 
 Thus, the final version of the `Promote()` and `SetManager()` methods looks like this:
 
@@ -161,13 +161,13 @@ Thus, the final version of the `Promote()` and `SetManager()` methods looks like
 public Task Promote(int newLevel)
 {
     State.Level = newLevel;
-    return State.WriteStateAsync();
+    return base.WriteStateAsync();
 }
 
 public Task SetManager(IManager manager)
 {
     State.Manager = manager;
-    return State.WriteStateAsync();
+    return base.WriteStateAsync();
 }
 ```
 
@@ -185,7 +185,7 @@ public async Task AddDirectReport(IEmployee employee)
                         data.From.ToString(),
                         data.Message);
 
-    await State.WriteStateAsync();
+    await base.WriteStateAsync();
 }
 ```
 
@@ -195,12 +195,12 @@ Set a breakpoint in `Employee.Promote()`.
 
 When we run the client code the first time and hit the breakpoint, the level field should be `0` and the newLevel parameter either `10` or `11`:
 
-![Persistence 2.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810750)
+![](../Images/Persistence 2.PNG)
 
 Let the application finish (reach the 'Hit Enter...' prompt) and exit. 
 Run it again, and compare what happens when you look at state this second time around:
 
-![Persistence 3.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810753)
+![](../Images/Persistence 3.PNG)
 
 
 ## Just Making Sure...
@@ -209,9 +209,9 @@ It's worth checking what Azure thinks about the data.
 Using a storage explorer such as Azure Storage Explorer (ASE) or the one built in to Server Explorer in Visual Studio 2013, open the storage account (or developer storage of the emulator) and find the 'OrleansGrainState' table. 
 It should look something like this (you have to hit 'Query' in ASE):
 
-![Persistence 4.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810756)
+![](../Images/Persistence 4.PNG)
 
-If everything is working correctly, the GUIDs should appear in the `PartitionKey` column, and the qualified class name of the grains should appear in the `RowKey` column.
+If everything is working correctly, the grain keys should appear in the `PartitionKey` column, and the qualified class name of the grains should appear in the `RowKey` column.
 
 ## Mixing Things
 

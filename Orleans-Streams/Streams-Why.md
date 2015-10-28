@@ -39,7 +39,7 @@ We want the system to support different ways of expressing the stream processing
 We want the system to allow for dynamically evolving topologies. The existing systems we mentioned above are usually limited to only static topologies that are fixed at deployment time and cannot evolve at runtime. In the following example of a dataflow expression everything is nice and simple until you need to change it.
 
 ``
-Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) 
+Stream.GroupBy(x=> x.key).Extract(x=>x.field).Select(x=>x+2).AverageWindow(x, 5sec).Where(x=>x > 0.8) *
 ``
 
 Change the threshold condition in the `Where` filter, add an additional `Select` statement or add another branch in the data-flow graph and produce a new output stream. In existing systems this is not possible without tearing down the entire topology and restarting the data-flow from scratch. Practically, those systems will checkpoint the existing computation and will be able to restart from the latest checkpoint. Still, such a restart is disruptive and costly to an online service that produces results in real time. Such a restart becomes especially impractical when we are talking about a large number of such expressions being executed with similar but different (per-user, per-deveice, et.) parameters and that keep constantly changing.
@@ -63,6 +63,10 @@ And of course, our system should have all the properties of a **"good distribute
 5. _Responsiveness_ - enable near real time scenarios.
 
 These were the requirements we had in mind for building [**Orleans Streaming**](index).
+
+---
+
+_Clarificaton_: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described [here](Streams-Programming-APIs). Providing declarative dataflow expressions is our future goal.
 
 ## Next
 [Orleans Streams Programming APIs](Streams-Programming-APIs)

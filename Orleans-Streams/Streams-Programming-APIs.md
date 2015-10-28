@@ -8,12 +8,14 @@ Applications interact with streams via APIs that are very similar to the well kn
 
 ### Async Stream<a name="Async-Stream"></a>
 
-An application starts by using a *stream provider* to get a handle to a stream. You can read more aabout stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers), but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:
+An application starts by using a *stream provider* to get a handle to a stream. You can read more about stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers), but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:
 
 ``` csharp
 IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
 IAsyncStream<T> stream = streamProvider.GetStream<T>(Guid, "MyStreamNamespace"); 
 ```
+
+Application can get a reference to the stream provider either by calling the `GetStreamProvider` method on the `Grain` class when inside a grain, or by calling `GrainClient.GetStreamProvider()` method when on the client.
 
 [**`Orleans.Streams.IAsyncStream<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs) is a **logical, strongly-typed handle to a virtual stream**. It is similar in spirit to Orleans Grain Reference. Calls to `GetStreamProvider` and `GetStream` are purely local. The arguments to `GetStream` are a GUID and an additional string that we call a stream namespace (which can be null). Together the GUID and the namespace string comprise the stream identity (similar in sprit to the arguments to `GrainFactory.GetGrain`). The combination of GUID and namespace string provide extra flexibility in determining stream identities. Just like grain 7 may exist within the Grain type `PlayerGrain` and a different grain 7 may exist within the grain type `ChatRoomGrain`, Stream 123 may exist with the stream namespace `PlayerEventsStream` and a different stream 123 may exist within the stream namespace `ChatRoomMessagesStream`.
 
@@ -108,6 +110,42 @@ IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider");
 IAsyncStream<T> stream = streamProvider.GetStream<T>(this.GetPrimaryKey(), "MyStreamNamespace"); 
 StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObserver<T>);  
 ```
+
+### Writing Subscription Logic<a name="Writing-Subscription-Logic"></a>
+
+Below are the guidlines on how to write the subscription logic for varios cases: explicit and implicit subscriptions, rewindable and non-rewindable streams. The main difference between explicit and implicit subscriptions is that for implicit the grain always has exactly one implicit subscription for every stream namespace, there is no way to create multiple subsriptions (there is no subscription multiplicity) and the grain logic always only needs to attach the processing logic. That also means that for implicit subscriptions there is never a need to Resume a subsription.
+On the other hand, for explicit subscriptions, one needs to Resume the subscription, otherwise if the grain subsribes again it will result in the grain being subscribed multipe times.
+
+
+**Implicit Subscriptions:**
+
+For implicit subscriptions case the grain needs to subscribe in order to attach the processing logic. This should be done in the grain's `OnActivateAsync` method. The grain should simply execute `await stream.SubscribeAsync(OnNext ...)` in its `OnActivateAsync` method. That will cause this particular activation to attach the `OnNext` function to process that stream. The grain can optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this implicit subscriptions to start consuming from that token. There is never a need for implicit subscriptions to call `ResumeAsync`.
+
+```C#
+public async override Task OnActivateAsync()
+{
+    var streamProvider = GetStreamProvider(PROVIDER_NAME);
+    var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
+    await x.SubscribeAsync(OnNextAsync)
+}
+```
+
+**Explicit Subscriptions:**
+
+Grain that wants to explicitly subscribe first has to call `SubscribeAsync` in some place in its code, in order to subsribe the first time. This causes the subsription to be established, as well as attaches the processig logic.
+Now imagine a case when the grain got deactivated and reactivated. The grain is still explicitly subscribed, but no processig logic is attached. The grain needs to re-attach the processing logic. To do that, in its `OnActivateAsync`, the grain first needs to find out what subscriptions it has, by calling `stream.GetAllSubscriptionHandles()`. Then the grain has to execute `ResumeAsync` on each  handle. The grain can also optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this explicit subscription to start consuming from that token.
+
+```C#
+public async override Task OnActivateAsync()
+{
+    var streamProvider = GetStreamProvider(PROVIDER_NAME);
+    var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
+    var subscriptionHandles = await stream.GetAllSubscriptionHandles();
+    if (!subscriptionHandles.IsNullOrEmpty())
+        subscriptionHandles.ForEach(async x => await x.ResumeAsync(OnNextAsync));
+}
+```
+
 
 ### Stream Order and Sequence Tokens<a name="Stream-Order-and-Sequence-Tokens"></a>
 

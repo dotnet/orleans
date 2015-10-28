@@ -9,3 +9,7 @@ title: Runtime Implemention Details
 ### [Messaging Delivery Guarantees](Messaging-Delivery-Guarantees)
 
 ### [Runtime Tables](Runtime-Tables)
+
+### [Relational Storage](Relational-Storage)
+
+### [Load Balancing](Load-Balancing)

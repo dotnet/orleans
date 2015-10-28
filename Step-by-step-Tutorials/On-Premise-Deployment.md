@@ -76,9 +76,9 @@ static void Main(string[] args)
     //    AppDomainInitializerArguments = args,
     //});
 
-    Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+    Orleans.GrainClient.Initialize("ClientConfiguration.xml");
 
-    var friend = HelloWorldInterfaces.HelloFactory.GetGrain(0);
+    var friend = GrainClient.GrainFactory.GetGrain<HelloWorldInterfaces.IHello>(0);
     Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
 
     Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
@@ -254,7 +254,7 @@ which corresponds to a server configuration that looks like this (relevant excer
 
 Running the client in VS, I see this:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=813859)
+![](../Images/onpremise 1.PNG)
 
 ## Monitoring Orleans
 Once Orleans is deployed, you can start an optional script that will monitor the Orleans deployment using standard performance counters.

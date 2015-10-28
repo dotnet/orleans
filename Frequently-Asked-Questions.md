@@ -59,3 +59,15 @@ Orleans currently does not support updating grain code on the fly. To upgrade to
 ## Can I persist a grain’s state to the Azure cache service?
 
 This can be done though a storage provider for Azure Cache. We don’t have one but you can easily build your own.
+
+## Can I Connect to Orleans silos from the public internet?
+
+Orleans is designed to be hosted as the back-end part of a service and you are suposed to create a front-end in your servers which clients connect to. It can be a http based Web API project, a socket server, a SignalR server or anything else which you require. You can actually connect to Orleans from the internet but it is not a good practice from the security point of view.
+
+## What happens if a silo fails before my grain call returns a response for my call?
+
+You'll receive a `TimeoutException` which you can catch and retry or do anything else which makes sense in your application logic, then the grain will be created on an available silo when you do the next call to it. Actually there is a delay between the time that your silo fails and Orleans cluster detect it which is configurable. In this transition period all of your calls to the grain will fail but after the detection of the failure the grain will be created on another silo and it will start to work so it will be eventually available. More info can be found [here](Runtime-Implementation-Details/Cluster-Management)
+
+## What happens if a grain call takes too much time to execute?
+
+Since Orleans uses a cooperative multi-tasking model, it will not preempt the execution of a grain automatically but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking. You should keep in mind that grain calls should not execute any long running tasks like IO synchronously and should not block on other tasks to complete. All waiting should be done asynchronously using the await keyword or other awaiting mechanisms. Grains should return as soon as possible to let other grains to execute for maximum throughput.

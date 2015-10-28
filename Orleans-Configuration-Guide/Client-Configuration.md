@@ -41,6 +41,16 @@ To configure the client to automatically find gateways from the silo cluster mem
 </ClientConfiguration>
 ```
 
+ or 
+
+``` xml
+<ClientConfiguration xmlns="urn:orleans">
+  <SystemStore SystemStoreType="ZooKeeper"
+               DeploymentId="target deployment ID"
+               DataConnectionString="ZooKeeper connection string"/>
+</ClientConfiguration>
+```
+
 
 ## Local Silo
 For the local development/test configuration that uses a local silo, the client gateway should be configured to 'localhost.'

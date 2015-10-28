@@ -92,7 +92,7 @@ public class Manager : Orleans.Grain, IManager
 {
     public override Task ActivateAsync()
     {
-        _me = EmployeeFactory.GetGrain(this.GetPrimaryKey());
+        _me = GrainFactory.GetGrain<IEmployee>(this.GetPrimaryKey());
         return base.ActivateAsync();
     }
 
@@ -126,14 +126,14 @@ In the client _(Program.cs)_, we can add a few lines to create a couple of emplo
 ``` csharp
 Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
 
-var e0 = EmployeeFactory.GetGrain(Guid.NewGuid());
-var e1 = EmployeeFactory.GetGrain(Guid.NewGuid());
-var e2 = EmployeeFactory.GetGrain(Guid.NewGuid());
-var e3 = EmployeeFactory.GetGrain(Guid.NewGuid());
-var e4 = EmployeeFactory.GetGrain(Guid.NewGuid());
+var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e1 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e2 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e3 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e4 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
 
-var m0 = ManagerFactory.GetGrain(Guid.NewGuid());
-var m1 = ManagerFactory.GetGrain(Guid.NewGuid());
+var m0 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.NewGuid());
+var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.NewGuid());
 var m0e = m0.AsEmployee().Result;
 var m1e = m1.AsEmployee().Result;
 
@@ -196,7 +196,7 @@ public class Manager : Employee, IManager
 
 Executing it, you should see something like this:
 
-![Multiple Actors1.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810446)
+![](../Images/Multiple Actors1.PNG)
 
 The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise.
 

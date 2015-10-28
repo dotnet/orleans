@@ -15,7 +15,7 @@ Orleans [GitHub repository](https://github.com/dotnet/orleans).
 
 * **[Prerequisites](Prerequisites)**
 
-* **[Installation of the SDK](Installation)**
+* **[Orleans Tools for Visual Studio](https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4)** or alternatively **[ETG.Orleans.Templates.VSIX](https://visualstudiogallery.msdn.microsoft.com/b61c87e7-0655-4a6e-8e4f-84192950e08c)** from BigPark
 
 * **[Orleans NuGet Packages](NuGets)**
 
@@ -63,6 +63,14 @@ Various community projects, including Orleans Monitoring, Design Patterns, Stora
 
 * **[Orleans Community - Gitter Chat Forum](https://gitter.im/dotnet/orleans)**
 
+* **[Orleans Community - Twitter](https://twitter.com/projectorleans)**
+
+* **[Orleans on Codeplex](https://orleans.codeplex.com)** - 
+[Discussion forum and questions](https://orleans.codeplex.com/discussions)
+
+* **[Orleans on StackOverflow](http://stackoverflow.com/questions/tagged/orleans)** - 
+More questions about Orleans. We prefer that people ask questions on [GitHub](https://github.com/dotnet/orleans/issues) or [Codeplex](https://orleans.codeplex.com/discussions) but will answer stackoverflow questions as well.
+
 * **[Who Is Using Orleans?](Who-Is-Using-Orleans)** 
 A partial list of companies, projects and applications which are using Orleans.
 
@@ -101,10 +109,6 @@ Where the journey began!
 * **[Orleans Technical Report - Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)**
 
 * **[Orleans Best Practices](http://research.microsoft.com/apps/pubs/default.aspx?id=244727)** A collection of tips and trick to help design, build, and run an Orleans-based application.
-
-* **[Original Orleans Codeplex site](https://orleans.codeplex.com)** 
-with documentation, samples and discussion forum. 
-Now **deprecated** - all source code, documentation and samples have now been migrated to GitHub.
 
 * **[Links](Links)** 
 Blog posts, articles and other links about Orleans.

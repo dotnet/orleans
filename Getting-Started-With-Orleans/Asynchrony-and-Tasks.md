@@ -13,7 +13,8 @@ The primary way of using a `Task` is to wait for its completion with the `await`
 
 ``` csharp
 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
-IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId) 
+IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId); // this is a way to get reference to a player grain when running within another grain
+// IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId); // this is a way to get reference to a player grain when running on Orleans client side
 await player.JoinGame(this); 
 players.Add(playerId); 
 return; 

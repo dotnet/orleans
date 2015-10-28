@@ -30,15 +30,17 @@ static void Main(string[] args)
     Console.WriteLine("Waiting for Orleans Silo to start. Press Enter to proceed...");
     Console.ReadLine();
 
-    Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+    Orleans.GrainClient.Initialize("ClientConfiguration.xml");
 }
 ```
 
-If you set the grain collection project as a startup project and hit F5, you will notice that it's started and hosted by a silo called "OrleansHost." 
-This is a ready-made host executable intended for running Orleans code on Windows Server (Azure has a different host). 
+If you set the grain collection project as a startup project and hit F5, you will notice that it's started and hosted by a silo called "OrleansHost."
+Alternatively you can create a console application and add reference to Microsoft.Orleans.OrleansHost NuGet package. The package contains OrleansHost.exe which can be set up in Debug / Start external programs project settings.
+OrleansHost.exe is a ready-made host executable intended for running Orleans code on Windows Server (Azure has a different host). 
 It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
 
-![Standalone 1.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810442)
+![](../Images/Standalone 1.PNG)
+
 
 This allows us to debug the grains in their own process, while keeping the client code in its own process. 
 If you let the client make its request, then terminate it using 'Enter' when asked, you should see only the client process windows disappear. 
@@ -66,7 +68,7 @@ public Task<string> SayHello(string greeting)
  We also change the client to send a greeting several times:
 
 ``` csharp
-var hello = MyGrainInterfaces1.Grain1Factory.GetGrain(0);
+var hello = GrainClient.GrainFactory.GetGrain<IGrain1>(0);
 Console.WriteLine(hello.SayHello("First").Result);
 Console.WriteLine(hello.SayHello("Second").Result);
 Console.WriteLine(hello.SayHello("Third").Result);
@@ -76,13 +78,13 @@ Console.WriteLine(hello.SayHello("Fourth").Result);
 What we would expect to see here is four greetings, the first of which is "Hello World!". 
 Let's check it out:
 
-![Standalone 2.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810443)
+![](../Images/Standalone 2.PNG)
 
 Terminate the client (make sure it's just the client, we need the grain host to stay up) and restart it using the context menu. 
 There's no reason to wait for the silo now, since it's already running. 
 Here's what we get:
 
-![Standalone 3.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810444)
+![](../Images/Standalone 3.PNG)
 
 Still four greetings, but instead of "Hello World!" the first greeting is the last one from our previous client session. 
 In other words, the grain in the silo kept some state around for us.

@@ -29,8 +29,8 @@ To connect to the local silo, the client needs to be configured to localhost and
 </ClientConfiguration>
 ```
 
-## Reliable Production Deployment 
-For a reliable production deployment, you need to use the Azure Table option for cluster membership. This configuration is typical of deployments to either on-premise servers or Azure virtual machine instances.
+## Reliable Production Deployment Using Azure
+For a reliable production deployment using Azure, you need to use the Azure Table option for cluster membership. This configuration is typical of deployments to either on-premise servers or Azure virtual machine instances.
 
  The format of the DataConnection string is "DefaultEndpointsProtocol=https;AccountName=<Azure storage account>;AccountKey=<Azure table storage account key>"
 
@@ -38,8 +38,10 @@ For a reliable production deployment, you need to use the Azure Table option for
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
+    <SystemStore SystemStoreType="AzureTable" 
+         DeploymentId="<your deployment ID>" 
+         DataConnectionString="<<see comment above>>" />
     <Liveness LivenessType ="AzureTable" />
-    <Azure DeploymentId="<your deployment ID>" DataConnectionString="<<see comment above>>"/>
   </Globals>
   <Defaults>
     <Networking Address="" Port="11111" />
@@ -52,7 +54,37 @@ Clients need to be configured to use Azure Table for discovering the gateways, t
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
-  <Azure DeploymentId="target deployment ID" DataConnectionString="<<see comment above>>"/>
+  <SystemStore SystemStoreType="AzureTable" DeploymentId="target deployment ID" DataConnectionString="<<see comment above>>" />
+</ClientConfiguration>
+```
+
+## Reliable Production Deployment Using ZooKeeper
+For a reliable production deployment using ZooKeeper, you need to use the ZooKeeper option for cluster membership. This configuration is typical of deployments to on-premise servers.
+
+ The format of the DataConnection string is documented in the [ZooKeeper Programmer's Guide](http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#ch_zkSessions). A minimum of 5 ZooKeeper servers is [recommended](http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup). 
+
+
+``` xml
+<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <SystemStore SystemStoreType="ZooKeeper"
+                   DeploymentId="<your deployment ID>"
+                   DataConnectionString="<<see comment above>>"/>
+  </Globals>
+  <Defaults>
+    <Networking Address="localhost" Port="11111" />
+    <ProxyingGateway Address="localhost" Port="30000" />
+  </Defaults>
+</OrleansConfiguration>
+```
+
+Clients need to be configured to use ZooKeeper for discovering the gateways, the addresses of the Orleans servers are not statically known to the clients.
+
+``` xml
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ClientConfiguration xmlns="urn:orleans">
+  <SystemStore SystemStoreType="ZooKeeper" DeploymentId="target deployment ID" DataConnectionString="<<see comment above>>"/>
 </ClientConfiguration>
 ```
 

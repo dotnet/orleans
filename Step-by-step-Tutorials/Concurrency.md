@@ -58,7 +58,7 @@ public async Task Greeting(GreetingData data)
     if (data.Count >= 3) return; 
 
     // send a message back to the sender
-    var fromGrain = EmployeeFactory.GetGrain(data.From);
+    var fromGrain = GrainFactory.GetGrain<IEmployee>(data.From);
     await fromGrain.Greeting(new GreetingData { 
         From = this.GetPrimaryKeyLong(), 
         Message = "Thanks!", 
@@ -85,8 +85,8 @@ Let's add some simple client code to add a direct report to a manager:
 
 
 ``` csharp
-var e0 = EmployeeFactory.GetGrain(0);
-var m1 = ManagerFactory.GetGrain(1);
+var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(0);
+var m1 = GrainClient.GrainFactory.GetGrain<IManager>(1);
 m1.AddDirectReport(e0);
 ```
 
@@ -126,7 +126,7 @@ public class Employee : Orleans.Grain, Interfaces.IEmployee
                       data.Message);
         await data.From.Greeting(
             new GreetingData { 
-                From = EmployeeFactory.Cast(this.AsReference()), 
+                From = this.AsReference<IEmployee>(), 
                 Message = "Hi yourself!" });
 }  
 ```

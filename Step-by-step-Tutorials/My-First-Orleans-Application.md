@@ -28,11 +28,13 @@ Typically, you will run one silo per machine, but it sometimes make sense to run
 After starting either Visual Studio 2012 or 2013, go to create a new project. 
 Under "Visual C#," you should see the following:
 
-![New DevTest 1.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810085)
+![](../Images/New DevTest 1.PNG)
 
 Choose the "Orleans Dev/Test Host" project type, create a directory for the solution, and create the project:
 
-![New DevTest 2.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810086)
+![](../Images/New DevTest 2.PNG)
+
+At this point go ahead and compile your project to download the packages. 
 
 The project is just a console application populated with code that helps you host a silo in an environment that is "developer friendly," i.e. where everything runs in a single process.
 
@@ -40,24 +42,28 @@ The main code does three things: it creates a silo in a separate app domain, ini
 
 
 ``` csharp
-static void Main(string[] args)
-{
-    AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, 
-        new AppDomainSetup
+        static void Main(string[] args)
         {
-            AppDomainInitializer = InitSilo,
-            AppDomainInitializerArguments = args,
-        });
+            // The Orleans silo environment is initialized in its own app domain in order to more
+            // closely emulate the distributed situation, when the client and the server cannot
+            // pass data via shared memory.
+            AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, new AppDomainSetup
+            {
+                AppDomainInitializer = InitSilo,
+                AppDomainInitializerArguments = args,
+            });
 
-    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
+            Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
 
-    // TODO: once the previous call returns, the silo is up and running.
-    //       This is the place your custom logic, for example calling client logic
-    //       or initializing an HTTP front end for accepting incoming requests.
+            // TODO: once the previous call returns, the silo is up and running.
+            //       This is the place your custom logic, for example calling client logic
+            //       or initializing an HTTP front end for accepting incoming requests.
 
-    Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
-    Console.ReadLine();
-}
+            Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
+            Console.ReadLine();
+
+            hostDomain.DoCallBack(ShutdownSilo);
+        }
 ```
 
 ## Adding Some Grains
@@ -68,27 +74,29 @@ Separating the two is a best practice since the interface project is shared betw
 
 In addition to the Dev/Test host, there are two more Orleans projects, and we should create one of each in our solution:
 
-![New DevTest 4.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810088)
+![](../Images/New DevTest 4.PNG)
 
 Once you have them in your solution, make sure to add a reference to the grain interface project from each of the other projects: the host, which will contain our client code, and the grain collection project. 
 
-Add a project dependency (not a project reference) on the grain collection to the host project, so that it is automatically (re-)built when starting the debugger.
+Add a reference for the grain collection project to the host project, so that it is automatically (re-)built and copied when starting the debugger.
 
-![New DevTest 7.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810091)
+![](../Images/New DevTest 7.PNG)
 
 Open the _IGrain1.cs_ file and add a method `SayHello()` to it. 
 We should have something like this:
 
 
 ``` csharp
-public interface IGrain1 : Orleans.IGrain
+public interface IGrain1 : IGrainWithIntegerKey
 {
     Task<string> SayHello();
 }
 ```
 
 
-Note that we're relying on TPL tasks in the interface method's return type -- an essential means to achieving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so. 
+One of the important things is choosing a Key type for your grains, in this example we are using Integer there are Guids, strings and various compound keys that may meet your needs.
+
+Additionally, Orleans relies on TPL tasks in the interface method's return type -- an essential means to achieving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so. 
 Use `Task` or `Task<T>` as the return type of all methods of communication interfaces.
 Next, we turn our attention to the grain implementation, which is found in _Grain1.cs_. The first thing to do is make sure that the interface it implements is the right one: it should be `MyGrainInterfaces1.IGrain1`, unless you renamed the project and/or the interface in the previous step.
 
@@ -119,8 +127,8 @@ In place of the comment following the call to `OrleansClient.Initialize()`, add 
 
 
 ``` csharp
-    var hello = MyGrainInterfaces1.Grain1Factory.GetGrain(0);
-    Console.WriteLine("\n\n{0}\n\n", hello.SayHello().Result);
+    var friend = GrainClient.GrainFactory.GetGrain<MyGrainInterfaces1.IGrain1>(0);
+    Console.WriteLine("\n\n{0}\n\n", friend.SayHello().Result);
 ```
 
 
@@ -129,7 +137,7 @@ Hit F5, let the silo initialization code take its time.
 This will take a few seconds, maybe as much as ten, and there will be a lot of log messages printed. 
 At the very end, you should see the printout of the greeting.
 
-![New DevTest 6.png](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=810090)
+![](../Images/New DevTest 6.PNG)
 
 These are the essential steps to create and run Orleans-based code: define communication interfaces, implement them using grain classes, and write some client code to communicate with the grains in order to test them. 
 In a realistic production environment, the grain code would be deployed in a silo hosted by Windows Azure or Windows Server and the client would most likely be a Web site or service using Orleans for the backend logic. 

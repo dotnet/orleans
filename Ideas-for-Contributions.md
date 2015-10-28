@@ -23,18 +23,15 @@ We roughly put them into 3 size categories based on our gut feel, which may be w
   * Will be less automatic than the built-in option but compatible with non-.NET clients
   * Explore other ways to use Bond.
 
-3. **Refactor code generation to use [Roslyn] (https://github.com/dotnet/roslyn) instead of CodeDOM** [Medium/Large]
-
-4. **Cluster monitoring dashboard** [Medium]
+3. **Cluster monitoring dashboard** [Medium]
   * https://github.com/OrleansContrib/OrleansMonitor may be a good start
 
-5. **Make system storage fully pluggable, so that we support more than Azure Table and SQL** [Medium/Large]
+4. **Proper support for F#** [Medium/Large]
+See [Issue #38](https://github.com/dotnet/orleans/issues/38)
 
-6. **Proper support for F#** [Medium/Large]
+5. **Orleans backplane for SignalR** [Medium]
+See [Issue #73](https://github.com/dotnet/orleans/issues/73)
 
-7. **Support for dependency injection** [Medium]
-
-8. **Orleans backplane for SignalR** [Medium]
-
-9. **Port Orleans to [coreclr](https://github.com/dotnet/coreclr)** [Medium]
+6. **Port Orleans to [coreclr](https://github.com/dotnet/coreclr)** [Medium]
+See [Issue #368](https://github.com/dotnet/orleans/issues/368)
   * Some APIs from the full .NET got deprecated in coreclr, mainly around files and reflection, but at large the porting effort shouldn't be too big. This will allow to run Orleans efficiently cross platform.

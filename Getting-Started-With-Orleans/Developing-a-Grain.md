@@ -15,18 +15,18 @@ The grain client project can use any standard .NET code project template, such a
 
 A grain cannot be explicitly created or deleted. 
 It always exists "virtually" and is activated automatically when a request is sent to it. 
-A grain has either a GUID or a long integer key within the grain type. 
-Application code creates a reference to a grain by calling the `GetGrain(Guid id)` or `GetGrain(long id)` static factory methods for a specific grain identity. 
+A grain has either a GUID, string or a long integer key within the grain type. 
+Application code creates a reference to a grain by calling the `GetGrain<TGrainType>(Guid id)` or `GetGrain<TGrainType>(long id)` or other overlaods of a generic grain factory methods for a specific grain identity. 
 The `GetGrain()` call is a purely local operation to create a grain reference. 
 It does not trigger creation of a grain activation and has not impact on its life cycle. 
 A grain activation is automatically created by the Orleans runtime upon a first request sent to the grain.
 
-A grain interface must inherit from `IGrain`. 
-The GUID or long integer key of a grain can later be retrieved via the `IGrain.GetPrimaryKey()` or `IGrain.GetPrimaryKeyLong()` extension methods, respectively.
+A grain interface must inherit from one of the `IGrainWithXKey`.interfaces where X is the type of the key used. 
+The GUID, string or long integer key of a grain can later be retrieved via the `GetPrimaryKey()` or `GetPrimaryKeyLong()` extension methods, respectively.
 
 ## Defining the Grain Interface
 
-A grain type is defined by an interface that inherits from the `IGrain` marker interface.
+A grain type is defined by an interface that inherits from one of the `IGrainWithXKey` marker interfaces like 'IGrainWithGuidKey' or 'IGrainWithStringKey'.
 
 All of the methods in the grain interface must return a `Task` or a `Task<T>` for .NET 4.5. 
 The underlying type `T` for value `Task` must be serializable.
@@ -34,7 +34,7 @@ The underlying type `T` for value `Task` must be serializable.
  Example:
 
 ``` csharp
-public interface IPlayerGrain : IGrain 
+public interface IPlayerGrain : IGrainWithGuidKey 
 { 
   Task<IGameGrain> GetCurrentGameAsync();
   Task JoinGameAsync(IGameGrain game); 
@@ -42,15 +42,24 @@ public interface IPlayerGrain : IGrain
 } 
 ```
 
-## Generating the Class Factory
+## Using the Grain Factory
 
-After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate a client proxy and factory classes corresponding to the user-defined grain interfaces and to merge this additional code back into the interface DLL. 
+After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate a client proxy classes corresponding to the user-defined grain interfaces and to merge this additional code back into the interface DLL. 
 The code generation tool, _ClientGenerator.exe_, can also be invoked directly as a part of post-build processing. 
 However this should be used with caution and is generally not recommended.
 
-The most important class in the generated proxy code is the grain factory class, which is named after the grain interface by stripping off the initial "I" and appending "Factory". 
-For instance, if your grain interface is `IPlayerGrain`, then your grain factory class will be called `PlayerGrainFactory`. 
-The namespace for this factory class is the same as that of the grain interface.
+Application should use the generic grain factory class to get references to grains. Inside the grain code the factory is availiable via the protected GrainFactory class member property. On the client side the factory is availiable via the `GrainClient.GrainFactory` static field.
+
+When running inside a grain the following code should be used to get the grain reference:
+
+``` csharp
+    this.GrainFactory.GetGrain<IPlayerGrain>(grainKey);
+```
+When running on the Orleans client side the following code should be used to get the grain reference:
+
+``` csharp
+    GrainClient.GrainFactory.GetGrain<IPlayerGrain>(grainKey);
+```
 
 ## The Implementation Class
 
@@ -111,13 +120,13 @@ For the remainder of this section, we will only be considering Option #2 / `Grai
 
 ## Grain State Stores
 
-Grain classes that inherit from `Grain<T>` (where `T` is an application-specific state data type derived from `IGrainState`) will have their state loaded automatically from a specified storage. 
+Grain classes that inherit from `Grain<T>` (where `T` is an application-specific state data type derived from `GrainState`) will have their state loaded automatically from a specified storage. 
 
 Grains will be marked with a `[StorageProvider]` attribute that specifies a named instance of a storage provider to use for reading / writing the state data for this grain. 
 
 ``` csharp
 [StorageProvider(ProviderName="store1")]
-public class MyGrain<IMyGrainState> ...
+public class MyGrain<MyGrainState> ...
 {
   ...
 }
@@ -128,14 +137,14 @@ The Orleans Provider Manager framework provides a mechanism to specify & registe
     <OrleansConfiguration xmlns="urn:orleans">
       <Globals>
         <StorageProviders>
-           <Provider Type="Orleans.Storage.DevStorage" Name="DevStore" />
+           <Provider Type="Orleans.Storage.MemoryStorage" Name="DevStore" />
            <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"    
               DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1" />
            <Provider Type="Orleans.Storage.AzureTableStorage" Name="store2" 
              DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2"  />
         </StorageProviders>
 
-Note: storage provider types `Orleans.Storage.AzureTableStorage` and `Orleans.Storage.DevStorage` are two standard storage providers built in to the Orleans runtime.
+Note: storage provider types `Orleans.Storage.AzureTableStorage` and `Orleans.Storage.MemoryStorage` are two standard storage providers built in to the Orleans runtime.
 
 If there is no `[StorageProvider]` attribute specified for a `Grain<T>` grain class, then a provider named `Default` will be searched for instead. 
 If not found then this is treated as a missing storage provider.
@@ -159,32 +168,23 @@ There are two main parts to the grain state / persistence APIs: Grain-to-Runtime
 
 ## Grain State Storage API
 
-The grain state storage functionality in the Orleans Runtime will provide read and write operations to automatically populate / save the `IGrainState` data object for that grain. 
+The grain state storage functionality in the Orleans Runtime will provide read and write operations to automatically populate / save the `GrainState` data object for that grain. 
 Under the covers, these functions will be connected (within the code generated by Orleans client-gen tool) through to the appropriate persistence provider configured for that grain.
-
-``` csharp
-public interface IGrainState
-{
-  string Etag { get; }
-  Task WriteStateAsync();
-  Task ReadStateAsync();
-}
-```
 
 ## Grain State Read / Write Functions
 
 Grain state will automatically be read when the grain is activated, but grains are responsible for explicitly triggering the write for any changed grain state as and when necessary. 
 See the [Failure Modes](#FailureModes) section below for details of error handling mechanisms.
 
-`GrainState` will be read automatically (using the equivalent of `IGrainState.ReadStateAsync()`) _before_ the `OnActivateAsync()` method is called for that activation. 
+`GrainState` will be read automatically (using the equivalent of `base.ReadStateAsync()`) _before_ the `OnActivateAsync()` method is called for that activation. 
 `GrainState` will not be refreshed before any method calls to that grain, unless the grain was activated for this call. 
 
-During any grain method call, a grain can request the Orleans runtime to write the current grain state data for that activation to the designated storage provider by calling `IGrainState.WriteStateAsync()`.
+During any grain method call, a grain can request the Orleans runtime to write the current grain state data for that activation to the designated storage provider by calling `base.WriteStateAsync()`.
 The grain is responsible for explicitly performing write operations when they make significant updates to their state data. 
-Most commonly, the grain method will return the `IGrainState.WriteStateAsync()` `Task` as the final result `Task` returned from that grain method, but it is not required to follow this pattern. 
+Most commonly, the grain method will return the `base.WriteStateAsync()` `Task` as the final result `Task` returned from that grain method, but it is not required to follow this pattern. 
 The runtime will not automatically update stored grain state after any grain methods. 
 
-During any grain method or timer callback handler in the grain, the grain can request the Orleans runtime to re-read the current grain state data for that activation from the designated storage provider by calling `IGrainState.ReadStateAsync()`.
+During any grain method or timer callback handler in the grain, the grain can request the Orleans runtime to re-read the current grain state data for that activation from the designated storage provider by calling `base.ReadStateAsync()`.
 This will completely overwrite any current state data currently stored in the grain state object with the latest values read from persistent store. 
 
 An opaque provider-specific `Etag` value (`string`) _may_ be set by a storage provider as part of the grain state metadata populated when state was read. 
@@ -195,21 +195,19 @@ Conceptually, the Orleans Runtime will take a deep copy of the grain state data 
 ## Sample Code for Grain State Read / Write Operations
 
 Grains must extend the `Grain<T>` class in order to participate in the Orleans grain state persistence mechanisms. 
-The `T` in the above definition will be replaced by an application-specific grain state interface type for this grain; see the example below.
-
-The grain class will also implement its specific grain interface, as with any other Orleans grain.
+The `T` in the above definition will be replaced by an application-specific grain state class for this grain; see the example below.
 
 The grain class should also be annotated with a `[StorageProvider]` attribute that tells the runtime which storage provider (instance) to use with grains of this type.
 
 ``` csharp
-public interface IMyGrainState : IGrainState
+public interface MyGrainState : GrainState
 {
-  int Field1 { get; set; }
-  string Field2 { get; set; }
+  public int Field1 { get; set; }
+  public string Field2 { get; set; }
 }
 
 [StorageProvider(ProviderName="store1")]
-public class MyPersistenceGrain : Grain<IMyGrainState>, IMyPersistenceGrain
+public class MyPersistenceGrain : Grain<MyGrainState>, IMyPersistenceGrain
 {
   ...
 }
@@ -222,7 +220,7 @@ From that point forward, the grain’s state will be available through the `Grai
 
 ## Grain State Write
 
-After making any appropriate changes to the grain’s in-memory state, the grain should call the `Grain<T>.State.WriteStateAsync()` method to write the changes to the persistent store via the defined storage provider for this grain type. 
+After making any appropriate changes to the grain’s in-memory state, the grain should call the `base.WriteStateAsync()` method to write the changes to the persistent store via the defined storage provider for this grain type. 
 This method is asynchronous and returns a `Task` that will typically be returned by the grain method as its own completion Task.
 
 
@@ -230,19 +228,19 @@ This method is asynchronous and returns a `Task` that will typically be returned
 public Task DoWrite(int val)
 {
   State.Field1 = val;
-  return State.WriteStateAsync();
+  return base.WriteStateAsync();
 }
 ```
 
 ## Grain State Refresh
 
-If a grain wishes to explicitly re-read the latest state for this grain from backing store, the grain should call the `Grain<T>.State.ReadStateAsync()` method. 
+If a grain wishes to explicitly re-read the latest state for this grain from backing store, the grain should call the `base.ReadStateAsync()` method. 
 This will reload the grain state from persistent store, via the defined storage provider for this grain type, and any previous in-memory copy of the grain state will be overwritten and replaced when the `ReadStateAsync()` `Task` completes.
 
 ``` csharp
 public async Task<int> DoRead()
 {
-  await State.ReadStateAsync();
+  await base.ReadStateAsync();
   return State.Field1;
 }
 ```
@@ -279,8 +277,8 @@ public interface IStorageProvider
   Task Init();
   Task Close();
 
-  Task ReadStateAsync(string grainType, GrainId grainId, IGrainState grainState);
-  Task WriteStateAsync(string grainType, GrainId grainId, IGrainState grainState);
+  Task ReadStateAsync(string grainType, GrainId grainId, GrainState grainState);
+  Task WriteStateAsync(string grainType, GrainId grainId, GrainState grainState);
 }
 ```
 

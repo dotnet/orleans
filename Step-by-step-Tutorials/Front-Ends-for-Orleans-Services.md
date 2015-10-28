@@ -11,19 +11,14 @@ Creating an HTTP API, or web application is a common scenario.
 Let's extend the Employee/Manager scenario from the  [Declarative-Persistence](Declarative-Persistence) walk-through to see what steps are required to publish grain data over HTTP.
 
 ##Creating the ASP.NET application
-First, you should add a new ASP.NET Web Application to your solution:
+First, you should add a new ASP.NET Web Application to your solution. Then, select the Web API template, although you could use MVC or Web Forms.
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815096)
-
-Select the Web API template, although you could use MVC or Web Forms.
-
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815097)
 
 ## Initializing Orleans
 
 Next, add a reference to the _Orleans.dll_ file in the project references.
 
-Now add the _DevTestClientConfiguration.xml_ file used in the Orleans Host application to the root of the ASP.NET project.
+Now add the _ClientConfiguration.xml_ file used in the Orleans Host application to the root of the ASP.NET project.
 
 As with the Orleans host we created earlier, we need to initialize Orleans. 
 This is best done in the _Global.asax.cs_ file like this:
@@ -35,7 +30,7 @@ namespace WebApplication1
     {
         protected void Application_Start()
         {
-            OrleansClient.Initialize(Server.MapPath("~/DevTestClientConfiguration.xml"));
+            Orleans.GrainClient.Initialize(Server.MapPath("~/ClientConfiguration.xml"));
        	   ...
 ```
 
@@ -46,13 +41,9 @@ Now when the ASP.NET application starts, it will initialize the Orleans Client.
 
 Now lets add a controller to the project, to receive HTTP requests, and call the grain code.
 
-Right click on the "Controllers" folder, and add a new "Web API 2 Controller - Empty":
+Right click on the "Controllers" folder, and add a new "Web API 2 Controller - Empty".
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815098)
-
-Next, call the controller `EmployeeController`:
-
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815099)
+Next, call the controller `EmployeeController`.
 
 This will create a new empty controller called `EmployeeController`.
 
@@ -63,7 +54,7 @@ public class EmployeeController : ApiController
 {
     public Task<int> Get(long id)
     {
-        var employee = EmployeeFactory.GetGrain(id);
+        var employee = GrainClient.GrainFactory.GetGrain<IEmployee>(id);
         return employee.Level;
     }
 }

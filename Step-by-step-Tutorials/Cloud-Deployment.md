@@ -27,12 +27,12 @@ Right click on your solution, and select 'Add | New Project...'.
 
 Choose the 'Windows Azure Cloud Service' project template:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815101)
+![](../Images/AzureTutorial1.PNG)
 
 When prompted, select a new 'Worker Role' to add to the project. 
 This will be used to host the Orleans Silos:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815102)
+![](../Images/AzureTutorial2.PNG)
 
 ## Add project references for Orleans Silo binaries 
 Add references to the `OrleansAzureSilo` project for the required Orleans server library files. 
@@ -45,7 +45,7 @@ Copies of these files can be found in the _.\Binaries\OrleansServer_ folder unde
 
 Note: All of these references MUST have _Copy Local = 'True'_ settings to ensure the necessary library DLLs get copied into the `OrleansAzureSilo` project output directory. 
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815103)
+![](../Images/AzureTutorial3.PNG)
 
 ## Configure Azure Worker Role for Orleans Silos 
 The Worker Role initialization class is a normal Azure worker role - it needs to inherit from the usual `Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint` base class. 
@@ -92,7 +92,6 @@ It is IMPORTANT to start the silo not in OnStart but in Run. Azure may not have 
 Then, in the `ServiceDefinition.csdef` file for this role, add some required configuration items used by the Orleans Azure hosting library to the WorkerRole configuration:
 
 * Add a `ConfigurationSettings` declaration named 'DataConnectionString'. This is the Azure storage location where Orleans Azure hosting library will place / look for its silo instance table. 
-* Add a `LocalStorage` declaration named 'LocalStoreDirectory'. This is the directory that will be used for any local cache directories. 
 * Add an `InternalEndpoint` declaration for a TCP endpoint named 'OrleansSiloEndpoint' 
 * Add an `InternalEndpoint` declaration for a TCP endpoint named 'OrleansProxyEndpoint' 
 
@@ -150,14 +149,14 @@ The networking configuration information in _OrleansConfiguration.xml_ will be o
 
 
 Note: You MUST ensure this config file get copied into the `OrleansAzureSilo` project output directory, to ensure they get picked up by the Azure packaging tools. 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815104)
+![](../Images/AzureTutorial4.PNG)
 
 ## Add your grain binaries to Azure Worker Role for Orleans Silos 
 Add the grain interfaces DLL and implementation classes DLL for the grains to he hosted in the Azure silo into the `OrleansAzureSilo` project, along with any supporting libraries those grains need.
 
 
 Note: You MUST ensure that all the referenced binaries are copied into the `OrleansAzureSilo` project output directory, to ensure they get picked up by the Azure packaging tools.
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815105)
+
 
 ## Running Orleans Client as Azure Web Role
 The user interface / presentation layer for your application will usually run as a Web Role in Azure.
@@ -173,7 +172,7 @@ Any type of web role can be used as an Orleans client, and there are no specific
 
 Add a web role to the solution:
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815106)
+![](../Images/AzureTutorial5.PNG)
 
 Add project references for Orleans Client binaries. 
 Add references to the web role project for the required Orleans client library files. 
@@ -266,7 +265,6 @@ Add the grain interfaces DLL for the application grains into this web role proje
 Access to the DLL containing the grain implementation classes should not be required by the client web role. 
 
 Note: You MUST ensure that all the referenced binaries for grain interfaces and the generated proxy / factory libraries are copied into the web role project output directory, to ensure they get picked up by the Azure packaging tools.
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815108)
 
 The grain implementation DLLs should not be required by the client and so should not be referenced by the web role.
 
@@ -297,7 +295,6 @@ See the Orleans API docs for details of the various `Initialize` methods availab
 ## Deploying to Azure
 The normal Azure deployment tools are used to deploy the application to Windows Azure – either into the local Azure Compute Emulator for local development / test (Press F5 to run), or into the Azure cloud hosting environment right click on the Cloud project and select 'Publish':
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=orleans&DownloadId=815110)
 
 ## Next
 We'll write our own storage provider, to save grain state to alternative to file instead of Windows Azure:
