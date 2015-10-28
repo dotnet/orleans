@@ -101,7 +101,7 @@ namespace Orleans.Runtime.Configuration
                         {
                             var assemblyName = className.Substring(pos + 1).Trim();
                             className = className.Substring(0, pos).Trim();
-                            assembly = Assembly.Load(assemblyName);
+                            assembly = Assembly.Load(new AssemblyName(assemblyName));
                         }
                         else
                         {
