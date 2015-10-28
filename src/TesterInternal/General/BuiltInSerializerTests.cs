@@ -1102,6 +1102,38 @@ namespace UnitTests.SerializerTests
                 ValidateArrayOfArrays<T>(expected[i], result[i], "Array of " + type + "[" + i + "][]");
             }
         }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Serialize_CircularReference()
+        {
+            var c1 = new CircularTest1();
+            var c2 = new CircularTest2();
+            c2.CircularTest1List.Add(c1);
+            c1.CircularTest2 = c2;
+
+            var deserialized = (CircularTest1)OrleansSerializationLoop(c1);
+            Assert.AreEqual(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
+            Assert.AreEqual(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+
+            deserialized = (CircularTest1)OrleansSerializationLoop(c1, true);
+            Assert.AreEqual(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
+            Assert.AreEqual(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+        }
+
+        [Serializable]
+        public class CircularTest1
+        {
+            public CircularTest2 CircularTest2 { get; set; }
+        }
+        [Serializable]
+        public class CircularTest2
+        {
+            public CircularTest2()
+            {
+                CircularTest1List = new List<CircularTest1>();                   
+            }
+            public List<CircularTest1> CircularTest1List { get; set; }
+        }
     }
 }
 

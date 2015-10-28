@@ -193,6 +193,22 @@ namespace Orleans.CodeGenerator
                             SF.VariableDeclarator("boxedResult").WithInitializer(SF.EqualsValueClause(resultVariable)))));
                 boxedResultVariable = SF.IdentifierName("boxedResult");
             }
+            
+            // Record the result for cyclic deserialization.
+            Expression<Action> recordObject =
+                () => DeserializationContext.Current.RecordObject(default(object));
+            var currentSerializationContext =
+                SyntaxFactory.AliasQualifiedName(
+                    SF.IdentifierName(SF.Token(SyntaxKind.GlobalKeyword)),
+                    SF.IdentifierName("Orleans"))
+                    .Qualify("Serialization")
+                    .Qualify("DeserializationContext")
+                    .Qualify("Current");
+            body.Add(
+                SF.ExpressionStatement(
+                    recordObject.Invoke(currentSerializationContext)
+                        .AddArgumentListArguments(
+                            SF.Argument(boxedResultVariable))));
 
             // Deserialize all fields.
             foreach (var field in fields)
