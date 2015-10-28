@@ -283,6 +283,7 @@ namespace Orleans.Runtime.Configuration
                     ConfigUtilities.ParseBool(child.GetAttribute("UseStandardSerializer"),
                                               "invalid boolean value for the UseStandardSerializer attribute on the Messaging element");
             }
+
             //--
             if (child.HasAttribute("BufferPoolBufferSize"))
             {

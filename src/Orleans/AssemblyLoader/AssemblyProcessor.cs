@@ -25,6 +25,8 @@ namespace Orleans.Runtime
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
+    using System.Linq;
     using System.Reflection;
 
     using Orleans.CodeGeneration;
@@ -83,7 +85,7 @@ namespace Orleans.Runtime
                 // initialize serialization for all assemblies to be loaded.
                 AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
 
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies().Concat(FindAssembliesWithOrleansReference());
 
                 // initialize serialization for already loaded assemblies.
                 CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
@@ -105,6 +107,47 @@ namespace Orleans.Runtime
         {
             ProcessAssembly(args.LoadedAssembly);
         }
+
+        private static IEnumerable<Assembly> FindAssembliesWithOrleansReference()
+        {
+            // load any assemblies that reference orleans from the probe directories
+
+            var current = AppDomain.CurrentDomain;
+            var probeDirectories = new List<string>();
+            probeDirectories.Add(current.BaseDirectory);
+            if (current.RelativeSearchPath != null)
+            {
+                probeDirectories.Add(Path.Combine(current.BaseDirectory, current.RelativeSearchPath));
+            }
+
+            if (current.DynamicDirectory != null)
+            {
+                probeDirectories.Add(current.DynamicDirectory);
+            }
+
+            var assembliesUsingOrleans = probeDirectories.Where(
+                dir => string.IsNullOrWhiteSpace(dir) == false && Directory.Exists(dir))
+                .SelectMany(dir => Directory.GetFiles(dir, "*.dll", SearchOption.TopDirectoryOnly))
+                .Where(f => current.GetAssemblies().All(an => an.Location.Equals(f, StringComparison.OrdinalIgnoreCase) == false))
+                .Select(
+                file =>
+                {
+                    try
+                    {
+                        var asm = Assembly.ReflectionOnlyLoadFrom(file);
+                        if (asm.GetReferencedAssemblies().Any(an => an.Name == "Orleans"))
+                        {
+                            return asm;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                    return null;
+                }).Where(asm => asm != null);
+
+            return assembliesUsingOrleans.Select(asm => current.Load(asm.GetName()));
+        } 
 
         /// <summary>
         /// Processes the provided assembly.
