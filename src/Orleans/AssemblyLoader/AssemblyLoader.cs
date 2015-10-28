@@ -106,7 +106,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var assembly = Assembly.Load(assemblyName);
+                var assembly = Assembly.Load(new AssemblyName(assemblyName));
                 var foundType =
                     TypeUtils.GetTypes(
                         assembly,
@@ -136,7 +136,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var assembly = Assembly.Load(assemblyName);
+                var assembly = Assembly.Load(new AssemblyName(assemblyName));
                 var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type)).First();
 
                 return (T)Activator.CreateInstance(foundType, true);

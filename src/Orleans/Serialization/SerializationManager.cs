@@ -2058,7 +2058,7 @@ namespace Orleans.Serialization
 
                         // in some cases we have to explicitly load the assembly even though it seems to be already loaded but for some reason it's not listed in AppDomain.CurrentDomain.GetAssemblies()
                         if (!this.assemblies.TryGetValue(assemblyName, out result))
-                            this.assemblies[assemblyName] = Assembly.Load(assemblyName);
+                            this.assemblies[assemblyName] = Assembly.Load(new AssemblyName(assemblyName));
 
                         result = this.assemblies[assemblyName];
                     }
