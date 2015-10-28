@@ -190,7 +190,7 @@ namespace Orleans.Runtime
             StatisticsCollector.Initialize(nodeConfig);
             
             RoslynCodeGenerator.Instance.GenerateAndLoadForAllAssemblies();
-            SerializationManager.Initialize(globalConfig.UseStandardSerializer, globalConfig.BondSchemaAssemblies);
+            SerializationManager.Initialize(globalConfig.UseStandardSerializer);
             initTimeout = globalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {

@@ -40,7 +40,8 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Serialization
 {
     using System.Diagnostics.CodeAnalysis;
-    using Orleans.Serialization.Bond;
+
+    using Orleans.Extensions;
 
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
@@ -83,10 +84,12 @@ namespace Orleans.Serialization
         #region Privates
 
         private static readonly HashSet<Type> registeredTypes;
+        private static readonly ConcurrentHashSet<IExternalSerializer> externalSerializers;
         private static readonly Dictionary<string, Type> types;
         private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
         private static readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
+
 
         private static readonly TraceLogger logger;
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
@@ -136,11 +139,10 @@ namespace Orleans.Serialization
         public static void InitializeForTesting()
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            BondSerializer.Initialize(string.Empty);
             AssemblyProcessor.Initialize();
         }
 
-        internal static void Initialize(bool useStandardSerializer, string bondSchemaAssemblies)
+        internal static void Initialize(bool useStandardSerializer)
         {
             UseStandardSerializer = useStandardSerializer;
             if (StatisticsCollector.CollectSerializationStats)
@@ -175,7 +177,6 @@ namespace Orleans.Serialization
                 FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
             }
 
-            BondSerializer.Initialize(bondSchemaAssemblies);
             AssemblyProcessor.Initialize();
         }
 
@@ -184,6 +185,7 @@ namespace Orleans.Serialization
             AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
 
             registeredTypes = new HashSet<Type>();
+            externalSerializers = new ConcurrentHashSet<IExternalSerializer>();
             types = new Dictionary<string, Type>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
@@ -528,7 +530,11 @@ namespace Orleans.Serialization
                             || (!type.Namespace.Equals("System", StringComparison.Ordinal)
                                 && !type.Namespace.StartsWith("System.", StringComparison.Ordinal))))
                     {
-                        if (type.GetCustomAttributes(typeof(RegisterSerializerAttribute), false).Length > 0)
+                        if (typeof(IExternalSerializer).IsAssignableFrom(type))
+                        {
+                            RegisterExternalSerializer(type);
+                        }
+                        else if (type.GetCustomAttributes(typeof(RegisterSerializerAttribute), false).Length > 0)
                         {
                             // Call the static Register method on the type
                             if (logger.IsVerbose3)
@@ -866,18 +872,25 @@ namespace Orleans.Serialization
             {
                 copy = copier(original);
                 SerializationContext.Current.RecordObject(original, copy);
-            }
-            else if (BondSerializer.TryCopy(original, out copy))
-            {
-                // only called for late-bound generic bond types.
-                SerializationContext.Current.RecordObject(original, copy);
-            }
-            else
-            {
-                copy = DeepCopierHelper(t, original);
+                return copy;
             }
 
-            return copy;
+            var externalSerializer =
+                externalSerializers.Lock.ReadLockExecute(
+                    () => externalSerializers.FirstOrDefault(serializer => serializer.IsSupportedType(t)));
+            if (externalSerializer != null)
+            {
+                Register(
+                    t,
+                    externalSerializer.DeepCopy,
+                    externalSerializer.Serialize,
+                    externalSerializer.Deserialize);
+                copy = externalSerializer.DeepCopy(original);
+                SerializationContext.Current.RecordObject(original, copy);
+                return copy;
+            }
+
+            return DeepCopierHelper(t, original);
         }
 
         private static object DeepCopierHelper(Type t, object original)
@@ -1113,8 +1126,18 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (BondSerializer.TrySerialize(stream, expected, obj))
+            var externalSerializer = externalSerializers.Lock.ReadLockExecute(
+                () => externalSerializers.FirstOrDefault(s => s.IsSupportedType(t)));
+
+            if (externalSerializer != null)
             {
+                Register(
+                    t,
+                    externalSerializer.DeepCopy,
+                    externalSerializer.Serialize,
+                    externalSerializer.Deserialize);
+                stream.WriteTypeHeader(t, expected);
+                externalSerializer.Serialize(obj, stream, expected);
                 return;
             }
 
@@ -1444,9 +1467,11 @@ namespace Orleans.Serialization
                 return result;
             }
 
-            if (BondSerializer.TryDeserialize(resultType, stream, out result))
+            var externalSerializer = externalSerializers.Lock.ReadLockExecute(() => externalSerializers.FirstOrDefault(ser => ser.IsSupportedType(resultType)));
+            if (externalSerializer != null)
             {
-                // try deserializing late-bound bond types
+                Register(resultType, externalSerializer.DeepCopy, externalSerializer.Serialize, externalSerializer.Deserialize);
+                result = externalSerializer.Deserialize(resultType, stream);
                 DeserializationContext.Current.RecordObject(start, result);
                 return result;
             }
@@ -2037,6 +2062,24 @@ namespace Orleans.Serialization
 
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
             logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
+        }
+
+        /// <summary>
+        /// Creates an instance of an external serializer
+        /// </summary>
+        /// <param name="type">The type that that implements <see cref="IExternalSerializer"/></param>
+        private static void RegisterExternalSerializer(Type type)
+        {
+            try
+            {
+                var serializer = Activator.CreateInstance(type) as IExternalSerializer;
+                serializer.Initialize();
+                externalSerializers.Add(serializer);
+            }
+            catch (Exception exception)
+            {
+                logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);   
+            }
         }
         
         /// <summary>

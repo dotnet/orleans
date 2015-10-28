@@ -86,14 +86,6 @@ namespace Orleans.Runtime.Configuration
         bool UseStandardSerializer { get; set; }
 
         /// <summary>
-        /// Gets or sets the semicolon delimited list of assemblies in unique assembly name format.
-        /// This parameter is intended for use with Bond Serialization/Deserialization in order to pre-load assemblies
-        /// containing Bond schemas so that serialization and deserialization can be registered with the Orleans serialization
-        /// manager.
-        /// </summary>
-        string BondSchemaAssemblies { get; set; }
-
-        /// <summary>
         /// The size of a buffer in the messaging buffer pool.
         /// </summary>
         int BufferPoolBufferSize { get; set; }
@@ -154,7 +146,6 @@ namespace Orleans.Runtime.Configuration
         internal const int DEFAULT_MAX_FORWARD_COUNT = 2;
         private const bool DEFAULT_RESEND_ON_TIMEOUT = false;
         private const bool DEFAULT_USE_STANDARD_SERIALIZER = false;
-        private const string DEFAULT_BOND_ASSEMBLIES = "";
         private static readonly int DEFAULT_SILO_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
@@ -183,7 +174,6 @@ namespace Orleans.Runtime.Configuration
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
             ClientSenderBuckets = DEFAULT_CLIENT_SENDER_BUCKETS;
             UseStandardSerializer = DEFAULT_USE_STANDARD_SERIALIZER;
-            BondSchemaAssemblies = DEFAULT_BOND_ASSEMBLIES;
 
             BufferPoolBufferSize = DEFAULT_BUFFER_POOL_BUFFER_SIZE;
             BufferPoolMaxSize = DEFAULT_BUFFER_POOL_MAX_SIZE;
@@ -293,11 +283,6 @@ namespace Orleans.Runtime.Configuration
                 UseStandardSerializer =
                     ConfigUtilities.ParseBool(child.GetAttribute("UseStandardSerializer"),
                                               "invalid boolean value for the UseStandardSerializer attribute on the Messaging element");
-            }
-
-            if (child.HasAttribute("BondSchemaAssemblies"))
-            {
-                BondSchemaAssemblies = child.GetAttribute("BondSchemaAssemblies");
             }
 
             //--

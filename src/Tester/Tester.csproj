@@ -139,6 +139,7 @@
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
     <Compile Include="BondSerializationTests.cs" />
+    <Compile Include="ExternalSerializerTest.cs" />
     <Compile Include="UnitTestSiloHost.cs" />
   </ItemGroup>
   <ItemGroup>

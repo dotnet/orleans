@@ -244,16 +244,6 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
-    <xs:attribute name="BondSchemaAssemblies" type="xs:string" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          A semicolon delimited list of assemblies in unique assembly name format.
-          This parameter is intended for use with Bond Serialization/Deserialization in order to pre-load assemblies
-          containing Bond schemas so that serialization and deserialization can be registered with the Orleans serialization
-          manager.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
     <xs:attribute name="MaxForwardCount" type="xs:int" use="optional">
       <xs:annotation>
         <xs:documentation>

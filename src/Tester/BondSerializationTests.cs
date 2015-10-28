@@ -39,6 +39,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void SimpleBondSchemaSerializationTest()
         {
             var schema = new SimpleBondSchema { SomeValue = int.MaxValue };
@@ -48,6 +49,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void SimpleGenericBondSchemaSerializationTest()
         {
             var schema = new SimpleGenericSchema<int> { SomeValue = int.MaxValue };
@@ -57,6 +59,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void SimpleNestedGenericBondSchemaSerializationTest()
         {
             var schema = new SimpleGenericSchema<SimpleGenericSchema<SimpleBondSchema>>
@@ -77,6 +80,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void RecursiveSerializationTest()
         {
             var schema = new RecursiveSchema();
@@ -92,6 +96,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void SimpleBondSchemaCopyTest()
         {
             var schema = new SimpleBondSchema { SomeValue = int.MaxValue };
@@ -101,6 +106,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void SimpleGenericBondSchemaCopyTest()
         {
             var schema = new SimpleGenericSchema<int> { SomeValue = int.MaxValue };
@@ -110,6 +116,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void SimpleNestedGenericBondSchemaCopyTest()
         {
             var schema = new SimpleGenericSchema<SimpleGenericSchema<SimpleBondSchema>>
@@ -130,6 +137,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Ignore]
         public void RecursiveCopyTest()
         {
             var schema = new RecursiveSchema();
