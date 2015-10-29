@@ -304,7 +304,7 @@ namespace Orleans.CodeGenerator
 
             // Get types from assemblies which reference Orleans and are not generated assemblies.
             var includedTypes = new HashSet<Type>();
-            foreach (var type in assemblies.SelectMany(_ => _.GetTypes()))
+            foreach (var type in assemblies.SelectMany(_ => _.DefinedTypes))
             {
                 // The module containing the serializer.
                 var module = runtime ? null : type.Module;

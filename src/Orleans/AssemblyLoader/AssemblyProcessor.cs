@@ -26,6 +26,7 @@ namespace Orleans.Runtime
     using System;
     using System.Collections.Generic;
     using System.Reflection;
+    using System.Linq;
 
     using Orleans.CodeGeneration;
     using Orleans.Serialization;
@@ -135,7 +136,7 @@ namespace Orleans.Runtime
             Type[] assemblyTypes;
             try
             {
-                assemblyTypes = assembly.GetTypes();
+                assemblyTypes = assembly.DefinedTypes.ToArray();
             }
             catch (Exception exception)
             {

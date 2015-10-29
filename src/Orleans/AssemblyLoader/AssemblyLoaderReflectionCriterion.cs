@@ -65,7 +65,7 @@ namespace Orleans.Runtime
                         Type[] types;
                         try
                         {
-                            types = assembly.GetTypes();
+                            types = assembly.DefinedTypes.ToArray();
                         }
                         catch (ReflectionTypeLoadException e)
                         {
