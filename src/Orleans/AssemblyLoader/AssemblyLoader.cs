@@ -228,7 +228,7 @@ namespace Orleans.Runtime
                 // that appear not to automatically resolve dependencies.
                 // We are trying to pre-load all dlls we find in the folder, so that if one of these
                 // assemblies happens to be a dependency of an assembly we later on call 
-                // Assembly.GetTypes() on, the dependency will be already loaded and will get
+                // Assembly.DefinedTypes on, the dependency will be already loaded and will get
                 // automatically resolved. Ugly, but seems to solve the problem.
 
                 foreach (var j in candidates)

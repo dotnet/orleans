@@ -180,7 +180,7 @@ namespace Orleans.CodeGenerator
             var all =
                 AppDomain.CurrentDomain.GetAssemblies()
                     .Where(_ => _.GetCustomAttribute<GeneratedCodeAttribute>() != null)
-                    .SelectMany(_ => _.GetTypes());
+                    .SelectMany(_ => _.DefinedTypes);
 
             // Get all generated types in each assembly.
             var attributes = all.SelectMany(_ => _.GetCustomAttributes()).OfType<GeneratedAttribute>();

@@ -142,12 +142,12 @@ namespace UnitTests.General
                 grainType = typeof(TGrainInterface).GetGenericTypeDefinition();
             }
 
-            var type = typeof(TGrainInterface).Assembly.GetTypes().First(
+            var type = typeof(TGrainInterface).Assembly.DefinedTypes.First(
                 _ =>
                 {
                     var attr = _.GetCustomAttribute<GrainReferenceAttribute>();
                     return attr != null && attr.GrainType == grainType;
-                });
+                }).AsType();
 
             if (typeof(TGrainInterface).IsConstructedGenericType)
             {
