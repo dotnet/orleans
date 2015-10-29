@@ -1,10 +1,6 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <TestSettings name="Local" id="8a37c363-3fe3-4ab6-a076-e4fcf4d95a30" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
   <Description>These are default test settings for a local test run.</Description>
-  <Deployment>
-    <DeploymentItem filename="Tester\bin\Debug\TestInput\" />
-    <DeploymentItem filename="TestInput\" />
-  </Deployment>
   <NamingScheme baseName="BuildResults" appendTimeStamp="false" />
   <Scripts setupScript=".\SetupTestScript.cmd" />
   <Execution hostProcessPlatform="MSIL">
