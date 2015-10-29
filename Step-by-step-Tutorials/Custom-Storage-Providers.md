@@ -23,21 +23,9 @@ To move it there on build will require adding a bit of post-build event code.
 We'll start by creating the project -- it should be a regular .NET class library. 
 Once the project is created, let's also rename the file _Class1.cs_ to _FileStorageProvider.cs_. 
 That should also prompt VS to rename the class we find inside. 
-Next, we must add references to two Orleans runtime assemblies -- _Orleans.dll_ and _OrleansRuntime.dll_. 
-The former is found under the SDK installation directory _$(OrleansSDK)\Binaries\OrleansClient_, while the latter is under _$(OrleansSDK)\Binaries\OrleansServer_.
+Next, we must add references to [Microsoft.Orleans.Core NuGet package](https://www.nuget.org/packages/Microsoft.Orleans.Core/).
 
-Edit the post-build events for the storage providers project to include the following lines:
-
-      if exist "$(OrleansSDK)\LocalSilo" (
-      copy /y StorageProviders.dll  "$(OrleansSDK)\LocalSilo\"
-      copy /y StorageProviders.pdb  "$(OrleansSDK)\LocalSilo\"
-      ) 
-
-
-
-Assuming, of course, that your project is called `StorageProviders`. 
-The silo host project is set up to run out of the _LocalSilo_ folder under the SDK, and the storage provider assembly needs to be there in order to be found by Orleans. 
-In fact, if you look at the silo host and grain collection projects, you will find similar post-build events code there.
+Assuming, of course, that your project is called `StorageProviders`, make you silo host project reference it, so that StorageProviders.dll gets copied to the silo folder.
 
 Our storage provider should implement the interface `Orleans.Storage.IStorageProvider`. 
 With a little bit of massaging of the code, it should look something like this:
