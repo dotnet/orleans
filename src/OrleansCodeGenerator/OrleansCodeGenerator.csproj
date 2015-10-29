@@ -37,7 +37,7 @@
     <DefineConstants>$(DefineConstants);EXCLUDE_CODEGEN</DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
+    <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <PropertyGroup>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
@@ -78,9 +78,6 @@
     <Compile Include="Utilities\SyntaxFactoryExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Orleans.snk">
-      <Link>Orleans.snk</Link>
-    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -98,4 +95,3 @@
   </Target>
   -->
 </Project>
-
