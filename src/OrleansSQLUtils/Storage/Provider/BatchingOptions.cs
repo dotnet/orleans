@@ -1,6 +1,6 @@
 namespace Orleans.SqlUtils.StorageProvider
 {
-    public sealed class BatchingOptions
+    internal sealed class BatchingOptions
     {
         public int BatchSize { get; set; }
         public int MaxConcurrentWrites { get; set; }

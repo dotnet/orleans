@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace Orleans.SqlUtils.StorageProvider.Instrumentation
 {
-    public class WritablePerformanceCounter
+    internal class WritablePerformanceCounter
     {
         public string CategoryName { get; private set; }
         public string CounterName { get; private set; }

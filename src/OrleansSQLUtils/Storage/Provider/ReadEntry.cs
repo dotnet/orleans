@@ -3,10 +3,17 @@ using System.Threading.Tasks;
 
 namespace Orleans.SqlUtils.StorageProvider
 {
+    /// <summary>
+    /// Entry for a read
+    /// </summary>
     public sealed class ReadEntry 
     {
+        /// <summary>
+        /// Grain identity
+        /// </summary>
         public GrainIdentity GrainIdentity { get; private set; }
-        public TaskCompletionSource<IDictionary<string, object>> CompletionSource { get; private set; }
+
+        internal TaskCompletionSource<IDictionary<string, object>> CompletionSource { get; private set; }
 
         internal ReadEntry(GrainIdentity grainIdentity, TaskCompletionSource<IDictionary<string, object>> tcs)
         {

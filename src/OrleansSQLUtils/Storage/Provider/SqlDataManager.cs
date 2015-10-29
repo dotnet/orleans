@@ -13,7 +13,7 @@ namespace Orleans.SqlUtils.StorageProvider
     /// Main class which is used by the actual Orleans SqlStorageProvider
     /// Decoupled from the provider for easy testability and avoidance of Orleans dependency
     /// </summary>
-    public class SqlDataManager : IDisposable
+    internal class SqlDataManager : IDisposable
     {
         private readonly Logger Logger;
 

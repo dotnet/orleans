@@ -5,6 +5,9 @@ using System.Data.SqlClient;
 
 namespace Orleans.SqlUtils.StorageProvider
 {
+    /// <summary>
+    /// Map of grain state to SQL tables
+    /// </summary>
     public class GrainStateMap
     {
         /// <summary>
@@ -12,7 +15,7 @@ namespace Orleans.SqlUtils.StorageProvider
         /// </summary>
         private readonly Dictionary<string, GrainStateMapEntry> _map = new Dictionary<string, GrainStateMapEntry>();
 
-        public GrainStateMapEntry For(string grainType)
+        internal GrainStateMapEntry For(string grainType)
         {
             GrainStateMapEntry mapEntry;
             if (!_map.TryGetValue(grainType, out mapEntry))
@@ -20,7 +23,7 @@ namespace Orleans.SqlUtils.StorageProvider
             return mapEntry;
         }
 
-        public GrainStateMap Register(string grainType,
+        internal GrainStateMap Register(string grainType,
             Action<SqlCommand, DataTable> prepareReadSqlCommand,
             Func<SqlDataReader, IDictionary<string, object>> createState,
             Func<IEnumerable<WriteEntry>, DataTable> prepareDataTable, 
@@ -32,6 +35,15 @@ namespace Orleans.SqlUtils.StorageProvider
             return this;
         }
 
+        /// <summary>
+        /// Registers a map
+        /// </summary>
+        /// <typeparam name="TGrainType">Grain type</typeparam>
+        /// <param name="prepareReadSqlCommand">Action to prepare a read command</param>
+        /// <param name="createState">Function to populate a grain state property bag</param>
+        /// <param name="prepareDataTable">Function to prepare a SQL table</param>
+        /// <param name="prepareUpsertSqlCommand">Action to prepare an upsert command</param>
+        /// <returns></returns>
         public GrainStateMap Register<TGrainType>(
             Action<SqlCommand, DataTable> prepareReadSqlCommand,
             Func<SqlDataReader, IDictionary<string, object>> createState,
@@ -47,7 +59,7 @@ namespace Orleans.SqlUtils.StorageProvider
         }
     }
 
-    public class GrainStateMapEntry
+    internal class GrainStateMapEntry
     {
         private readonly Action<SqlCommand, DataTable> _prepareReadSqlCommand;
         private readonly Action<SqlCommand, DataTable> _prepareUpsertSqlCommand;

@@ -6,7 +6,7 @@ using System.Security;
 
 namespace Orleans.SqlUtils.StorageProvider.Instrumentation
 {
-    public abstract class InstrumentationManager
+    internal abstract class InstrumentationManager
     {
         private readonly string _categoryName;
         private readonly string _categoryHelp;

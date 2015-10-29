@@ -2,7 +2,7 @@
 
 namespace Orleans.SqlUtils.StorageProvider.Instrumentation
 {
-    public class PerformanceCounterDefinition
+    internal class PerformanceCounterDefinition
     {
         private readonly string _categoryName;
         private readonly string _counterName;

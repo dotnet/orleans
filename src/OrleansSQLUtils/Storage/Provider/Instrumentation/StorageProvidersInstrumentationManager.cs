@@ -5,7 +5,7 @@ using Orleans.SqlUtils.StorageProvider.Instrumentation;
 
 namespace Orleans.SqlUtils.StorageProvider.Instrumentation
 {
-    public class StorageProvidersInstrumentationManager : InstrumentationManager
+    internal class StorageProvidersInstrumentationManager : InstrumentationManager
     {
         private const string ThisCategoryName = "Orleans SQL Storage Provider";
         private readonly bool _instrumentationEnabled;

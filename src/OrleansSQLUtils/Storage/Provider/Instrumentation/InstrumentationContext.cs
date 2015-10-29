@@ -1,6 +1,6 @@
 ﻿namespace Orleans.SqlUtils.StorageProvider.Instrumentation
 {
-    public class InstrumentationContext
+    internal class InstrumentationContext
     {
         private static readonly StorageProvidersInstrumentationManager InstrumentationManager;
         static InstrumentationContext()

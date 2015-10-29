@@ -268,7 +268,7 @@ namespace Orleans.SqlUtils.StorageProvider
         /// <summary>
         /// Callback from the Reading ActionBlock
         /// </summary>
-        /// <param name="batch"></param>
+        /// <param name="batchIn">Batch</param>
         /// <returns></returns>
         private async Task ReadBatchDataAsync(IEnumerable<ReadEntry> batchIn)
         {

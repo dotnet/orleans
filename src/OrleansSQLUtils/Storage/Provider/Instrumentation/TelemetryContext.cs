@@ -4,7 +4,7 @@ using Orleans.SqlUtils.StorageProvider.Instrumentation;
 
 namespace Orleans.SqlUtils.StorageProvider.Instrumentation
 {
-    public class TelemetryContext
+    internal class TelemetryContext
     {
         private const string CategoryName = "Orleans SQL Storage Provider";
         public static WritablePerformanceCounter OpenConnections { get; private set; }

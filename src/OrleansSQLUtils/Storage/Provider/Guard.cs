@@ -2,7 +2,7 @@
 
 namespace Orleans.SqlUtils.StorageProvider
 {
-    public static class Guard
+    internal static class Guard
     {
         public static void NotNullOrEmpty(string arg, string argName)
         {
