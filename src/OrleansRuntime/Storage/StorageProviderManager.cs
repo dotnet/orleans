@@ -69,6 +69,15 @@ namespace Orleans.Runtime.Storage
 
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
+        {
+            providerRuntime.SetInvokeInterceptor(interceptor);
+        }
+
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return providerRuntime.GetInvokeInterceptor();
+        }
 
         /// <summary>
         /// Get list of providers loaded in this silo.
