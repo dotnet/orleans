@@ -132,7 +132,7 @@ namespace Orleans.Runtime.GrainDirectory
                     IActivationInfo info;
                     if (Instances.TryGetValue(act, out info))
                     {
-                        if (info.TimeCreated >= DateTime.UtcNow - Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay)
+                        if (info.TimeCreated <= DateTime.UtcNow - Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay)
                         {
                             Instances.Remove(act);
                             VersionTag = rand.Next();

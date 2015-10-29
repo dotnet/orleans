@@ -1366,73 +1366,89 @@ namespace Orleans.Serialization
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
         public static object DeserializeInner(Type expected, BinaryTokenStreamReader stream)
         {
-            var start = stream.CurrentPosition;
+            var previousOffset = DeserializationContext.Current.CurrentObjectOffset;
+            DeserializationContext.Current.CurrentObjectOffset = stream.CurrentPosition;
 
-            // NOTE: we don't check that the actual dynamic result implements the expected type. We'll allow a cast exception higher up to catch this.
-
-            SerializationTokenType token;
-            object result;
-            if (stream.TryReadSimpleType(out result, out token))
-                return result;
-
-            // Special serializations (reference, fallback)
-            if (token == SerializationTokenType.Reference)
+            try
             {
-                var offset = stream.ReadInt();
-                return DeserializationContext.Current.FetchReferencedObject(offset);
-            }
-            if (token == SerializationTokenType.Fallback)
-            {
-                var fallbackResult = FallbackDeserializer(stream);
-                DeserializationContext.Current.RecordObject(start, fallbackResult);
-                return fallbackResult;
-            }
+                // NOTE: we don't check that the actual dynamic result implements the expected type.
+                // We'll allow a cast exception higher up to catch this.
+                SerializationTokenType token;
+                object result;
+                if (stream.TryReadSimpleType(out result, out token))
+                {
+                    return result;
+                }
 
-            Type resultType;
-            if (token == SerializationTokenType.ExpectedType)
-            {
-                if (expected == null)
-                    throw new SerializationException("ExpectedType token encountered but no expected type provided");
+                // Special serializations (reference, fallback)
+                if (token == SerializationTokenType.Reference)
+                {
+                    var offset = stream.ReadInt();
+                    result = DeserializationContext.Current.FetchReferencedObject(offset);
+                    return result;
+                }
+                if (token == SerializationTokenType.Fallback)
+                {
+                    var fallbackResult = FallbackDeserializer(stream);
+                    DeserializationContext.Current.RecordObject(fallbackResult);
+                    return fallbackResult;
+                }
 
-                resultType = expected;
-            }
-            else if (token == SerializationTokenType.SpecifiedType)
-            {
-                resultType = stream.ReadSpecifiedTypeHeader();
-            }
-            else
-            {
-                throw new SerializationException("Unexpected token '" + token + "' introducing type specifier");
-            }
+                Type resultType;
+                if (token == SerializationTokenType.ExpectedType)
+                {
+                    if (expected == null)
+                    {
+                        throw new SerializationException("ExpectedType token encountered but no expected type provided");
+                    }
 
-            // Handle object, which is easy
-            if (resultType.TypeHandle.Equals(objectTypeHandle))
-                return new object();
+                    resultType = expected;
+                }
+                else if (token == SerializationTokenType.SpecifiedType)
+                {
+                    resultType = stream.ReadSpecifiedTypeHeader();
+                }
+                else
+                {
+                    throw new SerializationException("Unexpected token '" + token + "' introducing type specifier");
+                }
 
-            // Handle enums
-            if (resultType.IsEnum)
-            {
-                result = Enum.ToObject(resultType, stream.ReadInt());
-                return result;
+                // Handle object, which is easy
+                if (resultType.TypeHandle.Equals(objectTypeHandle))
+                {
+                    return new object();
+                }
+
+                // Handle enums
+                if (resultType.IsEnum)
+                {
+                    result = Enum.ToObject(resultType, stream.ReadInt());
+                    return result;
+                }
+
+                if (resultType.IsArray)
+                {
+                    result = DeserializeArray(resultType, stream);
+                    DeserializationContext.Current.RecordObject(result);
+                    return result;
+                }
+
+                var deser = GetDeserializer(resultType);
+                if (deser != null)
+                {
+                    result = deser(resultType, stream);
+                    DeserializationContext.Current.RecordObject(result);
+                    return result;
+                }
+
+                throw new SerializationException(
+                    "Unsupported type '" + resultType.OrleansTypeName()
+                    + "' encountered. Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
             }
-
-            if (resultType.IsArray)
+            finally
             {
-                result = DeserializeArray(resultType, stream);
-                DeserializationContext.Current.RecordObject(start, result);
-                return result;
+                DeserializationContext.Current.CurrentObjectOffset = previousOffset;
             }
-
-            var deser = GetDeserializer(resultType);
-            if (deser != null)
-            {
-                result = deser(resultType, stream);
-                DeserializationContext.Current.RecordObject(start, result);
-                return result;
-            }
-
-            throw new SerializationException("Unsupported type '" + resultType.OrleansTypeName() + 
-                "' encountered. Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
         private static object DeserializeArray(Type resultType, BinaryTokenStreamReader stream)
@@ -2042,7 +2058,7 @@ namespace Orleans.Serialization
 
                         // in some cases we have to explicitly load the assembly even though it seems to be already loaded but for some reason it's not listed in AppDomain.CurrentDomain.GetAssemblies()
                         if (!this.assemblies.TryGetValue(assemblyName, out result))
-                            this.assemblies[assemblyName] = Assembly.Load(assemblyName);
+                            this.assemblies[assemblyName] = Assembly.Load(new AssemblyName(assemblyName));
 
                         result = this.assemblies[assemblyName];
                     }

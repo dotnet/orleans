@@ -258,41 +258,6 @@ namespace Orleans.Runtime
             return className.Substring(startIndex + 1, endIndex - startIndex - 1);
         }
 
-        public static CodeTypeParameterCollection GenericTypeParameters(Type t)
-        {
-            if (!t.IsGenericType) return null; 
-
-            var p = new CodeTypeParameterCollection();
-            foreach (var genericParameter in t.GetGenericTypeDefinition().GetGenericArguments())
-            {
-                var param = new CodeTypeParameter(genericParameter.Name);
-                if ((genericParameter.GenericParameterAttributes &
-                     GenericParameterAttributes.ReferenceTypeConstraint) != GenericParameterAttributes.None)
-                {
-                    param.Constraints.Add(" class");
-                }
-                if ((genericParameter.GenericParameterAttributes &
-                     GenericParameterAttributes.NotNullableValueTypeConstraint) != GenericParameterAttributes.None)
-                {
-                    param.Constraints.Add(" struct");
-                }
-                var constraints = genericParameter.GetGenericParameterConstraints();
-                foreach (var constraintType in constraints)
-                {
-                    param.Constraints.Add(
-                        new CodeTypeReference(GetParameterizedTemplateName(constraintType, false,
-                            x => true)));
-                }
-                if ((genericParameter.GenericParameterAttributes &
-                     GenericParameterAttributes.DefaultConstructorConstraint) != GenericParameterAttributes.None)
-                {
-                    param.HasConstructorConstraint = true;
-                }
-                p.Add(param);
-            }
-            return p;
-        }
-
         public static bool IsGenericClass(string name)
         {
             return name.Contains("`") || name.Contains("[");

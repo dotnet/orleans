@@ -151,6 +151,8 @@ namespace Orleans
             foreach (var key in values.Keys)
             {
                 var property = type.GetProperty(key);
+                // property doesn't have setter
+                if (property.GetSetMethod() == null) {continue;}
                 property.SetValue(this, values[key]);
             }
         }
@@ -163,7 +165,11 @@ namespace Orleans
         {
             var properties = this.GetType().GetProperties();
             foreach (var property in properties)
+            {
+                // property doesn't have setter
+                if (property.GetSetMethod() == null) {continue;}
                 property.SetValue(this, null);
+            }
         }
     }
  }

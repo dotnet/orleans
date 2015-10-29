@@ -101,14 +101,15 @@ namespace Orleans.Runtime.Configuration
                         {
                             var assemblyName = className.Substring(pos + 1).Trim();
                             className = className.Substring(0, pos).Trim();
-                            assembly = Assembly.Load(assemblyName);
+                            assembly = Assembly.Load(new AssemblyName(assemblyName));
                         }
                         else
                         {
                             assembly = Assembly.GetExecutingAssembly();
                         }
-                        var plugin = assembly.CreateInstance(className);
-                        if (plugin == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
+                        var pluginType = assembly.GetType(className);
+                        if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
+                        var plugin = Activator.CreateInstance(pluginType);
 
                         if (plugin is ILogConsumer)
                         {

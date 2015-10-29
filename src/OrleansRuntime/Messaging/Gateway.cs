@@ -616,7 +616,11 @@ namespace Orleans.Runtime.Messaging
                     string remoteEndpoint = "";
                     if (!(exc is ObjectDisposedException))
                     {
-                        remoteEndpoint = sock.RemoteEndPoint.ToString();
+                        try
+                        {
+                            remoteEndpoint = sock.RemoteEndPoint.ToString();
+                        }
+                        catch (Exception){}
                     }
                     sendErrorStr = String.Format("Exception sending to client at {0}: {1}", remoteEndpoint, exc);
                     Log.Warn(ErrorCode.GatewayExceptionSendingToClient, sendErrorStr, exc);
