@@ -198,10 +198,6 @@
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
-      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
-      <Name>OrleansCodeGenerator</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>

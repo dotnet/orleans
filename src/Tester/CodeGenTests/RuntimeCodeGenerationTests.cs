@@ -36,6 +36,7 @@ namespace Tester.CodeGenTests
     /// <summary>
     /// Tests runtime code generation.
     /// </summary>
+    [DeploymentItem("OrleansCodeGenerator.dll")]
     [TestClass]
     public class RuntimeCodeGenerationTests : UnitTestSiloHost
     {
