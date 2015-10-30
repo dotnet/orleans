@@ -1057,7 +1057,7 @@ namespace Orleans.Runtime
         {
             const string dateFormat = "yyyy-MM-dd-HH-mm-ss-fffZ"; // Example: 2010-09-02-09-50-43-341Z
 
-            var thisAssembly = (Assembly.GetEntryAssembly() ?? Assembly.GetCallingAssembly()) ?? Assembly.GetExecutingAssembly();
+            var thisAssembly = (Assembly.GetEntryAssembly() ?? Assembly.GetCallingAssembly()) ?? typeof(TraceLogger).GetTypeInfo().Assembly;
 
             var dumpFileName = string.Format(@"{0}-MiniDump-{1}.dmp",
                 thisAssembly.GetName().Name,

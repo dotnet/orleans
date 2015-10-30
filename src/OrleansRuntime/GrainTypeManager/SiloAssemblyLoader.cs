@@ -48,7 +48,7 @@ namespace Orleans.Runtime
 
         private void LoadApplicationAssemblies()
         {
-            var exeRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
             var directories = new Dictionary<string, SearchOption>
                     {

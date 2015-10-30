@@ -113,10 +113,11 @@ namespace Orleans.CodeGeneration
             AppDomain appDomain = null;
             try
             {
+                var assembly = typeof (GrainClientGenerator).GetTypeInfo().Assembly;
                 // Create AppDomain.
                 var appDomainSetup = new AppDomainSetup
                 {
-                    ApplicationBase = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                    ApplicationBase = Path.GetDirectoryName(assembly.Location),
                     DisallowBindingRedirects = false,
                     ConfigurationFile = AppDomain.CurrentDomain.SetupInformation.ConfigurationFile
                 };
@@ -130,7 +131,7 @@ namespace Orleans.CodeGeneration
                 var generator =
                     (GrainClientGenerator)
                     appDomain.CreateInstanceAndUnwrap(
-                        Assembly.GetExecutingAssembly().FullName,
+                        assembly.FullName,
                         typeof(GrainClientGenerator).FullName);
 
                 // Call a method 
