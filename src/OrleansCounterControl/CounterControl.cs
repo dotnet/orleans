@@ -57,7 +57,7 @@ namespace Orleans.Counter.Control
         {
             using (var usageStr = new StringWriter())
             {
-                usageStr.WriteLine(Assembly.GetExecutingAssembly().GetName().Name + ".exe {command}");
+                usageStr.WriteLine(typeof(CounterControl).GetTypeInfo().Assembly.GetName().Name + ".exe {command}");
                 usageStr.WriteLine("Where commands are:");
                 usageStr.WriteLine(" /? or /help       = Display usage info");
                 usageStr.WriteLine(" /r or /register   = Register Windows performance counters for Orleans [default]");
@@ -146,7 +146,7 @@ namespace Orleans.Counter.Control
             }
             catch (Exception exc) 
             {
-                ConsoleText.WriteError("Error running " + Assembly.GetExecutingAssembly().GetName().Name + ".exe", exc);
+                ConsoleText.WriteError("Error running " + typeof(CounterControl).GetTypeInfo().Assembly.GetName().Name + ".exe", exc);
 
                 if (!BruteForce) return 2;
 

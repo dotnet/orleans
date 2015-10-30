@@ -105,7 +105,7 @@ namespace Orleans.Runtime.Configuration
                         }
                         else
                         {
-                            assembly = Assembly.GetExecutingAssembly();
+                            assembly = typeof(ConfigUtilities).GetTypeInfo().Assembly;
                         }
                         var pluginType = assembly.GetType(className);
                         if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
@@ -477,7 +477,7 @@ namespace Orleans.Runtime.Configuration
         public static string FindConfigFile(bool isSilo)
         {
             // Add directory containing Orleans binaries to the search locations for config files
-            defaultConfigDirs[0] = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).GetTypeInfo().Assembly.Location);
 
             var notFound = new List<string>();
             foreach (string dir in defaultConfigDirs)

@@ -124,7 +124,7 @@ namespace Orleans.Runtime.Host
                 if (roleRootDir != null)
                 {
                     // Being called from Role startup code - either Azure WorkerRole or WebRole
-                    Assembly assy = Assembly.GetExecutingAssembly();
+                    Assembly assy = typeof(AzureConfigUtils).GetTypeInfo().Assembly;
                     string appRootPath = Path.GetDirectoryName(assy.Location);
                     if (appRootPath != null)
                         locations.Add(new DirectoryInfo(appRootPath));
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.Host
 
             Utils.SafeExecute(() =>
             {
-                Assembly assy = Assembly.GetExecutingAssembly();
+                Assembly assy = typeof(AzureConfigUtils).GetTypeInfo().Assembly;
                 string appRootPath = Path.GetDirectoryName(new Uri(assy.CodeBase).LocalPath);
                 if (appRootPath != null)
                     locations.Add(new DirectoryInfo(appRootPath));

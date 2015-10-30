@@ -241,7 +241,7 @@ namespace Orleans
                 new Dictionary<string, SearchOption>
                     {
                         {
-                            Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), 
+                            Path.GetDirectoryName(typeof(OutsideRuntimeClient).GetTypeInfo().Assembly.Location), 
                             SearchOption.AllDirectories
                         }
                     };
