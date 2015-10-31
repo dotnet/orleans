@@ -99,7 +99,7 @@ namespace Orleans.Runtime
 
             try
             {
-                if (StatsTablePublisher != null)
+                if (StatsTablePublisher != null && allCounters.Count > 0)
                 {
                     await StatsTablePublisher.ReportStats(allCounters);
                 }
