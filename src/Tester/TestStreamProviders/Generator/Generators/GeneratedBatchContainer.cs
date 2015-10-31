@@ -21,38 +21,42 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Runtime;
+using System;
+using System.Collections.Generic;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Tester.TestStreamProviders.Generator.Generators
 {
-    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
+    [Serializable]
+    internal class GeneratedBatchContainer : IBatchContainer
     {
-        public NoOpStreamDeliveryFailureHandler()
-            : this(true)
+        private readonly object payload;
+
+        public Guid StreamGuid { get; private set; }
+        public string StreamNamespace { get; private set; }
+        public StreamSequenceToken SequenceToken { get; set; }
+
+        public GeneratedBatchContainer(Guid streamGuid, string streamNamespace, object payload, StreamSequenceToken token)
         {
+            StreamGuid = streamGuid;
+            StreamNamespace = streamNamespace;
+            this.payload = payload;
+            this.SequenceToken = token;
         }
 
-        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            ShouldFaultSubsriptionOnError = faultOnError;
+            return new[] { Tuple.Create((T)payload, SequenceToken) };
         }
 
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
-
-        /// <summary>
-        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
-        /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
+        public bool ImportRequestContext()
         {
-            return TaskDone.Done;
+            return false;
         }
 
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
+        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
-            return TaskDone.Done;
+            return true;
         }
     }
 }

@@ -21,38 +21,31 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Runtime;
+using System;
+using System.Collections.Generic;
+using Orleans.Providers;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Tester.TestStreamProviders.Generator
 {
-    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
+    /// <summary>
+    /// Interface of generators used by the GeneratorStreamProvider.  Any method of generating events
+    ///  must conform to this interface to be used by the GeneratorStreamProvider.
+    /// </summary>
+    public interface IStreamGenerator
     {
-        public NoOpStreamDeliveryFailureHandler()
-            : this(true)
-        {
-        }
+        bool TryReadEvents(DateTime utcNow, out List<IBatchContainer> events);
+        void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig);
+    }
 
-        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
-        {
-            ShouldFaultSubsriptionOnError = faultOnError;
-        }
-
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
-
-        /// <summary>
-        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
-        /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
-        }
-
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
-        }
+    /// <summary>
+    /// Interface of configuration for generators used by the GeneratorStreamProvider.  This interface covers
+    ///   the minimal set of information the stream provider needs to configure a generator to generate data.  Generators should
+    ///   add any additional configuration information needed to it's implementation of this interface.
+    /// </summary>
+    public interface IStreamGeneratorConfig
+    {
+        Type StreamGeneratorType { get; }
+        void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration);
     }
 }

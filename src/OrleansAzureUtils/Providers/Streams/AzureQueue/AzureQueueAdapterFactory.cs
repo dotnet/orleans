@@ -33,7 +33,6 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
     public class AzureQueueAdapterFactory : IQueueAdapterFactory
     {
-        private const string CACHE_SIZE_PARAM = "CacheSize";
         private const int DEFAULT_CACHE_SIZE = 4096;
         private const string NUM_QUEUES_PARAM = "NumQueues";
 
@@ -61,14 +60,9 @@ namespace Orleans.Providers.Streams.AzureQueue
                 throw new ArgumentException(String.Format("{0} property not set", DATA_CONNECTION_STRING));
             if (!config.Properties.TryGetValue(DEPLOYMENT_ID, out deploymentId))
                 throw new ArgumentException(String.Format("{0} property not set", DEPLOYMENT_ID));
-            
-            string cacheSizeString;
-            cacheSize = DEFAULT_CACHE_SIZE;
-            if (config.Properties.TryGetValue(CACHE_SIZE_PARAM, out cacheSizeString))
-            {
-                if (!int.TryParse(cacheSizeString, out cacheSize))
-                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", CACHE_SIZE_PARAM));
-            }
+
+            cacheSize = SimpleQueueAdapterCache.ParseSize(config.Properties, DEFAULT_CACHE_SIZE);
+
             string numQueuesString;
             numQueues = DEFAULT_NUM_QUEUES;
             if (config.Properties.TryGetValue(NUM_QUEUES_PARAM, out numQueuesString))
@@ -79,7 +73,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
-            adapterCache = new SimpleQueueAdapterCache(this, cacheSize, logger);
+            adapterCache = new SimpleQueueAdapterCache(cacheSize, logger);
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>

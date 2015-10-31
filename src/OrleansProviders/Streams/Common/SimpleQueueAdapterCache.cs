@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -31,12 +32,13 @@ namespace Orleans.Providers.Streams.Common
 {
     public class SimpleQueueAdapterCache : IQueueAdapterCache
     {
+        private const string CACHE_SIZE_PARAM = "CacheSize";
+
         private readonly int cacheSize;
         private readonly Logger logger;
         private readonly ConcurrentDictionary<QueueId, IQueueCache> caches;
-
-
-        public SimpleQueueAdapterCache(IQueueAdapterFactory factory, int cacheSize, Logger logger)
+        
+        public SimpleQueueAdapterCache(int cacheSize, Logger logger)
         {
             if (cacheSize <= 0)
                 throw new ArgumentOutOfRangeException("cacheSize", "CacheSize must be a positive number.");
@@ -53,6 +55,18 @@ namespace Orleans.Providers.Streams.Common
         public int Size
         {
             get { return caches.Select(pair => pair.Value.Size).Sum(); }
+        }
+
+        public static int ParseSize(ReadOnlyDictionary<string, string> config, int defaultSize)
+        {
+            string cacheSizeString;
+            int cacheSize = defaultSize;
+            if (config.TryGetValue(CACHE_SIZE_PARAM, out cacheSizeString))
+            {
+                if (!int.TryParse(cacheSizeString, out cacheSize))
+                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", CACHE_SIZE_PARAM));
+            }
+            return cacheSize;
         }
     }
 }

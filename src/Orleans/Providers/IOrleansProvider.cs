@@ -21,8 +21,10 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 
@@ -108,5 +110,58 @@ namespace Orleans.Providers
         /// <returns>True if the property was found and removed, false otherwise.</returns>
         bool RemoveProperty(string key);
 
+    }
+
+    public static class ProviderConfigurationExtensions
+    {
+        public static int GetIntProperty(this IProviderConfiguration config, string key, int settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? int.Parse(s) : settingDefault;
+        }
+
+        public static string GetProperty(this IProviderConfiguration config, string key, string settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? s : settingDefault;
+        }
+
+        public static Guid GetGuidProperty(this IProviderConfiguration config, string key, Guid settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? Guid.Parse(s) : settingDefault;
+        }
+
+        public static T GetEnumProperty<T>(this IProviderConfiguration config, string key, T settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? (T)Enum.Parse(typeof(T),s) : settingDefault;
+        }
+
+        public static Type GetTypeProperty(this IProviderConfiguration config, string key, Type settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? Type.GetType(s) : settingDefault;
+        }
     }
 }
