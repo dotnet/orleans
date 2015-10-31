@@ -130,7 +130,7 @@ namespace Orleans.CodeGeneration
 
         public static bool IsGrainInterface(Type t)
         {
-            if (t.IsClass)
+            if (t.GetTypeInfo().IsClass)
                 return false;
             if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
                 return false;
@@ -140,7 +140,7 @@ namespace Orleans.CodeGeneration
             if (t == typeof (ISystemTarget))
                 return false;
 
-            return typeof (IAddressable).IsAssignableFrom(t);
+            return typeof (IAddressable).GetTypeInfo().IsAssignableFrom(t);
         }
 
         public static bool IsAddressable(Type t)
@@ -186,8 +186,9 @@ namespace Orleans.CodeGeneration
 
         public static bool IsTaskType(Type t)
         {
+            var typeInfo = t.GetTypeInfo();
             return t == typeof (Task)
-                || (t.IsGenericType && t.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.Task`1");
+                || (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.Task`1");
         }
 
         /// <summary>
@@ -254,9 +255,10 @@ namespace Orleans.CodeGeneration
                     strMethodId.Append(",");
 
                 strMethodId.Append(info.ParameterType.Name);
-                if (info.ParameterType.IsGenericType)
+                var typeInfo = info.ParameterType.GetTypeInfo();
+                if (typeInfo.IsGenericType)
                 {
-                    Type[] args = info.ParameterType.GetGenericArguments();
+                    Type[] args = typeInfo.GetGenericArguments();
                     foreach (Type arg in args)
                         strMethodId.Append(arg.Name);
                 }
@@ -304,11 +306,12 @@ namespace Orleans.CodeGeneration
         private void DefineClassNames(bool client)
         {
             var typeNameBase = TypeUtils.GetSimpleTypeName(Type, t => false, language);
-            if (Type.IsInterface && typeNameBase.Length > 1 && typeNameBase[0] == 'I' && Char.IsUpper(typeNameBase[1]))
+            var typeInfo = Type.GetTypeInfo();
+            if (typeInfo.IsInterface && typeNameBase.Length > 1 && typeNameBase[0] == 'I' && Char.IsUpper(typeNameBase[1]))
                 typeNameBase = typeNameBase.Substring(1);
 
             Namespace = Type.Namespace;
-            IsGeneric = Type.IsGenericType;
+            IsGeneric = typeInfo.IsGenericType;
             if (IsGeneric)
             {
                 Name = TypeUtils.GetParameterizedTemplateName(Type, language: language);
@@ -369,7 +372,7 @@ namespace Orleans.CodeGeneration
                             GetParameterName(parameter), type.FullName, method.Name));
                     }
 
-                    if (parameter.ParameterType.IsByRef)
+                    if (parameter.ParameterType.GetTypeInfo().IsByRef)
                     {
                         success = false;
                         violations.Add(String.Format("Argument {0} of method {1}.{2} is an a reference parameter. Reference parameters are not allowed.",
@@ -440,8 +443,9 @@ namespace Orleans.CodeGeneration
                 ParameterInfo[] parms = x.GetParameters();
                 foreach (ParameterInfo info in parms)
                 {
-                    xString.Append(info.ParameterType.Name);
-                    if (info.ParameterType.IsGenericType)
+                    var typeInfo = info.ParameterType.GetTypeInfo();
+                    xString.Append(typeInfo.Name);
+                    if (typeInfo.IsGenericType)
                     {
                         Type[] args = info.ParameterType.GetGenericArguments();
                         foreach (Type arg in args)
@@ -453,7 +457,8 @@ namespace Orleans.CodeGeneration
                 foreach (ParameterInfo info in parms)
                 {
                     yString.Append(info.ParameterType.Name);
-                    if (info.ParameterType.IsGenericType)
+                    var typeInfo = info.ParameterType.GetTypeInfo();
+                    if (typeInfo.IsGenericType)
                     {
                         Type[] args = info.ParameterType.GetGenericArguments();
                         foreach (Type arg in args)
@@ -482,17 +487,20 @@ namespace Orleans.CodeGeneration
             Type[] iTypes = GetRemoteInterfaces(serviceType, false).Values.ToArray();
             IEqualityComparer<MethodInfo> methodComparer = new MethodInfoComparer();
 
+            var typeInfo = grainType.GetTypeInfo();
+
             foreach (Type iType in iTypes)
             {
                 var mapping = new InterfaceMapping();
-                if (grainType.IsClass)
+                
+                if (typeInfo.IsClass)
                     mapping = grainType.GetInterfaceMap(iType);
 
-                if (grainType.IsInterface || mapping.TargetType == grainType)
+                if (typeInfo.IsInterface || mapping.TargetType == grainType)
                 {
                     foreach (var methodInfo in iType.GetMethods())
                     {
-                        if (grainType.IsClass)
+                        if (typeInfo.IsClass)
                         {
                             var mi = methodInfo;
                             var match = mapping.TargetMethods.Any(info => methodComparer.Equals(mi, info) &&

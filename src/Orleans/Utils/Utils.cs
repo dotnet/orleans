@@ -411,7 +411,7 @@ namespace Orleans.Runtime
 
             MethodInfo method;
             method = argumentTypes == null
-                ? cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                ? cl.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static).Where(m=>m.Name == methodName).FirstOrDefault()
                 : cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, argumentTypes, null);
 
             if (method == null)

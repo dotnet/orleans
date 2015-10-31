@@ -28,6 +28,7 @@ using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Providers;
 using Orleans.Serialization;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -255,7 +256,7 @@ namespace Orleans.Runtime
             public InvokerData(Type invokerType)
             {
                 baseInvokerType = invokerType;
-                if(invokerType.IsGenericType)
+                if(invokerType.GetTypeInfo().IsGenericType)
                     cachedGenericInvokers = new Dictionary<string, IGrainMethodInvoker>();
             }
 

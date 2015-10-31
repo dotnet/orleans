@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using Orleans.Runtime;
+using System.Reflection;
 
 namespace Orleans.CodeGeneration
 {
@@ -46,7 +47,9 @@ namespace Orleans.CodeGeneration
             }
             var implementation = TypeCodeMapper.GetImplementation(interfaceType, grainClassNamePrefix);
             GrainId grainId = getGrainId(implementation);
-            return GrainReference.FromGrainId(grainId, interfaceType.IsGenericType ? interfaceType.UnderlyingSystemType.FullName : null);
+
+            var typeInfo = interfaceType.GetTypeInfo();
+            return GrainReference.FromGrainId(grainId, typeInfo.IsGenericType ? typeInfo.UnderlyingSystemType.FullName : null);
         }
 
         /// <summary>
