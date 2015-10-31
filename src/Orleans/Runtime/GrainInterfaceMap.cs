@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
@@ -184,6 +185,7 @@ namespace Orleans.Runtime
         {
             implementation = null;
             GrainInterfaceData interfaceData;
+            var typeInfo = interfaceType.GetTypeInfo();
 
             // First, try to find a non-generic grain implementation:
             if (this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, false), out interfaceData) &&
@@ -194,7 +196,7 @@ namespace Orleans.Runtime
 
             // If a concrete implementation was not found and the interface is generic, 
             // try to find a generic grain implementation:
-            if (interfaceType.IsGenericType && 
+            if (typeInfo.IsGenericType && 
                 this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, true), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {
@@ -217,9 +219,10 @@ namespace Orleans.Runtime
 
         private string GetTypeKey(Type interfaceType, bool isGenericGrainClass)
         {
-            if (isGenericGrainClass && interfaceType.IsGenericType)
+            var typeInfo = interfaceType.GetTypeInfo();
+            if (isGenericGrainClass && typeInfo.IsGenericType)
             {
-                return interfaceType.GetGenericTypeDefinition().AssemblyQualifiedName;
+                return typeInfo.GetGenericTypeDefinition().AssemblyQualifiedName;
             }
             else 
             {
@@ -422,9 +425,10 @@ namespace Orleans.Runtime
 
         internal long GetTypeCode(Type interfaceType)
         {
-            if (interfaceType.IsGenericType && this.IsGeneric)
+            var typeInfo = interfaceType.GetTypeInfo();
+            if (typeInfo.IsGenericType && this.IsGeneric)
             {
-                string args = TypeUtils.GetGenericTypeArgs(interfaceType.GetGenericArguments(), t => true);
+                string args = TypeUtils.GetGenericTypeArgs(typeInfo.GetGenericArguments(), t => true);
                 int hash = Utils.CalculateIdHash(args);
                 return (((long)(hash & 0x00FFFFFF)) << 32) + GrainTypeCode;
             }

@@ -396,7 +396,7 @@ namespace Orleans.Serialization
             var baseType = t.BaseType;
             while (baseType != null)
             {
-                if (baseType.IsAbstract)
+                if (baseType.GetTypeInfo().IsAbstract)
                     Register(baseType);
 
                 baseType = baseType.BaseType;
@@ -438,7 +438,7 @@ namespace Orleans.Serialization
             var baseType = t.BaseType;
             while (baseType != null)
             {
-                if (baseType.IsAbstract)
+                if (baseType.GetTypeInfo().IsAbstract)
                     Register(baseType);
 
                 baseType = baseType.BaseType;
@@ -454,7 +454,7 @@ namespace Orleans.Serialization
         {
             try
             {
-                if (type.IsGenericTypeDefinition)
+                if (type.GetTypeInfo().IsGenericTypeDefinition)
                 {
                     Register(
                         type,
@@ -514,13 +514,14 @@ namespace Orleans.Serialization
 
             try
             {
-                if (type.IsEnum)
+                var typeInfo = type.GetTypeInfo();
+                if (typeInfo.IsEnum)
                 {
                     Register(type);
                 }
                 else if (!systemAssembly)
                 {
-                    if (!type.IsInterface && !type.IsAbstract
+                    if (!typeInfo.IsInterface && !typeInfo.IsAbstract
                         && (type.Namespace == null
                             || (!type.Namespace.Equals("System", StringComparison.Ordinal)
                                 && !type.Namespace.StartsWith("System.", StringComparison.Ordinal))))
@@ -534,7 +535,7 @@ namespace Orleans.Serialization
                                     type.Name,
                                     assembly.GetName().Name);
 
-                            var register = type.GetMethod("Register");
+                            var register = type.GetMethod("Register", Type.EmptyTypes);
                             if (register != null)
                             {
                                 try
@@ -640,19 +641,20 @@ namespace Orleans.Serialization
                                         type.Name,
                                         assembly.GetName().Name);
                             }
-                            else if (!type.IsSerializable)
+                            else if (!type.GetTypeInfo().IsSerializable)
                             {
                                 // Comparers with no fields can be safely dealt with as just a type name
                                 var comparer = false;
-                                foreach (var iface in type.GetInterfaces())
-                                    if (iface.IsGenericType
-                                        && (iface.GetGenericTypeDefinition() == typeof(IComparer<>)
-                                            || iface.GetGenericTypeDefinition() == typeof(IEqualityComparer<>)))
+                                foreach (var iface in type.GetInterfaces()) {
+                                    var ifaceTypeInfo = iface.GetTypeInfo();
+                                    if (ifaceTypeInfo.IsGenericType
+                                        && (ifaceTypeInfo.GetGenericTypeDefinition() == typeof(IComparer<>)
+                                            || ifaceTypeInfo.GetGenericTypeDefinition() == typeof(IEqualityComparer<>)))
                                     {
                                         comparer = true;
                                         break;
                                     }
-
+                                }
                                 if (comparer && (type.GetFields().Length == 0)) Register(type);
                             }
                             else
@@ -799,7 +801,8 @@ namespace Orleans.Serialization
                 if (copiers.TryGetValue(t.TypeHandle, out copier))
                     return copier;
 
-                if (t.IsGenericType && copiers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out copier))
+                var typeInfo = t.GetTypeInfo();
+                if (typeInfo.IsGenericType && copiers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out copier))
                     return copier;
             }
 
@@ -901,10 +904,11 @@ namespace Orleans.Serialization
                 }
 
                 var et = t.GetElementType();
+                var etInfo = et.GetTypeInfo();
                 if (et.IsOrleansShallowCopyable())
                 {
                     // Only check the size for primitive types because otherwise Buffer.ByteLength throws
-                    if (et.IsPrimitive && Buffer.ByteLength(originalArray) > LARGE_OBJECT_LIMIT)
+                    if (etInfo.IsPrimitive && Buffer.ByteLength(originalArray) > LARGE_OBJECT_LIMIT)
                     {
                         logger.Info(ErrorCode.Ser_LargeObjectAllocated,
                             "Large {0} array of total byte size {1} is being copied. This will result in an allocation on the large object heap. " +
@@ -958,7 +962,7 @@ namespace Orleans.Serialization
 
             }
 
-            if (t.IsSerializable)
+            if (t.GetTypeInfo().IsSerializable)
                 return FallbackSerializationDeepCopy(original);
 
             throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + 
@@ -979,8 +983,9 @@ namespace Orleans.Serialization
             lock (serializers)
             {
                 Serializer ser;
-                return serializers.TryGetValue(t.TypeHandle, out ser)
-                       || (t.IsGenericType && serializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out ser));
+                var typeInfo = t.GetTypeInfo();
+                return serializers.TryGetValue(typeInfo.TypeHandle, out ser)
+                       || (typeInfo.IsGenericType && serializers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out ser));
             }
         }
 
@@ -989,11 +994,12 @@ namespace Orleans.Serialization
             lock (serializers)
             {
                 Serializer ser;
-                if (serializers.TryGetValue(t.TypeHandle, out ser))
+                var typeInfo = t.GetTypeInfo();
+                if (serializers.TryGetValue(typeInfo.TypeHandle, out ser))
                     return ser;
 
-                if (t.IsGenericType)
-                    if (serializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out ser))
+                if (typeInfo.IsGenericType)
+                    if (serializers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out ser))
                         return ser;
             }
 
@@ -1043,9 +1049,10 @@ namespace Orleans.Serialization
             }
 
             var t = obj.GetType();
+            var typeInfo = t.GetTypeInfo();
 
             // Enums are extra-special
-            if (t.IsEnum)
+            if (typeInfo.IsEnum)
             {
                 stream.WriteTypeHeader(t, expected);
                 stream.Write(Convert.ToInt32(obj));
@@ -1059,7 +1066,7 @@ namespace Orleans.Serialization
             // At this point, we're either an object or a non-trivial value type
 
             // Start by checking to see if we're a back-reference, and recording us for possible future back-references if not
-            if (!t.IsValueType)
+            if (!typeInfo.IsValueType)
             {
                 int reference = SerializationContext.Current.CheckObjectWhileSerializing(obj);
                 if (reference >= 0)
@@ -1071,7 +1078,7 @@ namespace Orleans.Serialization
             }
 
             // If we're simply a plain old unadorned, undifferentiated object, life is easy
-            if (t.TypeHandle.Equals(objectTypeHandle))
+            if (typeInfo.TypeHandle.Equals(objectTypeHandle))
             {
                 stream.Write(SerializationTokenType.SpecifiedType);
                 stream.Write(SerializationTokenType.Object);
@@ -1079,14 +1086,14 @@ namespace Orleans.Serialization
             }
 
             // Arrays get handled specially
-            if (t.IsArray)
+            if (typeInfo.IsArray)
             {
                 var et = t.GetElementType();
                 if (HasOrleansSerialization(et))
                 {
                     SerializeArray((Array)obj, stream, expected, et);
                 }
-                else if (et.IsSerializable)
+                else if (et.GetTypeInfo().IsSerializable)
                 {
                     FallbackSerializer(obj, stream);
                 }
@@ -1105,13 +1112,13 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (t.IsSerializable)
+            if (typeInfo.IsSerializable)
             {
                 FallbackSerializer(obj, stream);
                 return;
             }
 
-            if ((obj is Exception) && !t.IsSerializable)
+            if ((obj is Exception) && !typeInfo.IsSerializable)
             {
                 // Exceptions should always be serializable, and thus handled by the prior if.
                 // In case someone creates a non-serializable exception, though, we don't want to 
@@ -1133,10 +1140,12 @@ namespace Orleans.Serialization
         // We assume that all lower bounds are 0, since creating an array with lower bound !=0 is hard in .NET 4.0+
         private static void SerializeArray(Array array, BinaryTokenStreamWriter stream, Type expected, Type et)
         {
+            var etTypeInfo = et.GetTypeInfo();
+
             // First check for one of the optimized cases
             if (array.Rank == 1)
             {
-                if (et.TypeHandle.Equals(byteTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(byteTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.ByteArray);
@@ -1144,7 +1153,7 @@ namespace Orleans.Serialization
                     stream.Write((byte[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(boolTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(boolTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.BoolArray);
@@ -1152,7 +1161,7 @@ namespace Orleans.Serialization
                     stream.Write((bool[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(charTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(charTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.CharArray);
@@ -1160,7 +1169,7 @@ namespace Orleans.Serialization
                     stream.Write((char[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(shortTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(shortTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.ShortArray);
@@ -1168,7 +1177,7 @@ namespace Orleans.Serialization
                     stream.Write((short[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(intTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(intTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.IntArray);
@@ -1176,7 +1185,7 @@ namespace Orleans.Serialization
                     stream.Write((int[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(longTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(longTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.LongArray);
@@ -1184,7 +1193,7 @@ namespace Orleans.Serialization
                     stream.Write((long[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(ushortTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(ushortTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.UShortArray);
@@ -1192,7 +1201,7 @@ namespace Orleans.Serialization
                     stream.Write((ushort[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(uintTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(uintTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.UIntArray);
@@ -1200,7 +1209,7 @@ namespace Orleans.Serialization
                     stream.Write((uint[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(ulongTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(ulongTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.ULongArray);
@@ -1208,7 +1217,7 @@ namespace Orleans.Serialization
                     stream.Write((ulong[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(floatTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(floatTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.FloatArray);
@@ -1216,7 +1225,7 @@ namespace Orleans.Serialization
                     stream.Write((float[])array);
                     return;
                 }
-                if (et.TypeHandle.Equals(doubleTypeHandle))
+                if (etTypeInfo.TypeHandle.Equals(doubleTypeHandle))
                 {
                     stream.Write(SerializationTokenType.SpecifiedType);
                     stream.Write(SerializationTokenType.DoubleArray);
@@ -1419,14 +1428,15 @@ namespace Orleans.Serialization
                     return new object();
                 }
 
+                var resultTypeInfo = resultType.GetTypeInfo();
                 // Handle enums
-                if (resultType.IsEnum)
+                if (resultTypeInfo.IsEnum)
                 {
                     result = Enum.ToObject(resultType, stream.ReadInt());
                     return result;
                 }
 
-                if (resultType.IsArray)
+                if (resultTypeInfo.IsArray)
                 {
                     result = DeserializeArray(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);

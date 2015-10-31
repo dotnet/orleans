@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -65,7 +66,7 @@ namespace Orleans.Runtime
                         ignored = null;
                         foreach (var requiredType in requiredTypes)
                         {
-                            if (requiredType.IsAssignableFrom(type))
+                            if (requiredType.GetTypeInfo().IsAssignableFrom(type))
                             {
                                 //  we found a match! load the assembly.
                                 return true;
