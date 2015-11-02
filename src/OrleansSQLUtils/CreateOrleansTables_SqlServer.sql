@@ -1198,13 +1198,13 @@ VALUES
 	N'SET NOCOUNT ON;
 	SELECT
 		[Address],
-        [ProxyPort],
+		[ProxyPort],
 		[Generation]
-      FROM
-		[MembershipReadAll]
-      WHERE
+	FROM
+		[OrleansMembershipTable]
+	WHERE
 		[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
-        AND [Status]   = @status AND @status IS NOT NULL;',
+		AND [Status]   = @status AND @status IS NOT NULL;',
 	N''
 );
 
@@ -1249,27 +1249,29 @@ VALUES
 	'MembershipReadAllKey',
 	N'SET NOCOUNT ON;
 	SELECT
-		[Port],
-		[Generation],
-		[Address],
-		[HostName],
-		[Status],
-		[ProxyPort],
-		[RoleName],
-		[InstanceName],
-		[UpdateZone],
-		[FaultZone],
-		[StartTime],
-		[IAmAliveTime],
-		[ETag],
-		[Version],
-		[VersionETag],
-		[SuspectingSilos],
-		[SuspectingTimes]
+		v.[DeploymentId],
+		m.[Address],
+		m.[Port],
+		m.[Generation],
+		m.[HostName],
+		m.[Status],
+		m.[ProxyPort],
+		m.[RoleName],
+		m.[InstanceName],
+		m.[UpdateZone],
+		m.[FaultZone],
+		m.[SuspectingSilos],
+		m.[SuspectingTimes],
+		m.[StartTime],
+		m.[IAmAliveTime],
+		m.[ETag],
+		v.[Version],
+		v.[ETag] AS VersionETag
 	FROM
-		[MembershipReadAll]
+		[OrleansMembershipVersionTable] v
+		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.[DeploymentId] = m.[DeploymentId]
 	WHERE
-		[DeploymentId]   = @deploymentId AND @deploymentId IS NOT NULL;',
+		v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;',
 	N''
 );
 
@@ -1423,31 +1425,5 @@ VALUES
 	 COMMIT TRANSACTION;',
 	N''
 );
-
-GO
-
-CREATE VIEW [MembershipReadAll] AS
-SELECT
-    v.[DeploymentId],
-    m.[Address],
-    m.[Port],
-    m.[Generation],
-    m.[HostName],
-    m.[Status],
-    m.[ProxyPort],
-    m.[RoleName],
-    m.[InstanceName],
-    m.[UpdateZone],
-    m.[FaultZone],
-    m.[SuspectingSilos],
-    m.[SuspectingTimes],
-    m.[StartTime],
-    m.[IAmAliveTime],
-    m.[ETag],
-    v.[Version],
-    v.[ETag] AS VersionETag
-FROM
-    [dbo].[OrleansMembershipVersionTable] v
-    LEFT OUTER JOIN [dbo].[OrleansMembershipTable] m ON v.DeploymentId = m.DeploymentId;
 
 GO
