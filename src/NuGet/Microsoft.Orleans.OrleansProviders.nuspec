@@ -23,7 +23,6 @@
   </metadata>
   <files>
     <file src="OrleansProviders.dll" target="lib\net45" />
-    <file src="OrleansProviders.pdb" target="lib\net45" />
-    <file src="SQLServer\CreateOrleansTables_SqlServer.sql" target="lib\net45\SQLServer" />
+    <file src="OrleansProviders.pdb" target="lib\net45" />    
   </files>
 </package>

@@ -163,7 +163,7 @@
     <None Include="ReadMe.md" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\OrleansProviders\SQLServer\CreateOrleansTables_SqlServer.sql">
+    <Content Include="..\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
       <Link>CreateOrleansTables_SqlServer.sql</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -200,4 +200,3 @@ call "$(SolutionDir)Build\PostBuild.cmd"
   </Target>
   -->
 </Project>
-
