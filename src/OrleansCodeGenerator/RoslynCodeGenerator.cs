@@ -63,18 +63,6 @@ namespace Orleans.CodeGenerator
         private static readonly RoslynCodeGenerator StaticInstance = new RoslynCodeGenerator();
 
         /// <summary>
-        /// Initializes static members of the <see cref="RoslynCodeGenerator"/> class.
-        /// </summary>
-        static RoslynCodeGenerator()
-        {
-            AppDomain.CurrentDomain.AssemblyLoad += (sender, args) => RegisterGeneratedCodeTarget(args.LoadedAssembly);
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                RegisterGeneratedCodeTarget(asm);
-            }
-        }
-
-        /// <summary>
         /// Gets the static instance.
         /// </summary>
         public static RoslynCodeGenerator Instance
@@ -121,6 +109,7 @@ namespace Orleans.CodeGenerator
             var timer = Stopwatch.StartNew();
             foreach (var input in inputs)
             {
+                RegisterGeneratedCodeTargets(input);
                 TryLoadGeneratedAssemblyFromCache(input);
             }
 
@@ -131,31 +120,43 @@ namespace Orleans.CodeGenerator
                 return;
             }
 
-            // Generate code for newly loaded assemblies.
-            var generatedSyntax = GenerateForAssemblies(grainAssemblies, true);
-
-            var compiled = default(byte[]);
-            if (generatedSyntax.Syntax != null)
+            try
             {
-                compiled = CompileAndLoad(generatedSyntax);
+                // Generate code for newly loaded assemblies.
+                var generatedSyntax = GenerateForAssemblies(grainAssemblies, true);
+
+                var compiled = default(byte[]);
+                if (generatedSyntax.Syntax != null)
+                {
+                    compiled = CompileAndLoad(generatedSyntax);
+                }
+
+                foreach (var assembly in generatedSyntax.SourceAssemblies)
+                {
+                    var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
+                    CompiledAssemblies.AddOrUpdate(
+                        assembly.GetName().FullName,
+                        generatedAssembly,
+                        (_, __) => generatedAssembly);
+                }
+
+                if (Logger.IsVerbose2)
+                {
+                    Logger.Verbose2(
+                        (int)ErrorCode.CodeGenCompilationSucceeded,
+                        "Generated code for {0} assemblies in {1}ms",
+                        generatedSyntax.SourceAssemblies.Count,
+                        timer.ElapsedMilliseconds);
+                }
             }
-
-            foreach (var assembly in generatedSyntax.SourceAssemblies)
+            catch (Exception exception)
             {
-                var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
-                CompiledAssemblies.AddOrUpdate(
-                    assembly.GetName().FullName,
-                    generatedAssembly,
-                    (_, __) => generatedAssembly);
-            }
-
-            if (Logger.IsVerbose2)
-            {
-                Logger.Verbose2(
-                    (int)ErrorCode.CodeGenCompilationSucceeded,
-                    "Generated code for {0} assemblies in {1}ms",
-                    generatedSyntax.SourceAssemblies.Count,
-                    timer.ElapsedMilliseconds);
+                var message = string.Format(
+                    "Exception generating code for input assemblies:\n{0}\nException: {1}",
+                    string.Join("\n", grainAssemblies.Select(_ => _.GetName().FullName)),
+                    TraceLogger.PrintException(exception));
+                Logger.Warn((int)ErrorCode.CodeGenCompilationFailed, message, exception);
+                throw;
             }
         }
 
@@ -167,37 +168,50 @@ namespace Orleans.CodeGenerator
         /// </param>
         public void GenerateAndLoadForAssembly(Assembly input)
         {
-            if (!ShouldGenerateCodeForAssembly(input))
+            try
             {
-                TryLoadGeneratedAssemblyFromCache(input);
+                RegisterGeneratedCodeTargets(input);
+                if (!ShouldGenerateCodeForAssembly(input))
+                {
+                    TryLoadGeneratedAssemblyFromCache(input);
 
-                return;
+                    return;
+                }
+
+                var timer = Stopwatch.StartNew();
+                var generated = GenerateForAssemblies(new List<Assembly> { input }, true);
+
+                var compiled = default(byte[]);
+                if (generated.Syntax != null)
+                {
+                    compiled = CompileAndLoad(generated);
+                }
+
+                foreach (var assembly in generated.SourceAssemblies)
+                {
+                    var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
+                    CompiledAssemblies.AddOrUpdate(
+                        assembly.GetName().FullName,
+                        generatedAssembly,
+                        (_, __) => generatedAssembly);
+                }
+
+                if (Logger.IsVerbose2)
+                {
+                    Logger.Verbose2(
+                        (int)ErrorCode.CodeGenCompilationSucceeded,
+                        "Generated code for 1 assembly in {0}ms",
+                        timer.ElapsedMilliseconds);
+                }
             }
-
-            var timer = Stopwatch.StartNew();
-            var generated = GenerateForAssemblies(new List<Assembly> { input }, true);
-
-            var compiled = default(byte[]);
-            if (generated.Syntax != null)
+            catch (Exception exception)
             {
-                compiled = CompileAndLoad(generated);
-            }
-
-            foreach (var assembly in generated.SourceAssemblies)
-            {
-                var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
-                CompiledAssemblies.AddOrUpdate(
-                    assembly.GetName().FullName,
-                    generatedAssembly,
-                    (_, __) => generatedAssembly);
-            }
-
-            if (Logger.IsVerbose2)
-            {
-                Logger.Verbose2(
-                    (int)ErrorCode.CodeGenCompilationSucceeded,
-                    "Generated code for 1 assembly in {0}ms",
-                    timer.ElapsedMilliseconds);
+                var message = string.Format(
+                    "Exception generating code for input assembly {0}\nException: {1}",
+                    input.GetName().FullName,
+                    TraceLogger.PrintException(exception));
+                Logger.Warn((int)ErrorCode.CodeGenCompilationFailed, message, exception);
+                throw;
             }
         }
 
@@ -212,6 +226,7 @@ namespace Orleans.CodeGenerator
         /// </returns>
         public string GenerateSourceForAssembly(Assembly input)
         {
+            RegisterGeneratedCodeTargets(input);
             if (!ShouldGenerateCodeForAssembly(input))
             {
                 return string.Empty;
@@ -461,7 +476,7 @@ namespace Orleans.CodeGenerator
         /// Registers the input assembly with this class.
         /// </summary>
         /// <param name="input">The assembly to register.</param>
-        private static void RegisterGeneratedCodeTarget(Assembly input)
+        private static void RegisterGeneratedCodeTargets(Assembly input)
         {
             var targets = input.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>();
             foreach (var target in targets)

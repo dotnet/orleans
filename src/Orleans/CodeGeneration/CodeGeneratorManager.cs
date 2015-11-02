@@ -25,6 +25,9 @@
         /// <summary>
         /// Ensures code for the <paramref name="input"/> assembly has been generated and loaded.
         /// </summary>
+        /// <param name="input">
+        /// The input assembly.
+        /// </param>
         public static void GenerateAndCacheCodeForAssembly(Assembly input)
         {
             var codeGen = CodeGeneratorInstance.Value;
