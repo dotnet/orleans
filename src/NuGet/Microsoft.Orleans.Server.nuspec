@@ -23,6 +23,7 @@
       <dependency id="Microsoft.Orleans.OrleansHost" version="$version$" />
       <dependency id="Microsoft.Orleans.CounterControl" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansCodeGenerator" version="$version$" />
     </dependencies>
   </metadata>
   <files>

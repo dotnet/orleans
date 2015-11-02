@@ -44,7 +44,7 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// Implements a code generator using the Roslyn C# compiler.
     /// </summary>
-    public class RoslynCodeGenerator : IRuntimeCodeGenerator, ISourceCodeGenerator
+    public class RoslynCodeGenerator : IRuntimeCodeGenerator, ISourceCodeGenerator, ICodeGeneratorCache
     {
         /// <summary>
         /// The compiled assemblies.
@@ -76,15 +76,15 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Adds a pre-generated assembly.
         /// </summary>
-        /// <param name="assemblyName">
-        /// The name of the assembly the provided <paramref name="rawAssembly"/> targets.
+        /// <param name="targetAssemblyName">
+        /// The name of the assembly the provided <paramref name="generatedAssembly"/> targets.
         /// </param>
-        /// <param name="rawAssembly">
-        /// The raw assembly.
+        /// <param name="generatedAssembly">
+        /// The generated assembly.
         /// </param>
-        public static void AddCachedAssembly(string assemblyName, byte[] rawAssembly)
+        public void AddGeneratedAssembly(string targetAssemblyName, byte[] generatedAssembly)
         {
-            CompiledAssemblies.TryAdd(assemblyName, new GeneratedAssembly { RawBytes = rawAssembly });
+            CompiledAssemblies.TryAdd(targetAssemblyName, new GeneratedAssembly { RawBytes = generatedAssembly });
         }
 
         /// <summary>
@@ -245,7 +245,7 @@ namespace Orleans.CodeGenerator
         /// Returns the collection of generated assemblies as pairs of target assembly name to raw assembly bytes.
         /// </summary>
         /// <returns>The collection of generated assemblies.</returns>
-        internal IDictionary<string, byte[]> GetGeneratedAssemblies()
+        public IDictionary<string, byte[]> GetGeneratedAssemblies()
         {
             return CompiledAssemblies.ToDictionary(_ => _.Key, _ => _.Value.RawBytes);
         }

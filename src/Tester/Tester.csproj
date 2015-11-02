@@ -161,6 +161,10 @@
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
+      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
+      <Name>OrleansCodeGenerator</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansCounterControl\OrleansCounterControl.csproj">
       <Project>{606b9647-cc0c-4058-bfbc-b5b7ed4f3c56}</Project>
       <Name>OrleansCounterControl</Name>
