@@ -53,7 +53,7 @@ if not "%BuildingInsideVisualStudio%" == "true" (
         del /q *.nupkg
 
         @echo ===== Build Orleans NuGet packages from %TargetDir%
-        call "%SolutionDir%NuGet\CreateOrleansPackages.bat" . .\Version.txt
+        call "%SolutionDir%NuGet\CreateOrleansPackages.bat" . .\Version.txt %SolutionDir%
         if ERRORLEVEL 1 EXIT /B 1
     
         @echo == Copying Orleans NuGet packages to %PKG_DIR%

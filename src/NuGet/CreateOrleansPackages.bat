@@ -7,6 +7,7 @@ set NUGET_EXE=%~dp0..\.nuget\nuget.exe
 
 set BASE_PATH=%1
 set VERSION=%2
+set SRC_DIR=%3
 IF %2 == "" set VERSION=%~dp0..\Build\Version.txt
 
 @echo CreateOrleansNugetPackages running in directory = %1
@@ -40,11 +41,11 @@ if not "%VERSION_BETA%" == "" ( set VERSION=%VERSION%-%VERSION_BETA% )
 @echo VERSION_BETA=%VERSION_BETA%
 @echo VERSION=%VERSION%
 
-@echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%
+@echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH% -- SRC_DIR=%SRC_DIR%
 
-@set NUGET_PACK_OPTS= -Version %VERSION% 
+@set NUGET_PACK_OPTS= -Version %VERSION%
 @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis -Symbols
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%"
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -Properties SRC_DIR=%SRC_DIR%
 @REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
