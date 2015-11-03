@@ -112,6 +112,7 @@
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\ControllableStreamProviderTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
+    <Compile Include="MembershipTests\SilosStopTests.cs" />
     <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\StreamTestsConstants.cs" />
@@ -225,4 +226,3 @@
   </Target>
   -->
 </Project>
-
