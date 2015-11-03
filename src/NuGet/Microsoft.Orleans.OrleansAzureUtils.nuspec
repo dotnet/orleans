@@ -30,5 +30,6 @@
     <file src="OrleansAzureUtils.dll" target="lib\net45" />
     <file src="OrleansAzureUtils.pdb" target="lib\net45" />
     <file src="OrleansAzureUtils.xml" target="lib\net45" />
+    <file src="$SRC_DIR$OrleansAzureUtils\**\*.cs" target="src" />
   </files>
 </package>

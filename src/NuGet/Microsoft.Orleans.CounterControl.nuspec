@@ -27,5 +27,6 @@
     <file src="OrleansCounterControl.exe" target="lib\net45" />
     <file src="OrleansCounterControl.pdb" target="lib\net45" />
     <file src="OrleansCounterControl.exe.config" target="lib\net45" />
+    <file src="$SRC_DIR$OrleansCounterControl\**\*.cs" target="src" />
   </files>
 </package>

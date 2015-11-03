@@ -26,5 +26,6 @@
     <file src="OrleansManager.pdb" target="lib\net45" />
     <file src="OrleansManager.exe.config" target="lib\net45" />
     <file src="ClientConfiguration.xml" target="lib\net45" />
+    <file src="$SRC_DIR$OrleansManager\**\*.cs" target="src" />
   </files>
 </package>
