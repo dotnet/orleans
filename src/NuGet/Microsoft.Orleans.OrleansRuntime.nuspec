@@ -24,5 +24,6 @@
   <files>
     <file src="OrleansRuntime.dll" target="lib\net45" />
     <file src="OrleansRuntime.pdb" target="lib\net45" />
+    <file src="$SRC_DIR$OrleansRuntime\**\*.cs" target="src" />
   </files>
 </package>

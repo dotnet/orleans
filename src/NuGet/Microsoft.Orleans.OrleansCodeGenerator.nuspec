@@ -24,5 +24,6 @@
   </metadata>
   <files>
     <file src="OrleansCodeGenerator.dll" target="lib\net45" />
+    <file src="$SRC_DIR$OrleansCodeGenerator\**\*.cs" target="src" />
   </files>
 </package>
