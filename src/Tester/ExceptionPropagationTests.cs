@@ -56,7 +56,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task TaskCancelationPropagation()
         {
-            IExceptionGrain grain = this.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var actualException = default(Exception);
             try
             {
