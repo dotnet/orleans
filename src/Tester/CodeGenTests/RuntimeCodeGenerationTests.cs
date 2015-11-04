@@ -55,7 +55,7 @@ namespace Tester.CodeGenTests
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public async Task RuntimeCodeGenTest()
         {
-            var grain = this.GrainFactory.GetGrain<IRuntimeCodeGenGrain<@event>>(Guid.NewGuid());
+            var grain = GrainFactory.GetGrain<IRuntimeCodeGenGrain<@event>>(Guid.NewGuid());
             var expected = new @event
             {
                 Id = Guid.NewGuid(),
@@ -76,7 +76,7 @@ namespace Tester.CodeGenTests
         public async Task RuntimeCodeGenNestedGenericTest()
         {
             const int Expected = 123985;
-            var grain = this.GrainFactory.GetGrain<INestedGenericGrain>(Guid.NewGuid());
+            var grain = GrainFactory.GetGrain<INestedGenericGrain>(Guid.NewGuid());
             
             var nestedGeneric = new NestedGeneric<int> { Payload = new NestedGeneric<int>.Nested { Value = Expected } };
             var actual = await grain.Do(nestedGeneric);
