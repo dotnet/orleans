@@ -595,12 +595,12 @@ namespace Orleans.Runtime
             return response;
         }
 
-        public Message CreatePromptTimeoutResponse(string errorMsg)
+        public Message CreatePromptExceptionResponse(Exception exception)
         {
             return new Message(Category, Directions.Response)
             {
                 Result = ResponseTypes.Error,
-                BodyObject = Response.ExceptionResponse(new TimeoutException(errorMsg))
+                BodyObject = Response.ExceptionResponse(exception)
             };
         }
 

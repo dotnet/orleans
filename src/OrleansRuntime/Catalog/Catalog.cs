@@ -1283,6 +1283,10 @@ namespace Orleans.Runtime
             // thus it will only deliver a "remove" notification for a given silo once to us. Therefore, we need to react the fist time we are notified.
             // We may review the directory behaiviour in the future and treat ShuttingDown differently ("drain only") and then this code will have to change a well.
             if (!status.IsTerminating()) return;
+            if (status == SiloStatus.Dead)
+            {
+                RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(updatedSilo);
+            }
 
             var activationsToShutdown = new List<ActivationData>();
             try
