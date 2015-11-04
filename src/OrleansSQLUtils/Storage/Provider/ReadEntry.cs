@@ -6,7 +6,7 @@ namespace Orleans.SqlUtils.StorageProvider
     /// <summary>
     /// Entry for a read
     /// </summary>
-    public sealed class ReadEntry 
+    internal sealed class ReadEntry 
     {
         /// <summary>
         /// Grain identity

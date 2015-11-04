@@ -78,7 +78,6 @@
     <Compile Include="SQLAdapter\DeviceGrain.cs" />
     <Compile Include="SQLAdapter\ICustomerState.cs" />
     <Compile Include="SQLAdapter\IDeviceState.cs" />
-    <Compile Include="SQLAdapter\SampleGrainStateMapFactory.cs" />
     <Compile Include="StatelessWorkerGrain.cs" />
     <Compile Include="SimpleObserverableGrain.cs" />
     <Compile Include="ObserverGrain.cs" />

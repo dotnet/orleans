@@ -3,7 +3,7 @@ namespace Orleans.SqlUtils.StorageProvider
     /// <summary>
     /// Factory interface for creating grain state maps for SQL storage provider
     /// </summary>
-    public interface IGrainStateMapFactory
+    internal interface IGrainStateMapFactory
     {
         /// <summary>
         /// Creates a grain state map 

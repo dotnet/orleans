@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using System.Data;
 using Newtonsoft.Json;
-using Orleans.SqlUtils.StorageProvider;
+using Orleans.SqlUtils.StorageProvider.GrainClasses;
 
-namespace Orleans.SqlUtils.StorageProvider.GrainClasses
+namespace Orleans.SqlUtils.StorageProvider.Tests
 {
     /// <summary>
     /// Sample grains' state map. Potential for improvement and usage of auto mapping libraries
     /// </summary>
-    public class SampleGrainStateMapFactory : IGrainStateMapFactory
+    internal class SampleGrainStateMapFactory : IGrainStateMapFactory
     {
         public GrainStateMap CreateGrainStateMap()
         {
