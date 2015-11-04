@@ -71,3 +71,13 @@ You'll receive a `TimeoutException` which you can catch and retry or do anything
 ## What happens if a grain call takes too much time to execute?
 
 Since Orleans uses a cooperative multi-tasking model, it will not preempt the execution of a grain automatically but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking. You should keep in mind that grain calls should not execute any long running tasks like IO synchronously and should not block on other tasks to complete. All waiting should be done asynchronously using the await keyword or other awaiting mechanisms. Grains should return as soon as possible to let other grains to execute for maximum throughput.
+
+## In what cases can a split brain (Same grain activated in multiple silos at the same time)happen?
+
+This can never happen during normal operations and each grain is supposed to have one and only one instance per ID.
+ The only time this can occur is when a silo crashes or if it's killed without being allowed to properly shutdown.
+ In that case there is a 30-60 seconds window (based on configuration) where a grain can exists in multiple silos before one is removed from the system.
+Grain IDs with their activation (instance) address is stored in a distributed hash table and each silo owns a partition of the DHT. When views of two different silos differ, both can request creation of an instance and as a result, two instances of the grain will exist until the cluster silos reach an agreement, then one of the instances will be deactivated and only one activation will survive.
+ You can find out more about how Orleans manages the clusters at [Cluster Management](Runtime-Implementation-Details/Cluster-Management) page.
+Also you can take a look at Orleans's [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for more detailed information, however you don't need to understand it fully to be able to write your application code.
+ You just need to consider the rare possibility of having two instances of an actor while writing your application.
