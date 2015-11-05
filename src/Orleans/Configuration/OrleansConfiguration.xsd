@@ -184,6 +184,36 @@
         Specifies global messaging configuration.
       </xs:documentation>
     </xs:annotation>
+    <xs:sequence>
+      <xs:element name="SerializationProviders" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            A collection of serialization providers that implement the Orleans.Serialization.IExternalSerializer interface.
+            IMPORTANT: The silo and client configurations must match.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Provider" minOccurs="1" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>
+                  A member of the provider collection.
+                </xs:documentation>
+              </xs:annotation>
+              <xs:complexType>
+                <xs:attribute name="type" type="xs:string">
+                  <xs:annotation>
+                    <xs:documentation>
+                      The fully qualified type name of a non-abstract, non-generic class that has a default parameterless constructor and implements Orleans.Serialization.IExternalSerializer
+                    </xs:documentation>
+                  </xs:annotation>
+                </xs:attribute>         
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
     <xs:attribute name="ResponseTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
         <xs:documentation>

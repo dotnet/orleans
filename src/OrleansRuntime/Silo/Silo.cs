@@ -186,7 +186,7 @@ namespace Orleans.Runtime
             StatisticsCollector.Initialize(nodeConfig);
             
             CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
-            SerializationManager.Initialize(globalConfig.UseStandardSerializer);
+            SerializationManager.Initialize(globalConfig.UseStandardSerializer, globalConfig.SerializationProviders);
             initTimeout = globalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
