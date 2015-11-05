@@ -138,6 +138,11 @@ The Orleans samples come with a very nice class called HostWrapper, which abstra
 
 
 ``` csharp
+using Orleans.Runtime.Host;
+using Orleans;
+using System.Net;
+
+
 class Program
 {
 
