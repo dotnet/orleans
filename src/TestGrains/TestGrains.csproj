@@ -44,8 +44,15 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CircularStateTestGrain.cs" />
@@ -67,6 +74,10 @@
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
     <Compile Include="SampleStreamingGrain.cs" />
     <Compile Include="SimpleDIGrain.cs" />
+    <Compile Include="SQLAdapter\CustomerGrain.cs" />
+    <Compile Include="SQLAdapter\DeviceGrain.cs" />
+    <Compile Include="SQLAdapter\ICustomerState.cs" />
+    <Compile Include="SQLAdapter\IDeviceState.cs" />
     <Compile Include="StatelessWorkerGrain.cs" />
     <Compile Include="SimpleObserverableGrain.cs" />
     <Compile Include="ObserverGrain.cs" />
@@ -85,6 +96,10 @@
     <ProjectReference Include="..\OrleansEventSourcing\OrleansEventSourcing.csproj">
       <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
       <Name>OrleansEventSourcing</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansSQLUtils\OrleansSqlUtils.csproj">
+      <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
+      <Name>OrleansSqlUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
