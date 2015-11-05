@@ -6,11 +6,6 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 -->
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
-  <!-- Signing key for the current project, if applicable -->
-  <PropertyGroup Condition="'$(SignAssembly)' == 'true' and '$(AssemblyOriginatorKeyFile)' != '' and '$(SnkFile)' == ''">
-    <SnkFile>$(AssemblyOriginatorKeyFile)</SnkFile>
-  </PropertyGroup>
-
   <!-- Work out the path to ClientGenerator.exe -->
   <Choose>
     <!-- Using Orleans NuGet packages -->
@@ -42,24 +37,6 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <Otherwise>
       <PropertyGroup>
         <CodeGenToolExe>$(CodeGenToolExeDir)\ClientGenerator.exe</CodeGenToolExe>
-      </PropertyGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
-    <When Condition="'$(VisualStudioVersion)' == '11.0'">
-      <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Fsc.exe')">
-        <FSharpCompilerPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\fsc.exe</FSharpCompilerPath>
-      </PropertyGroup>
-    </When>
-    <When Condition="'$(VisualStudioVersion)' == '14.0'">
-      <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\4.0\Framework\v4.0\Fsc.exe')">
-        <FSharpCompilerPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\4.0\Framework\v4.0\Fsc.exe</FSharpCompilerPath>
-      </PropertyGroup>
-    </When>
-    <Otherwise>
-      <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.1\Framework\v4.0\Fsc.exe')">
-        <FSharpCompilerPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.1\Framework\v4.0\fsc.exe</FSharpCompilerPath>
       </PropertyGroup>
     </Otherwise>
   </Choose>
@@ -98,24 +75,14 @@ Copyright (C) Microsoft Corporation. All rights reserved.
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
     </PropertyGroup>
-    <Message Text="[OrleansCodeGeneration] - Code-gen args file=$(ArgsFile)"/>
-    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/nomerge"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(SnkFile)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/fsharp:$(FSharpCompilerPath)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/cwd:$(ProjectDir)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/config:$(Configuration)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionExplicit:$(OptionExplicit)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionCompare:$(OptionCompare)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionStrict:$(OptionStrict)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)"/>
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')"/>
+    <ItemGroup>
+      <CodeGenArgs Include="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
+      <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')"/>
+      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')"/>
+    </ItemGroup>
     <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Message Text="[OrleansCodeGeneration] - Code-gen args file=$(ArgsFile)"/>
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
     <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"' />
   </Target>

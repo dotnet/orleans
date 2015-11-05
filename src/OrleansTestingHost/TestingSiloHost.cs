@@ -77,7 +77,7 @@ namespace Orleans.TestingHost
 
         private static int InstanceCounter = 0;
 
-        public IGrainFactory GrainFactory { get; private set; }
+        public static IGrainFactory GrainFactory { get; private set; }
 
         public Logger logger 
         {

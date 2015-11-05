@@ -7,11 +7,12 @@ set NUGET_EXE=%~dp0..\.nuget\nuget.exe
 
 set BASE_PATH=%1
 set VERSION=%2
+set SRC_DIR=%3
 IF %2 == "" set VERSION=%~dp0..\Build\Version.txt
 
-@echo CreateOrleansNugetPackages running in directory =
+@echo CreateOrleansNugetPackages running in directory = %1
 @cd
-@echo CreateOrleansNugetPackages version file = %VERSION% from base dir = %BASE_DIR% using nuget location = %NUGET_EXE%
+@echo CreateOrleansNugetPackages version file = %VERSION% from base dir = %BASE_PATH% using nuget location = %NUGET_EXE%
 
 if "%BASE_PATH%" == "." (
 	if EXIST "Release" (
@@ -22,25 +23,29 @@ if "%BASE_PATH%" == "." (
 )
 @echo Using binary drop location directory %BASE_PATH%
 
-if "%PRODUCT_VERSION%" == "" (
-
-  if EXIST "%VERSION%" (
+if EXIST "%VERSION%" (
       @Echo Using version number from file %VERSION%
-      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION%"`) do set VERSION=%%i.%%j.%%k
-  ) else (
-      @Echo ERROR: Unable to read version number from file %VERSION%
-      GOTO Usage
-  )
+      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION%"`) do (
+
+	   set VERSION=%%i.%%j.%%k
+	   set VERSION_BETA=%%l
+	  )
+	  
 ) else (
-    set VERSION=%PRODUCT_VERSION%
-	@Echo Using version number %VERSION% from %%PRODUCT_VERSION%%
+    @Echo ERROR: Unable to read version number from file %VERSION%
+    GOTO Usage
 )
 
-@echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%
+if not "%VERSION_BETA%" == "" ( set VERSION=%VERSION%-%VERSION_BETA% )
 
-@set NUGET_PACK_OPTS= -Version %VERSION% 
+@echo VERSION_BETA=%VERSION_BETA%
+@echo VERSION=%VERSION%
+
+@echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH% -- SRC_DIR=%SRC_DIR%
+
+@set NUGET_PACK_OPTS= -Version %VERSION%
 @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis -Symbols
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%"
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -Properties SRC_DIR=%SRC_DIR%
 @REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
 
 FOR %%G IN ("%~dp0*.nuspec") DO (

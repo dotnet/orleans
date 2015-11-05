@@ -69,7 +69,7 @@ namespace Orleans.Runtime
             var loader = new SiloAssemblyLoader();
 
             // Generate code for newly loaded assemblies.
-            CodeGenerator.RoslynCodeGenerator.Instance.GenerateAndLoadForAllAssemblies();
+            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
 
             // (no more assemblies should be loaded into memory, so now is a good time to log all types registered with the serialization manager)
             SerializationManager.LogRegisteredTypes();

@@ -15,8 +15,7 @@
     <AssemblyName>Orleans</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
+    <SignAssembly>false</SignAssembly>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -92,6 +91,7 @@
     <Compile Include="Async\TaskExtensions.cs" />
     <Compile Include="CodeGeneration\CodeGeneratorManager.cs" />
     <Compile Include="CodeGeneration\GrainState.cs" />
+    <Compile Include="CodeGeneration\ICodeGeneratorCache.cs" />
     <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
     <Compile Include="CodeGeneration\IRuntimeCodeGenerator.cs" />
     <Compile Include="CodeGeneration\ISourceCodeGenerator.cs" />
@@ -128,6 +128,7 @@
     <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />
+    <Compile Include="Streams\Predicates\DefaultStreamFilterPredicateWrapper.cs" />
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
@@ -366,9 +367,6 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Orleans.snk">
-      <Link>Orleans.snk</Link>
-    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
@@ -405,33 +403,16 @@
     <!-- Finally invoke code generator on the recently built Orleans.dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
-      <CodeGenToolExecCmd>"$(BootstrapOutputPath)ClientGenerator.exe" /nomerge /bootstrap "/in:$(BootstrapOutputPath)\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</CodeGenToolExecCmd>
-    </PropertyGroup>
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - CodeGen Cmd = $(CodeGenToolExecCmd)" />
-    <Exec Command="$(CodeGenToolExecCmd)" />
-  </Target>
-  <Target Name="WriteArgsToFileForDebugging" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
-    <MakeDir Directories="$(IntermediateOutputPath)Generated" />
-    <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
     </PropertyGroup>
-    <Message Text="[OrleansClientPreprocessing] - Code-gen args file=$(ArgsFile)" />
-    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="/nomerge" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/key:$(AssemblyOriginatorKeyFile)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/d:$([MSBuild]::Escape($(DefineConstants)))" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Import->'/imports:%(Identity)')" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/rns:$(RootNamespace)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(ReferencePath->'/r:%(Identity)')" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/fsharp:$(FSharpCompilerPath)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/cwd:$(ProjectDir)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/config:$(Configuration)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionExplicit:$(OptionExplicit)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionCompare:$(OptionCompare)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionStrict:$(OptionStrict)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/OptionInfer:$(OptionInfer)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="/MyType:$(MyType)" />
-    <WriteLinesToFile File="$(ArgsFile)" Lines="@(Compile->'/src:%(Identity)')" />
+    <ItemGroup>
+      <CodeGenArgs Include="/bootstrap" />
+      <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)"/>
+      <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')"/>
+      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')"/>
+    </ItemGroup>
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
+    <Exec Command='"$(BootstrapOutputPath)ClientGenerator.exe" "@$(ArgsFile)"' />
   </Target>
 </Project>
-

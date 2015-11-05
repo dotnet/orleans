@@ -34,6 +34,7 @@ namespace Orleans.Streams
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private static readonly IBackoffProvider DefaultBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+        private static readonly IStreamFilterPredicateWrapper DefaultStreamFilter =new DefaultStreamFilterPredicateWrapper();
         private const int StreamInactivityCheckFrequency = 10;
 
         private readonly string streamProviderName;
@@ -240,12 +241,12 @@ namespace Orleans.Streams
 
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter);
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter ?? DefaultStreamFilter);
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
                 if (data.State == StreamConsumerDataState.Inactive)
-                    RunConsumerCursor(data, filter).Ignore(); // Start delivering events if not actively doing so
+                    RunConsumerCursor(data, data.Filter).Ignore(); // Start delivering events if not actively doing so
             }
         }
 

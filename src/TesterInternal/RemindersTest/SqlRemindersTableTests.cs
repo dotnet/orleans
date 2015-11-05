@@ -39,8 +39,7 @@ namespace UnitTests.RemindersTest
     /// <summary>
     /// Tests for operation of Orleans Reminders Table using SQL
     /// </summary>
-    [TestClass]
-    [DeploymentItem("CreateOrleansTables_SqlServer.sql")]
+    [TestClass]    
     public class SQLRemindersTableTests
     {
         public TestContext TestContext { get; set; }

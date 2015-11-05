@@ -67,9 +67,9 @@ SELECT
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 8 THEN 'SQL Server 2000'
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 9 THEN 'SQL Server 2005'
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 10 
-            AND RIGHT(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), 5), 2) = 00 THEN 'SQL Server 2008'
+            AND RIGHT(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), 5), 2) = '0.' THEN 'SQL Server 2008'
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 10 
-            AND RIGHT(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), 5), 2) = 50 THEN 'SQL Server 2008 R2' 
+            AND RIGHT(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), 5), 2) = '50' THEN 'SQL Server 2008 R2' 
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 11 THEN 'SQL Server 2012'
         WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 12 THEN 'SQL Server 2014'
 		WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 13 THEN 'SQL Server 2016' 				
@@ -1198,13 +1198,13 @@ VALUES
 	N'SET NOCOUNT ON;
 	SELECT
 		[Address],
-        [ProxyPort],
+		[ProxyPort],
 		[Generation]
-      FROM
-		[MembershipReadAll]
-      WHERE
+	FROM
+		[OrleansMembershipTable]
+	WHERE
 		[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
-        AND [Status]   = @status AND @status IS NOT NULL;',
+		AND [Status]   = @status AND @status IS NOT NULL;',
 	N''
 );
 
@@ -1249,27 +1249,29 @@ VALUES
 	'MembershipReadAllKey',
 	N'SET NOCOUNT ON;
 	SELECT
-		[Port],
-		[Generation],
-		[Address],
-		[HostName],
-		[Status],
-		[ProxyPort],
-		[RoleName],
-		[InstanceName],
-		[UpdateZone],
-		[FaultZone],
-		[StartTime],
-		[IAmAliveTime],
-		[ETag],
-		[Version],
-		[VersionETag],
-		[SuspectingSilos],
-		[SuspectingTimes]
+		v.[DeploymentId],
+		m.[Address],
+		m.[Port],
+		m.[Generation],
+		m.[HostName],
+		m.[Status],
+		m.[ProxyPort],
+		m.[RoleName],
+		m.[InstanceName],
+		m.[UpdateZone],
+		m.[FaultZone],
+		m.[SuspectingSilos],
+		m.[SuspectingTimes],
+		m.[StartTime],
+		m.[IAmAliveTime],
+		m.[ETag],
+		v.[Version],
+		v.[ETag] AS VersionETag
 	FROM
-		[MembershipReadAll]
+		[OrleansMembershipVersionTable] v
+		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.[DeploymentId] = m.[DeploymentId]
 	WHERE
-		[DeploymentId]   = @deploymentId AND @deploymentId IS NOT NULL;',
+		v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;',
 	N''
 );
 
@@ -1423,31 +1425,5 @@ VALUES
 	 COMMIT TRANSACTION;',
 	N''
 );
-
-GO
-
-CREATE VIEW [MembershipReadAll] AS
-SELECT
-    v.[DeploymentId],
-    m.[Address],
-    m.[Port],
-    m.[Generation],
-    m.[HostName],
-    m.[Status],
-    m.[ProxyPort],
-    m.[RoleName],
-    m.[InstanceName],
-    m.[UpdateZone],
-    m.[FaultZone],
-    m.[SuspectingSilos],
-    m.[SuspectingTimes],
-    m.[StartTime],
-    m.[IAmAliveTime],
-    m.[ETag],
-    v.[Version],
-    v.[ETag] AS VersionETag
-FROM
-    [dbo].[OrleansMembershipVersionTable] v
-    LEFT OUTER JOIN [dbo].[OrleansMembershipTable] m ON v.DeploymentId = m.DeploymentId;
 
 GO

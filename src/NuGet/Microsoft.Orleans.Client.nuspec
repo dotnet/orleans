@@ -20,6 +20,7 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansCodeGenerator" version="$version$" />
     </dependencies>
   </metadata>
   <files>
