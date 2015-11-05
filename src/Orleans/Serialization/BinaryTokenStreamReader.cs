@@ -79,6 +79,15 @@ namespace Orleans.Serialization
         /// <summary> Current read position in the stream. </summary>
         public int CurrentPosition { get { return currentOffset + totalProcessedBytes - currentSegment.Offset; } }
 
+        /// <summary>
+        /// Creates a copy of the current stream reader.
+        /// </summary>
+        /// <returns>The new copy</returns>
+        public BinaryTokenStreamReader Copy()
+        {
+            return new BinaryTokenStreamReader(this.buffers);
+        }
+
         private void StartNextSegment()
         {
             totalProcessedBytes += currentSegment.Count;

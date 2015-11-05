@@ -82,10 +82,12 @@ namespace Orleans.Serialization
         #region Privates
 
         private static readonly HashSet<Type> registeredTypes;
+        private static readonly List<IExternalSerializer> externalSerializers;
         private static readonly Dictionary<string, Type> types;
         private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
         private static readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
+
 
         private static readonly TraceLogger logger;
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
@@ -132,13 +134,14 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        public static void InitializeForTesting()
+        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null)
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             AssemblyProcessor.Initialize();
+            RegisterSerializationProviders(serializationProviders);
         }
 
-        internal static void Initialize(bool useStandardSerializer)
+        internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders)
         {
             UseStandardSerializer = useStandardSerializer;
             if (StatisticsCollector.CollectSerializationStats)
@@ -174,6 +177,7 @@ namespace Orleans.Serialization
             }
 
             AssemblyProcessor.Initialize();
+            RegisterSerializationProviders(serializationProviders);
         }
 
         static SerializationManager()
@@ -181,6 +185,7 @@ namespace Orleans.Serialization
             AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
 
             registeredTypes = new HashSet<Type>();
+            externalSerializers = new List<IExternalSerializer>();
             types = new Dictionary<string, Type>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
@@ -863,13 +868,23 @@ namespace Orleans.Serialization
             {
                 copy = copier(original);
                 SerializationContext.Current.RecordObject(original, copy);
-            }
-            else
-            {
-                copy = DeepCopierHelper(t, original);
+                return copy;
             }
 
-            return copy;
+            var externalSerializer = externalSerializers.FirstOrDefault(serializer => serializer.IsSupportedType(t));
+            if (externalSerializer != null)
+            {
+                Register(
+                    t,
+                    externalSerializer.DeepCopy,
+                    externalSerializer.Serialize,
+                    externalSerializer.Deserialize);
+                copy = externalSerializer.DeepCopy(original);
+                SerializationContext.Current.RecordObject(original, copy);
+                return copy;
+            }
+
+            return DeepCopierHelper(t, original);
         }
 
         private static object DeepCopierHelper(Type t, object original)
@@ -1102,6 +1117,19 @@ namespace Orleans.Serialization
             {
                 stream.WriteTypeHeader(t, expected);
                 ser(obj, stream, expected);
+                return;
+            }
+
+            var externalSerializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
+            if (externalSerializer != null)
+            {
+                Register(
+                    t,
+                    externalSerializer.DeepCopy,
+                    externalSerializer.Serialize,
+                    externalSerializer.Deserialize);
+                stream.WriteTypeHeader(t, expected);
+                externalSerializer.Serialize(obj, stream, expected);
                 return;
             }
 
@@ -1437,6 +1465,15 @@ namespace Orleans.Serialization
                 if (deser != null)
                 {
                     result = deser(resultType, stream);
+                    DeserializationContext.Current.RecordObject(result);
+                    return result;
+                }
+
+                var externalSerializer = externalSerializers.FirstOrDefault(ser => ser.IsSupportedType(resultType));
+                if (externalSerializer != null)
+                {
+                    Register(resultType, externalSerializer.DeepCopy, externalSerializer.Serialize, externalSerializer.Deserialize);
+                    result = externalSerializer.Deserialize(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);
                     return result;
                 }
@@ -2033,6 +2070,33 @@ namespace Orleans.Serialization
 
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
             logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
+        }
+        
+        /// <summary>
+        /// Loads the external srializers and places them into a hash set
+        /// </summary>
+        /// <param name="type">The list of types that implement <see cref="IExternalSerializer"/></param>
+        private static void RegisterSerializationProviders(List<TypeInfo> providerTypes)
+        {
+            if (providerTypes == null)
+            {
+                return;
+            }
+
+            providerTypes.ForEach(
+                type =>
+                {
+                    try
+                    {
+                        var serializer = Activator.CreateInstance(type) as IExternalSerializer;
+                        serializer.Initialize(logger);
+                        externalSerializers.Add(serializer);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);
+                    }
+                });
         }
         
         /// <summary>
