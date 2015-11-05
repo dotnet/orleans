@@ -25,7 +25,7 @@ The test cases like ordinary grain code should call grains and then wait for the
 The `TestingSiloHost` which we inherit from starts the silos up for us but we need to shutdown them ourselves.
 The samples here are using MS Test but you can use NUnit, XUnit or any other testing framework that you want. Let's use the hello world sample's code here as an example.
 
-``` cshar
+``` csharp
 using System;
 using System.Threading.Tasks;
 using HelloWorldInterfaces;
