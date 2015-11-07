@@ -62,22 +62,22 @@ This can be done though a storage provider for Azure Cache. We don’t have one 
 
 ## Can I Connect to Orleans silos from the public internet?
 
-Orleans is designed to be hosted as the back-end part of a service and you are suposed to create a front-end in your servers which clients connect to. It can be a http based Web API project, a socket server, a SignalR server or anything else which you require. You can actually connect to Orleans from the internet but it is not a good practice from the security point of view.
+Orleans is designed to be hosted as the back-end part of a service and you are suposed to create a front-end in your servers which externa clients connect to. It can be an http based Web API project, a socket server, a SignalR server or anything else which you require. You can actually connect to Orleans from the internet, but it is not a good practice from the security point of view.
 
 ## What happens if a silo fails before my grain call returns a response for my call?
 
-You'll receive a `TimeoutException` which you can catch and retry or do anything else which makes sense in your application logic, then the grain will be created on an available silo when you do the next call to it. Actually there is a delay between the time that your silo fails and Orleans cluster detect it which is configurable. In this transition period all of your calls to the grain will fail but after the detection of the failure the grain will be created on another silo and it will start to work so it will be eventually available. More info can be found [here](Runtime-Implementation-Details/Cluster-Management)
+You'll receive a `TimeoutException` which you can catch and retry or do anything else which makes sense in your application logic. The grain will be automaticaly re-created on an available silo when you do the next call to it. Actually there is a delay between the time that your silo fails and Orleans cluster detect it which is configurable. In this transition period all of your calls to the grain will fail, but after the detection of the failure the grain will be created on another silo and it will start to work, so it will be eventually available. More information can be found [here](Runtime-Implementation-Details/Cluster-Management)
 
 ## What happens if a grain call takes too much time to execute?
 
-Since Orleans uses a cooperative multi-tasking model, it will not preempt the execution of a grain automatically but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking. You should keep in mind that grain calls should not execute any long running tasks like IO synchronously and should not block on other tasks to complete. All waiting should be done asynchronously using the await keyword or other awaiting mechanisms. Grains should return as soon as possible to let other grains to execute for maximum throughput.
+Since Orleans uses a cooperative multi-tasking model, it will not preempt the execution of a grain automatically but Orleans generates warnings for long executing grain calls so you can detect them. Cooperative multi-tasking has a much better throughput compared to preemptive multi-tasking. You should keep in mind that grain calls should not execute any long running tasks like IO synchronously and should not block on other tasks to complete. All waiting should be done asynchronously using the `await` keyword or other asynchronous waiting mechanisms. Grains should return as soon as possible to let other grains execute for maximum throughput.
 
-## In what cases can a split brain (Same grain activated in multiple silos at the same time)happen?
+## In what cases can a split brain (same grain activated in multiple silos at the same time) happen?
 
-This can never happen during normal operations and each grain is supposed to have one and only one instance per ID.
- The only time this can occur is when a silo crashes or if it's killed without being allowed to properly shutdown.
- In that case there is a 30-60 seconds window (based on configuration) where a grain can exists in multiple silos before one is removed from the system.
-Grain IDs with their activation (instance) address is stored in a distributed hash table and each silo owns a partition of the DHT. When views of two different silos differ, both can request creation of an instance and as a result, two instances of the grain will exist until the cluster silos reach an agreement, then one of the instances will be deactivated and only one activation will survive.
- You can find out more about how Orleans manages the clusters at [Cluster Management](Runtime-Implementation-Details/Cluster-Management) page.
-Also you can take a look at Orleans's [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for more detailed information, however you don't need to understand it fully to be able to write your application code.
- You just need to consider the rare possibility of having two instances of an actor while writing your application.
+This can never happen during normal operations and each grain will have one and only one instance per ID.
+The only time this can occur is when a silo crashes or if it's killed without being allowed to properly shutdown.
+In that case there is a 30-60 seconds window (based on configuration) where a grain can exist in multiple silos before one is removed from the system.
+The mapping from grain IDs to their activation (instance) addresses is stored in a distributed directory (implemented with DHT) and each silo owns a partition of this directory. When membership views of two silos differ, both can request creation of an instance and as a result. two instances of the grain may co-exist. Once the cluster silos reach an agreement on membership, one of the instances will be deactivated and only one activation will survive.
+You can find out more about how Orleans manages the clusters at [Cluster Management](Runtime-Implementation-Details/Cluster-Management) page.
+Also you can take a look at Orleans's [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for a more detailed information, however you don't need to understand it fully to be able to write your application code.
+You just need to consider the rare possibility of having two instances of an actor while writing your application.
