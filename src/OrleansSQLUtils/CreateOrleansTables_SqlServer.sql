@@ -128,7 +128,7 @@ BEGIN
 	CREATE TABLE [OrleansMembershipVersionTable]
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME2(3) NOT NULL, 
+		[Timestamp] DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(), 
 		[Version] BIGINT NOT NULL,		
 		[ETag] ROWVERSION NOT NULL,
     
@@ -152,8 +152,11 @@ BEGIN
 		[SuspectingTimes] NVARCHAR(MAX) NULL, 
 		[StartTime] DATETIME2(3) NOT NULL, 
 		[IAmAliveTime] DATETIME2(3) NOT NULL,			
-		[ETag] ROWVERSION NOT NULL,
-    
+		
+		-- Not using ROWVERSION here since we're not updating the ETag on IAmAliveTime field updates.
+		-- Using BINARY(8) because a nonnullable ROWVERSION column is semantically equivalent to a binary(8) column. 
+		[ETag] BINARY(8) NOT NULL DEFAULT 0,
+		    
 		-- A refactoring note: This combination needs to be unique, currently enforced by making it a primary key.
 		-- See more information at http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html.
 		CONSTRAINT PK_OrleansMembershipTable_DeploymentId PRIMARY KEY([DeploymentId], [Address], [Port], [Generation]),	
@@ -177,7 +180,7 @@ BEGIN
 	(
 		[OrleansStatisticsTableId] INT IDENTITY(1,1) NOT NULL,
 		[DeploymentId] NVARCHAR(150) NOT NULL,      
-		[Timestamp] DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), 
+		[Timestamp] DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(), 
 		[Id] NVARCHAR(250) NOT NULL,     
 		[HostName] NVARCHAR(150) NOT NULL, 
 		[Name] NVARCHAR(150) NULL, 
@@ -192,7 +195,7 @@ BEGIN
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
 		[ClientId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME2(3) NOT NULL, 
+		[Timestamp] DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(),
 		[Address] VARCHAR(45) NOT NULL, 
 		[HostName] NVARCHAR(150) NOT NULL, 
 		[CPU] FLOAT NOT NULL,
@@ -210,7 +213,7 @@ BEGIN
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
 		[SiloId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME2(3) NOT NULL, 
+		[Timestamp] DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(),
 		[Address] VARCHAR(45) NOT NULL, 
 		[Port] INT NOT NULL, 
 		[Generation] INT NOT NULL, 
@@ -269,12 +272,10 @@ BEGIN
 		INSERT INTO [OrleansMembershipVersionTable]
 		(
 			[DeploymentId],
-			[Timestamp],
 			[Version]	    
 		)
 		SELECT	
 			@deploymentId,
-			SYSUTCDATETIME(),
 			@version        
 		WHERE NOT EXISTS
 		(			
@@ -361,7 +362,7 @@ BEGIN
 			-- to be rolled back.
 			UPDATE [OrleansMembershipVersionTable]
 			SET
-				[Timestamp]	= SYSUTCDATETIME(),
+				[Timestamp]	= GETUTCDATE(),
 				[Version]	= @version
 			WHERE
 				([DeploymentId]	= @deploymentId AND @deploymentId IS NOT NULL)
@@ -412,7 +413,8 @@ BEGIN
 			[SuspectingSilos]	= @suspectingSilos,
 			[SuspectingTimes]	= @suspectingTimes,
 			[StartTime]			= @startTime,
-			[IAmAliveTime]		= @iAmAliveTime
+			[IAmAliveTime]		= @iAmAliveTime,
+			[Etag]				= @etag + 1
 		WHERE
 			([DeploymentId]		= @deploymentId AND @deploymentId IS NOT NULL)
 			AND ([Address]		= @address AND @address IS NOT NULL)
@@ -429,7 +431,7 @@ BEGIN
 			-- to be rolled back.
 			UPDATE [OrleansMembershipVersionTable]
 			SET
-				[Timestamp]	= SYSUTCDATETIME(),
+				[Timestamp]	= GETUTCDATE(),
 				[Version]	= @version
 			WHERE
 				DeploymentId	= @deploymentId AND @deploymentId IS NOT NULL
@@ -510,548 +512,6 @@ BEGIN
 		BEGIN
 			UPDATE [OrleansClientMetricsTable]
 			SET			
-				[Timestamp] = SYSUTCDATETIME(),
-				[Address] = @address,
-				[HostName] = @hostName,
-				[CPU] = @cpuUsage,
-				[Memory] = @memoryUsage,
-				[SendQueue] = @sendQueueLength,
-				[ReceiveQueue] = @receiveQueueLength,
-				[SentMessages] = @sentMessagesCount,
-				[ReceivedMessages] = @receivedMessagesCount,
-				[ConnectedGatewayCount] = @connectedGatewaysCount
-			WHERE
-				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
-				AND ([ClientId] = @clientId AND @clientId IS NOT NULL);
-		END
-		ELSE
-		BEGIN	
-			INSERT INTO [OrleansClientMetricsTable]
-			(
-				[DeploymentId],
-				[ClientId],
-				[Timestamp],
-				[Address],			
-				[HostName],
-				[CPU],
-				[Memory],
-				[SendQueue],
-				[ReceiveQueue],
-				[SentMessages],
-				[ReceivedMessages],
-				[ConnectedGatewayCount]
-			)
-			VALUES
-			(
-				@deploymentId,
-				@clientId,
-				SYSUTCDATETIME(),
-				@address,
-				@hostName,
-				@cpuUsage,
-				@memoryUsage,
-				@sendQueueLength,
-				@receiveQueueLength,
-				@sentMessagesCount,
-				@receivedMessagesCount,
-				@connectedGatewaysCount
-			);
-		END
-		COMMIT TRANSACTION;',
-		N''
-	);
-
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
-	VALUES
-	(
-		'UpsertSiloMetricsKey',
-		N'SET XACT_ABORT, NOCOUNT ON;		
-		BEGIN TRANSACTION;
-		IF EXISTS(SELECT 1 FROM  [OrleansSiloMetricsTable]  WITH(updlock, holdlock) WHERE
-			[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
-			AND [SiloId] = @siloId AND @siloId IS NOT NULL)
-		BEGIN
-			UPDATE [OrleansSiloMetricsTable]
-			SET
-				Timestamp = SYSUTCDATETIME(),
-				Address = @address,
-				Port = @port,
-				Generation = @generation,
-				HostName = @hostName,
-				GatewayAddress = @gatewayAddress,
-				GatewayPort = @gatewayPort,
-				CPU = @cpuUsage,
-				Memory = @memoryUsage,
-				Activations = @activationsCount,
-				RecentlyUsedActivations = @recentlyUsedActivationsCount,
-				SendQueue = @sendQueueLength,
-				ReceiveQueue = @receiveQueueLength,
-				RequestQueue = @requestQueueLength,
-				SentMessages = @sentMessagesCount,
-				ReceivedMessages = @receivedMessagesCount,
-				LoadShedding = @isOverloaded,
-				ClientCount = @clientCount
-			WHERE
-				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
-				AND ([SiloId] = @siloId AND @siloId IS NOT NULL);
-		END
-		ELSE
-		BEGIN
-			INSERT INTO [OrleansSiloMetricsTable]
-			(
-				[DeploymentId],
-				[SiloId],
-				[Timestamp],
-				[Address],
-				[Port],
-				[Generation],
-				[HostName],
-				[GatewayAddress],
-				[GatewayPort],
-				[CPU],
-				[Memory],
-				[Activations],
-				[RecentlyUsedActivations],
-				[SendQueue],
-				[ReceiveQueue],
-				[RequestQueue],
-				[SentMessages],	
-				[ReceivedMessages],
-				[LoadShedding],
-				[ClientCount]
-			)
-			VALUES
-			(
-				@deploymentId,
-				@siloId,
-				SYSUTCDATETIME(),
-				@address,
-				@port,
-				@generation,
-				@hostName,
-				@gatewayAddress,
-				@gatewayPort,
-				@cpuUsage,
-				@memoryUsage,
-				@activationsCount,
-				@recentlyUsedActivationsCount,
-				@sendQueueLength,
-				@receiveQueueLength,
-				@requestQueueLength,
-				@sentMessagesCount,
-				@receivedMessagesCount,
-				@isOverloaded,
-				@clientCount
-			);
-		END
-		COMMIT TRANSACTION;',
-		N''
-	);
-END
-ELSE
-BEGIN
-	-- These table definitions are for SQL Server 2000.
-	CREATE TABLE [OrleansMembershipVersionTable]
-	(
-		[DeploymentId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME NOT NULL, 
-		[Version] BIGINT NOT NULL,
-
-		-- ETag should also always be unique, but there will ever be only one row.
-		-- This is BINARY(16) to be as much compatible with the later SQL Server
-		-- editions as possible.
-		[ETag] BINARY(16) NOT NULL,
-    
-		CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY([DeploymentId])	
-	);
-
-	CREATE TABLE [OrleansMembershipTable]
-	(
-		[DeploymentId] NVARCHAR(150) NOT NULL, 
-		[Address] VARCHAR(45) NOT NULL, 
-		[Port] INT NOT NULL, 
-		[Generation] INT NOT NULL, 
-		[HostName] NVARCHAR(150) NOT NULL, 
-		[Status] INT NOT NULL, 
-		[ProxyPort] INT NULL, 
-		[RoleName] NVARCHAR(150) NULL, 
-		[InstanceName] NVARCHAR(150) NULL, 
-		[UpdateZone] INT NULL, 
-		[FaultZone] INT NULL,		
-		[SuspectingSilos] NTEXT NULL, 
-		[SuspectingTimes] NTEXT NULL, 
-		[StartTime] DATETIME NOT NULL, 
-		[IAmAliveTime] DATETIME NOT NULL,
-	
-		-- This ETag should always be unique for a given primary key.
-		-- This is BINARY(16) to be as much compatible with the later SQL Server
-		-- editions as possible. 
-		[ETag] BINARY(16) NOT NULL,
-    
-		-- A refactoring note: This combination needs to be unique, currently enforced by making it a primary key.
-		-- See more information at http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html.
-		CONSTRAINT PK_OrleansMembershipTable_DeploymentId PRIMARY KEY([DeploymentId], [Address], [Port], [Generation]),	
-		CONSTRAINT FK_OrleansMembershipTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
-	);
-
-	CREATE TABLE [OrleansRemindersTable]
-	(
-		[ServiceId] NVARCHAR(150) NOT NULL, 
-		[GrainId] NVARCHAR(150) NOT NULL, 
-		[ReminderName] NVARCHAR(150) NOT NULL,
-		[StartTime] DATETIME NOT NULL, 
-		[Period] INT NOT NULL,
-		[GrainIdConsistentHash] INT NOT NULL,
-				
-		-- This is BINARY(16) to be as much compatible with the later SQL Server
-		-- editions as possible.
-		[ETag] BINARY(16) NOT NULL,
-    
-		CONSTRAINT PK_OrleansRemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY([ServiceId], [GrainId], [ReminderName])
-	);
-	
-	CREATE TABLE [OrleansStatisticsTable]
-	(
-		[OrleansStatisticsTableId] INT IDENTITY(1,1) NOT NULL,
-		[DeploymentId] NVARCHAR(150) NOT NULL,      
-		[Timestamp] DATETIME NOT NULL DEFAULT GETUTCDATE(), 
-		[Id] NVARCHAR(250) NOT NULL,     
-		[HostName] NVARCHAR(150) NOT NULL, 
-		[Name] NVARCHAR(150) NULL, 
-		[IsDelta] BIT NOT NULL, 
-		[StatValue] NVARCHAR(1024) NOT NULL,
-		[Statistic] NVARCHAR(250) NOT NULL,
-
-		CONSTRAINT OrleansStatisticsTable_OrleansStatisticsTableId PRIMARY KEY([OrleansStatisticsTableId])	
-	);
-
-	CREATE TABLE [OrleansClientMetricsTable]
-	(
-		[DeploymentId] NVARCHAR(150) NOT NULL, 
-		[ClientId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME NOT NULL, 
-		[Address] VARCHAR(45) NOT NULL, 
-		[HostName] NVARCHAR(150) NOT NULL, 
-		[CPU] FLOAT NOT NULL,
-		[Memory] BIGINT NOT NULL,
-		[SendQueue] INT NOT NULL, 
-		[ReceiveQueue] INT NOT NULL, 
-		[SentMessages] BIGINT NOT NULL,
-		[ReceivedMessages] BIGINT NOT NULL,
-		[ConnectedGatewayCount] BIGINT NOT NULL,
-    
-		CONSTRAINT PK_OrleansClientMetricsTable_DeploymentId_ClientId PRIMARY KEY([DeploymentId], [ClientId])
-	);
-
-	CREATE TABLE [OrleansSiloMetricsTable]
-	(
-		[DeploymentId] NVARCHAR(150) NOT NULL, 
-		[SiloId] NVARCHAR(150) NOT NULL, 
-		[Timestamp] DATETIME NOT NULL, 
-		[Address] VARCHAR(45) NOT NULL, 
-		[Port] INT NOT NULL, 
-		[Generation] INT NOT NULL, 
-		[HostName] NVARCHAR(150) NOT NULL, 
-		[GatewayAddress] VARCHAR(45) NULL, 
-		[GatewayPort] INT NULL, 
-		[CPU] FLOAT NOT NULL,
-		[Memory] BIGINT NOT NULL,
-		[Activations] INT NOT NULL,
-		[RecentlyUsedActivations] INT NOT NULL,
-		[SendQueue] INT NOT NULL, 
-		[ReceiveQueue] INT NOT NULL, 
-		[RequestQueue] BIGINT NOT NULL,
-		[SentMessages] BIGINT NOT NULL,
-		[ReceivedMessages] BIGINT NOT NULL,
-		[LoadShedding] BIT NOT NULL,
-		[ClientCount] BIGINT NOT NULL,
-    
-		CONSTRAINT PK_OrleansSiloMetricsTable_DeploymentId_SiloId PRIMARY KEY([DeploymentId], [SiloId]),
-		CONSTRAINT FK_OrleansSiloMetricsTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
-	);
-
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
-	VALUES
-	(
-		'UpdateIAmAlivetimeKey',
-		N'
-		-- This is not expected to never fail by Orleans, so return value
-		-- is not needed nor is it checked.
-		SET NOCOUNT ON;
-		BEGIN TRANSACTION;
-		UPDATE [OrleansMembershipTable]
-		SET
-			IAmAliveTime = @iAmAliveTime,
-			ETag = NEWID()
-		WHERE
-			([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
-			AND ([Address] = @address AND @address IS NOT NULL)
-			AND ([Port] = @port AND @port IS NOT NULL)
-			AND ([Generation] = @generation AND @generation IS NOT NULL);
-		COMMIT TRANSACTION;',
-		N''
-	);
-
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
-	VALUES
-	(
-		'InsertMembershipVersionKey',
-		N'SET NOCOUNT ON;
-		BEGIN TRANSACTION;
-		INSERT INTO [OrleansMembershipVersionTable]
-		(
-			[DeploymentId],
-			[TimeStamp],
-			[Version],
-			[ETag]
-		)
-		SELECT	
-			@deploymentId,
-			GETUTCDATE(),
-			@version,
-			NEWID()
-		WHERE NOT EXISTS
-		(
-			SELECT 1
-			FROM OrleansMembershipVersionTable WITH(HOLDLOCK, XLOCK, ROWLOCK)
-			WHERE [DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
-		);
-                                        
-		IF @@ROWCOUNT > 0
-		BEGIN
-			COMMIT TRANSACTION;
-			SELECT CAST(1 AS BIT);
-		END
-		ELSE
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT CAST(0 AS BIT);
-		END',
-		N''
-	);
-
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
-	VALUES
-	(
-		'InsertMembershipKey',
-		N'SET NOCOUNT ON;
-		BEGIN TRANSACTION; --  @@TRANCOUNT = 0 -> +1.
-		-- There is no need to check the condition for inserting
-		-- as the necessary condition with regard to table membership
-		-- protocol is enforced as part of the primary key definition.
-		-- Inserting will fail if there is already a membership
-		-- row with the same
-		-- * [DeploymentId] = @deploymentId
-		-- * [Address]		= @address
-		-- * [Port]			= @port
-		-- * [Generation]	= @generation
-		--
-		-- For more information on table membership protocol insert see at
-		-- http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html and at
-		-- https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs
-		INSERT INTO [OrleansMembershipTable]
-		(
-			[DeploymentId],
-			[Address],
-			[Port],
-			[Generation],
-			[HostName],
-			[Status],
-			[ProxyPort],
-			[RoleName],
-			[InstanceName],
-			[UpdateZone],
-			[FaultZone],
-			[SuspectingSilos],
-			[SuspectingTimes],
-			[StartTime],
-			[IAmAliveTime],
-			[ETag]
-		)
-		VALUES
-		(
-			@deploymentId,
-			@address,
-			@port,
-			@generation,
-			@hostName,
-			@status,
-			@proxyPort,
-			@roleName,
-			@instanceName,
-			@updateZone,
-			@faultZone,
-			@suspectingSilos,
-			@suspectingTimes,
-			@startTime,
-			@iAmAliveTime,
-			NEWID()
-		);
-
-		IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
-
-		IF @@TRANCOUNT > 0
-		BEGIN
-			-- The transaction has not been rolled back. The following
-			-- update must succeed or else the whole transaction needs
-			-- to be rolled back.
-			UPDATE [OrleansMembershipVersionTable]
-			SET
-				[Timestamp]	= GETUTCDATE(),
-				[Version]	= @version,
-				[ETag]		= NEWID()
-			WHERE
-				([DeploymentId]	= @deploymentId AND @deploymentId IS NOT NULL)
-				AND ([ETag]		= @versionEtag AND @versionEtag IS NOT NULL);
-
-			-- Here the rowcount should always be either zero (no update)
-			-- or one (exactly one entry updated). Having more means that multiple
-			-- lines matched the condition. This should not be possible, but checking
-			-- only for zero allows the system to function and there is no harm done
-			-- besides potentially superfluous updates.
-			IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
-		END
-
-		IF @@TRANCOUNT > 0
-		BEGIN
-			COMMIT TRANSACTION;
-			SELECT CAST(1 AS BIT);
-		END
-		ELSE
-		BEGIN	
-			SELECT CAST(0 AS BIT);
-		END', 
-		N''
-	);
-
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
-	VALUES
-	(
-		'UpdateMembershipKey',
-		N'SET NOCOUNT ON;
-		BEGIN TRANSACTION; --  @@TRANCOUNT + 1
-
-		-- For more information on table membership protocol update see at
-		-- http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html and at
-		-- https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs.
-		UPDATE [OrleansMembershipTable]
-		SET
-			[Address]			= @address,
-			[Port]				= @port,
-			[Generation]		= @generation,
-			[HostName]			= @hostName,
-			[Status]			= @status,
-			[ProxyPort]			= @proxyPort,
-			[RoleName]			= @roleName,
-			[InstanceName]		= @instanceName,
-			[UpdateZone]		= @updateZone,
-			[FaultZone]			= @faultZone,
-			[SuspectingSilos]	= @suspectingSilos,
-			[SuspectingTimes]	= @suspectingTimes,
-			[StartTime]			= @startTime,
-			[IAmAliveTime]		= @iAmAliveTime,
-			[ETag]				= NEWID()
-		WHERE
-			([DeploymentId]		= @deploymentId AND @deploymentId IS NOT NULL)
-			AND ([Address]		= @address AND @address IS NOT NULL)
-			AND ([Port]			= @port AND @port IS NOT NULL)
-			AND ([Generation]	= @generation AND @generation IS NOT NULL)
-			AND ([ETag]			= @etag and @etag IS NOT NULL)
-
-		IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
-
-		IF @@TRANCOUNT > 0
-		BEGIN
-			-- The transaction has not been rolled back. The following
-			-- update must succeed or else the whole transaction needs
-			-- to be rolled back.
-			UPDATE [OrleansMembershipVersionTable]
-			SET
-				[Timestamp]	= GETUTCDATE(),
-				[Version]	= @version,
-				[ETag]		= NEWID()
-			WHERE
-				DeploymentId	= @deploymentId AND @deploymentId IS NOT NULL
-				AND ETag		= @versionEtag AND @versionEtag IS NOT NULL;
-
-			IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
-		END
-
-		IF @@TRANCOUNT > 0
-		BEGIN
-			COMMIT TRANSACTION;
-			SELECT CAST(1 AS BIT);
-		END
-		ELSE
-		BEGIN	
-			SELECT CAST(0 AS BIT);
-		END',
-		N''
-	);
-
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
-	VALUES
-	(
-		'UpsertReminderRowKey',
-		N'SET XACT_ABORT, NOCOUNT ON;
-		DECLARE @newEtag AS BINARY(16) = NEWID();
-		BEGIN TRANSACTION;                    
-		IF NOT EXISTS(SELECT 1 FROM [OrleansRemindersTable]  WITH(updlock, holdlock) WHERE
-			[ServiceId] = @serviceId AND @serviceId IS NOT NULL
-			AND [GrainId] = @grainId AND @grainId IS NOT NULL
-			AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL)
-		BEGIN        
-			INSERT INTO [OrleansRemindersTable]
-			(
-				[ServiceId],
-				[GrainId],
-				[ReminderName],
-				[StartTime],
-				[Period],
-				[GrainIdConsistentHash],
-				[ETag]
-			)
-			VALUES
-			(
-				@serviceId,
-				@grainId,
-				@reminderName,
-				@startTime,
-				@period,
-				@grainIdConsistentHash,
-				@newEtag
-			);
-		END
-		ELSE
-		BEGIN        
-			UPDATE [OrleansRemindersTable]
-			SET				
-				[StartTime]             = @startTime,
-				[Period]                = @period,
-				[GrainIdConsistentHash] = @grainIdConsistentHash,
-				[ETag]                  = @newEtag
-			WHERE
-				[ServiceId] = @serviceId AND @serviceId IS NOT NULL
-				AND [GrainId] = @grainId AND @grainId IS NOT NULL
-				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
-		END	
-		COMMIT TRANSACTION;
-		SELECT @newEtag;',
-		N''
-	);
-
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
-	VALUES
-	(
-		'UpsertReportClientMetricsKey',
-		N'SET XACT_ABORT, NOCOUNT ON;		
-		BEGIN TRANSACTION;     
-		IF EXISTS(SELECT 1 FROM [OrleansClientMetricsTable]  WITH(updlock, holdlock) WHERE
-			[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
-			AND [ClientId] = @clientId AND @clientId IS NOT NULL)
-		BEGIN
-			UPDATE [OrleansClientMetricsTable]
-			SET			
 				[Timestamp] = GETUTCDATE(),
 				[Address] = @address,
 				[HostName] = @hostName,
@@ -1072,7 +532,6 @@ BEGIN
 			(
 				[DeploymentId],
 				[ClientId],
-				[Timestamp],
 				[Address],			
 				[HostName],
 				[CPU],
@@ -1087,7 +546,6 @@ BEGIN
 			(
 				@deploymentId,
 				@clientId,
-				GETUTCDATE(),
 				@address,
 				@hostName,
 				@cpuUsage,
@@ -1143,7 +601,6 @@ BEGIN
 			(
 				[DeploymentId],
 				[SiloId],
-				[Timestamp],
 				[Address],
 				[Port],
 				[Generation],
@@ -1166,7 +623,536 @@ BEGIN
 			(
 				@deploymentId,
 				@siloId,
-				GETUTCDATE(),
+				@address,
+				@port,
+				@generation,
+				@hostName,
+				@gatewayAddress,
+				@gatewayPort,
+				@cpuUsage,
+				@memoryUsage,
+				@activationsCount,
+				@recentlyUsedActivationsCount,
+				@sendQueueLength,
+				@receiveQueueLength,
+				@requestQueueLength,
+				@sentMessagesCount,
+				@receivedMessagesCount,
+				@isOverloaded,
+				@clientCount
+			);
+		END
+		COMMIT TRANSACTION;',
+		N''
+	);
+END
+ELSE
+BEGIN
+	-- These table definitions are for SQL Server 2000.
+	CREATE TABLE [OrleansMembershipVersionTable]
+	(
+		[DeploymentId] NVARCHAR(150) NOT NULL, 
+		[Timestamp] DATETIME NOT NULL DEFAULT GETUTCDATE(),
+		[Version] BIGINT NOT NULL,
+
+		-- ETag should also always be unique, but there will ever be only one row.
+		-- This is BINARY(8) to be as much compatible with the later SQL Server
+		-- editions as possible.
+		[ETag] BINARY(8) NOT NULL DEFAULT 0,
+    
+		CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY([DeploymentId])	
+	);
+
+	CREATE TABLE [OrleansMembershipTable]
+	(
+		[DeploymentId] NVARCHAR(150) NOT NULL, 
+		[Address] VARCHAR(45) NOT NULL, 
+		[Port] INT NOT NULL, 
+		[Generation] INT NOT NULL, 
+		[HostName] NVARCHAR(150) NOT NULL, 
+		[Status] INT NOT NULL, 
+		[ProxyPort] INT NULL, 
+		[RoleName] NVARCHAR(150) NULL, 
+		[InstanceName] NVARCHAR(150) NULL, 
+		[UpdateZone] INT NULL, 
+		[FaultZone] INT NULL,		
+		[SuspectingSilos] NTEXT NULL, 
+		[SuspectingTimes] NTEXT NULL, 
+		[StartTime] DATETIME NOT NULL, 
+		[IAmAliveTime] DATETIME NOT NULL,
+	
+		-- This ETag should always be unique for a given primary key.
+		-- This is BINARY(8) to be as much compatible with the later SQL Server
+		-- editions as possible. 
+		[ETag] BINARY(8) NOT NULL DEFAULT 0,
+    
+		-- A refactoring note: This combination needs to be unique, currently enforced by making it a primary key.
+		-- See more information at http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html.
+		CONSTRAINT PK_OrleansMembershipTable_DeploymentId PRIMARY KEY([DeploymentId], [Address], [Port], [Generation]),	
+		CONSTRAINT FK_OrleansMembershipTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
+	);
+
+	CREATE TABLE [OrleansRemindersTable]
+	(
+		[ServiceId] NVARCHAR(150) NOT NULL, 
+		[GrainId] NVARCHAR(150) NOT NULL, 
+		[ReminderName] NVARCHAR(150) NOT NULL,
+		[StartTime] DATETIME NOT NULL, 
+		[Period] INT NOT NULL,
+		[GrainIdConsistentHash] INT NOT NULL,
+				
+		-- This is BINARY(8) to be as much compatible with the later SQL Server
+		-- editions as possible.
+		[ETag] BINARY(8) NOT NULL DEFAULT 0,
+    
+		CONSTRAINT PK_OrleansRemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY([ServiceId], [GrainId], [ReminderName])
+	);
+	
+	CREATE TABLE [OrleansStatisticsTable]
+	(
+		[OrleansStatisticsTableId] INT IDENTITY(1,1) NOT NULL,
+		[DeploymentId] NVARCHAR(150) NOT NULL,      
+		[Timestamp] DATETIME NOT NULL DEFAULT GETUTCDATE(), 
+		[Id] NVARCHAR(250) NOT NULL,     
+		[HostName] NVARCHAR(150) NOT NULL, 
+		[Name] NVARCHAR(150) NULL, 
+		[IsDelta] BIT NOT NULL, 
+		[StatValue] NVARCHAR(1024) NOT NULL,
+		[Statistic] NVARCHAR(250) NOT NULL,
+
+		CONSTRAINT OrleansStatisticsTable_OrleansStatisticsTableId PRIMARY KEY([OrleansStatisticsTableId])	
+	);
+
+	CREATE TABLE [OrleansClientMetricsTable]
+	(
+		[DeploymentId] NVARCHAR(150) NOT NULL, 
+		[ClientId] NVARCHAR(150) NOT NULL, 
+		[Timestamp] DATETIME NOT NULL DEFAULT GETUTCDATE(),
+		[Address] VARCHAR(45) NOT NULL, 
+		[HostName] NVARCHAR(150) NOT NULL, 
+		[CPU] FLOAT NOT NULL,
+		[Memory] BIGINT NOT NULL,
+		[SendQueue] INT NOT NULL, 
+		[ReceiveQueue] INT NOT NULL, 
+		[SentMessages] BIGINT NOT NULL,
+		[ReceivedMessages] BIGINT NOT NULL,
+		[ConnectedGatewayCount] BIGINT NOT NULL,
+    
+		CONSTRAINT PK_OrleansClientMetricsTable_DeploymentId_ClientId PRIMARY KEY([DeploymentId], [ClientId])
+	);
+
+	CREATE TABLE [OrleansSiloMetricsTable]
+	(
+		[DeploymentId] NVARCHAR(150) NOT NULL, 
+		[SiloId] NVARCHAR(150) NOT NULL, 
+		[Timestamp] DATETIME NOT NULL DEFAULT GETUTCDATE(),
+		[Address] VARCHAR(45) NOT NULL, 
+		[Port] INT NOT NULL, 
+		[Generation] INT NOT NULL, 
+		[HostName] NVARCHAR(150) NOT NULL, 
+		[GatewayAddress] VARCHAR(45) NULL, 
+		[GatewayPort] INT NULL, 
+		[CPU] FLOAT NOT NULL,
+		[Memory] BIGINT NOT NULL,
+		[Activations] INT NOT NULL,
+		[RecentlyUsedActivations] INT NOT NULL,
+		[SendQueue] INT NOT NULL, 
+		[ReceiveQueue] INT NOT NULL, 
+		[RequestQueue] BIGINT NOT NULL,
+		[SentMessages] BIGINT NOT NULL,
+		[ReceivedMessages] BIGINT NOT NULL,
+		[LoadShedding] BIT NOT NULL,
+		[ClientCount] BIGINT NOT NULL,
+    
+		CONSTRAINT PK_OrleansSiloMetricsTable_DeploymentId_SiloId PRIMARY KEY([DeploymentId], [SiloId]),
+		CONSTRAINT FK_OrleansSiloMetricsTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
+	);
+
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	VALUES
+	(
+		'UpdateIAmAlivetimeKey',
+		N'
+		-- This is not expected to never fail by Orleans, so return value
+		-- is not needed nor is it checked.
+		SET NOCOUNT ON;
+		BEGIN TRANSACTION;
+		UPDATE [OrleansMembershipTable]
+		SET
+			IAmAliveTime = @iAmAliveTime
+		WHERE
+			([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
+			AND ([Address] = @address AND @address IS NOT NULL)
+			AND ([Port] = @port AND @port IS NOT NULL)
+			AND ([Generation] = @generation AND @generation IS NOT NULL);
+		COMMIT TRANSACTION;',
+		N''
+	);
+
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	VALUES
+	(
+		'InsertMembershipVersionKey',
+		N'SET NOCOUNT ON;
+		BEGIN TRANSACTION;
+		INSERT INTO [OrleansMembershipVersionTable]
+		(
+			[DeploymentId],
+			[Version]
+		)
+		SELECT	
+			@deploymentId,
+			@version
+		WHERE NOT EXISTS
+		(
+			SELECT 1
+			FROM OrleansMembershipVersionTable WITH(HOLDLOCK, XLOCK, ROWLOCK)
+			WHERE [DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
+		);
+                                        
+		IF @@ROWCOUNT > 0
+		BEGIN
+			COMMIT TRANSACTION;
+			SELECT CAST(1 AS BIT);
+		END
+		ELSE
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT CAST(0 AS BIT);
+		END',
+		N''
+	);
+
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	VALUES
+	(
+		'InsertMembershipKey',
+		N'SET NOCOUNT ON;
+		BEGIN TRANSACTION; --  @@TRANCOUNT = 0 -> +1.
+		-- There is no need to check the condition for inserting
+		-- as the necessary condition with regard to table membership
+		-- protocol is enforced as part of the primary key definition.
+		-- Inserting will fail if there is already a membership
+		-- row with the same
+		-- * [DeploymentId] = @deploymentId
+		-- * [Address]		= @address
+		-- * [Port]			= @port
+		-- * [Generation]	= @generation
+		--
+		-- For more information on table membership protocol insert see at
+		-- http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html and at
+		-- https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs
+		INSERT INTO [OrleansMembershipTable]
+		(
+			[DeploymentId],
+			[Address],
+			[Port],
+			[Generation],
+			[HostName],
+			[Status],
+			[ProxyPort],
+			[RoleName],
+			[InstanceName],
+			[UpdateZone],
+			[FaultZone],
+			[SuspectingSilos],
+			[SuspectingTimes],
+			[StartTime],
+			[IAmAliveTime]
+		)
+		VALUES
+		(
+			@deploymentId,
+			@address,
+			@port,
+			@generation,
+			@hostName,
+			@status,
+			@proxyPort,
+			@roleName,
+			@instanceName,
+			@updateZone,
+			@faultZone,
+			@suspectingSilos,
+			@suspectingTimes,
+			@startTime,
+			@iAmAliveTime
+		);
+
+		IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
+
+		IF @@TRANCOUNT > 0
+		BEGIN
+			-- The transaction has not been rolled back. The following
+			-- update must succeed or else the whole transaction needs
+			-- to be rolled back.
+			UPDATE [OrleansMembershipVersionTable]
+			SET
+				[Timestamp]	= GETUTCDATE(),
+				[Version]	= @version,
+				[ETag]		= @versionEtag + 1
+			WHERE
+				([DeploymentId]	= @deploymentId AND @deploymentId IS NOT NULL)
+				AND ([ETag]		= @versionEtag AND @versionEtag IS NOT NULL);
+
+			-- Here the rowcount should always be either zero (no update)
+			-- or one (exactly one entry updated). Having more means that multiple
+			-- lines matched the condition. This should not be possible, but checking
+			-- only for zero allows the system to function and there is no harm done
+			-- besides potentially superfluous updates.
+			IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
+		END
+
+		IF @@TRANCOUNT > 0
+		BEGIN
+			COMMIT TRANSACTION;
+			SELECT CAST(1 AS BIT);
+		END
+		ELSE
+		BEGIN	
+			SELECT CAST(0 AS BIT);
+		END', 
+		N''
+	);
+
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	VALUES
+	(
+		'UpdateMembershipKey',
+		N'SET NOCOUNT ON;
+		BEGIN TRANSACTION; --  @@TRANCOUNT + 1
+
+		-- For more information on table membership protocol update see at
+		-- http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html and at
+		-- https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs.
+		UPDATE [OrleansMembershipTable]
+		SET
+			[Address]			= @address,
+			[Port]				= @port,
+			[Generation]		= @generation,
+			[HostName]			= @hostName,
+			[Status]			= @status,
+			[ProxyPort]			= @proxyPort,
+			[RoleName]			= @roleName,
+			[InstanceName]		= @instanceName,
+			[UpdateZone]		= @updateZone,
+			[FaultZone]			= @faultZone,
+			[SuspectingSilos]	= @suspectingSilos,
+			[SuspectingTimes]	= @suspectingTimes,
+			[StartTime]			= @startTime,
+			[IAmAliveTime]		= @iAmAliveTime,
+			[ETag]				= @etag + 1
+		WHERE
+			([DeploymentId]		= @deploymentId AND @deploymentId IS NOT NULL)
+			AND ([Address]		= @address AND @address IS NOT NULL)
+			AND ([Port]			= @port AND @port IS NOT NULL)
+			AND ([Generation]	= @generation AND @generation IS NOT NULL)
+			AND ([ETag]			= @etag and @etag IS NOT NULL)
+
+		IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
+
+		IF @@TRANCOUNT > 0
+		BEGIN
+			-- The transaction has not been rolled back. The following
+			-- update must succeed or else the whole transaction needs
+			-- to be rolled back.
+			UPDATE [OrleansMembershipVersionTable]
+			SET
+				[Timestamp]	= GETUTCDATE(),
+				[Version]	= @version,
+				[ETag]		= @versionEtag + 1
+			WHERE
+				DeploymentId	= @deploymentId AND @deploymentId IS NOT NULL
+				AND ETag		= @versionEtag AND @versionEtag IS NOT NULL;
+
+			IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
+		END
+
+		IF @@TRANCOUNT > 0
+		BEGIN
+			COMMIT TRANSACTION;
+			SELECT CAST(1 AS BIT);
+		END
+		ELSE
+		BEGIN	
+			SELECT CAST(0 AS BIT);
+		END',
+		N''
+	);
+
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	VALUES
+	(
+		'UpsertReminderRowKey',
+		N'SET XACT_ABORT, NOCOUNT ON;
+		DECLARE @newEtag AS BINARY(8) = 0;
+		BEGIN TRANSACTION;
+		SELECT @newEtag = [ETag] + 1 FROM [OrleansRemindersTable]  WITH(updlock, holdlock) WHERE
+			[ServiceId] = @serviceId AND @serviceId IS NOT NULL
+			AND [GrainId] = @grainId AND @grainId IS NOT NULL
+			AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
+		IF @newEtag = 0
+		BEGIN        
+			INSERT INTO [OrleansRemindersTable]
+			(
+				[ServiceId],
+				[GrainId],
+				[ReminderName],
+				[StartTime],
+				[Period],
+				[GrainIdConsistentHash]
+			)
+			VALUES
+			(
+				@serviceId,
+				@grainId,
+				@reminderName,
+				@startTime,
+				@period,
+				@grainIdConsistentHash
+			);
+		END
+		ELSE
+		BEGIN        
+			UPDATE [OrleansRemindersTable]
+			SET				
+				[StartTime]             = @startTime,
+				[Period]                = @period,
+				[GrainIdConsistentHash] = @grainIdConsistentHash,
+				[ETag]                  = @newEtag
+			WHERE
+				[ServiceId] = @serviceId AND @serviceId IS NOT NULL
+				AND [GrainId] = @grainId AND @grainId IS NOT NULL
+				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
+		END	
+		COMMIT TRANSACTION;
+		SELECT @newEtag AS ETag;',
+		N''
+	);
+
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	VALUES
+	(
+		'UpsertReportClientMetricsKey',
+		N'SET XACT_ABORT, NOCOUNT ON;		
+		BEGIN TRANSACTION;     
+		IF EXISTS(SELECT 1 FROM [OrleansClientMetricsTable]  WITH(updlock, holdlock) WHERE
+			[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
+			AND [ClientId] = @clientId AND @clientId IS NOT NULL)
+		BEGIN
+			UPDATE [OrleansClientMetricsTable]
+			SET			
+				[Timestamp] = GETUTCDATE(),
+				[Address] = @address,
+				[HostName] = @hostName,
+				[CPU] = @cpuUsage,
+				[Memory] = @memoryUsage,
+				[SendQueue] = @sendQueueLength,
+				[ReceiveQueue] = @receiveQueueLength,
+				[SentMessages] = @sentMessagesCount,
+				[ReceivedMessages] = @receivedMessagesCount,
+				[ConnectedGatewayCount] = @connectedGatewaysCount
+			WHERE
+				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
+				AND ([ClientId] = @clientId AND @clientId IS NOT NULL);
+		END
+		ELSE
+		BEGIN	
+			INSERT INTO [OrleansClientMetricsTable]
+			(
+				[DeploymentId],
+				[ClientId],
+				[Address],			
+				[HostName],
+				[CPU],
+				[Memory],
+				[SendQueue],
+				[ReceiveQueue],
+				[SentMessages],
+				[ReceivedMessages],
+				[ConnectedGatewayCount]
+			)
+			VALUES
+			(
+				@deploymentId,
+				@clientId,
+				@address,
+				@hostName,
+				@cpuUsage,
+				@memoryUsage,
+				@sendQueueLength,
+				@receiveQueueLength,
+				@sentMessagesCount,
+				@receivedMessagesCount,
+				@connectedGatewaysCount
+			);
+		END
+		COMMIT TRANSACTION;',
+		N''
+	);
+
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	VALUES
+	(
+		'UpsertSiloMetricsKey',
+		N'SET XACT_ABORT, NOCOUNT ON;		
+		BEGIN TRANSACTION;
+		IF EXISTS(SELECT 1 FROM  [OrleansSiloMetricsTable]  WITH(updlock, holdlock) WHERE
+			[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
+			AND [SiloId] = @siloId AND @siloId IS NOT NULL)
+		BEGIN
+			UPDATE [OrleansSiloMetricsTable]
+			SET
+				Timestamp = GETUTCDATE(),
+				Address = @address,
+				Port = @port,
+				Generation = @generation,
+				HostName = @hostName,
+				GatewayAddress = @gatewayAddress,
+				GatewayPort = @gatewayPort,
+				CPU = @cpuUsage,
+				Memory = @memoryUsage,
+				Activations = @activationsCount,
+				RecentlyUsedActivations = @recentlyUsedActivationsCount,
+				SendQueue = @sendQueueLength,
+				ReceiveQueue = @receiveQueueLength,
+				RequestQueue = @requestQueueLength,
+				SentMessages = @sentMessagesCount,
+				ReceivedMessages = @receivedMessagesCount,
+				LoadShedding = @isOverloaded,
+				ClientCount = @clientCount
+			WHERE
+				([DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL)
+				AND ([SiloId] = @siloId AND @siloId IS NOT NULL);
+		END
+		ELSE
+		BEGIN
+			INSERT INTO [OrleansSiloMetricsTable]
+			(
+				[DeploymentId],
+				[SiloId],
+				[Address],
+				[Port],
+				[Generation],
+				[HostName],
+				[GatewayAddress],
+				[GatewayPort],
+				[CPU],
+				[Memory],
+				[Activations],
+				[RecentlyUsedActivations],
+				[SendQueue],
+				[ReceiveQueue],
+				[RequestQueue],
+				[SentMessages],	
+				[ReceivedMessages],
+				[LoadShedding],
+				[ClientCount]
+			)
+			VALUES
+			(
+				@deploymentId,
+				@siloId,
 				@address,
 				@port,
 				@generation,
