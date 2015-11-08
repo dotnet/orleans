@@ -565,7 +565,7 @@ namespace Orleans.Serialization
                             {
                                 logger.Warn(
                                     ErrorCode.SerMgr_MissingRegisterMethod,
-                                    "Type {0} from assembly {1} has the RegisterSerializer attribute but no Register static method",
+                                    "Type {0} from assembly {1} has the RegisterSerializer attribute but no public static void Register method",
                                     type.Name,
                                     assembly.GetName().Name);
                             }
