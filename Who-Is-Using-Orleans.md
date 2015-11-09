@@ -7,7 +7,7 @@ tagline: A partial list of companies and projects that are using Orleans
 
 
 Orleans has been used extensively by several Microsoft projects and product groups, 
-most notably by 343 Industries as a platform for all of Halo 4 cloud services.
+most notably by 343 Industries as a platform for all of Halo 4 and Halo 5 cloud services.
 
 There are various other internal projects at Microsoft which are using Orleans, but we are not able to talk publicly about many of those yet.
 
