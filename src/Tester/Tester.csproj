@@ -69,12 +69,12 @@
       <HintPath>$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.0\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Framework.DependencyInjection">
-      <HintPath>$(SolutionDir)packages\Microsoft.Framework.DependencyInjection.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.dll</HintPath>
+    <Reference Include="Microsoft.Framework.DependencyInjection, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Framework.DependencyInjection.1.0.0-beta8\lib\net45\Microsoft.Framework.DependencyInjection.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Framework.DependencyInjection.Abstractions">
-      <HintPath>$(SolutionDir)packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.Abstractions.dll</HintPath>
+    <Reference Include="Microsoft.Framework.DependencyInjection.Abstractions, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta8\lib\net45\Microsoft.Framework.DependencyInjection.Abstractions.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework">
@@ -216,6 +216,10 @@
     <ProjectReference Include="..\OrleansCounterControl\OrleansCounterControl.csproj">
       <Project>{606b9647-cc0c-4058-bfbc-b5b7ed4f3c56}</Project>
       <Name>OrleansCounterControl</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansDependencyInjection\OrleansDependencyInjection.csproj">
+      <Project>{58cf4453-987a-4ed5-8640-7b27838c12fd}</Project>
+      <Name>OrleansDependencyInjection</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansHost\OrleansHost.csproj">
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>

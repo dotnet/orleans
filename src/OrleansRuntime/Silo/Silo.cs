@@ -219,7 +219,16 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            services = ConfigureStartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+            var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
+            if (startupBuilder != null)
+            {
+                logger.Info(ErrorCode.SiloLoadeDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
+                services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+            }
+            else
+            {
+                logger.Warn(ErrorCode.SiloFailedToLoadDI, "Failed to load an implementation of IStartupBuilder from OrleansDependencyInjection.dll");
+            }
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
