@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -83,6 +84,7 @@ namespace Orleans.Serialization
 
         private static readonly HashSet<Type> registeredTypes;
         private static readonly List<IExternalSerializer> externalSerializers;
+        private static readonly ConcurrentDictionary<Type, byte> typesWithNoExternalSerializers;
         private static readonly Dictionary<string, Type> types;
         private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
@@ -186,6 +188,7 @@ namespace Orleans.Serialization
 
             registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
+            typesWithNoExternalSerializers = new ConcurrentDictionary<Type, byte>();
             types = new Dictionary<string, Type>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
@@ -871,15 +874,10 @@ namespace Orleans.Serialization
                 return copy;
             }
 
-            var externalSerializer = externalSerializers.FirstOrDefault(serializer => serializer.IsSupportedType(t));
-            if (externalSerializer != null)
+            IExternalSerializer serializer;
+            if (TryFindAndRegisterExternalSerializer(t, out serializer))
             {
-                Register(
-                    t,
-                    externalSerializer.DeepCopy,
-                    externalSerializer.Serialize,
-                    externalSerializer.Deserialize);
-                copy = externalSerializer.DeepCopy(original);
+                copy = serializer.DeepCopy(original);
                 SerializationContext.Current.RecordObject(original, copy);
                 return copy;
             }
@@ -1120,16 +1118,11 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var externalSerializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
-            if (externalSerializer != null)
+            IExternalSerializer serializer;
+            if (TryFindAndRegisterExternalSerializer(t, out serializer))
             {
-                Register(
-                    t,
-                    externalSerializer.DeepCopy,
-                    externalSerializer.Serialize,
-                    externalSerializer.Deserialize);
                 stream.WriteTypeHeader(t, expected);
-                externalSerializer.Serialize(obj, stream, expected);
+                serializer.Serialize(obj, stream, expected);
                 return;
             }
 
@@ -1469,11 +1462,10 @@ namespace Orleans.Serialization
                     return result;
                 }
 
-                var externalSerializer = externalSerializers.FirstOrDefault(ser => ser.IsSupportedType(resultType));
-                if (externalSerializer != null)
+                IExternalSerializer serializer;
+                if (TryFindAndRegisterExternalSerializer(resultType, out serializer))
                 {
-                    Register(resultType, externalSerializer.DeepCopy, externalSerializer.Serialize, externalSerializer.Deserialize);
-                    result = externalSerializer.Deserialize(resultType, stream);
+                    result = serializer.Deserialize(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);
                     return result;
                 }
@@ -1828,6 +1820,29 @@ namespace Orleans.Serialization
                     return des(t, stream);
             }
             throw new SerializationException(String.Format("Unexpected token {0} parsing message headers", token));
+        }
+
+        private static bool TryFindAndRegisterExternalSerializer(Type t, out IExternalSerializer serializer)
+        {
+            if (externalSerializers.Count == 0 || typesWithNoExternalSerializers.ContainsKey(t))
+            {
+                serializer = null;
+                return false;
+            }
+
+            serializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
+            if (serializer == null)
+            {
+                typesWithNoExternalSerializers.TryAdd(t, 0);
+                return false;
+            }
+
+            Register(
+                t,
+                serializer.DeepCopy,
+                serializer.Serialize,
+                serializer.Deserialize);
+            return true;
         }
 
         #endregion
