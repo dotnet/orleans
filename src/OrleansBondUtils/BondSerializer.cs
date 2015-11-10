@@ -36,6 +36,9 @@ namespace Orleans.Serialization
     using BondBinaryReader = Bond.Protocols.SimpleBinaryReader<Orleans.Serialization.InputStream>;
     using BondTypeDeserializer = Bond.Deserializer<Bond.Protocols.SimpleBinaryReader<Orleans.Serialization.InputStream>>;
 
+    /// <summary>
+    /// An implementation of IExternalSerializer for usage with Bond types.
+    /// </summary>
     public class BondSerializer : IExternalSerializer
     {
         private static readonly ConcurrentDictionary<RuntimeTypeHandle, Delegate> CopierDictionary = new ConcurrentDictionary<RuntimeTypeHandle, Delegate>();
@@ -44,6 +47,11 @@ namespace Orleans.Serialization
 
         private TraceLogger logger;
 
+        /// <summary>
+        /// Determines whether this serializer has the ability to serialize a particular type.
+        /// </summary>
+        /// <param name="itemType">The type of the item to be serialized</param>
+        /// <returns>A value indicating whether the type can be serialized</returns>
         public bool IsSupportedType(Type itemType)
         {
             if (CopierDictionary.ContainsKey(itemType.TypeHandle))
@@ -65,6 +73,11 @@ namespace Orleans.Serialization
             return true;
         }
 
+        /// <summary>
+        /// Creates a deep copy of an object
+        /// </summary>
+        /// <param name="source">The source object to be copy</param>
+        /// <returns>The copy that was created</returns>
         public object DeepCopy(object source)
         {
             if (source == null)
@@ -82,6 +95,12 @@ namespace Orleans.Serialization
             return copier.DynamicInvoke(source);
         }
 
+        /// <summary>
+        /// Deserializes an object from a binary stream
+        /// </summary>
+        /// <param name="expectedType">The type that is expected to be deserialized</param>
+        /// <param name="reader">The <see cref="BinaryTokenStreamReader"/></param>
+        /// <returns>The deserialized object</returns>
         public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
         {
             if (expectedType == null)
@@ -107,11 +126,21 @@ namespace Orleans.Serialization
             return deserializer.Deserialize(bondReader);
         }
 
+        /// <summary>
+        /// Initializes the external serializer
+        /// </summary>
+        /// <param name="logger">The logger to use to capture any serialization events</param>
         public void Initialize(TraceLogger logger)
         {
             this.logger = logger;
         }
 
+        /// <summary>
+        /// Serializes an object to a binary stream
+        /// </summary>
+        /// <param name="item">The object to serialize</param>
+        /// <param name="writer">The <see cref="BinaryTokenStreamWriter"/></param>
+        /// <param name="expectedType">The type the deserializer should expect</param>
         public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
         {
             if (writer == null)
