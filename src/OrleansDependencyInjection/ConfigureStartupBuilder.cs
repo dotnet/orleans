@@ -33,7 +33,10 @@ using Orleans.Streams;
 
 namespace Orleans.Runtime.Startup
 {
-    internal class ConfigureStartupBuilder
+    /// <summary>
+    /// Configure dependency injection at startup
+    /// </summary>
+    public class ConfigureStartupBuilder : IStartupBuilder
     {
         internal static IServiceProvider ConfigureStartup(string startupTypeName)
         {
@@ -131,6 +134,11 @@ namespace Orleans.Runtime.Startup
             {
                 return Activator.CreateInstance(serviceType);
             }
+        }
+
+        IServiceProvider IStartupBuilder.ConfigureStartup(string startupTypeName)
+        {
+            return ConfigureStartupBuilder.ConfigureStartup(startupTypeName);
         }
     }
 }
