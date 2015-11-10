@@ -904,5 +904,10 @@ namespace Orleans
         {
             throw new NotImplementedException();
         }
+
+        public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
