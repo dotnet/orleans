@@ -98,6 +98,7 @@
     <Compile Include="CodeGeneration\Language.cs" />
     <Compile Include="CodeGeneration\OrleansCodeGenerationTargetAttribute.cs" />
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
+    <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
     <Compile Include="Core\Exceptions.cs" />
@@ -407,12 +408,12 @@
     </PropertyGroup>
     <ItemGroup>
       <CodeGenArgs Include="/bootstrap" />
-      <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)"/>
-      <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')"/>
-      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')"/>
+      <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)" />
+      <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')" />
+      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')" />
     </ItemGroup>
-    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)" />
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
-    <Exec Command='"$(BootstrapOutputPath)ClientGenerator.exe" "@$(ArgsFile)"' />
+    <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" />
   </Target>
 </Project>

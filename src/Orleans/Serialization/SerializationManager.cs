@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -82,10 +83,13 @@ namespace Orleans.Serialization
         #region Privates
 
         private static readonly HashSet<Type> registeredTypes;
+        private static readonly List<IExternalSerializer> externalSerializers;
+        private static readonly ConcurrentDictionary<Type, byte> typesWithNoExternalSerializers;
         private static readonly Dictionary<string, Type> types;
         private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
         private static readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
+
 
         private static readonly TraceLogger logger;
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
@@ -132,13 +136,14 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        public static void InitializeForTesting()
+        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null)
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             AssemblyProcessor.Initialize();
+            RegisterSerializationProviders(serializationProviders);
         }
 
-        internal static void Initialize(bool useStandardSerializer)
+        internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders)
         {
             UseStandardSerializer = useStandardSerializer;
             if (StatisticsCollector.CollectSerializationStats)
@@ -174,6 +179,7 @@ namespace Orleans.Serialization
             }
 
             AssemblyProcessor.Initialize();
+            RegisterSerializationProviders(serializationProviders);
         }
 
         static SerializationManager()
@@ -181,6 +187,8 @@ namespace Orleans.Serialization
             AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
 
             registeredTypes = new HashSet<Type>();
+            externalSerializers = new List<IExternalSerializer>();
+            typesWithNoExternalSerializers = new ConcurrentDictionary<Type, byte>();
             types = new Dictionary<string, Type>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
@@ -863,13 +871,18 @@ namespace Orleans.Serialization
             {
                 copy = copier(original);
                 SerializationContext.Current.RecordObject(original, copy);
-            }
-            else
-            {
-                copy = DeepCopierHelper(t, original);
+                return copy;
             }
 
-            return copy;
+            IExternalSerializer serializer;
+            if (TryFindAndRegisterExternalSerializer(t, out serializer))
+            {
+                copy = serializer.DeepCopy(original);
+                SerializationContext.Current.RecordObject(original, copy);
+                return copy;
+            }
+
+            return DeepCopierHelper(t, original);
         }
 
         private static object DeepCopierHelper(Type t, object original)
@@ -1102,6 +1115,14 @@ namespace Orleans.Serialization
             {
                 stream.WriteTypeHeader(t, expected);
                 ser(obj, stream, expected);
+                return;
+            }
+
+            IExternalSerializer serializer;
+            if (TryFindAndRegisterExternalSerializer(t, out serializer))
+            {
+                stream.WriteTypeHeader(t, expected);
+                serializer.Serialize(obj, stream, expected);
                 return;
             }
 
@@ -1437,6 +1458,14 @@ namespace Orleans.Serialization
                 if (deser != null)
                 {
                     result = deser(resultType, stream);
+                    DeserializationContext.Current.RecordObject(result);
+                    return result;
+                }
+
+                IExternalSerializer serializer;
+                if (TryFindAndRegisterExternalSerializer(resultType, out serializer))
+                {
+                    result = serializer.Deserialize(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);
                     return result;
                 }
@@ -1793,6 +1822,29 @@ namespace Orleans.Serialization
             throw new SerializationException(String.Format("Unexpected token {0} parsing message headers", token));
         }
 
+        private static bool TryFindAndRegisterExternalSerializer(Type t, out IExternalSerializer serializer)
+        {
+            if (externalSerializers.Count == 0 || typesWithNoExternalSerializers.ContainsKey(t))
+            {
+                serializer = null;
+                return false;
+            }
+
+            serializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
+            if (serializer == null)
+            {
+                typesWithNoExternalSerializers.TryAdd(t, 0);
+                return false;
+            }
+
+            Register(
+                t,
+                serializer.DeepCopy,
+                serializer.Serialize,
+                serializer.Deserialize);
+            return true;
+        }
+
         #endregion
 
         #region Fallback serializer and deserializer
@@ -2033,6 +2085,33 @@ namespace Orleans.Serialization
 
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
             logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
+        }
+        
+        /// <summary>
+        /// Loads the external srializers and places them into a hash set
+        /// </summary>
+        /// <param name="type">The list of types that implement <see cref="IExternalSerializer"/></param>
+        private static void RegisterSerializationProviders(List<TypeInfo> providerTypes)
+        {
+            if (providerTypes == null)
+            {
+                return;
+            }
+
+            providerTypes.ForEach(
+                type =>
+                {
+                    try
+                    {
+                        var serializer = Activator.CreateInstance(type) as IExternalSerializer;
+                        serializer.Initialize(logger);
+                        externalSerializers.Add(serializer);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);
+                    }
+                });
         }
         
         /// <summary>
