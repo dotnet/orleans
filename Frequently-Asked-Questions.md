@@ -81,3 +81,4 @@ The mapping from grain IDs to their activation (instance) addresses is stored in
 You can find out more about how Orleans manages the clusters at [Cluster Management](Runtime-Implementation-Details/Cluster-Management) page.
 Also you can take a look at Orleans's [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for a more detailed information, however you don't need to understand it fully to be able to write your application code.
 You just need to consider the rare possibility of having two instances of an actor while writing your application.
+
