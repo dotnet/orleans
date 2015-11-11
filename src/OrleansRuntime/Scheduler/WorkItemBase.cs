@@ -46,9 +46,9 @@ namespace Orleans.Runtime.Scheduler
 
         public abstract void Execute();
 
-        public bool IsSystem
+        public bool IsSystemPriority
         {
-            get { return SchedulingUtils.IsSystemContext(this.SchedulingContext); }
+            get { return SchedulingUtils.IsSystemPriorityContext(this.SchedulingContext); }
         }
 
         public override string ToString()

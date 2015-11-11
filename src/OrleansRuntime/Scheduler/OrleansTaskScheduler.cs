@@ -159,11 +159,12 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsVerbose) logger.Verbose("StopApplicationTurns");
 #endif
-            RunQueue.RunDownApplication();
+            // Do not RunDown the application run queue, since it is still used by low priority system targets.
+
             applicationTurnsStopped = true;
             foreach (var group in workgroupDirectory.Values)
             {
-                if (!group.IsSystem)
+                if (!group.IsSystemGroup)
                     group.Stop();
             }
         }
@@ -187,10 +188,10 @@ namespace Orleans.Runtime.Scheduler
 #endif
             var context = contextObj as ISchedulingContext;
             var workItemGroup = GetWorkItemGroup(context);
-            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystem)
+            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
-                logger.Warn(ErrorCode.SchedulerAppTurnsStopped, string.Format("Dropping Task {0} because applicaiton turns are stopped", task));
+                logger.Warn(ErrorCode.SchedulerAppTurnsStopped_2, string.Format("Dropping Task {0} because application turns are stopped", task));
                 return;
             }
 
@@ -225,11 +226,11 @@ namespace Orleans.Runtime.Scheduler
             }
 
             var workItemGroup = GetWorkItemGroup(context);
-            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystem)
+            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
-                var msg = string.Format("Dropping work item {0} because applicaiton turns are stopped", workItem);
-                logger.Warn(ErrorCode.SchedulerAppTurnsStopped, msg);
+                var msg = string.Format("Dropping work item {0} because application turns are stopped", workItem);
+                logger.Warn(ErrorCode.SchedulerAppTurnsStopped_1, msg);
                 return;
             }
 

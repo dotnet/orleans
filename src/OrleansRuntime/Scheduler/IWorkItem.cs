@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Scheduler
         ISchedulingContext SchedulingContext { get; set; }
         TimeSpan TimeSinceQueued { get; }
         DateTime TimeQueued { get; set;  }
-        bool IsSystem { get; }
+        bool IsSystemPriority { get; }
         void Execute();
     }
 }
