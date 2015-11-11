@@ -25,5 +25,8 @@
     <file src="OrleansRuntime.dll" target="lib\net45" />
     <file src="OrleansRuntime.pdb" target="lib\net45" />
     <file src="$SRC_DIR$OrleansRuntime\**\*.cs" target="src" />
+    <file src="OrleansDependencyInjection.dll" target="lib\net45" />
+    <file src="OrleansDependencyInjection.pdb" target="lib\net45" />
+    <file src="$SRC_DIR$OrleansDependencyInjection\*.cs" target="src" />
   </files>
 </package>

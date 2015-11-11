@@ -71,8 +71,9 @@ namespace Orleans.CodeGenerator
         /// </returns>
         internal static TypeDeclarationSyntax GenerateClass(Type grainType, Action<Type> onEncounteredType)
         {
-            var genericTypes = grainType.IsGenericTypeDefinition
-                                   ? grainType.GetGenericArguments()
+            var grainTypeInfo = grainType.GetTypeInfo();
+            var genericTypes = grainTypeInfo.IsGenericTypeDefinition
+                                   ? grainTypeInfo.GetGenericArguments()
                                          .Select(_ => SF.TypeParameter(_.ToString()))
                                          .ToArray()
                                    : new TypeParameterSyntax[0];
@@ -282,7 +283,7 @@ namespace Orleans.CodeGenerator
 
             // Addressable arguments must be converted to references before passing.
             if (typeof(IAddressable).IsAssignableFrom(arg.ParameterType)
-                && (typeof(Grain).IsAssignableFrom(arg.ParameterType) || arg.ParameterType.IsInterface))
+                && (typeof(Grain).IsAssignableFrom(arg.ParameterType) || arg.ParameterType.GetTypeInfo().IsInterface))
             {
                 return
                     SF.ConditionalExpression(
@@ -353,9 +354,8 @@ namespace Orleans.CodeGenerator
         private static MethodDeclarationSyntax GenerateGetMethodNameMethod(Type grainType)
         {
             // Get the method with the correct type.
-            var method = typeof(GrainReference).GetMethod(
-                "GetMethodName",
-                BindingFlags.NonPublic | BindingFlags.Instance);
+            var method = typeof(GrainReference).GetMethods(
+                BindingFlags.NonPublic | BindingFlags.Instance).Where(m=>m.Name == "GetMethodName").FirstOrDefault();
 
             var methodDeclaration =
                 method.GetDeclarationSyntax()

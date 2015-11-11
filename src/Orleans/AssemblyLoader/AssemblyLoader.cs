@@ -111,8 +111,8 @@ namespace Orleans.Runtime
                     TypeUtils.GetTypes(
                         assembly,
                         type =>
-                        typeof(T).IsAssignableFrom(type) && !type.IsInterface
-                        && type.GetConstructor(Type.EmptyTypes) != null).FirstOrDefault();
+                        typeof(T).GetTypeInfo().IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
+                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null).FirstOrDefault();
                 if (foundType == null)
                 {
                     return null;

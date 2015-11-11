@@ -34,6 +34,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [DeploymentItem("OrleansStartupConfigurationForTesting.xml")]
+    [DeploymentItem("OrleansDependencyInjection.dll")]
     [TestClass]
     public class DependencyInjectionGrainTests : UnitTestSiloHost
     {

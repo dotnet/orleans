@@ -86,8 +86,9 @@ namespace Orleans.CodeGenerator
         /// </returns>
         internal static IEnumerable<TypeDeclarationSyntax> GenerateClass(Type type, Action<Type> onEncounteredType)
         {
-            var genericTypes = type.IsGenericTypeDefinition
-                                   ? type.GetGenericArguments().Select(_ => SF.TypeParameter(_.ToString())).ToArray()
+            var typeInfo = type.GetTypeInfo();
+            var genericTypes = typeInfo.IsGenericTypeDefinition
+                                   ? typeInfo.GetGenericArguments().Select(_ => SF.TypeParameter(_.ToString())).ToArray()
                                    : new TypeParameterSyntax[0];
 
             var attributes = new List<AttributeSyntax>
@@ -118,7 +119,7 @@ namespace Orleans.CodeGenerator
                 GenerateDeserializerMethod(type, fields),
             };
 
-            if (type.IsConstructedGenericType || !type.IsGenericTypeDefinition)
+            if (typeInfo.IsConstructedGenericType || !typeInfo.IsGenericTypeDefinition)
             {
                 members.Add(GenerateRegisterMethod(type));
                 members.Add(GenerateConstructor(className));
@@ -138,7 +139,7 @@ namespace Orleans.CodeGenerator
 
             var classes = new List<TypeDeclarationSyntax> { classDeclaration };
 
-            if (type.IsGenericTypeDefinition)
+            if (typeInfo.IsGenericTypeDefinition)
             {
                 // Create a generic representation of the serializer type.
                 var serializerType =
@@ -184,7 +185,7 @@ namespace Orleans.CodeGenerator
 
             var body = new List<StatementSyntax> { resultDeclaration };
 
-            if (type.IsValueType)
+            if (type.GetTypeInfo().IsValueType)
             {
                 // For value types, we need to box the result for reflection-based setters to work.
                 body.Add(SF.LocalDeclarationStatement(
@@ -314,7 +315,7 @@ namespace Orleans.CodeGenerator
                                 SF.VariableDeclarator("result")
                                     .WithInitializer(SF.EqualsValueClause(GetObjectCreationExpressionSyntax(type))))));
 
-                if (type.IsValueType)
+                if (type.GetTypeInfo().IsValueType)
                 {
                     // For value types, we need to box the result for reflection-based setters to work.
                     body.Add(SF.LocalDeclarationStatement(
@@ -402,15 +403,17 @@ namespace Orleans.CodeGenerator
         private static ExpressionSyntax GetObjectCreationExpressionSyntax(Type type)
         {
             ExpressionSyntax result;
-            if (type.IsValueType)
+            var typeInfo = type.GetTypeInfo();
+
+            if (typeInfo.IsValueType)
             {
                 // Use the default value.
-                result = SF.DefaultExpression(type.GetTypeSyntax());
+                result = SF.DefaultExpression(typeInfo.GetTypeSyntax());
             }
             else if (type.GetConstructor(Type.EmptyTypes) != null)
             {
                 // Use the default constructor.
-                result = SF.ObjectCreationExpression(type.GetTypeSyntax()).AddArgumentListArguments();
+                result = SF.ObjectCreationExpression(typeInfo.GetTypeSyntax()).AddArgumentListArguments();
             }
             else
             {
@@ -421,7 +424,7 @@ namespace Orleans.CodeGenerator
                     type.GetTypeSyntax(),
                     getUninitializedObject.Invoke()
                         .AddArgumentListArguments(
-                            SF.Argument(SF.TypeOfExpression(type.GetTypeSyntax()))));
+                            SF.Argument(SF.TypeOfExpression(typeInfo.GetTypeSyntax()))));
             }
 
             return result;

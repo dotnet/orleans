@@ -109,7 +109,7 @@ namespace Orleans.CodeGeneration
         /// Adds a pre-generated assembly to the assembly cache.
         /// </summary>
         /// <param name="targetAssemblyName">
-        /// The name of the assembly the provided <paramref name="rawAssembly"/> targets.
+        /// The name of the assembly the provided <paramref name="generatedAssembly"/> targets.
         /// </param>
         /// <param name="generatedAssembly">
         /// The generated assembly.
