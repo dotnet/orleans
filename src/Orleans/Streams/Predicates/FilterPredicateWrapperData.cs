@@ -32,6 +32,8 @@ namespace Orleans.Streams
 
     /// <summary>
     /// This class is a [Serializable] function pointer to a static predicate method, used for stream filtering.
+    /// The predicate function / lamda is not directly serialized, only the class / method info details required to reconstruct the function reference on the other side.
+    /// Predicate filter functions must be staic (non-abstract) methods, so full class name and method name are sufficient info to rehydrate.
     /// </summary>
     [Serializable]
     internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper
@@ -41,29 +43,37 @@ namespace Orleans.Streams
         private string methodName;
         private string className;
 
+        private const string SER_FIELD_CLASS  = "ClassName";
+        private const string SER_FIELD_DATA   = "FilterData";
+        private const string SER_FIELD_METHOD = "MethodName";
+
         [NonSerialized]
         private StreamFilterPredicate predicateFunc;
 
         internal FilterPredicateWrapperData(object filterData, StreamFilterPredicate pred)
         {
+            CheckFilterPredicateFunc(pred); // Assert expected pre-conditions are always true.
+
             FilterData = filterData;
             predicateFunc = pred;
+
             DehydrateStaticFunc(pred);
         }
 
         #region ISerializable methods
         protected FilterPredicateWrapperData(SerializationInfo info, StreamingContext context)
         {
-            FilterData = info.GetValue("FilterData", typeof(object));
-            methodName = info.GetString("MethodName");
-            className = info.GetString("ClassName");
+            FilterData = info.GetValue(SER_FIELD_DATA, typeof(object));
+            methodName = info.GetString(SER_FIELD_METHOD);
+            className  = info.GetString(SER_FIELD_CLASS);
+
             predicateFunc = RehydrateStaticFuncion(className, methodName);
         }
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("FilterData", FilterData);
-            info.AddValue("MethodName", methodName);
-            info.AddValue("ClassName", className);
+            info.AddValue(SER_FIELD_DATA,   FilterData);
+            info.AddValue(SER_FIELD_METHOD, methodName);
+            info.AddValue(SER_FIELD_CLASS,  className);
         }
         #endregion
 
@@ -78,24 +88,43 @@ namespace Orleans.Streams
 
         private static StreamFilterPredicate RehydrateStaticFuncion(string funcClassName, string funcMethodName)
         {
-            var funcClassType = CachedTypeResolver.Instance.ResolveType(funcClassName);
-            var method = funcClassType.GetMethod(funcMethodName);
-            return (StreamFilterPredicate)method.CreateDelegate(typeof(StreamFilterPredicate));
+            Type funcClassType = CachedTypeResolver.Instance.ResolveType(funcClassName);
+            MethodInfo method = funcClassType.GetMethod(funcMethodName);
+            StreamFilterPredicate pred = (StreamFilterPredicate) method.CreateDelegate(typeof(StreamFilterPredicate));
+#if DEBUG
+            CheckFilterPredicateFunc(pred); // Assert expected pre-conditions are always true.
+#endif
+            return pred;
         }
 
         private void DehydrateStaticFunc(StreamFilterPredicate pred)
         {
-            var method = pred.Method;
-
-            if (!CheckStaticFunc(method)) throw new ArgumentException("Filter function must be static and not abstract.");
-
+#if DEBUG
+            CheckFilterPredicateFunc(pred); // Assert expected pre-conditions are always true.
+#endif
+            MethodInfo method = pred.Method;
             className = method.DeclaringType.FullName;
             methodName = method.Name;
         }
 
-        private static bool CheckStaticFunc(MethodInfo method)
+        /// <summary>
+        /// Check that the user-supplied stream predicate function is valid.
+        /// Stream predicate functions must be static and not abstract.
+        /// </summary>
+        /// <param name="func"></param>
+        private static void CheckFilterPredicateFunc(StreamFilterPredicate predicate)
         {
-            return method.IsStatic && !method.IsAbstract;
+            if (predicate == null)
+            {
+                throw new ArgumentNullException("predicate", "Stream Filter predicate function must not be null.");
+            }
+
+            MethodInfo method = predicate.Method;
+
+            if (!method.IsStatic || method.IsAbstract)
+            {
+                throw new ArgumentException("Stream Filter predicate function must be static and not abstract.");
+            }
         }
 
         public override string ToString()
