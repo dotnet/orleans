@@ -323,9 +323,10 @@ namespace Orleans.CodeGenerator
             {
                 // The module containing the serializer.
                 var module = runtime ? null : type.Module;
+                var typeInfo = type.GetTypeInfo();
 
                 // Every type which is encountered must be considered for serialization.
-                if (!type.IsNested && !type.IsGenericParameter && type.IsSerializable)
+                if (!typeInfo.IsNested && !typeInfo.IsGenericParameter && typeInfo.IsSerializable)
                 {
                     // If a type was encountered which can be accessed, process it for serialization.
                     var isAccessibleForSerialization =

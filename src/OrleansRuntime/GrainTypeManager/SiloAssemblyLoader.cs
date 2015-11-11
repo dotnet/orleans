@@ -94,13 +94,13 @@ namespace Orleans.Runtime
                 var parentType = grainType.BaseType;
                 while (parentType != typeof (Grain) && parentType != typeof(object))
                 {
-                    if (parentType.IsGenericType)
+                    if (parentType.GetTypeInfo().IsGenericType)
                     {
                         var definition = parentType.GetGenericTypeDefinition();
                         if (definition == typeof (Grain<>))
                         {
                             var stateArg = parentType.GetGenericArguments()[0];
-                            if (stateArg.IsClass)
+                            if (stateArg.GetTypeInfo().IsClass)
                             {
                                 grainStateType = stateArg;
                                 break;
@@ -144,7 +144,7 @@ namespace Orleans.Runtime
         /// </summary>
         private static GrainTypeData GetTypeData(Type grainType, Type stateObjectType)
         {
-            return grainType.IsGenericTypeDefinition ? 
+            return grainType.GetTypeInfo().IsGenericTypeDefinition ? 
                 new GenericGrainTypeData(grainType, stateObjectType) : 
                 new GrainTypeData(grainType, stateObjectType);
         }

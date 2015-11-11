@@ -65,8 +65,9 @@ namespace Orleans.CodeGenerator
         {
             var baseTypes = new List<BaseTypeSyntax> { SF.SimpleBaseType(typeof(IGrainMethodInvoker).GetTypeSyntax()) };
 
-            var genericTypes = grainType.IsGenericTypeDefinition
-                                   ? grainType.GetGenericArguments()
+            var grainTypeInfo = grainType.GetTypeInfo();
+            var genericTypes = grainTypeInfo.IsGenericTypeDefinition
+                                   ? grainTypeInfo.GetGenericArguments()
                                          .Select(_ => SF.TypeParameter(_.ToString()))
                                          .ToArray()
                                    : new TypeParameterSyntax[0];

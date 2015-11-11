@@ -82,16 +82,18 @@ namespace Orleans.CodeGenerator
 
         internal static void RecordTypeToGenerate(Type t)
         {
-            if (t.IsGenericParameter || ProcessedTypes.Contains(t) || TypesToProcess.Contains(t) 
-                ||typeof (Exception).IsAssignableFrom(t)) return;
+            var typeInfo = t.GetTypeInfo();
 
-            if (t.IsArray)
+            if (typeInfo.IsGenericParameter || ProcessedTypes.Contains(t) || TypesToProcess.Contains(t) 
+                ||typeof (Exception).GetTypeInfo().IsAssignableFrom(t)) return;
+
+            if (typeInfo.IsArray)
             {
-                RecordTypeToGenerate(t.GetElementType());
+                RecordTypeToGenerate(typeInfo.GetElementType());
                 return;
             }
 
-            if (t.IsNestedPublic || t.IsNestedFamily || t.IsNestedPrivate)
+            if (typeInfo.IsNestedPublic || typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
             {
                 Log.Warn(
                     ErrorCode.CodeGenIgnoringTypes,
@@ -99,7 +101,7 @@ namespace Orleans.CodeGenerator
                     t.Name);
             }
 
-            if (t.IsGenericType)
+            if (typeInfo.IsGenericType)
             {
                 var args = t.GetGenericArguments();
                 foreach (var arg in args)
@@ -107,12 +109,12 @@ namespace Orleans.CodeGenerator
                         RecordTypeToGenerate(arg);
             }
 
-            if (t.IsInterface || t.IsAbstract || t.IsEnum || t == typeof (object) || t == typeof (void) 
+            if (typeInfo.IsInterface || typeInfo.IsAbstract || typeInfo.IsEnum || t == typeof (object) || t == typeof (void) 
                 || GrainInterfaceData.IsTaskType(t)) return;
 
-            if (t.IsGenericType)
+            if (typeInfo.IsGenericType)
             {
-                var def = t.GetGenericTypeDefinition();
+                var def = typeInfo.GetGenericTypeDefinition();
                 if (def == typeof (Task<>) || (SerializationManager.GetSerializer(def) != null) ||
                     ProcessedTypes.Contains(def) || typeof (IAddressable).IsAssignableFrom(def)) return;
 
@@ -126,10 +128,10 @@ namespace Orleans.CodeGenerator
                 return;
             }
 
-            if (t.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
-                typeof (IAddressable).IsAssignableFrom(t)) return;
+            if (typeInfo.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
+                typeof (IAddressable).GetTypeInfo().IsAssignableFrom(t)) return;
 
-            if (t.Namespace != null && (t.Namespace.Equals("System") || t.Namespace.StartsWith("System.")))
+            if (typeInfo.Namespace != null && (typeInfo.Namespace.Equals("System") || typeInfo.Namespace.StartsWith("System.")))
             {
                 var message = "System type " + t.Name + " may require a custom serializer for optimal performance. "
                               + "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.";

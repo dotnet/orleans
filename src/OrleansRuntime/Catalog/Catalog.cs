@@ -28,7 +28,6 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Framework.DependencyInjection;
 
 using Orleans.Core;
 using Orleans.Providers;
@@ -642,8 +641,14 @@ namespace Orleans.Runtime
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
             Type grainType = grainTypeData.Type;
-            var grain = (Grain)Runtime.Silo.CurrentSilo.Services.GetRequiredService(grainType);
-            // Inject runtime hookups into grain instance
+
+            // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
+            var services = Runtime.Silo.CurrentSilo.Services;
+            var grain = services != null
+                ? (Grain) services.GetService(grainType)
+                : (Grain) Activator.CreateInstance(grainType);
+
+            // Inject runtime hooks into grain instance
             grain.Runtime = grainRuntime;
             grain.Data = data;
 

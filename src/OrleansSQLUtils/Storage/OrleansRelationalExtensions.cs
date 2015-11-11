@@ -830,7 +830,7 @@ namespace Orleans.SqlUtils
                 }
             }
 
-            string etag = Convert.ToBase64String(record.GetValue<byte[]>("ETag"));
+            string etag = Convert.ToBase64String(record.GetValueOrDefault("ETag", new byte[0]));
             int tableVersion = (int)record.GetValueOrDefault<long>("Version");
             string versionETag = Convert.ToBase64String(record.GetValueOrDefault<byte[]>("VersionETag"));
 

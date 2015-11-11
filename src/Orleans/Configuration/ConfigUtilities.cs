@@ -282,6 +282,60 @@ namespace Orleans.Runtime.Configuration
             return p;
         }
 
+        internal static Type ParseFullyQualifiedType(string input, string errorMessage)
+        {
+            Type returnValue;
+            try
+            {
+                returnValue = Type.GetType(input);
+            }
+            catch(Exception e)
+            {
+                throw new FormatException(errorMessage, e);
+            }
+
+            if (returnValue == null)
+            {
+                throw new FormatException(errorMessage);
+            }
+
+            return returnValue;
+        }
+
+        internal static void ValidateSerializationProvider(Type type)
+        {
+            if (type.IsClass == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} was not a class", type.FullName));
+            }
+
+            if (type.IsAbstract)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} was an abstract class", type.FullName));
+            }
+
+            if (type.IsPublic == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} is not public", type.FullName));
+            }
+
+            if (type.IsGenericType && type.IsConstructedGenericType == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} is generic and has a missing type parameter specification", type.FullName));
+            }
+
+            var constructor = type.GetConstructor(Type.EmptyTypes);
+            if (constructor == null)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} does not have a parameterless constructor", type.FullName));
+            }
+
+            if (constructor.IsPublic == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} has a non-public parameterless constructor", type.FullName));
+            }
+        }
+
         // Time spans are entered as a string of decimal digits, optionally followed by a unit string: "ms", "s", "m", "hr"
         internal static TimeSpan ParseTimeSpan(string input, string errorMessage)
         {

@@ -243,10 +243,11 @@ namespace Orleans.CodeGenerator.Utilities
         /// </returns>
         public static TypeParameterConstraintClauseSyntax[] GetTypeConstraintSyntax(this Type genericTypeArgument)
         {
-            if (genericTypeArgument.IsGenericTypeDefinition)
+            var typeInfo = genericTypeArgument.GetTypeInfo();
+            if (typeInfo.IsGenericTypeDefinition)
             {
-                    var constraints = new List<TypeParameterConstraintClauseSyntax>();
-                foreach (var genericParameter in genericTypeArgument.GetGenericArguments())
+                var constraints = new List<TypeParameterConstraintClauseSyntax>();
+                foreach (var genericParameter in typeInfo.GetGenericArguments())
                 {
                     var parameterConstraints = new List<TypeParameterConstraintSyntax>();
                     var attributes = genericParameter.GenericParameterAttributes;
