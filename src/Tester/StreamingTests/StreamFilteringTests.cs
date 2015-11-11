@@ -396,6 +396,7 @@ namespace Tester.StreamingTests
         {
         }
 
+        [Ignore]
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_Basic()
         {
@@ -404,6 +405,7 @@ namespace Tester.StreamingTests
             await Test_Filter_EvenOdd(true);
         }
 
+        [Ignore]
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_EvenOdd()
         {
@@ -412,6 +414,7 @@ namespace Tester.StreamingTests
             await Test_Filter_EvenOdd();
         }
 
+        [Ignore]
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         [ExpectedException(typeof(ArgumentException))]
         public async Task AQ_Filter_BadFunc()
@@ -429,6 +432,7 @@ namespace Tester.StreamingTests
             }
         }
 
+        [Ignore]
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_TwoObsv_Different()
         {
@@ -437,6 +441,7 @@ namespace Tester.StreamingTests
             await Test_Filter_TwoObsv_Different();
         }
 
+        [Ignore]
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_TwoObsv_Same()
         {
