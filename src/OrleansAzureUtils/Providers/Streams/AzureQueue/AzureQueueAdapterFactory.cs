@@ -61,7 +61,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             if (!config.Properties.TryGetValue(DEPLOYMENT_ID, out deploymentId))
                 throw new ArgumentException(String.Format("{0} property not set", DEPLOYMENT_ID));
 
-            cacheSize = SimpleQueueAdapterCache.ParseSize(config.Properties, DEFAULT_CACHE_SIZE);
+            cacheSize = SimpleQueueAdapterCache.ParseSize(config, DEFAULT_CACHE_SIZE);
 
             string numQueuesString;
             numQueues = DEFAULT_NUM_QUEUES;

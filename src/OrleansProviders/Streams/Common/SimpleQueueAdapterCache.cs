@@ -57,16 +57,9 @@ namespace Orleans.Providers.Streams.Common
             get { return caches.Select(pair => pair.Value.Size).Sum(); }
         }
 
-        public static int ParseSize(ReadOnlyDictionary<string, string> config, int defaultSize)
+        public static int ParseSize(IProviderConfiguration config, int defaultSize)
         {
-            string cacheSizeString;
-            int cacheSize = defaultSize;
-            if (config.TryGetValue(CACHE_SIZE_PARAM, out cacheSizeString))
-            {
-                if (!int.TryParse(cacheSizeString, out cacheSize))
-                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", CACHE_SIZE_PARAM));
-            }
-            return cacheSize;
+            return config.GetIntProperty(CACHE_SIZE_PARAM, defaultSize);
         }
     }
 }
