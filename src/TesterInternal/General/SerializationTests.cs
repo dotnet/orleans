@@ -131,27 +131,28 @@ namespace UnitTests.General
         public GrainReference GetGrainReference<TGrainInterface>()
         {
             var grainType = typeof(TGrainInterface);
+            var typeInfo = grainType.GetTypeInfo();
 
-            if (typeof(TGrainInterface).IsGenericTypeDefinition)
+            if (typeInfo.IsGenericTypeDefinition)
             {
                 throw new ArgumentException("Cannot create grain reference for non-concrete grain type");
             }
 
-            if (typeof(TGrainInterface).IsConstructedGenericType)
+            if (typeInfo.IsConstructedGenericType)
             {
-                grainType = typeof(TGrainInterface).GetGenericTypeDefinition();
+                grainType = typeInfo.GetGenericTypeDefinition();
             }
 
-            var type = typeof(TGrainInterface).Assembly.DefinedTypes.First(
+            var type = typeInfo.Assembly.DefinedTypes.First(
                 _ =>
                 {
                     var attr = _.GetCustomAttribute<GrainReferenceAttribute>();
                     return attr != null && attr.GrainType == grainType;
                 }).AsType();
 
-            if (typeof(TGrainInterface).IsConstructedGenericType)
+            if (typeInfo.IsConstructedGenericType)
             {
-                type = type.MakeGenericType(typeof(TGrainInterface).GetGenericArguments());
+                type = type.MakeGenericType(typeInfo.GetGenericArguments());
             }
 
             var regularGrainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());

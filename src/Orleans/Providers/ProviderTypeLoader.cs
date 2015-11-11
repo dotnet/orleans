@@ -83,7 +83,8 @@ namespace Orleans.Providers
 
         private void ProcessType(Type type)
         {
-            if (alreadyProcessed.Contains(type) || type.IsInterface || type.IsAbstract || !condition(type)) return;
+            var typeInfo = type.GetTypeInfo();
+            if (alreadyProcessed.Contains(type) || typeInfo.IsInterface || typeInfo.IsAbstract || !condition(type)) return;
 
             alreadyProcessed.Add(type);
             callback(type);

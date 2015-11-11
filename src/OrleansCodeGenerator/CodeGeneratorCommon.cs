@@ -123,7 +123,12 @@ namespace Orleans.CodeGenerator
                 {
                     source = source ?? GenerateSourceCode(code);
                     var errors = string.Join("\n", compilationResult.Diagnostics.Select(_ => _.ToString()));
-                    logger.Warn(ErrorCode.CodeGenCompilationFailed, "Compilation of assembly {0} failed with errors:\n{1}", assemblyName, errors, source);
+                    logger.Warn(
+                        ErrorCode.CodeGenCompilationFailed,
+                        "Compilation of assembly {0} failed with errors:\n{1}\nGenerated Source Code:\n{2}",
+                        assemblyName,
+                        errors,
+                        source);
                     throw new CodeGenerationException(errors);
                 }
                 

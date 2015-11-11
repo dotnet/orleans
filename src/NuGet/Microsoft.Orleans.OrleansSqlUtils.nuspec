@@ -25,5 +25,6 @@
     <file src="OrleansSqlUtils.dll" target="lib\net45" />
     <file src="OrleansSqlUtils.pdb" target="lib\net45" />
     <file src="OrleansSqlUtils.xml" target="lib\net45" />
+    <file src="CreateOrleansTables_SqlServer.sql" target="lib\net45\SQLServer" />
   </files>
 </package>

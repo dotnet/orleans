@@ -193,18 +193,19 @@ namespace Orleans
         private Task<TGrainObserverInterface> CreateObjectReferenceImpl<TGrainObserverInterface>(IAddressable obj)
         {
             var interfaceType = typeof(TGrainObserverInterface);
-            if (!interfaceType.IsInterface)
+            var interfaceTypeInfo = interfaceType.GetTypeInfo();
+            if (!interfaceTypeInfo.IsInterface)
             {
                 throw new ArgumentException(
                     string.Format(
                         "The provided type parameter must be an interface. '{0}' is not an interface.",
-                        interfaceType.FullName));
+                        interfaceTypeInfo.FullName));
             }
 
-            if (!interfaceType.IsInstanceOfType(obj))
+            if (!interfaceTypeInfo.IsInstanceOfType(obj))
             {
                 throw new ArgumentException(
-                    string.Format("The provided object must implement '{0}'.", interfaceType.FullName),
+                    string.Format("The provided object must implement '{0}'.", interfaceTypeInfo.FullName),
                     "obj");
             }
             
@@ -247,9 +248,10 @@ namespace Orleans
 
         private static IGrainMethodInvoker MakeInvoker(Type interfaceType)
         {
-            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(interfaceType.Assembly);
-            var genericInterfaceType = interfaceType.IsConstructedGenericType
-                                           ? interfaceType.GetGenericTypeDefinition()
+            var typeInfo = interfaceType.GetTypeInfo(); 
+            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
+            var genericInterfaceType = typeInfo.IsConstructedGenericType
+                                           ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;
 
             // Try to find the correct IGrainMethodInvoker type for this interface.
@@ -259,9 +261,9 @@ namespace Orleans
                 return null;
             }
 
-            if (interfaceType.IsConstructedGenericType)
+            if (typeInfo.IsConstructedGenericType)
             {
-                invokerType = invokerType.MakeGenericType(interfaceType.GenericTypeArguments);
+                invokerType = invokerType.MakeGenericType(typeInfo.GenericTypeArguments);
             }
 
             return (IGrainMethodInvoker)Activator.CreateInstance(invokerType);
@@ -288,9 +290,10 @@ namespace Orleans
 
         private static GrainReferenceCaster MakeCaster(Type interfaceType)
         {
-            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(interfaceType.Assembly);
-            var genericInterfaceType = interfaceType.IsConstructedGenericType
-                                           ? interfaceType.GetGenericTypeDefinition()
+            var typeInfo = interfaceType.GetTypeInfo();
+            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
+            var genericInterfaceType = typeInfo.IsConstructedGenericType
+                                           ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;
 
             // Try to find the correct GrainReference type for this interface.
@@ -301,9 +304,9 @@ namespace Orleans
                     string.Format("Cannot find generated GrainReference class for interface '{0}'", interfaceType));
             }
 
-            if (interfaceType.IsConstructedGenericType)
+            if (typeInfo.IsConstructedGenericType)
             {
-                grainReferenceType = grainReferenceType.MakeGenericType(interfaceType.GenericTypeArguments);
+                grainReferenceType = grainReferenceType.MakeGenericType(typeInfo.GenericTypeArguments);
             }
 
             // Get the grain reference constructor.

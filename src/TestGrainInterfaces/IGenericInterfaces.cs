@@ -181,4 +181,11 @@ namespace UnitTests.GrainInterfaces
         Task ScheduleDelayedPing(IGenericPingSelf<T> target, T t, TimeSpan delay);
         Task ScheduleDelayedPingToSelfAndDeactivate(IGenericPingSelf<T> target, T t, TimeSpan delay);
     }
+
+    public interface ILongRunningTaskGrain<T> : IGrainWithGuidKey
+    {
+        Task<string> GetRuntimeInstanceId();
+        Task<T> LongRunningTask(T t, TimeSpan delay);
+        Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
+    }
 }

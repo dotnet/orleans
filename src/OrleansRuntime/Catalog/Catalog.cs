@@ -28,7 +28,6 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Framework.DependencyInjection;
 
 using Orleans.Core;
 using Orleans.Providers;
@@ -642,8 +641,14 @@ namespace Orleans.Runtime
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
             Type grainType = grainTypeData.Type;
-            var grain = (Grain)Runtime.Silo.CurrentSilo.Services.GetRequiredService(grainType);
-            // Inject runtime hookups into grain instance
+
+            // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
+            var services = Runtime.Silo.CurrentSilo.Services;
+            var grain = services != null
+                ? (Grain) services.GetService(grainType)
+                : (Grain) Activator.CreateInstance(grainType);
+
+            // Inject runtime hooks into grain instance
             grain.Runtime = grainRuntime;
             grain.Data = data;
 
@@ -1283,6 +1288,10 @@ namespace Orleans.Runtime
             // thus it will only deliver a "remove" notification for a given silo once to us. Therefore, we need to react the fist time we are notified.
             // We may review the directory behaiviour in the future and treat ShuttingDown differently ("drain only") and then this code will have to change a well.
             if (!status.IsTerminating()) return;
+            if (status == SiloStatus.Dead)
+            {
+                RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(updatedSilo);
+            }
 
             var activationsToShutdown = new List<ActivationData>();
             try

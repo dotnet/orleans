@@ -44,8 +44,8 @@ namespace Orleans.SqlUtils
         /// table that will be updated with multiple values. The other ones are updated with one value only.
         /// </summary>
         private readonly static string[] InsertStatisticsMultiupdateColumns = new[] { "@isDelta", "@statValue", "@statistic" };
-        
-        
+
+
         /// <summary>
         /// Either inserts or updates a silo metrics row.
         /// </summary>
@@ -59,65 +59,64 @@ namespace Orleans.SqlUtils
         /// <param name="siloMetrics">The silo metrics to be either updated or inserted.</param>
         /// <returns></returns>
         public static async Task UpsertSiloMetricsAsync(this IRelationalStorage storage, string query, string deploymentId, string siloId, IPEndPoint gateway, SiloAddress siloAddress, string hostName, ISiloPerformanceMetrics siloMetrics)
-        {            
+        {
             await storage.ExecuteAsync(query, command =>
-            {               
-                var direction = ParameterDirection.Input;
-                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(deploymentIdParameter);
 
-                var clientIdParameter = CreateSiloIdParameter(command, siloId, direction);
+                var clientIdParameter = CreateSiloIdParameter(command, siloId);
                 command.Parameters.Add(clientIdParameter);
 
-                var addressParameter = CreateAddressParameter(command, siloAddress.Endpoint.Address, direction);
+                var addressParameter = CreateAddressParameter(command, siloAddress.Endpoint.Address);
                 command.Parameters.Add(addressParameter);
 
-                var portParameter = CreatePortParameter(command, siloAddress.Endpoint.Port, direction);
+                var portParameter = CreatePortParameter(command, siloAddress.Endpoint.Port);
                 command.Parameters.Add(portParameter);
 
-                var generationParameter = CreateGenerationParameter(command, siloAddress.Generation, direction);
+                var generationParameter = CreateGenerationParameter(command, siloAddress.Generation);
                 command.Parameters.Add(generationParameter);
 
-                var hostNameParameter = CreateHostNameParameter(command, hostName, direction);
+                var hostNameParameter = CreateHostNameParameter(command, hostName);
                 command.Parameters.Add(hostNameParameter);
-                
-                var gatewayAddressParameter = CreateGatewayAddressParameter(command, gateway != null ? gateway.Address : null, direction);
+
+                var gatewayAddressParameter = CreateGatewayAddressParameter(command, gateway != null ? gateway.Address : null);
                 command.Parameters.Add(gatewayAddressParameter);
 
-                var gatewayPortParameter = CreateGatewayPortParameter(command, gateway != null ? gateway.Port : 0, direction);
+                var gatewayPortParameter = CreateGatewayPortParameter(command, gateway != null ? gateway.Port : 0);
                 command.Parameters.Add(gatewayPortParameter);
-                
-                var cpuUsageParameter = CreateCpuUsageParameter(command, siloMetrics.CpuUsage, direction);
+
+                var cpuUsageParameter = CreateCpuUsageParameter(command, siloMetrics.CpuUsage);
                 command.Parameters.Add(cpuUsageParameter);
 
-                var memoryUsageParameter = CreateMemoryUsageParameter(command, siloMetrics.MemoryUsage, direction);
+                var memoryUsageParameter = CreateMemoryUsageParameter(command, siloMetrics.MemoryUsage);
                 command.Parameters.Add(memoryUsageParameter);
 
-                var activationsCountParameter = CreateActivationsCountParameter(command, siloMetrics.ActivationCount, direction);
+                var activationsCountParameter = CreateActivationsCountParameter(command, siloMetrics.ActivationCount);
                 command.Parameters.Add(activationsCountParameter);
 
-                var recentlyUsedActivationsCountParameter = CreateRecentlyUsedActivationsCountParameter(command, siloMetrics.RecentlyUsedActivationCount, direction);
+                var recentlyUsedActivationsCountParameter = CreateRecentlyUsedActivationsCountParameter(command, siloMetrics.RecentlyUsedActivationCount);
                 command.Parameters.Add(recentlyUsedActivationsCountParameter);
 
-                var sendQueueLengthParameter = CreateSendQueueUsageParameter(command, siloMetrics.SendQueueLength, direction);
+                var sendQueueLengthParameter = CreateSendQueueUsageParameter(command, siloMetrics.SendQueueLength);
                 command.Parameters.Add(sendQueueLengthParameter);
 
-                var receiveQueueParameter = CreateReceiveQueueLengthParameter(command, siloMetrics.ReceiveQueueLength, direction);
+                var receiveQueueParameter = CreateReceiveQueueLengthParameter(command, siloMetrics.ReceiveQueueLength);
                 command.Parameters.Add(receiveQueueParameter);
 
-                var sentMessagesCountParameter = CreateSentMessagesCountParameter(command, siloMetrics.SentMessages, direction);
+                var sentMessagesCountParameter = CreateSentMessagesCountParameter(command, siloMetrics.SentMessages);
                 command.Parameters.Add(sentMessagesCountParameter);
 
-                var receivedMessagesCountParameter = CreateReceivedMessagesCountParameter(command, siloMetrics.ReceivedMessages, direction);
+                var receivedMessagesCountParameter = CreateReceivedMessagesCountParameter(command, siloMetrics.ReceivedMessages);
                 command.Parameters.Add(receivedMessagesCountParameter);
 
-                var requestQueueLengthParameter = CreateRequestQueueLengthParameter(command, siloMetrics.RequestQueueLength, direction);
+                var requestQueueLengthParameter = CreateRequestQueueLengthParameter(command, siloMetrics.RequestQueueLength);
                 command.Parameters.Add(requestQueueLengthParameter);
-                
-                var isOverloadedParameter = CreateIsOverloadedParameter(command, siloMetrics.IsOverloaded, direction);
+
+                var isOverloadedParameter = CreateIsOverloadedParameter(command, siloMetrics.IsOverloaded);
                 command.Parameters.Add(isOverloadedParameter);
 
-                var clientCountParameter = CreateClientCountParameter(command, siloMetrics.ClientCount, direction);
+                var clientCountParameter = CreateClientCountParameter(command, siloMetrics.ClientCount);
                 command.Parameters.Add(clientCountParameter);
             }).ConfigureAwait(continueOnCapturedContext: false);
         }
@@ -135,41 +134,40 @@ namespace Orleans.SqlUtils
         /// <param name="clientMetrics">The client metrics to be either updated or inserted.</param>
         /// <returns></returns>
         public static async Task UpsertReportClientMetricsAsync(this IRelationalStorage storage, string query, string deploymentId, string clientId, IPAddress clientAddress, string hostName, IClientPerformanceMetrics clientMetrics)
-        {            
+        {
             await storage.ExecuteAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(deploymentIdParameter);
 
-                var clientIdParameter = CreateClientIdParameter(command, clientId, direction);
+                var clientIdParameter = CreateClientIdParameter(command, clientId);
                 command.Parameters.Add(clientIdParameter);
 
-                var addressParameter = CreateAddressParameter(command, clientAddress, direction);
+                var addressParameter = CreateAddressParameter(command, clientAddress);
                 command.Parameters.Add(addressParameter);
 
-                var hostNameParameter = CreateHostNameParameter(command, hostName, direction);
+                var hostNameParameter = CreateHostNameParameter(command, hostName);
                 command.Parameters.Add(hostNameParameter);
 
-                var cpuUsageParameter = CreateCpuUsageParameter(command, clientMetrics.CpuUsage, direction);
+                var cpuUsageParameter = CreateCpuUsageParameter(command, clientMetrics.CpuUsage);
                 command.Parameters.Add(cpuUsageParameter);
 
-                var memoryUsageParameter = CreateMemoryUsageParameter(command, clientMetrics.MemoryUsage, direction);
+                var memoryUsageParameter = CreateMemoryUsageParameter(command, clientMetrics.MemoryUsage);
                 command.Parameters.Add(memoryUsageParameter);
 
-                var sendQueueLengthParameter = CreateSendQueueUsageParameter(command, clientMetrics.SendQueueLength, direction);
+                var sendQueueLengthParameter = CreateSendQueueUsageParameter(command, clientMetrics.SendQueueLength);
                 command.Parameters.Add(sendQueueLengthParameter);
 
-                var receiveQueueParameter = CreateReceiveQueueLengthParameter(command, clientMetrics.ReceiveQueueLength, direction);
+                var receiveQueueParameter = CreateReceiveQueueLengthParameter(command, clientMetrics.ReceiveQueueLength);
                 command.Parameters.Add(receiveQueueParameter);
 
-                var sentMessagesCountParameter = CreateSentMessagesCountParameter(command, clientMetrics.SentMessages, direction);
+                var sentMessagesCountParameter = CreateSentMessagesCountParameter(command, clientMetrics.SentMessages);
                 command.Parameters.Add(sentMessagesCountParameter);
 
-                var receivedMessagesCountParameter = CreateReceivedMessagesCountParameter(command, clientMetrics.ReceivedMessages, direction);
+                var receivedMessagesCountParameter = CreateReceivedMessagesCountParameter(command, clientMetrics.ReceivedMessages);
                 command.Parameters.Add(receivedMessagesCountParameter);
 
-                var connectionGatewayCountParameter = CreateConnectionGatewayCountParameter(command, clientMetrics.ConnectedGatewayCount, direction);
+                var connectionGatewayCountParameter = CreateConnectionGatewayCountParameter(command, clientMetrics.ConnectedGatewayCount);
                 command.Parameters.Add(connectionGatewayCountParameter);
             }).ConfigureAwait(continueOnCapturedContext: false);
         }
@@ -186,10 +184,11 @@ namespace Orleans.SqlUtils
         /// <param name="id">The silo address or client ID.</param>
         /// <param name="counters">The counters to be inserted.</param>        
         public static async Task InsertStatisticsCountersAsync(this IRelationalStorage storage, string queryTemplate, string deploymentId, string hostName, string siloOrClientName, string id, IEnumerable<ICounter> counters)
-        {           
+        {
             //Zero statistic values mean either that the system is not running or no updates. Such values are not inserted and pruned
             //here so that no insert query or parameters are generated.
             var countersList = counters.Where(i => !"0".Equals(i.IsValueDelta ? i.GetDeltaString() : i.GetValueString())).ToList();
+            if(countersList.Count == 0) { return; }
 
             //Note that the following is almost the same as RelationalStorageExtensions.ExecuteMultipleInsertIntoAsync
             //the only difference being that some columns are skipped. Likely it would be beneficial to introduce
@@ -239,29 +238,28 @@ namespace Orleans.SqlUtils
 
             var query = queryTemplate.Replace(template, string.Join(" UNION ALL SELECT ", collectionOfParametersToBeUnionized));
             await storage.ExecuteAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(deploymentIdParameter);
 
-                var idParameter = CreateIdParameter(command, id, direction);
+                var idParameter = CreateIdParameter(command, id);
                 command.Parameters.Add(idParameter);
 
-                var hostNameParameter = CreateHostNameParameter(command, hostName, direction);
+                var hostNameParameter = CreateHostNameParameter(command, hostName);
                 command.Parameters.Add(hostNameParameter);
 
-                var nameParameter = CreateNameParameter(command, siloOrClientName, direction);
+                var nameParameter = CreateNameParameter(command, siloOrClientName);
                 command.Parameters.Add(nameParameter);
 
                 for(int i = 0; i < countersList.Count; ++i)
                 {
-                    var isDeltaParameter = CreateIsDeltaParameter(command, countersList[i].IsValueDelta, i, direction);
+                    var isDeltaParameter = CreateIsDeltaParameter(command, countersList[i].IsValueDelta, i);
                     command.Parameters.Add(isDeltaParameter);
 
-                    var statParameter = CreateStatParameter(command, countersList[i].IsValueDelta ? countersList[i].GetDeltaString() : countersList[i].GetValueString(), i, direction);
+                    var statParameter = CreateStatParameter(command, countersList[i].IsValueDelta ? countersList[i].GetDeltaString() : countersList[i].GetValueString(), i);
                     command.Parameters.Add(statParameter);
 
-                    var statisticNameParameter = CreateStatisticNameParameter(command, countersList[i].Name, i, direction);
+                    var statisticNameParameter = CreateStatisticNameParameter(command, countersList[i].Name, i);
                     command.Parameters.Add(statisticNameParameter);
                 }
             }).ConfigureAwait(continueOnCapturedContext: false);
@@ -277,14 +275,13 @@ namespace Orleans.SqlUtils
         /// <param name="grainRef">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
         internal static async Task<ReminderTableData> ReadReminderRowsAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var serviceIdParameter = CreateServiceIdParameter(command, serviceId, direction);
+            {                
+                var serviceIdParameter = CreateServiceIdParameter(command, serviceId);
                 command.Parameters.Add(serviceIdParameter);
 
-                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString(), direction);
+                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString());
                 command.Parameters.Add(grainIdParameter);
             }, (selector, _) =>
             {
@@ -305,17 +302,16 @@ namespace Orleans.SqlUtils
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
         internal static async Task<ReminderTableData> ReadReminderRowsAsync(this IRelationalStorage storage, string query, string serviceId, uint beginHash, uint endHash)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var serviceIdParameter = CreateServiceIdParameter(command, serviceId, direction);
+            {                
+                var serviceIdParameter = CreateServiceIdParameter(command, serviceId);
                 command.Parameters.Add(serviceIdParameter);
 
-                var beginHashParameter = CreateBeginHashParameter(command, beginHash, direction);
+                var beginHashParameter = CreateBeginHashParameter(command, beginHash);
                 command.Parameters.Add(beginHashParameter);
 
-                var endHashParameter = CreateEndHashParameter(command, endHash, direction);
+                var endHashParameter = CreateEndHashParameter(command, endHash);
                 command.Parameters.Add(endHashParameter);
             }, (selector, _) =>
             {
@@ -336,17 +332,16 @@ namespace Orleans.SqlUtils
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
         internal static async Task<ReminderEntry> ReadReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var serviceIdParameter = CreateServiceIdParameter(command, serviceId, direction);
+            {                
+                var serviceIdParameter = CreateServiceIdParameter(command, serviceId);
                 command.Parameters.Add(serviceIdParameter);
 
-                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString(), direction);
+                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString());
                 command.Parameters.Add(grainIdParameter);
 
-                var reminderNameParameter = CreateReminderName(command, reminderName, direction);
+                var reminderNameParameter = CreateReminderName(command, reminderName);
                 command.Parameters.Add(reminderNameParameter);
             }, (selector, _) =>
             {
@@ -369,26 +364,25 @@ namespace Orleans.SqlUtils
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
         internal static async Task<string> UpsertReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName, DateTime startTime, TimeSpan period)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var serviceIdParameter = CreateServiceIdParameter(command, serviceId, direction);
+            {                
+                var serviceIdParameter = CreateServiceIdParameter(command, serviceId);
                 command.Parameters.Add(serviceIdParameter);
 
-                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString(), direction);
+                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString());
                 command.Parameters.Add(grainIdParameter);
 
-                var reminderNameParameter = CreateReminderName(command, reminderName, direction);
+                var reminderNameParameter = CreateReminderName(command, reminderName);
                 command.Parameters.Add(reminderNameParameter);
 
-                var startTimeParameter = CreateStartTimeParameter(command, startTime, direction);
+                var startTimeParameter = CreateStartTimeParameter(command, startTime);
                 command.Parameters.Add(startTimeParameter);
 
-                var periodParameter = CreatePeriodParameter(command, period, direction);
+                var periodParameter = CreatePeriodParameter(command, period);
                 command.Parameters.Add(periodParameter);
 
-                var grainIdConsistentHashParameter = CreateGrainIdConsistentHashParameter(command, grainRef.GetUniformHashCode(), direction);
+                var grainIdConsistentHashParameter = CreateGrainIdConsistentHashParameter(command, grainRef.GetUniformHashCode());
                 command.Parameters.Add(grainIdConsistentHashParameter);
             }, (selector, _) =>
             {
@@ -410,20 +404,19 @@ namespace Orleans.SqlUtils
         /// <param name="etag"></param>
         /// <returns></returns>
         internal static async Task<bool> DeleteReminderRowAsync(this IRelationalStorage storage, string query, string serviceId, GrainReference grainRef, string reminderName, string etag)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var serviceIdParameter = CreateServiceIdParameter(command, serviceId, direction);
+            {                
+                var serviceIdParameter = CreateServiceIdParameter(command, serviceId);
                 command.Parameters.Add(serviceIdParameter);
 
-                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString(), direction);
+                var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString());
                 command.Parameters.Add(grainIdParameter);
 
-                var reminderNameParameter = CreateReminderName(command, reminderName, direction);
+                var reminderNameParameter = CreateReminderName(command, reminderName);
                 command.Parameters.Add(reminderNameParameter);
 
-                var etagParameter = CreateEtagParameter(command, etag, direction);
+                var etagParameter = CreateEtagParameter(command, etag);
                 command.Parameters.Add(etagParameter);
             }, (selector, _) =>
             {
@@ -442,11 +435,10 @@ namespace Orleans.SqlUtils
         /// <param name="serviceId"></param>
         /// <returns></returns>
         internal static async Task DeleteReminderRowsAsync(this IRelationalStorage storage, string query, string serviceId)
-        {            
+        {
             await storage.ExecuteAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var serviceIdParameter = CreateServiceIdParameter(command, serviceId, direction);
+            {             
+                var serviceIdParameter = CreateServiceIdParameter(command, serviceId);
                 command.Parameters.Add(serviceIdParameter);
             }).ConfigureAwait(continueOnCapturedContext: false);
         }
@@ -461,14 +453,13 @@ namespace Orleans.SqlUtils
         /// <param name="deploymentId">The deployment for which to query the gateways.</param>
         /// <returns>The gateways for the silo.</returns>
         internal static async Task<IList<Uri>> ActiveGatewaysAsync(this IRelationalStorage storage, string query, string deploymentId)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var statusParameter = CreateStatusParameter(command, SiloStatus.Active, direction);
+                var statusParameter = CreateStatusParameter(command, SiloStatus.Active);
                 command.Parameters.Add(statusParameter);
             }, (selector, _) =>
             {
@@ -493,20 +484,19 @@ namespace Orleans.SqlUtils
         /// <param name="key">Silo data used as parameters in the query.</param>
         /// <returns>Membership table data.</returns>
         internal static async Task<MembershipTableData> MembershipDataAsync(this IRelationalStorage storage, string query, string deploymentId, SiloAddress key)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var addressParameter = CreateAddressParameter(command, key.Endpoint.Address, direction);
+                var addressParameter = CreateAddressParameter(command, key.Endpoint.Address);
                 command.Parameters.Add(addressParameter);
 
-                var portParameter = CreatePortParameter(command, key.Endpoint.Port, direction);
+                var portParameter = CreatePortParameter(command, key.Endpoint.Port);
                 command.Parameters.Add(portParameter);
 
-                var generationParameter = CreateGenerationParameter(command, key.Generation, direction);
+                var generationParameter = CreateGenerationParameter(command, key.Generation);
                 command.Parameters.Add(generationParameter);
             }, (selector, _) =>
             {
@@ -529,11 +519,10 @@ namespace Orleans.SqlUtils
         /// <param name="deploymentId"></param>
         /// <returns></returns>
         internal static async Task<MembershipTableData> AllMembershipDataAsync(this IRelationalStorage storage, string query, string deploymentId)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(deploymentIdParameter);
             }, (selector, _) =>
             {
@@ -556,11 +545,10 @@ namespace Orleans.SqlUtils
         /// <param name="deploymentId"></param>
         /// <returns></returns>
         internal static async Task DeleteMembershipTableEntriesAsync(this IRelationalStorage storage, string query, string deploymentId)
-        {            
+        {
             await storage.ExecuteAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
             }).ConfigureAwait(continueOnCapturedContext: false);
         }
@@ -575,23 +563,22 @@ namespace Orleans.SqlUtils
         /// <param name="membershipEntry"></param>
         /// <returns></returns>
         internal static async Task UpdateIAmAliveTimeAsync(this IRelationalStorage storage, string query, string deploymentId, MembershipEntry membershipEntry)
-        {            
+        {
             await storage.ExecuteAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var iAmAliveTimeParameter = CreateIAmAliveTimeParameter(command, membershipEntry.IAmAliveTime, direction);
+                var iAmAliveTimeParameter = CreateIAmAliveTimeParameter(command, membershipEntry.IAmAliveTime);
                 command.Parameters.Add(iAmAliveTimeParameter);
 
-                var addressParameter = CreateAddressParameter(command, membershipEntry.SiloAddress.Endpoint.Address, direction);
+                var addressParameter = CreateAddressParameter(command, membershipEntry.SiloAddress.Endpoint.Address);
                 command.Parameters.Add(addressParameter);
 
-                var portParameter = CreatePortParameter(command, membershipEntry.SiloAddress.Endpoint.Port, direction);
+                var portParameter = CreatePortParameter(command, membershipEntry.SiloAddress.Endpoint.Port);
                 command.Parameters.Add(portParameter);
 
-                var generationParameter = CreateGenerationParameter(command, membershipEntry.SiloAddress.Generation, direction);
+                var generationParameter = CreateGenerationParameter(command, membershipEntry.SiloAddress.Generation);
                 command.Parameters.Add(generationParameter);
             }).ConfigureAwait(continueOnCapturedContext: false);
         }
@@ -606,14 +593,13 @@ namespace Orleans.SqlUtils
         /// <param name="version">The version information to insert.</param>
         /// <returns><em>TRUE</em> if a row was inserted. <em>FALSE</em> otherwise.</returns>
         internal static async Task<bool> InsertMembershipVersionRowAsync(this IRelationalStorage storage, string query, string deploymentId, int version)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version, direction);
+                var versionParameter = CreateVersionParameter(command, version);
                 command.Parameters.Add(versionParameter);
             }, (selector, _) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
 
@@ -631,60 +617,59 @@ namespace Orleans.SqlUtils
         /// <param name="version">The version data to insert.</param>
         /// <returns><em>TRUE</em> if insert succeeds. <em>FALSE</em> otherwise.</returns>
         internal static async Task<bool> InsertMembershipRowAsync(this IRelationalStorage storage, string query, string deploymentId, MembershipEntry membershipEntry, TableVersion version)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version.Version, direction);
+                var versionParameter = CreateVersionParameter(command, version.Version);
                 command.Parameters.Add(versionParameter);
 
-                var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag, direction);
+                var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag);
                 command.Parameters.Add(versionEtagParameter);
 
                 //The insert membership row part.
-                var addressParameter = CreateAddressParameter(command, membershipEntry.SiloAddress.Endpoint.Address, direction);
+                var addressParameter = CreateAddressParameter(command, membershipEntry.SiloAddress.Endpoint.Address);
                 command.Parameters.Add(addressParameter);
 
-                var portParameter = CreatePortParameter(command, membershipEntry.SiloAddress.Endpoint.Port, direction);
+                var portParameter = CreatePortParameter(command, membershipEntry.SiloAddress.Endpoint.Port);
                 command.Parameters.Add(portParameter);
 
-                var generationParameter = CreateGenerationParameter(command, membershipEntry.SiloAddress.Generation, direction);
+                var generationParameter = CreateGenerationParameter(command, membershipEntry.SiloAddress.Generation);
                 command.Parameters.Add(generationParameter);
 
-                var hostNameParameter = CreateHostNameParameter(command, membershipEntry.HostName, direction);
+                var hostNameParameter = CreateHostNameParameter(command, membershipEntry.HostName);
                 command.Parameters.Add(hostNameParameter);
 
-                var statusParameter = CreateStatusParameter(command, membershipEntry.Status, direction);
+                var statusParameter = CreateStatusParameter(command, membershipEntry.Status);
                 command.Parameters.Add(statusParameter);
 
-                var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort, direction);
+                var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort);
                 command.Parameters.Add(proxyPortParameter);
 
-                var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName, direction);
+                var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName);
                 command.Parameters.Add(roleNameParameter);
 
-                var instanceNameParameter = CreateInstanceNameParameter(command, membershipEntry.InstanceName, direction);
+                var instanceNameParameter = CreateInstanceNameParameter(command, membershipEntry.InstanceName);
                 command.Parameters.Add(instanceNameParameter);
 
-                var updateZoneParameter = CreateUpdateZoneParameter(command, membershipEntry.UpdateZone, direction);
+                var updateZoneParameter = CreateUpdateZoneParameter(command, membershipEntry.UpdateZone);
                 command.Parameters.Add(updateZoneParameter);
 
-                var faultZoneParameter = CreateFaultZoneParameter(command, membershipEntry.FaultZone, direction);
+                var faultZoneParameter = CreateFaultZoneParameter(command, membershipEntry.FaultZone);
                 command.Parameters.Add(faultZoneParameter);
 
-                var startTimeParameter = CreateStartTimeParameter(command, membershipEntry.StartTime, direction);
+                var startTimeParameter = CreateStartTimeParameter(command, membershipEntry.StartTime);
                 command.Parameters.Add(startTimeParameter);
 
-                var iAmAliveTimeParameter = CreateIAmAliveTimeParameter(command, membershipEntry.IAmAliveTime, direction);
+                var iAmAliveTimeParameter = CreateIAmAliveTimeParameter(command, membershipEntry.IAmAliveTime);
                 command.Parameters.Add(iAmAliveTimeParameter);
-
-                var suspectingSilosParameter = CreateSuspectingSilosParameter(command, membershipEntry, direction);
+                
+                var suspectingSilosParameter = CreateSuspectingSilosParameter(command, membershipEntry);
                 command.Parameters.Add(suspectingSilosParameter);
 
-                var suspectingTimesParameter = CreateSuspectingTimesParameter(command, membershipEntry, direction);
+                var suspectingTimesParameter = CreateSuspectingTimesParameter(command, membershipEntry);
                 command.Parameters.Add(suspectingTimesParameter);
 
             }, (selector, _) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
@@ -704,63 +689,62 @@ namespace Orleans.SqlUtils
         /// <param name="version">The membership version used to update database.</param>
         /// <returns><em>TRUE</em> if update SUCCEEDS. <em>FALSE</em> ot</returns>
         internal static async Task<bool> UpdateMembershipRowAsync(this IRelationalStorage storage, string query, string deploymentId, string etag, MembershipEntry membershipEntry, TableVersion version)
-        {            
+        {
             var ret = await storage.ReadAsync(query, command =>
-            {
-                var direction = ParameterDirection.Input;
-                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId, direction);
+            {                
+                var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version.Version, direction);
+                var versionParameter = CreateVersionParameter(command, version.Version);
                 command.Parameters.Add(versionParameter);
 
-                var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag, direction);
+                var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag);
                 command.Parameters.Add(versionEtagParameter);
 
                 //The insert membership row part.
-                var etagParameter = CreateEtagParameter(command, etag, direction);
+                var etagParameter = CreateEtagParameter(command, etag);
                 command.Parameters.Add(etagParameter);
 
-                var addressParameter = CreateAddressParameter(command, membershipEntry.SiloAddress.Endpoint.Address, direction);
+                var addressParameter = CreateAddressParameter(command, membershipEntry.SiloAddress.Endpoint.Address);
                 command.Parameters.Add(addressParameter);
 
-                var portParameter = CreatePortParameter(command, membershipEntry.SiloAddress.Endpoint.Port, direction);
+                var portParameter = CreatePortParameter(command, membershipEntry.SiloAddress.Endpoint.Port);
                 command.Parameters.Add(portParameter);
 
-                var generationParameter = CreateGenerationParameter(command, membershipEntry.SiloAddress.Generation, direction);
+                var generationParameter = CreateGenerationParameter(command, membershipEntry.SiloAddress.Generation);
                 command.Parameters.Add(generationParameter);
 
-                var hostNameParameter = CreateHostNameParameter(command, membershipEntry.HostName, direction);
+                var hostNameParameter = CreateHostNameParameter(command, membershipEntry.HostName);
                 command.Parameters.Add(hostNameParameter);
 
-                var statusParameter = CreateStatusParameter(command, membershipEntry.Status, direction);
+                var statusParameter = CreateStatusParameter(command, membershipEntry.Status);
                 command.Parameters.Add(statusParameter);
 
-                var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort, direction);
+                var proxyPortParameter = CreateProxyPortParameter(command, membershipEntry.ProxyPort);
                 command.Parameters.Add(proxyPortParameter);
 
-                var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName, direction);
+                var roleNameParameter = CreateRoleNameParameter(command, membershipEntry.RoleName);
                 command.Parameters.Add(roleNameParameter);
 
-                var instanceNameParameter = CreateInstanceNameParameter(command, membershipEntry.InstanceName, direction);
+                var instanceNameParameter = CreateInstanceNameParameter(command, membershipEntry.InstanceName);
                 command.Parameters.Add(instanceNameParameter);
 
-                var updateZoneParameter = CreateUpdateZoneParameter(command, membershipEntry.UpdateZone, direction);
+                var updateZoneParameter = CreateUpdateZoneParameter(command, membershipEntry.UpdateZone);
                 command.Parameters.Add(updateZoneParameter);
 
-                var faultZoneParameter = CreateFaultZoneParameter(command, membershipEntry.FaultZone, direction);
+                var faultZoneParameter = CreateFaultZoneParameter(command, membershipEntry.FaultZone);
                 command.Parameters.Add(faultZoneParameter);
 
-                var startTimeParameter = CreateStartTimeParameter(command, membershipEntry.StartTime, direction);
+                var startTimeParameter = CreateStartTimeParameter(command, membershipEntry.StartTime);
                 command.Parameters.Add(startTimeParameter);
 
-                var iAmAliveTimeParameter = CreateIAmAliveTimeParameter(command, membershipEntry.IAmAliveTime, direction);
+                var iAmAliveTimeParameter = CreateIAmAliveTimeParameter(command, membershipEntry.IAmAliveTime);
                 command.Parameters.Add(iAmAliveTimeParameter);
-
-                var suspectingSilosParameter = CreateSuspectingSilosParameter(command, membershipEntry, direction);
+                
+                var suspectingSilosParameter = CreateSuspectingSilosParameter(command, membershipEntry);
                 command.Parameters.Add(suspectingSilosParameter);
 
-                var suspectingTimesParameter = CreateSuspectingTimesParameter(command, membershipEntry, direction);
+                var suspectingTimesParameter = CreateSuspectingTimesParameter(command, membershipEntry);
                 command.Parameters.Add(suspectingTimesParameter);
 
             }, (selector, _) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
@@ -791,13 +775,13 @@ namespace Orleans.SqlUtils
         private static Tuple<MembershipEntry, string, int, string> CreateMembershipEntry(IDataRecord record)
         {
             //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
-            DateTime? startTime = record.GetValueOrDefault<DateTime?>("StartTime");                                    
+            DateTime? startTime = record.GetValueOrDefault<DateTime?>("StartTime");
             MembershipEntry entry = null;
             if(startTime.HasValue)
             {
                 int port = record.GetValue<int>("Port");
                 int generation = record.GetValue<int>("Generation");
-                string address = record.GetValue<string>("Address");                                                                                                                                   
+                string address = record.GetValue<string>("Address");
                 entry = new MembershipEntry
                 {
                     SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(address), port), generation),
@@ -846,7 +830,7 @@ namespace Orleans.SqlUtils
                 }
             }
 
-            string etag = Convert.ToBase64String(record.GetValue<byte[]>("ETag"));
+            string etag = Convert.ToBase64String(record.GetValueOrDefault("ETag", new byte[0]));
             int tableVersion = (int)record.GetValueOrDefault<long>("Version");
             string versionETag = Convert.ToBase64String(record.GetValueOrDefault<byte[]>("VersionETag"));
 
@@ -854,552 +838,283 @@ namespace Orleans.SqlUtils
         }
 
 
-        private static IDbDataParameter CreateBeginHashParameter(IDbCommand command, uint beginHash, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "beginHash";
-            parameter.Value = (int)beginHash;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateBeginHashParameter(IDbCommand command, uint beginHash)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "beginHash", (int)beginHash);
         }
 
 
-        private static IDbDataParameter CreateEndHashParameter(IDbCommand command, uint endHash, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "endHash";
-            parameter.Value = (int)endHash;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateEndHashParameter(IDbCommand command, uint endHash)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "endHash", (int)endHash);
         }
 
 
-        private static IDbDataParameter CreateServiceIdParameter(IDbCommand command, string serviceId, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "serviceId";
-            parameter.Value = serviceId;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateServiceIdParameter(IDbCommand command, string serviceId)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "serviceId", serviceId);
         }
 
 
-        private static IDbDataParameter CreateGrainIdParameter(IDbCommand command, string grainId, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "grainId";
-            parameter.Value = grainId;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateGrainIdParameter(IDbCommand command, string grainId)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "grainId", grainId);
         }
 
 
-        private static IDbDataParameter CreateDeploymentIdParameter(IDbCommand command, string deploymentId, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "deploymentId";
-            parameter.Value = deploymentId;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateDeploymentIdParameter(IDbCommand command, string deploymentId)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "deploymentId", deploymentId);
         }
 
 
-        private static IDbDataParameter CreateSiloIdParameter(IDbCommand command, string siloId, ParameterDirection direction)
+        private static IDbDataParameter CreateSiloIdParameter(IDbCommand command, string siloId)
         {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "siloId";
-            parameter.Value = siloId;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
+            return command.CreateParameter(ParameterDirection.Input, "siloId", siloId);
         }
 
 
-        private static IDbDataParameter CreateClientIdParameter(IDbCommand command, string clientId, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "clientId";
-            parameter.Value = clientId;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateClientIdParameter(IDbCommand command, string clientId)
+        {           
+            return command.CreateParameter(ParameterDirection.Input, "clientId", clientId);
         }
 
 
-        private static IDbDataParameter CreateIdParameter(IDbCommand command, string id, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "id";
-            parameter.Value = id;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateIdParameter(IDbCommand command, string id)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "id", id);
         }
 
 
-        private static IDbDataParameter CreateReminderName(IDbCommand command, string reminderName, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "reminderName";
-            parameter.Value = reminderName;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateReminderName(IDbCommand command, string reminderName)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "reminderName", reminderName);
         }
 
 
-        private static IDbDataParameter CreateStatusParameter(IDbCommand command, SiloStatus status, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "status";
-            parameter.Value = (int)status;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
+        private static IDbDataParameter CreateStatusParameter(IDbCommand command, SiloStatus status)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "status", (int)status);
         }
 
 
-        private static IDbDataParameter CreateAddressParameter(IDbCommand command, IPAddress address, ParameterDirection direction)
+        private static IDbDataParameter CreateAddressParameter(IDbCommand command, IPAddress address)
         {
             var parameter = command.CreateParameter();
             parameter.ParameterName = "address";
             parameter.Value = address.ToString();
             parameter.DbType = DbType.AnsiString;
-            parameter.Direction = direction;
+            parameter.Direction = ParameterDirection.Input;
 
             return parameter;
         }
 
-        private static IDbDataParameter CreateGatewayAddressParameter(IDbCommand command, IPAddress gatewayAddress, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "gatewayAddress";
-            parameter.Value = gatewayAddress != null ? (object)gatewayAddress.ToString() : DBNull.Value;
-            parameter.DbType = DbType.AnsiString;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreatePortParameter(IDbCommand command, int port, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "port";
-            parameter.Value = port;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateGatewayPortParameter(IDbCommand command, int gatewayPort, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "gatewayPort";
-            parameter.Value = gatewayPort;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateGenerationParameter(IDbCommand command, int generation, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "generation";
-            parameter.Value = generation;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateVersionParameter(IDbCommand command, Int64 version, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "version";
-            parameter.Value = version;
-            parameter.DbType = DbType.Int64;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateEtagParameter(IDbCommand command, string etag, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "etag";
-            parameter.Value = etag != null ? (object)Convert.FromBase64String(etag) : DBNull.Value;
-            parameter.DbType = DbType.Binary;
-            parameter.Size = 16;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateVersionEtagParameter(IDbCommand command, string versionEtag, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "versionEtag";
-            parameter.Value = Convert.FromBase64String(versionEtag);
-            parameter.DbType = DbType.Binary;
-            parameter.Size = 16;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateHostNameParameter(IDbCommand command, string hostName, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "hostName";
-            parameter.Value = hostName;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateNameParameter(IDbCommand command, string name, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "name";
-            parameter.Value = name;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateCounterParameter(IDbCommand command, long counter, int countOf, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = string.Format("counter{0}", countOf);
-            parameter.Value = counter;
-            parameter.DbType = DbType.Int64;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateIsDeltaParameter(IDbCommand command, bool isDelta, int countOf, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = string.Format("isDelta{0}", countOf);
-            parameter.Value = isDelta;
-            parameter.DbType = DbType.Boolean;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateStatParameter(IDbCommand command, string statValue, int countOf, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = string.Format("statValue{0}", countOf);
-            parameter.Value = statValue;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateStatisticNameParameter(IDbCommand command, string counterName, int countOf, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = string.Format("statistic{0}", countOf);
-            parameter.Value = counterName;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateProxyPortParameter(IDbCommand command, int proxyPort, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "proxyPort";
-            parameter.Value = proxyPort;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-        private static IDbDataParameter CreateRoleNameParameter(IDbCommand command, string roleName, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "roleName";
-            parameter.Value = roleName;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateInstanceNameParameter(IDbCommand command, string instanceName, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "instanceName";
-            parameter.Value = instanceName;
-            parameter.DbType = DbType.String;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateUpdateZoneParameter(IDbCommand command, int updateZone, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "updateZone";
-            parameter.Value = updateZone;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateFaultZoneParameter(IDbCommand command, int faultZone, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "faultZone";
-            parameter.Value = faultZone;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateStartTimeParameter(IDbCommand command, DateTime startTime, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "startTime";
-            parameter.Value = EnsureSqlMinValue(startTime);
-            parameter.DbType = DbType.DateTime;//Using DateTime for cross DB compatibility. The underlying DB table column type can be DateTime or DateTime2
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreatePeriodParameter(IDbCommand command, TimeSpan period, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "period";
-            parameter.Value = (int)period.TotalMilliseconds;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateGrainIdConsistentHashParameter(IDbCommand command, uint reminderHash, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "grainIdConsistentHash";
-            parameter.Value = (int)reminderHash;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateIAmAliveTimeParameter(IDbCommand command, DateTime iAmAlive, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "iAmAliveTime";
-            parameter.Value = EnsureSqlMinValue(iAmAlive);
-            parameter.DbType = DbType.DateTime;//Using DateTime for cross DB compatibility. The underlying DB table column type can be DateTime or DateTime2
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateCpuUsageParameter(IDbCommand command, float cpuUsage, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "cpuUsage";
-            parameter.Value = cpuUsage;
-            parameter.DbType = DbType.Single;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateMemoryUsageParameter(IDbCommand command, long memoryUsage, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "memoryUsage";
-            parameter.Value = memoryUsage;
-            parameter.DbType = DbType.Int64;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateActivationsCountParameter(IDbCommand command, int activationsCount, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "activationsCount";
-            parameter.Value = activationsCount;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateRecentlyUsedActivationsCountParameter(IDbCommand command, int recentlyUsedActivationsCount, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "recentlyUsedActivationsCount";
-            parameter.Value = recentlyUsedActivationsCount;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-        
-        private static IDbDataParameter CreateSendQueueUsageParameter(IDbCommand command, int sendQueueLength, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "sendQueueLength";
-            parameter.Value = sendQueueLength;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateReceiveQueueLengthParameter(IDbCommand command, int receiveQueueLength, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "receiveQueueLength";
-            parameter.Value = receiveQueueLength;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateSentMessagesCountParameter(IDbCommand command, long sentMessages, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "sentMessagesCount";
-            parameter.Value = sentMessages;
-            parameter.DbType = DbType.Int64;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateReceivedMessagesCountParameter(IDbCommand command, long receivedMessages, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "receivedMessagesCount";
-            parameter.Value = receivedMessages;
-            parameter.DbType = DbType.Int64;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateRequestQueueLengthParameter(IDbCommand command, long requestQueueLength, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "requestQueueLength";
-            parameter.Value = requestQueueLength;
-            parameter.DbType = DbType.Int64;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-                
-
-        private static IDbDataParameter CreateIsOverloadedParameter(IDbCommand command, bool isOverloaded, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "isOverloaded";
-            parameter.Value = isOverloaded;
-            parameter.DbType = DbType.Boolean;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateClientCountParameter(IDbCommand command, long clientCount, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "clientCount";
-            parameter.Value = clientCount;
-            parameter.DbType = DbType.Int64;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateConnectionGatewayCountParameter(IDbCommand command, long connectedGatewaysCount, ParameterDirection direction)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "connectedGatewaysCount";
-            parameter.Value = connectedGatewaysCount;
-            parameter.DbType = DbType.Int32;
-            parameter.Direction = direction;
-
-            return parameter;
-        }
-
-
-        private static IDbDataParameter CreateSuspectingSilosParameter(IDbCommand command, MembershipEntry membershipEntry, ParameterDirection direction)
+        private static IDbDataParameter CreateGatewayAddressParameter(IDbCommand command, IPAddress gatewayAddress)
         {            
+            string transformedGatewayAddress = gatewayAddress != null ? gatewayAddress.ToString() : null;
+            return command.CreateParameter(ParameterDirection.Input, "gatewayAddress", transformedGatewayAddress);
+        }
+
+
+        private static IDbDataParameter CreatePortParameter(IDbCommand command, int port)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "port", port);
+        }
+
+
+        private static IDbDataParameter CreateGatewayPortParameter(IDbCommand command, int gatewayPort)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "gatewayPort", gatewayPort);
+        }
+
+
+        private static IDbDataParameter CreateGenerationParameter(IDbCommand command, int generation)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "generation", generation);
+        }
+
+
+        private static IDbDataParameter CreateVersionParameter(IDbCommand command, long version)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "version", version);
+        }
+
+
+        private static IDbDataParameter CreateEtagParameter(IDbCommand command, string etag)
+        {
+            byte[] convertedEtag = etag != null ? Convert.FromBase64String(etag) : null;
+            return command.CreateParameter(ParameterDirection.Input, "etag", convertedEtag, 16);
+        }
+
+
+        private static IDbDataParameter CreateVersionEtagParameter(IDbCommand command, string versionEtag)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "versionEtag", Convert.FromBase64String(versionEtag), 16);
+        }
+
+
+        private static IDbDataParameter CreateHostNameParameter(IDbCommand command, string hostName)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "hostName", hostName);
+        }
+
+
+        private static IDbDataParameter CreateNameParameter(IDbCommand command, string name)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "name", name);
+        }
+
+                
+        private static IDbDataParameter CreateIsDeltaParameter(IDbCommand command, bool isDelta, int countOf)
+        {
+            return command.CreateParameter(ParameterDirection.Input, string.Format("isDelta{0}", countOf), isDelta);
+        }
+
+
+        private static IDbDataParameter CreateStatParameter(IDbCommand command, string statValue, int countOf)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, string.Format("statValue{0}", countOf), statValue);
+        }
+
+
+        private static IDbDataParameter CreateStatisticNameParameter(IDbCommand command, string counterName, int countOf)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, string.Format("statistic{0}", countOf), counterName);
+        }
+
+
+        private static IDbDataParameter CreateProxyPortParameter(IDbCommand command, int proxyPort)
+        {            
+            return command.CreateParameter(ParameterDirection.Input, "proxyPort", proxyPort);
+        }
+
+
+        private static IDbDataParameter CreateRoleNameParameter(IDbCommand command, string roleName)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "roleName", roleName);
+        }
+
+
+        private static IDbDataParameter CreateInstanceNameParameter(IDbCommand command, string instanceName)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "instanceName", instanceName);
+        }
+
+
+        private static IDbDataParameter CreateUpdateZoneParameter(IDbCommand command, int updateZone)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "updateZone", updateZone);
+        }
+
+
+        private static IDbDataParameter CreateFaultZoneParameter(IDbCommand command, int faultZone)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "faultZone", faultZone);
+        }
+
+
+        private static IDbDataParameter CreateStartTimeParameter(IDbCommand command, DateTime startTime)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "startTime", EnsureSqlMinValue(startTime));
+        }
+
+
+        private static IDbDataParameter CreatePeriodParameter(IDbCommand command, TimeSpan period)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "period", (int)period.TotalMilliseconds);
+        }
+
+
+        private static IDbDataParameter CreateGrainIdConsistentHashParameter(IDbCommand command, uint grainIdConsistentHash)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "grainIdConsistentHash", (int)grainIdConsistentHash);
+        }
+
+
+        private static IDbDataParameter CreateIAmAliveTimeParameter(IDbCommand command, DateTime iAmAliveTime)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "iAmAliveTime", iAmAliveTime);
+        }
+
+
+        private static IDbDataParameter CreateCpuUsageParameter(IDbCommand command, float cpuUsage)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "cpuUsage", cpuUsage);
+        }
+
+
+        private static IDbDataParameter CreateMemoryUsageParameter(IDbCommand command, long memoryUsage)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "memoryUsage", memoryUsage);
+        }
+
+
+        private static IDbDataParameter CreateActivationsCountParameter(IDbCommand command, int activationsCount)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "activationsCount", activationsCount);
+        }
+
+
+        private static IDbDataParameter CreateRecentlyUsedActivationsCountParameter(IDbCommand command, int recentlyUsedActivationsCount)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "recentlyUsedActivationsCount", recentlyUsedActivationsCount);
+        }
+
+
+        private static IDbDataParameter CreateSendQueueUsageParameter(IDbCommand command, int sendQueueLength)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "sendQueueLength", sendQueueLength);
+        }
+
+
+        private static IDbDataParameter CreateReceiveQueueLengthParameter(IDbCommand command, int receiveQueueLength)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "receiveQueueLength", receiveQueueLength);
+        }
+
+
+        private static IDbDataParameter CreateSentMessagesCountParameter(IDbCommand command, long sentMessagesCount)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "sentMessagesCount", sentMessagesCount);
+        }
+
+
+        private static IDbDataParameter CreateReceivedMessagesCountParameter(IDbCommand command, long receivedMessagesCount)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "receivedMessagesCount", receivedMessagesCount);
+        }
+
+
+        private static IDbDataParameter CreateRequestQueueLengthParameter(IDbCommand command, long requestQueueLength)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "requestQueueLength", requestQueueLength);
+        }
+
+
+        private static IDbDataParameter CreateIsOverloadedParameter(IDbCommand command, bool isOverloaded)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "isOverloaded", isOverloaded);
+        }
+
+
+        private static IDbDataParameter CreateClientCountParameter(IDbCommand command, long clientCount)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "clientCount", clientCount);
+        }
+
+
+        private static IDbDataParameter CreateConnectionGatewayCountParameter(IDbCommand command, long connectedGatewaysCount)
+        {
+            return command.CreateParameter(ParameterDirection.Input, "connectedGatewaysCount", connectedGatewaysCount);
+        }
+
+
+        private static IDbDataParameter CreateSuspectingSilosParameter(IDbCommand command, MembershipEntry membershipEntry)
+        {
             var parameter = command.CreateParameter();
             parameter.ParameterName = "suspectingSilos";
             parameter.DbType = DbType.String;
-            parameter.Direction = direction;
+            parameter.Direction = ParameterDirection.Input;
 
             if(membershipEntry.SuspectTimes != null)
             {
@@ -1426,12 +1141,12 @@ namespace Orleans.SqlUtils
         }
 
 
-        private static IDbDataParameter CreateSuspectingTimesParameter(IDbCommand command, MembershipEntry membershipEntry, ParameterDirection direction)
-        {            
+        private static IDbDataParameter CreateSuspectingTimesParameter(IDbCommand command, MembershipEntry membershipEntry)
+        {
             var parameter = command.CreateParameter();
             parameter.ParameterName = "suspectingTimes";
             parameter.DbType = DbType.String;
-            parameter.Direction = direction;
+            parameter.Direction = ParameterDirection.Input;
 
             if(membershipEntry.SuspectTimes != null)
             {

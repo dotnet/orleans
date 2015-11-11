@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -45,13 +46,14 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableData Read(SiloAddress key)
         {
             return siloTable.ContainsKey(key) ? 
-                new MembershipTableData(siloTable[key], tableVersion) : new MembershipTableData(tableVersion);
+                new MembershipTableData((Tuple<MembershipEntry, string>)SerializationManager.DeepCopy(siloTable[key]), tableVersion) 
+                : new MembershipTableData(tableVersion);
         }
 
         public MembershipTableData ReadAll()
         {
             return new MembershipTableData(siloTable.Values.Select(tuple => 
-                new Tuple<MembershipEntry, string>(tuple.Item1, tuple.Item2)).ToList(), tableVersion);
+                new Tuple<MembershipEntry, string>((MembershipEntry)SerializationManager.DeepCopy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
         }
 
         public TableVersion ReadTableVersion()

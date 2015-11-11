@@ -25,5 +25,6 @@
     <file src="OrleansEventSourcing.dll" target="lib\net45" />
     <file src="OrleansEventSourcing.pdb" target="lib\net45" />
     <file src="OrleansEventSourcing.xml" target="lib\net45" />
+    <file src="$SRC_DIR$OrleansEventSourcing\**\*.cs" target="src" />
   </files>
 </package>

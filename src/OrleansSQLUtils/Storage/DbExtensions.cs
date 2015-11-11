@@ -81,6 +81,31 @@ namespace Orleans.SqlUtils
             { typeof(DateTimeOffset?),  DbType.DateTimeOffset },
         });
 
+        
+        /// <summary>
+        /// Creates a new SQL parameter using the given arguments.
+        /// </summary>
+        /// <typeparam name="T">The type of the parameter.</typeparam>
+        /// <param name="command">The command to use to create the parameter.</param>
+        /// <param name="direction">The direction of the parameter.</param>
+        /// <param name="parameterName">The name of the parameter.</param>
+        /// <param name="value">The value of the parameter.</param>
+        /// <param name="size">The size of the parameter value.</param>
+        /// <returns>A parameter created using the given arguments.</returns>
+        public static IDbDataParameter CreateParameter<T>(this IDbCommand command, ParameterDirection direction, string parameterName, T value, int? size = null)
+        {
+            //There should be no boxing for value types. See at:
+            //http://stackoverflow.com/questions/8823239/comparing-a-generic-against-null-that-could-be-a-value-or-reference-type
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = parameterName;
+            parameter.Value = (object)value ?? DBNull.Value;
+            parameter.DbType = typeMap[typeof(T)];
+            parameter.Direction = direction;
+            if(size != null) { parameter.Size = size.Value; }
+                        
+            return parameter;
+        }
+
 
         /// <summary>
         /// Returns a value if it is not <see cref="System.DBNull"/>, <em>default(TValue)</em> otherwise.

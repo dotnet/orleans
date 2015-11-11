@@ -25,7 +25,6 @@ using System;
 using System.IO;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 
 namespace UnitTests.Tester
@@ -40,6 +39,7 @@ namespace UnitTests.Tester
     [DeploymentItem("ClientConfigurationForTesting.xml")]
     [DeploymentItem("TestGrainInterfaces.dll")]
     [DeploymentItem("TestGrains.dll")]
+    [DeploymentItem("OrleansCodeGenerator.dll")]
     public class UnitTestSiloHost : TestingSiloHost
     {
         public UnitTestSiloHost() // : base()

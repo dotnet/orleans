@@ -31,6 +31,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -48,13 +49,8 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
 
-
 namespace Orleans.Runtime
 {
-    using System.Collections.ObjectModel;
-
-    using Orleans.CodeGeneration;
-    using Orleans.CodeGenerator;
 
     /// <summary>
     /// Orleans silo.
@@ -189,8 +185,8 @@ namespace Orleans.Runtime
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
             
-            RoslynCodeGenerator.Instance.GenerateAndLoadForAllAssemblies();
-            SerializationManager.Initialize(globalConfig.UseStandardSerializer);
+            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
+            SerializationManager.Initialize(globalConfig.UseStandardSerializer, globalConfig.SerializationProviders);
             initTimeout = globalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
@@ -223,7 +219,16 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            services = ConfigureStartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+            var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
+            if (startupBuilder != null)
+            {
+                logger.Info(ErrorCode.SiloLoadeDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
+                services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+            }
+            else
+            {
+                logger.Warn(ErrorCode.SiloFailedToLoadDI, "Failed to load an implementation of IStartupBuilder from OrleansDependencyInjection.dll");
+            }
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -854,7 +859,7 @@ namespace Orleans.Runtime
             /// <param name="collection">The collection to populate.</param>
             public void UpdateGeneratedAssemblies(GeneratedAssemblies collection)
             {
-                var generatedAssemblies = RoslynCodeGenerator.Instance.GetGeneratedAssemblies();
+                var generatedAssemblies = CodeGeneratorManager.GetGeneratedAssemblies();
                 foreach (var asm in generatedAssemblies)
                 {
                     collection.Add(asm.Key, asm.Value);
@@ -994,7 +999,7 @@ namespace Orleans.Runtime
                 /// <param name="cachedAssembly">The generated assembly.</param>
                 public void AddCachedAssembly(string targetAssemblyName, byte[] cachedAssembly)
                 {
-                    RoslynCodeGenerator.AddCachedAssembly(targetAssemblyName, cachedAssembly);
+                    CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly);
                 }
             }
         }

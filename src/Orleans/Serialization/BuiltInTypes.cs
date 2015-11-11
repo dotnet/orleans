@@ -429,7 +429,7 @@ namespace Orleans.Serialization
         {
             var dict = (Dictionary<K, V>)original;
             SerializationManager.SerializeInner(dict.Comparer.Equals(EqualityComparer<K>.Default) ? null : dict.Comparer,
-                                           stream, typeof (IEqualityComparer<K>));
+                                           stream, typeof(IEqualityComparer<K>));
             stream.Write(dict.Count);
             foreach (var pair in dict)
             {
@@ -979,7 +979,7 @@ namespace Orleans.Serialization
                 return new T?();
             }
 
-            var val = (T) SerializationManager.DeserializeInner(typeof (T), stream);
+            var val = (T)SerializationManager.DeserializeInner(typeof(T), stream);
             return new Nullable<T>(val);
         }
 
@@ -1014,7 +1014,7 @@ namespace Orleans.Serialization
 
         internal static void SerializeImmutable<T>(object original, BinaryTokenStreamWriter stream, Type expected)
         {
-            var obj = (Immutable<T>) original;
+            var obj = (Immutable<T>)original;
             SerializationManager.SerializeInner(obj.Value, stream, typeof(T));
         }
 
@@ -1032,7 +1032,7 @@ namespace Orleans.Serialization
         #endregion
 
         #endregion
-        
+
         #region Other System types
 
         #region TimeSpan
@@ -1099,7 +1099,7 @@ namespace Orleans.Serialization
 
         internal static void SerializeGuid(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            var guid = (Guid) obj;
+            var guid = (Guid)obj;
             stream.Write(guid.ToByteArray());
         }
 
@@ -1148,7 +1148,7 @@ namespace Orleans.Serialization
 
         internal static void SerializeGrainId(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            var id = (GrainId) obj;
+            var id = (GrainId)obj;
             stream.Write(id);
         }
 
@@ -1228,7 +1228,7 @@ namespace Orleans.Serialization
 
         internal static void SerializeCorrelationId(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            var id = (CorrelationId) obj;
+            var id = (CorrelationId)obj;
             stream.Write(id);
         }
 
@@ -1368,15 +1368,15 @@ namespace Orleans.Serialization
                 genericArgs = t.GetGenericArguments();
             }
 
-            var genericCopier = typeof(BuiltInTypes).GetMethod(copierName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var genericCopier = typeof(BuiltInTypes).GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Where(m => m.Name == copierName).FirstOrDefault();
             var concreteCopier = genericCopier.MakeGenericMethod(genericArgs);
             var copier = (SerializationManager.DeepCopier)concreteCopier.CreateDelegate(typeof(SerializationManager.DeepCopier));
 
-            var genericSerializer = typeof(BuiltInTypes).GetMethod(serializerName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var genericSerializer = typeof(BuiltInTypes).GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Where(m => m.Name == serializerName).FirstOrDefault();
             var concreteSerializer = genericSerializer.MakeGenericMethod(genericArgs);
             var serializer = (SerializationManager.Serializer)concreteSerializer.CreateDelegate(typeof(SerializationManager.Serializer));
 
-            var genericDeserializer = typeof(BuiltInTypes).GetMethod(deserializerName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var genericDeserializer = typeof(BuiltInTypes).GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Where(m => m.Name == deserializerName).FirstOrDefault();
             var concreteDeserializer = genericDeserializer.MakeGenericMethod(genericArgs);
             var deserializer =
                 (SerializationManager.Deserializer)concreteDeserializer.CreateDelegate(typeof(SerializationManager.Deserializer));
@@ -1394,15 +1394,15 @@ namespace Orleans.Serialization
                 genericArgs = concreteType.GetGenericArguments();
             }
 
-            var genericCopier = definingType.GetMethod(copierName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var genericCopier = definingType.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Where(m => m.Name == copierName).FirstOrDefault();
             var concreteCopier = genericCopier.MakeGenericMethod(genericArgs);
             var copier = (SerializationManager.DeepCopier)concreteCopier.CreateDelegate(typeof(SerializationManager.DeepCopier));
 
-            var genericSerializer = definingType.GetMethod(serializerName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var genericSerializer = definingType.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Where(m => m.Name == serializerName).FirstOrDefault();
             var concreteSerializer = genericSerializer.MakeGenericMethod(genericArgs);
             var serializer = (SerializationManager.Serializer)concreteSerializer.CreateDelegate(typeof(SerializationManager.Serializer));
 
-            var genericDeserializer = definingType.GetMethod(deserializerName, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var genericDeserializer = definingType.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Where(m => m.Name == deserializerName).FirstOrDefault();
             var concreteDeserializer = genericDeserializer.MakeGenericMethod(genericArgs);
             var deserializer =
                 (SerializationManager.Deserializer)concreteDeserializer.CreateDelegate(typeof(SerializationManager.Deserializer));

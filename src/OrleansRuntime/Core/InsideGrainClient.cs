@@ -750,5 +750,16 @@ namespace Orleans.Runtime
         {
             return Silo.CurrentSilo.LocalSiloStatusOracle.GetApproximateSiloStatus(siloAddress);
         }
+
+        public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
+        {
+            foreach (var callback in callbacks)
+            {
+                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                {
+                    callback.Value.OnTargetSiloFail();
+                }
+            }
+        }
     }
 }

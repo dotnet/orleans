@@ -28,6 +28,7 @@ using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Providers;
 using Orleans.Serialization;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -69,7 +70,7 @@ namespace Orleans.Runtime
             var loader = new SiloAssemblyLoader();
 
             // Generate code for newly loaded assemblies.
-            CodeGenerator.RoslynCodeGenerator.Instance.GenerateAndLoadForAllAssemblies();
+            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
 
             // (no more assemblies should be loaded into memory, so now is a good time to log all types registered with the serialization manager)
             SerializationManager.LogRegisteredTypes();
@@ -255,7 +256,7 @@ namespace Orleans.Runtime
             public InvokerData(Type invokerType)
             {
                 baseInvokerType = invokerType;
-                if(invokerType.IsGenericType)
+                if(invokerType.GetTypeInfo().IsGenericType)
                     cachedGenericInvokers = new Dictionary<string, IGrainMethodInvoker>();
             }
 

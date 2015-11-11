@@ -63,12 +63,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.Framework.DependencyInjection">
-      <HintPath>$(SolutionDir)packages\Microsoft.Framework.DependencyInjection.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Framework.DependencyInjection.Abstractions">
-      <HintPath>$(SolutionDir)packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta7\lib\net45\Microsoft.Framework.DependencyInjection.Abstractions.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Core" />
@@ -117,8 +111,7 @@
     </Compile>
     <Compile Include="ReminderService\MockReminderTable.cs" />
     <Compile Include="Scheduler\ITaskScheduler.cs" />
-    <Compile Include="Startup\ConfigureStartupBuilder.cs" />
-    <Compile Include="Startup\ConfigureServicesBuilder.cs" />
+    <Compile Include="Silo\IStartupBuilder.cs" />
     <Compile Include="Storage\IStorageProviderManager.cs" />
     <Compile Include="Silo\SiloHost.cs" />
     <Compile Include="Scheduler\TaskSchedulerUtils.cs" />
@@ -198,19 +191,14 @@
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
-      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
-      <Name>OrleansCodeGenerator</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <Folder Include="Startup\" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <PropertyGroup>

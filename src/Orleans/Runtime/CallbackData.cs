@@ -114,43 +114,29 @@ namespace Orleans.Runtime
             if (alreadyFired)
                 return;
             var msg = Message; // Local working copy
-            lock (this)
-            {
-                if (alreadyFired)
-                    return;
-
-                if (config.ResendOnTimeout && resendFunc(msg))
-                {
-                    if(logger.IsVerbose) logger.Verbose("OnTimeout - Resend {0} for {1}", msg.ResendCount, msg);
-                    return;
-                }
-
-                alreadyFired = true;
-                DisposeTimer();
-                if (StatisticsCollector.CollectApplicationRequestsStats)
-                {
-                    timeSinceIssued.Stop();
-                }
-
-                if (unregister != null)
-                {
-                    unregister();
-                }
-            }
 
             string messageHistory = msg.GetTargetHistory();
             string errorMsg = String.Format("Response did not arrive on time in {0} for message: {1}. Target History is: {2}",
                                 timeout, msg, messageHistory);
             logger.Warn(ErrorCode.Runtime_Error_100157, "{0}. About to break its promise.", errorMsg);
 
-            var error = msg.CreatePromptTimeoutResponse(errorMsg);
-            if (StatisticsCollector.CollectApplicationRequestsStats)
-            {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);
-                ApplicationRequestsStatisticsGroup.OnAppRequestsTimedOut();
-            }
+            var error = msg.CreatePromptExceptionResponse(new TimeoutException(errorMsg));
+            OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
+        }
 
-            callback(error, context);
+        public void OnTargetSiloFail()
+        {
+            if (alreadyFired)
+                return;
+
+            var msg = Message;
+            var messageHistory = msg.GetTargetHistory();
+            string errorMsg = string.Format("The target silo became unavailable for message: {0}. Target History is: {1}",
+                                 msg, messageHistory);
+            logger.Warn(ErrorCode.Runtime_Error_100157, "{0}. About to break its promise.", errorMsg);
+
+            var error = msg.CreatePromptExceptionResponse(new SiloUnavailableException(errorMsg));
+            OnFail(msg, error, "On silo fail - Resend {0} for {1}");
         }
 
         public void DoCallback(Message response)
@@ -209,6 +195,44 @@ namespace Orleans.Runtime
                 }
             }
             catch (Exception) { } // Ignore any problems with Dispose
+        }
+
+        private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
+        {
+            lock (this)
+            {
+                if (alreadyFired)
+                    return;
+
+                if (config.ResendOnTimeout && resendFunc(msg))
+                {
+                    if (logger.IsVerbose) logger.Verbose(resendLogMessageFormat, msg.ResendCount, msg);
+                    return;
+                }
+
+                alreadyFired = true;
+                DisposeTimer();
+                if (StatisticsCollector.CollectApplicationRequestsStats)
+                {
+                    timeSinceIssued.Stop();
+                }
+
+                if (unregister != null)
+                {
+                    unregister();
+                }
+            }
+            
+            if (StatisticsCollector.CollectApplicationRequestsStats)
+            {
+                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);
+                if (isOnTimeout)
+                {
+                    ApplicationRequestsStatisticsGroup.OnAppRequestsTimedOut();
+                }
+            }
+
+            callback(error, context);
         }
 
         public TimeSpan RequestedTimeout()

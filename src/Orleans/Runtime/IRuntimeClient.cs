@@ -107,5 +107,7 @@ namespace Orleans.Runtime
         IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null);
 
         SiloStatus GetSiloStatus(SiloAddress siloAddress);
+
+        void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
     }
 }

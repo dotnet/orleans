@@ -558,4 +558,23 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
     }
+
+    public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
+    {
+        public async Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay)
+        {
+            return await target.LongRunningTask(t, delay);
+        }
+
+        public async Task<T> LongRunningTask(T t, TimeSpan delay)
+        {
+            await Task.Delay(delay);
+            return await Task.FromResult(t);
+        }
+
+        public Task<string> GetRuntimeInstanceId()
+        {
+            return Task.FromResult(RuntimeIdentity);
+        }
+    }
 }

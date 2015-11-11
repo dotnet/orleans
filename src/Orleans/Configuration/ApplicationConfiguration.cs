@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using System.Xml;
 
@@ -388,15 +389,17 @@ namespace Orleans.Runtime.Configuration
                 logger.Error(ErrorCode.Loader_TypeLoadError_2, errStr);
                 throw new OrleansException(errStr);
             }
+            var typeInfo = type.GetTypeInfo();
             // postcondition: returned type must implement IGrain.
-            if (!typeof(IGrain).IsAssignableFrom(type))
+            if (!typeof(IGrain).GetTypeInfo().IsAssignableFrom(type))
             {
                 string errStr = String.Format("Type {0} must implement IGrain to be used Application configuration context.",type.FullName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_3, errStr);
                 throw new OrleansException(errStr);
             }
             // postcondition: returned type must either be an interface or a class.
-            if (!type.IsInterface && !type.IsClass)
+            
+            if (!typeInfo.IsInterface && !typeInfo.IsClass)
             {
                 string errStr = String.Format("Type {0} must either be an interface or class used Application configuration context.",type.FullName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_4, errStr);

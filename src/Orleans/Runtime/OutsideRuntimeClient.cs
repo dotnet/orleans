@@ -154,7 +154,7 @@ namespace Orleans
 
             if (!TraceLogger.IsInitialized) TraceLogger.Initialize(config);
             StatisticsCollector.Initialize(config);
-            SerializationManager.Initialize(config.UseStandardSerializer);
+            SerializationManager.Initialize(config.UseStandardSerializer, cfg.SerializationProviders);
             logger = TraceLogger.GetLogger("OutsideRuntimeClient", TraceLogger.LoggerType.Runtime);
             appLogger = TraceLogger.GetLogger("Application", TraceLogger.LoggerType.Application);
 
@@ -901,6 +901,11 @@ namespace Orleans
         }
 
         public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {
             throw new NotImplementedException();
         }
