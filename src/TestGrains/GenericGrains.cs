@@ -321,7 +321,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericSelfManagedGrain<T, U> : Grain, IGenericSelfManagedGrain<T, U>
+    public class BasicGenericGrain<T, U> : Grain, IBasicGenericGrain<T, U>
     {
         private T _a;
         private U _b;

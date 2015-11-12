@@ -119,7 +119,7 @@ namespace UnitTests.GrainInterfaces
     {
     }
 
-    public interface IGenericSelfManagedGrain<T, U> : IGrainWithIntegerKey
+    public interface IBasicGenericGrain<T, U> : IGrainWithIntegerKey
     {
         Task<T> GetA();
         Task<string> GetAxB();
