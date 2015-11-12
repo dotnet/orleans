@@ -253,6 +253,75 @@ namespace Orleans.Serialization
             return retVal;
         }
 
+        internal static void SerializeGenericSortedSet(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var generics = t.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(t, "SerializeSortedSet", "DeserializeSortedSet", "DeepCopySortedSet", generics);
+
+            concretes.Item1(original, stream, expected);
+        }
+
+        internal static object DeserializeGenericSortedSet(Type expected, BinaryTokenStreamReader stream)
+        {
+            var generics = expected.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(expected, "SerializeSortedSet", "DeserializeSortedSet", "DeepCopySortedSet", generics);
+
+            return concretes.Item2(expected, stream);
+        }
+
+        internal static object CopyGenericSortedSet(object original)
+        {
+            Type t = original.GetType();
+            var generics = t.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(t, "SerializeSortedSet", "DeserializeSortedSet", "DeepCopySortedSet", generics);
+
+            return concretes.Item3(original);
+        }
+
+        internal static void SerializeSortedSet<T>(object obj, BinaryTokenStreamWriter stream, Type expected)
+        {
+            var set = (SortedSet<T>)obj;
+            SerializationManager.SerializeInner(set.Comparer.Equals(Comparer<T>.Default) ? null : set.Comparer,
+                stream, typeof(IComparer<T>));
+            stream.Write(set.Count);
+            foreach (var element in set)
+            {
+                SerializationManager.SerializeInner(element, stream, typeof(T));
+            }
+        }
+
+        internal static object DeserializeSortedSet<T>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var comparer =
+                (IComparer<T>)SerializationManager.DeserializeInner(typeof(IComparer<T>), stream);
+            var count = stream.ReadInt();
+            var set = new SortedSet<T>(comparer);
+            DeserializationContext.Current.RecordObject(set);
+            for (var i = 0; i < count; i++)
+            {
+                set.Add((T)SerializationManager.DeserializeInner(typeof(T), stream));
+            }
+            return set;
+        }
+
+        internal static object DeepCopySortedSet<T>(object original)
+        {
+            var set = (SortedSet<T>)original;
+
+            if (typeof(T).IsOrleansShallowCopyable())
+            {
+                return new SortedSet<T>(set, set.Comparer);
+            }
+
+            var retVal = new SortedSet<T>(set.Comparer);
+            SerializationContext.Current.RecordObject(original, retVal);
+            foreach (var item in set)
+            {
+                retVal.Add((T)SerializationManager.DeepCopyInner(item));
+            }
+            return retVal;
+        }
         #endregion
 
         #region Queues
