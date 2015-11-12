@@ -68,7 +68,12 @@ namespace Orleans.Runtime.Scheduler
 
         public ISchedulingContext SchedulingContext { get; set; }
 
-        public bool IsSystem
+        public bool IsSystemPriority
+        {
+            get { return SchedulingUtils.IsSystemPriorityContext(SchedulingContext); }
+        }
+
+        internal bool IsSystemGroup
         {
             get { return SchedulingUtils.IsSystemContext(SchedulingContext); }
         }
@@ -160,7 +165,7 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskRunner = new ActivationTaskScheduler(this);
-            log = IsSystem ? TraceLogger.GetLogger("Scheduler." + Name + ".WorkItemGroup", TraceLogger.LoggerType.Runtime) : appLogger;
+            log = IsSystemPriority ? TraceLogger.GetLogger("Scheduler." + Name + ".WorkItemGroup", TraceLogger.LoggerType.Runtime) : appLogger;
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
             {
@@ -427,7 +432,7 @@ namespace Orleans.Runtime.Scheduler
         public override string ToString()
         {
             return String.Format("{0}WorkItemGroup:Name={1},WorkGroupStatus={2}",
-                IsSystem ? "System*" : "",
+                IsSystemGroup ? "System*" : "",
                 Name,
                 state);
         }

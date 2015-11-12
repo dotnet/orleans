@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Scheduler
             try
             {
 #if PRIORITIZE_SYSTEM_TASKS
-                if (workItem.IsSystem)
+                if (workItem.IsSystemPriority)
                 {
     #if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectShedulerQueuesStats)
@@ -177,13 +177,6 @@ namespace Orleans.Runtime.Scheduler
             sb.AppendLine("Main Queue:");
             foreach (var workItem in mainQueue)
                 sb.AppendFormat("  {0}", workItem).AppendLine();
-        }
-
-        public void RunDownApplication()
-        {
-#if PRIORITIZE_SYSTEM_TASKS
-            mainQueue.CompleteAdding();
-#endif
         }
 
         public void RunDown()

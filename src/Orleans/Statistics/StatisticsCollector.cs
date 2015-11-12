@@ -73,7 +73,7 @@ namespace Orleans.Runtime
 
         internal static bool ReportPerWorkItemStats(ISchedulingContext schedulingContext)
         {
-            return SchedulingUtils.IsSystemContext(schedulingContext) ? IsVerbose2 : IsVerbose3;
+            return SchedulingUtils.IsSystemPriorityContext(schedulingContext) ? IsVerbose2 : IsVerbose3;
         }
 
         //--------------------------------------//

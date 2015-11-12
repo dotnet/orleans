@@ -732,7 +732,7 @@ namespace Orleans
         SchedulerWorkGroupShuttingDown          = SchedulerBase + 16,
         SchedulerNotEnqueuWorkWhenShutdown      = SchedulerBase + 17,
         SchedulerNotExecuteWhenShutdown         = SchedulerBase + 18,
-        SchedulerAppTurnsStopped                = SchedulerBase + 19,
+        SchedulerAppTurnsStopped_1              = SchedulerBase + 19,
         SchedulerWorkGroupStopping              = SchedulerBase + 20,
         SchedulerSkipWorkStopping               = SchedulerBase + 21,
         SchedulerSkipWorkCancelled              = SchedulerBase + 22,
@@ -745,6 +745,7 @@ namespace Orleans
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
         SchedulerWorkerThreadExc                = SchedulerBase + 30,
         SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
+        SchedulerAppTurnsStopped_2              = SchedulerBase + 32,
 
         GatewayBase                             = Runtime + 1300,
         GatewayClientOpenedSocket               = GatewayBase + 1,
