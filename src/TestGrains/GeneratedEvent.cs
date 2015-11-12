@@ -21,38 +21,19 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Runtime;
+using System;
 
-namespace Orleans.Streams
+namespace TestGrains
 {
-    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
+    [Serializable]
+    public class GeneratedEvent
     {
-        public NoOpStreamDeliveryFailureHandler()
-            : this(true)
+        public enum GeneratedEventType
         {
+            Fill,
+            End,
         }
 
-        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
-        {
-            ShouldFaultSubsriptionOnError = faultOnError;
-        }
-
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
-
-        /// <summary>
-        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
-        /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
-        }
-
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
-        }
+        public GeneratedEventType EventType { get; set; }
     }
 }

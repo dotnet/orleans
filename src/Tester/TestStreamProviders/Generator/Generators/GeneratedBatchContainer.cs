@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -22,44 +22,41 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Concurrent;
-using System.Collections.ObjectModel;
-using System.Linq;
-using Orleans.Runtime;
+using System.Collections.Generic;
 using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.Common
+namespace Tester.TestStreamProviders.Generator.Generators
 {
-    public class SimpleQueueAdapterCache : IQueueAdapterCache
+    [Serializable]
+    internal class GeneratedBatchContainer : IBatchContainer
     {
-        private const string CACHE_SIZE_PARAM = "CacheSize";
+        private readonly object payload;
 
-        private readonly int cacheSize;
-        private readonly Logger logger;
-        private readonly ConcurrentDictionary<QueueId, IQueueCache> caches;
-        
-        public SimpleQueueAdapterCache(int cacheSize, Logger logger)
+        public Guid StreamGuid { get; private set; }
+        public string StreamNamespace { get; private set; }
+        public StreamSequenceToken SequenceToken { get; set; }
+
+        public GeneratedBatchContainer(Guid streamGuid, string streamNamespace, object payload, StreamSequenceToken token)
         {
-            if (cacheSize <= 0)
-                throw new ArgumentOutOfRangeException("cacheSize", "CacheSize must be a positive number.");
-            this.cacheSize = cacheSize;
-            this.logger = logger;
-            caches = new ConcurrentDictionary<QueueId, IQueueCache>();
+            StreamGuid = streamGuid;
+            StreamNamespace = streamNamespace;
+            this.payload = payload;
+            this.SequenceToken = token;
         }
 
-        public IQueueCache CreateQueueCache(QueueId queueId)
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return caches.AddOrUpdate(queueId, (id) => new SimpleQueueCache(id, cacheSize, logger), (id, queueCache) => queueCache);
+            return new[] { Tuple.Create((T)payload, SequenceToken) };
         }
 
-        public int Size
+        public bool ImportRequestContext()
         {
-            get { return caches.Select(pair => pair.Value.Size).Sum(); }
+            return false;
         }
 
-        public static int ParseSize(IProviderConfiguration config, int defaultSize)
+        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
-            return config.GetIntProperty(CACHE_SIZE_PARAM, defaultSize);
+            return true;
         }
     }
 }

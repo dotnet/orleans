@@ -60,6 +60,9 @@
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="EventSourcing\PersonState.cs" />
+    <Compile Include="GeneratedEventCollectorGrain.cs" />
+    <Compile Include="GeneratedEvent.cs" />
+    <Compile Include="GeneratedEventReporterGrain.cs" />
     <Compile Include="GeneratorTestDerivedDerivedGrain.cs" />
     <Compile Include="GeneratorTestDerivedGrain1.cs" />
     <Compile Include="GeneratorTestDerivedGrain2.cs" />

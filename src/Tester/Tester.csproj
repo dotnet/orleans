@@ -96,6 +96,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Data.Services.Client" />
@@ -143,7 +144,15 @@
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
+    <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
+    <Compile Include="TestStreamProviders\Generator\Generators\GeneratedBatchContainer.cs" />
+    <Compile Include="TestStreamProviders\Generator\IStreamGenerator.cs" />
+    <Compile Include="TestStreamProviders\Generator\Generators\SimpleGenerator.cs" />
+    <Compile Include="TestStreamProviders\Generator\GeneratorAdapterConfig.cs" />
+    <Compile Include="TestStreamProviders\Generator\GeneratorAdapterFactory.cs" />
+    <Compile Include="TestStreamProviders\Generator\GeneratorStreamProvider.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
+    <Compile Include="TestStreamProviders\Generator\Generators\SimpleGeneratorConfig.cs" />
     <Compile Include="BondSerializationTests.cs" />
     <Compile Include="ExternalSerializerTest.cs" />
     <Compile Include="UnitTestSiloHost.cs" />
