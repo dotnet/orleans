@@ -89,6 +89,7 @@ namespace Orleans.Messaging
             IsLive = false;
             receiver.Stop();
             base.Stop();
+            RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
             {

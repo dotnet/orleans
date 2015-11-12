@@ -907,7 +907,13 @@ namespace Orleans
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {
-            throw new NotImplementedException();
+            foreach (var callback in callbacks)
+            {
+                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                {
+                    callback.Value.OnTargetSiloFail();
+                }
+            }
         }
     }
 }
