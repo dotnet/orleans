@@ -52,31 +52,5 @@ namespace Orleans.SqlUtils
         /// PostgreSQL invariant name string.
         /// </summary>
         public const string InvariantNamePostgreSql = "Npgsql";
-
-        /// <summary>
-        /// A key for a well known constant, likely set by a database connector vendor.
-        /// </summary>
-        public const string NameKey = "Name";
-
-        /// <summary>
-        /// A key for a well known constant, likey set by a database connector vendor.
-        /// </summary>
-        public const string DescriptionKey = "Description";
-
-        /// <summary>
-        /// A key for a well known constant, likely set by a database connector vendor.
-        /// </summary>
-        public const string InvariantNameKey = "InvariantName";
-
-        /// <summary>
-        /// A key for a well known constant, likely set by a database connector vendor.
-        /// </summary>
-        public const string AssemblyQualifiedNameKey = "AssemblyQualifiedName";
-
-        /// <summary>
-        /// A parameter indicator that can be used in queries which is then substituted according to the
-        /// underlying database.
-        /// </summary>
-        public const string InvariantParameterIndicator = "@";
     }
 }

@@ -22,10 +22,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using Orleans.Runtime.Configuration;
-using System;
 using System.Threading.Tasks;
 using Orleans.SqlUtils;
-using Orleans.SqlUtils.Management;
 
 
 namespace Orleans.Runtime.ReminderService
@@ -34,59 +32,47 @@ namespace Orleans.Runtime.ReminderService
     {
         private string serviceId;
         private string deploymentId;
-        private IRelationalStorage database;
-        private QueryConstantsBag queryConstants;
+        private RelationalOrleansQueries orleansQueries;
 
         public async Task Init(GlobalConfiguration config, TraceLogger logger)
         {
             serviceId = config.ServiceId.ToString();
             deploymentId = config.DeploymentId;
-            database = RelationalStorageUtilities.CreateGenericStorageInstance(config.AdoInvariantForReminders,
-                config.DataConnectionStringForReminders);
-            queryConstants = await database.InitializeOrleansQueriesAsync();
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariantForReminders, config.DataConnectionStringForReminders);
         }
 
 
         public Task<ReminderTableData> ReadRows(GrainReference grainRef)
         {
-            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.ReadReminderRowsKey);
-            return database.ReadReminderRowsAsync(query, serviceId, grainRef);
+            return orleansQueries.ReadReminderRowsAsync(serviceId, grainRef);
         }
 
 
         public Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
         {
-            var queryKey = beginHash < endHash ? QueryKeys.ReadRangeRows1Key : QueryKeys.ReadRangeRows2Key;
-            var query = queryConstants.GetConstant(database.InvariantName, queryKey);
-            return database.ReadReminderRowsAsync(query, serviceId, beginHash, endHash);
+            return orleansQueries.ReadReminderRowsAsync(serviceId, beginHash, endHash);
         }
 
 
         public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
-            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.ReadReminderRowKey);
-            return database.ReadReminderRowAsync(query, serviceId, grainRef, reminderName);
-        }
-              
+            return orleansQueries.ReadReminderRowAsync(serviceId, grainRef, reminderName);
+        }   
         
         public Task<string> UpsertRow(ReminderEntry entry)
         {
-            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.UpsertReminderRowKey);
-            return database.UpsertReminderRowAsync(query, serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period);            
+            return orleansQueries.UpsertReminderRowAsync(serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period);            
         }
-
 
         public Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
-            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.DeleteReminderRowKey);
-            return database.DeleteReminderRowAsync(query, serviceId, grainRef, reminderName, eTag);            
+            return orleansQueries.DeleteReminderRowAsync(serviceId, grainRef, reminderName, eTag);            
         }
 
 
         public Task TestOnlyClearTable()
         {
-            var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.DeleteReminderRowsKey);
-            return database.DeleteReminderRowsAsync(query, serviceId);
+            return orleansQueries.DeleteReminderRowsAsync(serviceId);
         }
     }
 }

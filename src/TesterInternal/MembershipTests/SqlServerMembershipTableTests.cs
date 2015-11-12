@@ -28,7 +28,6 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.TestingHost;
 using Orleans.AzureUtils;
 using Orleans.SqlUtils;
 using UnitTests.StorageTests;
@@ -37,32 +36,32 @@ using UnitTests.General;
 namespace UnitTests.MembershipTests
 {
     /// <summary>
-    /// Tests for operation of Orleans Membership Table using SQL
+    /// Tests for operation of Orleans Membership Table using SQL Server
     /// </summary>
     [TestClass]    
-    public class SQLMembershipTableTests
+    public class SqlServerMembershipTableTests
     {
         public TestContext TestContext { get; set; }
 
         private string deploymentId;
         private SiloAddress siloAddress;
         private IMembershipTable membership;
-        private static IRelationalStorage relationalStorage;
+        private static string connectionString;
         private const string testDatabaseName = "OrleansTest";
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
-        private readonly TraceLogger logger = TraceLogger.GetLogger("SQLMembershipTableTests", TraceLogger.LoggerType.Application);
+        private readonly TraceLogger logger = TraceLogger.GetLogger("SqlServerMembershipTableTests", TraceLogger.LoggerType.Application);
 
         // Use ClassInitialize to run code before running the first test in the class
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("SQLMembershipTableTests", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("SqlServerMembershipTableTests", Logger.Severity.Verbose3);
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
 
-            relationalStorage = SqlTestsEnvironment.Setup(testDatabaseName);
+            connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, testDatabaseName).Result.CurrentConnectionString;
         }
 
 
@@ -77,7 +76,7 @@ namespace UnitTests.MembershipTests
             GlobalConfiguration config = new GlobalConfiguration
             {
                 DeploymentId = deploymentId,                
-                DataConnectionString = relationalStorage.ConnectionString                
+                DataConnectionString = connectionString        
             };
 
             var mbr = new SqlMembershipTable();
