@@ -85,7 +85,6 @@
     <Compile Include="General\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
-    <Compile Include="GrainActivateDeactivateTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
     <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
@@ -97,7 +96,6 @@
     <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
     <Compile Include="RemindersTest\SqlRemindersTableTests.cs" />
     <Compile Include="General\SerializationTests.cs" />
-    <Compile Include="BasicActivationTests.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
