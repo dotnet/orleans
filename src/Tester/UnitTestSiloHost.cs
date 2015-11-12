@@ -40,6 +40,8 @@ namespace UnitTests.Tester
     [DeploymentItem("TestGrainInterfaces.dll")]
     [DeploymentItem("TestGrains.dll")]
     [DeploymentItem("OrleansCodeGenerator.dll")]
+    [DeploymentItem("TestInternalGrainInterfaces.dll")]
+    [DeploymentItem("TestInternalGrains.dll")]
     public class UnitTestSiloHost : TestingSiloHost
     {
         public UnitTestSiloHost() // : base()
