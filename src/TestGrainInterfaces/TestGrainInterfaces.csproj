@@ -45,6 +45,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IActivateDeactivateTestGrain.cs" />
     <Compile Include="ICircularStateTestGrain.cs" />
     <Compile Include="IActivateDeactivateWatcherGrain.cs" />
     <Compile Include="IExceptionGrain.cs" />
@@ -62,6 +63,7 @@
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyIGrains.cs" />
     <Compile Include="IProxyGrain.cs" />
+    <Compile Include="IReentrantStressTestGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
     <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />

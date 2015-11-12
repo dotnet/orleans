@@ -21,35 +21,52 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Concurrency;
-using Orleans.Runtime;
 
 namespace TestInternalGrainInterfaces
 {
-    internal interface IStressTestGrain : IGrainWithIntegerKey
+    // Note: Self-managed can only implement one grain interface, so have to use copy-paste rather than subclassing 
+
+    public interface ISimpleActivateDeactivateTestGrain : IGrainWithIntegerKey
     {
-        Task<string> GetLabel();
+        Task<string> DoSomething();
+        Task DoDeactivate();
+    }
 
-        Task SetLabel(string label);
+    public interface ITailCallActivateDeactivateTestGrain : IGrainWithIntegerKey
+    {
+        Task<string> DoSomething();
+        Task DoDeactivate();
+    }
 
-        Task PingOthers(long[] others);
+    public interface ILongRunningActivateDeactivateTestGrain : IGrainWithIntegerKey
+    {
+        Task<string> DoSomething();
+        Task DoDeactivate();
+    }
 
-        Task<List<Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>>>> LookUpMany(SiloAddress destination, List<Tuple<GrainId, int>> grainAndETagList, int retries = 0);
+    public interface IBadActivateDeactivateTestGrain : IGrainWithIntegerKey
+    {
+        Task ThrowSomething();
+        Task<long> GetKey();
+    }
 
-        Task Send(byte[] data);
+    public interface IBadConstructorTestGrain : IGrainWithIntegerKey
+    {
+        Task<string> DoSomething();
+    }
 
-        Task<byte[]> Echo(byte[] data);
+    public interface ITaskActionActivateDeactivateTestGrain : IGrainWithIntegerKey
+    {
+        Task<string> DoSomething();
+        Task DoDeactivate();
+    }
 
-        Task Ping(byte[] data);
+    public interface ICreateGrainReferenceTestGrain : IGrainWithIntegerKey
+    {
+        Task<string> DoSomething();
 
-        Task PingWithDelay(byte[] data, TimeSpan delay);
-
-        Task<IStressTestGrain> GetGrainReference();
-
-        Task DeactivateSelf();
+        Task ForwardCall(IBadActivateDeactivateTestGrain otherGrain);
     }
 }

@@ -85,7 +85,6 @@
     <Compile Include="General\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
-    <Compile Include="GrainActivateDeactivateTests.cs" />
     <Compile Include="MembershipTests\MySqlMembershipTableTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
     <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
@@ -99,7 +98,6 @@
     <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="General\SerializationTests.cs" />
-    <Compile Include="BasicActivationTests.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />

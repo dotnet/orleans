@@ -108,6 +108,7 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BasicActivationTests.cs" />
     <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
     <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
     <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
@@ -115,6 +116,7 @@
     <Compile Include="ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
+    <Compile Include="GrainActivateDeactivateTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
     <Compile Include="MemoryStorageProviderTests.cs" />
@@ -281,6 +283,14 @@
     <ProjectReference Include="..\TestGrains\TestGrains.csproj">
       <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
       <Name>TestGrains</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
+      <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>
+      <Name>TestInternalGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
+      <Project>{4682abc1-1a51-4794-8012-da8e59ebc72e}</Project>
+      <Name>TestInternalGrains</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

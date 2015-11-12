@@ -6,6 +6,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestInternalGrainInterfaces;
+using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
 namespace UnitTests.ActivationsLifeCycleTests
@@ -49,7 +50,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             int id = random.Next();
             ISimpleActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
 
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
@@ -61,7 +62,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             ISimpleActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
             // Activate
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
 
             // Deactivate
             await grain.DoDeactivate();
@@ -77,7 +78,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             ISimpleActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
             // Activate
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
             // Deactivate
             await grain.DoDeactivate();
             Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
@@ -85,7 +86,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
             // Reactivate
-            ActivationId activation2 = await grain.DoSomething();
+            string activation2 = await grain.DoSomething();
 
             Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
@@ -97,7 +98,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             int id = random.Next();
             ITailCallActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
 
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
@@ -109,7 +110,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             ITailCallActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
             // Activate
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
 
             // Deactivate
             await grain.DoDeactivate();
@@ -125,7 +126,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             ITailCallActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
             // Activate
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
             // Deactivate
             await grain.DoDeactivate();
             Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
@@ -133,7 +134,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
             // Reactivate
-            ActivationId activation2 = await grain.DoSomething();
+            string activation2 = await grain.DoSomething();
 
             Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
@@ -146,7 +147,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             ILongRunningActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ILongRunningActivateDeactivateTestGrain>(id);
 
             // Activate
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
 
             await CheckNumActivateDeactivateCalls(1, 0, activation, "Before deactivation");
 
@@ -157,7 +158,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
             // Reactivate
-            ActivationId activation2 = await grain.DoSomething();
+            string activation2 = await grain.DoSomething();
 
             Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
@@ -273,7 +274,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             int id = random.Next();
             ICreateGrainReferenceTestGrain grain = GrainClient.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
 
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
             Assert.IsNotNull(activation);
         }
 
@@ -284,25 +285,25 @@ namespace UnitTests.ActivationsLifeCycleTests
             ITaskActionActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITaskActionActivateDeactivateTestGrain>(id);
 
             // Activate
-            ActivationId activation = await grain.DoSomething();
+            string activation = await grain.DoSomething();
 
             // Deactivate
             await grain.DoDeactivate();
             Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
 
-            await CheckNumActivateDeactivateCalls(1, 1, activation);
+            await CheckNumActivateDeactivateCalls(1, 1, activation.ToString());
         }
 
         private async Task CheckNumActivateDeactivateCalls(
             int expectedActivateCalls,
             int expectedDeactivateCalls,
-            ActivationId forActivation,
+            string forActivation,
             string when = null)
         {
             await CheckNumActivateDeactivateCalls(
                 expectedActivateCalls,
                 expectedDeactivateCalls,
-                new ActivationId[] { forActivation },
+                new string[] { forActivation },
                 when )
             ;
         }
@@ -310,13 +311,13 @@ namespace UnitTests.ActivationsLifeCycleTests
         private async Task CheckNumActivateDeactivateCalls(
             int expectedActivateCalls, 
             int expectedDeactivateCalls,
-            ActivationId[] forActivations,
+            string[] forActivations,
             string when = null)
         {
-            ActivationId[] activateCalls = await watcher.GetActivateCalls();
+            string[] activateCalls = await watcher.GetActivateCalls();
             Assert.AreEqual(expectedActivateCalls, activateCalls.Length, "Number of Activate calls {0}", when);
 
-            ActivationId[] deactivateCalls = await watcher.GetDeactivateCalls();
+            string[] deactivateCalls = await watcher.GetDeactivateCalls();
             Assert.AreEqual(expectedDeactivateCalls, deactivateCalls.Length, "Number of Deactivate calls {0}", when);
 
             for (int i = 0; i < expectedActivateCalls; i++)

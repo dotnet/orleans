@@ -187,17 +187,17 @@ namespace UnitTests.General
         public void BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {
             List<Task> promises = new List<Task>();
-            TimeSpan prevTimeout = RuntimeClient.Current.GetResponseTimeout();
+            TimeSpan prevTimeout = GrainClient.GetResponseTimeout();
 
             // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
             TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
-            RuntimeClient.Current.SetResponseTimeout(shortTimeout);
+            GrainClient.SetResponseTimeout(shortTimeout);
 
             ITestGrain grain = GrainClient.GrainFactory.GetGrain<ITestGrain>(12);
             int num = 10;
             for (long i = 0; i < num; i++)
             {
-                Task task = grain.DoLongAction(shortTimeout.Multiply(3), "A_" + i);
+                Task task = grain.DoLongAction(TimeSpan.FromMilliseconds(shortTimeout.TotalMilliseconds * 3), "A_" + i);
                 promises.Add(task);
             }
             try
@@ -212,7 +212,7 @@ namespace UnitTests.General
             Thread.Sleep(TimeSpan.FromSeconds(10));
 
             // set the regular response time back, expect msgs ot succeed.
-            RuntimeClient.Current.SetResponseTimeout(prevTimeout);
+            GrainClient.SetResponseTimeout(prevTimeout);
 
             logger.Info("About to send a next legit request that should succeed.");
             grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
