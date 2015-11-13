@@ -22,10 +22,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
+using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
@@ -48,6 +50,12 @@ namespace UnitTests.StreamingTests
             })
         {
             runner = new SubscriptionMultiplicityTestRunner(SMSStreamProviderName, GrainClient.Logger);
+        }
+
+        public override void AdjustForTest(Orleans.Runtime.Configuration.ClientConfiguration config)
+        {
+            config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName, new Dictionary<string,string>());
+ 	        base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run
@@ -90,6 +98,13 @@ namespace UnitTests.StreamingTests
         {
             logger.Info("************************ SMSActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task SMSSubscribeFromClientTest()
+        {
+            logger.Info("************************ SMSSubscribeFromClientTest *********************************");
+            await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
         }
     }
 }
