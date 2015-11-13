@@ -45,12 +45,6 @@ namespace Orleans.SqlUtils
         private static readonly string indexedParameterTemplate = "@p{0}";
 
         /// <summary>
-        /// This is used to acquire some constants that change rarely if ever.
-        /// </summary>
-        private static readonly QueryConstantsBag queryConstants = new QueryConstantsBag();
-
-
-        /// <summary>
         /// Executes a multi-record insert query clause with <em>SELECT UNION ALL</em>.
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -73,8 +67,10 @@ namespace Orleans.SqlUtils
                 throw new ArgumentNullException("parameters");
             }
 
-            var startEscapeIndicator = queryConstants.GetConstant(storage.InvariantName, RelationalVendorConstants.StartEscapeIndicatorKey);
-            var endEscapeIndicator = queryConstants.GetConstant(storage.InvariantName, RelationalVendorConstants.EndEscapeIndicatorKey);
+            var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);
+
+            var startEscapeIndicator = storageConsts.StartEscapeIndicator;
+            var endEscapeIndicator = storageConsts.EndEscapeIndicator;
 
             //SqlParameters map is needed in case the query needs to be parameterized in order to avoid two
             //reflection passes as first a query needs to be constructed and after that when a database
@@ -139,17 +135,7 @@ namespace Orleans.SqlUtils
                 }
             }
 
-            //If this is an Oracle database, every UNION ALL SELECT needs to have "FROM DUAL" appended.
-            if(storage.InvariantName == AdoNetInvariants.InvariantNameOracleDatabase)
-            {
-                //Counting starts from 1 as the first SELECT should not select from dual.
-                for(int i = 1; i < values.Count; ++i)
-                {
-                    values[i] = string.Concat(values[i], " FROM DUAL");
-                }
-            }
-
-            var query = string.Format(insertIntoValuesTemplate, tableName, columns, string.Join(" UNION ALL SELECT ", values));
+            var query = string.Format(insertIntoValuesTemplate, tableName, columns, string.Join(storageConsts.UnionAllSelectTemplate, values));
             return storage.ExecuteAsync(query, command =>
             {
                 if(useSqlParams)
