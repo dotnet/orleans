@@ -60,17 +60,29 @@ namespace Orleans
 
         // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
         // That means we are running in side a silo.
-        private static bool IsRunningInsideGrain { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
+        private static bool IsRunningInsideSilo { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
 
-        //TODO: prevent client code from using this from inside a Grain
+        //TODO: prevent client code from using this from inside a Grain or provider
         public static IGrainFactory GrainFactory
         {
             get
             {
-                if (IsRunningInsideGrain)
+                if (IsRunningInsideSilo)
                 {
-                    throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
-                                               "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+                    // just in case, make sure we don't get NullRefExc when checking RuntimeContext.
+                    bool runningInsideGrain = RuntimeContext.Current != null && RuntimeContext.CurrentActivationContext != null
+                        && RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.Activation;
+                    if (runningInsideGrain)
+                    {
+                        throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
+                                 "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+
+                    }
+                    else // running inside provider or else where
+                    {
+                        throw new OrleansException("You are running inside the provider code, on the silo. GrainClient.GrainFactory should only be used on the client side. " +
+                                "Inside the provider code use GrainFactory that is passed via IProviderRuntime (use providerRuntime.GrainFactory).");
+                    }
                 }
 
                 if (!IsInitialized)
