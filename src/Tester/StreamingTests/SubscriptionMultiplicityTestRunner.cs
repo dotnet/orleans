@@ -327,6 +327,34 @@ namespace UnitTests.StreamingTests
             await consumer2.StopConsuming(handle2);
         }
 
+        public async Task SubscribeFromClientTest(Guid streamGuid, string streamNamespace)
+        {
+            // get producer and consumer
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            int eventCount = 0;
+
+            var provider = GrainClient.GetStreamProvider(streamProviderName);
+            var stream = provider.GetStream<int>(streamGuid, streamNamespace);
+            var handle = await stream.SubscribeAsync((e,t) =>
+            {
+                eventCount++;
+                return TaskDone.Done;
+            });
+
+            // produce some messages
+            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+
+            await producer.StartPeriodicProducing();
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+            await producer.StopPeriodicProducing();
+
+            // check
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, () => eventCount, lastTry), Timeout);
+
+            // unsubscribe
+            await handle.UnsubscribeAsync();
+        }
+
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int consumerCount, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
@@ -368,6 +396,33 @@ namespace UnitTests.StreamingTests
             }
             logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, 
                 Utils.EnumerableToString(numConsumed, kvp => kvp.Key.HandleId.ToString() + "->" +  kvp.Value.ToString()));
+            return true;
+        }
+
+        private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, Func<int> eventCount, bool assertIsTrue)
+        {
+            var numProduced = await producer.GetNumberProduced();
+            var numConsumed = eventCount();
+            if (assertIsTrue)
+            {
+                Assert.IsTrue(numProduced > 0, "Events were not produced");
+                Assert.AreEqual(numProduced, numConsumed, "Produced and consumed counts do not match");
+            }
+            else if (numProduced <= 0 || // no events produced?
+                     numProduced != numConsumed)
+            {
+                if (numProduced <= 0)
+                {
+                    logger.Info("numProduced <= 0: Events were not produced");
+                }
+                if (numProduced != numConsumed)
+                {
+                    logger.Info("numProduced != numConsumed: Produced and consumed counts do not match. numProduced = {0}, consumed = {1}",
+                        numProduced, numConsumed);
+                }
+                return false;
+            }
+            logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             return true;
         }
     }
