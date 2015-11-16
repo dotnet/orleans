@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -50,6 +51,12 @@ namespace UnitTests.StreamingTests
             })
         {
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
+        }
+
+        public override void AdjustForTest(Orleans.Runtime.Configuration.ClientConfiguration config)
+        {
+            config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName, new Dictionary<string, string>());
+            base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run
@@ -113,6 +120,12 @@ namespace UnitTests.StreamingTests
             logger.Info("************************ AQTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
-        
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        public async Task AQSubscribeFromClientTest()
+        {
+            logger.Info("************************ AQSubscribeFromClientTest *********************************");
+            await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+        }
     }
 }
