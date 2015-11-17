@@ -406,8 +406,9 @@ namespace Orleans
         SiloShutdownEventCreated        = SiloBase + 42,
         SiloShutdownEventOpened         = SiloBase + 43,
         SiloShutdownEventReceived       = SiloBase + 44,
-        SiloLoadeDI                     = SiloBase + 45,
+        SiloLoadedDI                    = SiloBase + 45,
         SiloFailedToLoadDI              = SiloBase + 46,
+        SiloFileNotFoundLoadingDI       = SiloBase + 47,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,

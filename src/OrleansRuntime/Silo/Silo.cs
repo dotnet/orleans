@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime;
@@ -222,8 +223,15 @@ namespace Orleans.Runtime
             var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
             if (startupBuilder != null)
             {
-                logger.Info(ErrorCode.SiloLoadeDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
-                services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+                logger.Info(ErrorCode.SiloLoadedDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
+                try
+                {
+                    services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+                }
+                catch (FileNotFoundException exc)
+                {
+                    logger.Warn(ErrorCode.SiloFileNotFoundLoadingDI, "Caught a FileNotFoundException calling ConfigureStartup(). Ignoring it. {0}", exc);
+                }
             }
             else
             {
