@@ -173,22 +173,24 @@ namespace Orleans.CodeGenerator
             var resultVariable = SF.IdentifierName("result");
 
             var body = new List<StatementSyntax> { resultDeclaration };
-          
-            // Record the result for cyclic deserialization.
-            Expression<Action> recordObject =
-                () => DeserializationContext.Current.RecordObject(default(object));
-            var currentSerializationContext =
-                SyntaxFactory.AliasQualifiedName(
-                    SF.IdentifierName(SF.Token(SyntaxKind.GlobalKeyword)),
-                    SF.IdentifierName("Orleans"))
-                    .Qualify("Serialization")
-                    .Qualify("DeserializationContext")
-                    .Qualify("Current");
-            body.Add(
-                SF.ExpressionStatement(
-                    recordObject.Invoke(currentSerializationContext)
-                        .AddArgumentListArguments(
-                            SF.Argument(resultVariable))));
+
+            // Value types cannot be referenced, only copied, so there is no need to box & record instances of value types.
+            if (!type.IsValueType)
+            {
+                // Record the result for cyclic deserialization.
+                Expression<Action> recordObject = () => DeserializationContext.Current.RecordObject(default(object));
+                var currentSerializationContext =
+                    SyntaxFactory.AliasQualifiedName(
+                        SF.IdentifierName(SF.Token(SyntaxKind.GlobalKeyword)),
+                        SF.IdentifierName("Orleans"))
+                        .Qualify("Serialization")
+                        .Qualify("DeserializationContext")
+                        .Qualify("Current");
+                body.Add(
+                    SF.ExpressionStatement(
+                        recordObject.Invoke(currentSerializationContext)
+                            .AddArgumentListArguments(SF.Argument(resultVariable))));
+            }
 
             // Deserialize all fields.
             foreach (var field in fields)
