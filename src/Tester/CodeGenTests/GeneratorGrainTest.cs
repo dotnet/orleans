@@ -9,6 +9,7 @@ using UnitTests.Tester;
 namespace Tester.CodeGenTests
 {
     using System;
+    using System.Collections.Generic;
 
     using UnitTests.GrainInterfaces;
 
@@ -54,9 +55,30 @@ namespace Tester.CodeGenTests
 
             // Test abstract class serialization.
             var expectedAbstract = new OuterClass.SomeConcreteClass { Int = 89, String = Guid.NewGuid().ToString() };
+            expectedAbstract.Classes = new List<SomeAbstractClass>
+            {
+                expectedAbstract,
+                new AnotherConcreteClass
+                {
+                    AnotherString = "hi",
+                    Interfaces = new List<ISomeInterface> { expectedAbstract }
+                }
+            };
             var actualAbstract = await grain.RoundTripClass(expectedAbstract);
             Assert.AreEqual(expectedAbstract.Int, actualAbstract.Int);
             Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract).String);
+            Assert.AreEqual(expectedAbstract.Classes.Count, actualAbstract.Classes.Count);
+            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract.Classes[0]).String);
+            Assert.AreEqual(expectedAbstract.Classes[1].Interfaces[0].Int, actualAbstract.Classes[1].Interfaces[0].Int);
+
+            // Test abstract class serialization with state.
+            await grain.SetState(expectedAbstract);
+            actualAbstract = await grain.GetState();
+            Assert.AreEqual(expectedAbstract.Int, actualAbstract.Int);
+            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract).String);
+            Assert.AreEqual(expectedAbstract.Classes.Count, actualAbstract.Classes.Count);
+            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract.Classes[0]).String);
+            Assert.AreEqual(expectedAbstract.Classes[1].Interfaces[0].Int, actualAbstract.Classes[1].Interfaces[0].Int);
 
             // Test interface serialization.
             var expectedInterface = expectedAbstract;

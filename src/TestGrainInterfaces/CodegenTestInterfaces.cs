@@ -49,6 +49,9 @@ namespace UnitTests.GrainInterfaces
         Task<SomeAbstractClass> RoundTripClass(SomeAbstractClass input);
         Task<ISomeInterface> RoundTripInterface(ISomeInterface input);
         Task<SomeAbstractClass.SomeEnum> RoundTripEnum(SomeAbstractClass.SomeEnum input);
+
+        Task SetState(SomeAbstractClass input);
+        Task<SomeAbstractClass> GetState();
     }
 }
 
@@ -135,6 +138,10 @@ namespace UnitTests.GrainInterfaces
     public abstract class SomeAbstractClass : ISomeInterface
     {
         public abstract int Int { get; set; }
+
+        public List<ISomeInterface> Interfaces { get; set; }
+
+        public List<SomeAbstractClass> Classes { get; set; }
 
         [Serializable]
         public enum SomeEnum
