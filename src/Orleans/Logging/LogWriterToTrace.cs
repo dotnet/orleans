@@ -102,11 +102,13 @@ namespace Orleans.Runtime
 
             if (exception == null)
             {
-                tsRef.TraceEvent(teType, errorCode, msg);
+                //tsRef.TraceEvent(teType, errorCode, msg);
+                tsRef.TraceEvent(teType, errorCode, "{0} from {1} at {2}", message, caller, myIPEndPoint);
             }
             else
             {
-                tsRef.TraceData(teType, errorCode, exception, myIPEndPoint);
+                //tsRef.TraceData(teType, errorCode, exception, myIPEndPoint);
+                tsRef.TraceData(teType, errorCode, exception);
             }
 
             return msg;
