@@ -19,6 +19,9 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="EnterpriseLibrary.TransientFaultHandling" version="6.0.1304.0" />
+      <dependency id="Microsoft.Azure.SqlDatabase.ElasticScale.Client" version="1.1.0" />
+      <dependency id="Microsoft.Tpl.Dataflow" version="4.5.24" />
     </dependencies>
   </metadata>
   <files>
@@ -26,5 +29,6 @@
     <file src="OrleansSqlUtils.pdb" target="lib\net45" />
     <file src="OrleansSqlUtils.xml" target="lib\net45" />
     <file src="CreateOrleansTables_SqlServer.sql" target="lib\net45\SQLServer" />
+    <file src="CreateOrleansTables_MySql.sql" target="lib\net45\MySql" />
   </files>
 </package>
