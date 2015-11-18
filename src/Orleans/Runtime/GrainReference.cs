@@ -621,6 +621,10 @@ namespace Orleans.Runtime
                    !HasGenericArgument ? String.Empty : String.Format("<{0}>", genericArguments)); 
         }
 
+        public string ToKeyStringWithoutType()
+        {
+            return GrainId.ToKeyStringWithoutType();
+        }
 
         /// <summary> Get the key value for this grain, as a string. </summary>
         public string ToKeyString()

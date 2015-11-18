@@ -304,6 +304,23 @@ namespace Orleans.Runtime
             // ReSharper restore NonReadonlyFieldInGetHashCode
         }
 
+        internal string ToKeyStringWithoutType()
+        {
+            string key = string.Empty;
+
+            if (IsLongKey)
+            {
+                key = PrimaryKeyToLong().ToString();
+            }
+            else if (N1 != 0)
+            {
+                key = PrimaryKeyToGuid().ToString();
+            }
+
+            if (!HasKeyExt) return key;
+            return key == string.Empty ? KeyExt : key + "+" + KeyExt;
+        }
+
         private Guid ConvertToGuid()
         {
             return new Guid((UInt32)(N0 & 0xffffffff), (UInt16)(N0 >> 32), (UInt16)(N0 >> 48), (byte)N1, (byte)(N1 >> 8), (byte)(N1 >> 16), (byte)(N1 >> 24), (byte)(N1 >> 32), (byte)(N1 >> 40), (byte)(N1 >> 48), (byte)(N1 >> 56));
