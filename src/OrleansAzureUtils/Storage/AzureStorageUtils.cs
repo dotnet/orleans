@@ -92,7 +92,8 @@ namespace Orleans.AzureUtils
             if (exc is StorageException)
             {
                 StorageException ste = exc as StorageException;
-                return ste.RequestInformation.ExtendedErrorInformation.ErrorCode;
+                if(ste.RequestInformation.ExtendedErrorInformation != null)
+                    return ste.RequestInformation.ExtendedErrorInformation.ErrorCode;
             }
             return null;
         }
