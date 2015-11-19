@@ -73,7 +73,7 @@ namespace Orleans.Runtime
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
             Log = TraceLogger.GetLogger(Name, TraceLogger.LoggerType.Runtime);
-            AppDomain.CurrentDomain.DomainUnload += new EventHandler(CurrentDomain_DomainUnload);
+            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -94,7 +94,10 @@ namespace Orleans.Runtime
         {
             try
             {
-                Stop();
+                if (State != ThreadState.Stopped)
+                {
+                    Stop();
+                }
             }
             catch (Exception exc)
             {
@@ -138,6 +141,7 @@ namespace Orleans.Runtime
                         State = ThreadState.Stopped;
                     }
                 }
+                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
             }
             catch (Exception exc)
             {
@@ -151,6 +155,23 @@ namespace Orleans.Runtime
         {
             if(t!=null)
                 t.Abort(stateInfo);
+        }
+
+        public void Join(TimeSpan timeout)
+        {
+            try
+            {
+                var agentThread = t;
+                if (agentThread != null)
+                {
+                    bool joined = agentThread.Join(timeout);
+                    Log.Verbose("{0} the agent thread {1} after {2} time.", joined ? "Joined" : "Did not join", Name, timeout);
+                }
+            }catch(Exception exc)
+            {
+                // ignore. Just make sure Join does not throw.
+                Log.Verbose("Ignoring error during Join: {0}", exc);
+            }
         }
 
         protected abstract void Run();
