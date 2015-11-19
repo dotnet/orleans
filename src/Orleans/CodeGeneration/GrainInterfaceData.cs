@@ -33,7 +33,7 @@ using Orleans.Concurrency;
 
 namespace Orleans.CodeGeneration
 {
-    internal class GrainInterfaceData
+    internal static class GrainInterfaceData
     {
         [Serializable]
         internal class RulesViolationException : ArgumentException
@@ -45,86 +45,6 @@ namespace Orleans.CodeGeneration
             }
 
             public List<string> Violations { get; private set; }
-        }
-
-        public Type Type { get; private set; }
-        public bool IsGeneric { get; private set; }
-        public string Name { get; private set; }
-        public string Namespace { get; private set; }
-        public string TypeName { get; private set; }
-        public string FactoryClassBaseName { get; private set; }
-
-        public bool IsExtension
-        {
-            get { return typeof(IGrainExtension).IsAssignableFrom(Type); }
-        }
-        
-        public string FactoryClassName
-        {
-            get { return TypeUtils.GetParameterizedTemplateName(FactoryClassBaseName, Type, language: language); }
-        }
-
-        public string ReferenceClassBaseName { get; set; }
-
-        public string ReferenceClassName
-        {
-            get { return TypeUtils.GetParameterizedTemplateName(ReferenceClassBaseName, Type, language: language); }
-        }
-
-        public string InterfaceTypeName
-        {
-            get { return TypeUtils.GetParameterizedTemplateName(Type, language: language); }
-        }
-
-        public string StateClassBaseName { get; internal set; }
-
-        public string InvokerClassBaseName { get; internal set; }
-
-        public string InvokerClassName
-        {
-            get { return TypeUtils.GetParameterizedTemplateName(InvokerClassBaseName, Type, language: language); }
-        }
-
-        public string TypeFullName
-        {
-            get { return Namespace + "." + TypeUtils.GetParameterizedTemplateName(Type, language: language); }
-        }
-
-        private readonly Language language;
-
-        public GrainInterfaceData(Language language)
-        {
-            this.language = language;
-        }
-
-        public GrainInterfaceData(Language language, Type type) : this(language)
-        {
-            if (!IsGrainInterface(type))
-                throw new ArgumentException(String.Format("{0} is not a grain interface", type.FullName));
-
-            List<string> violations;
-
-            bool ok = ValidateInterfaceRules(type, out violations);
-
-            if (!ok && violations != null && violations.Count > 0)
-                throw new RulesViolationException(string.Format("{0} does not conform to the grain interface rules.", type.FullName), violations);
-
-            Type = type;
-            DefineClassNames(true);
-        }
-
-        public static GrainInterfaceData FromGrainClass(Type grainType, Language language)
-        {
-            if (!TypeUtils.IsConcreteGrainClass(grainType) &&
-                !TypeUtils.IsSystemTargetClass(grainType))
-            {
-                List<string> violations = new List<string> { String.Format("{0} implements IGrain but is not a concrete Grain Class (Hint: Extend the base Grain or Grain<T> class).", grainType.FullName) };
-                throw new RulesViolationException("Invalid Grain class.", violations);
-            }
-
-            var gi = new GrainInterfaceData(language) { Type = grainType };
-            gi.DefineClassNames(false);
-            return gi;
         }
 
         public static bool IsGrainInterface(Type t)
@@ -142,11 +62,6 @@ namespace Orleans.CodeGeneration
             return typeof (IAddressable).GetTypeInfo().IsAssignableFrom(t);
         }
 
-        public static bool IsAddressable(Type t)
-        {
-            return typeof(IAddressable).IsAssignableFrom(t);
-        }
-        
         public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = true)
         {
             var methodInfos = new List<MethodInfo>();
@@ -164,23 +79,10 @@ namespace Orleans.CodeGeneration
             return methodInfos.ToArray();
         }
 
-        public static string GetFactoryNameBase(string typeName)
-        {
-            if (typeName.Length > 1 && typeName[0] == 'I' && Char.IsUpper(typeName[1]))
-                typeName = typeName.Substring(1);
-
-            return TypeUtils.GetSimpleTypeName(typeName) + "Factory";
-        }
-
         public static string GetParameterName(ParameterInfo info)
         {
             var n = info.Name;
             return string.IsNullOrEmpty(n) ? "arg" + info.Position : n;
-        }
-
-        public static bool IsSystemTargetType(Type interfaceType)
-        {
-            return typeof (ISystemTarget).IsAssignableFrom(interfaceType);
         }
 
         public static bool IsTaskType(Type t)
@@ -267,11 +169,6 @@ namespace Orleans.CodeGeneration
             return Utils.CalculateIdHash(strMethodId.ToString());
         }
 
-        public bool IsSystemTarget
-        {
-            get { return IsSystemTargetType(Type); }
-        }
-
         public static int GetGrainInterfaceId(Type grainInterface)
         {
             return GetTypeCode(grainInterface);
@@ -302,37 +199,33 @@ namespace Orleans.CodeGeneration
         }
 
         
-        private void DefineClassNames(bool client)
-        {
-            var typeNameBase = TypeUtils.GetSimpleTypeName(Type, t => false, language);
-            var typeInfo = Type.GetTypeInfo();
-            if (typeInfo.IsInterface && typeNameBase.Length > 1 && typeNameBase[0] == 'I' && Char.IsUpper(typeNameBase[1]))
-                typeNameBase = typeNameBase.Substring(1);
-
-            Namespace = Type.Namespace;
-            IsGeneric = typeInfo.IsGenericType;
-            if (IsGeneric)
-            {
-                Name = TypeUtils.GetParameterizedTemplateName(Type, language: language);
-            }
-            else
-            {
-                Name = Type.Name;
-            }
-
-            TypeName = client ? InterfaceTypeName : TypeUtils.GetParameterizedTemplateName(Type, language:language);
-            FactoryClassBaseName = GetFactoryNameBase(typeNameBase);
-            InvokerClassBaseName = typeNameBase + "MethodInvoker";
-            StateClassBaseName = typeNameBase + "State";
-            ReferenceClassBaseName = typeNameBase + "Reference";
-        }
-
-        private static bool ValidateInterfaceRules(Type type, out List<string> violations)
+        internal static bool TryValidateInterfaceRules(Type type, out List<string> violations)
         {
             violations = new List<string>();
 
             bool success = ValidateInterfaceMethods(type, violations);
             return success && ValidateInterfaceProperties(type, violations);
+        }
+
+        internal static void ValidateInterfaceRules(Type type)
+        {
+            List<string> violations;
+            if (!TryValidateInterfaceRules(type, out violations))
+            {
+                foreach (var violation in violations)
+                    ConsoleText.WriteLine("ERROR: " + violation);
+
+                throw new RulesViolationException(
+                    string.Format("{0} does not conform to the grain interface rules.", type.FullName), violations);
+            }
+        }
+
+        internal static void ValidateInterface(Type type)
+        {
+            if (!IsGrainInterface(type))
+                throw new ArgumentException(String.Format("{0} is not a grain interface", type.FullName));
+
+            ValidateInterfaceRules(type);
         }
 
         private static bool ValidateInterfaceMethods(Type type, List<string> violations)
