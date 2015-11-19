@@ -609,6 +609,72 @@ namespace Orleans.Serialization
             return result;
         }
 
+        internal static void SerializeGenericReadOnlyDictionary(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, "SerializeReadOnlyDictionary", "DeserializeReadOnlyDictionary", "CopyReadOnlyDictionary");
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object DeserializeGenericReadOnlyDictionary(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, "SerializeReadOnlyDictionary", "DeserializeReadOnlyDictionary", "CopyReadOnlyDictionary");
+            return concreteMethods.Item2(expected, stream);
+        }
+
+        internal static object CopyGenericReadOnlyDictionary(object original)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, "SerializeReadOnlyDictionary", "DeserializeReadOnlyDictionary", "CopyReadOnlyDictionary");
+            return concreteMethods.Item3(original);
+        }
+
+        internal static void SerializeReadOnlyDictionary<K, V>(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            var dict = (ReadOnlyDictionary<K, V>)original;
+            stream.Write(dict.Count);
+            foreach (var pair in dict)
+            {
+                SerializationManager.SerializeInner(pair.Key, stream, typeof(K));
+                SerializationManager.SerializeInner(pair.Value, stream, typeof(V));
+            }
+        }
+
+        internal static object DeserializeReadOnlyDictionary<K, V>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var count = stream.ReadInt();
+            var dict = new Dictionary<K, V>(count);
+            for (var i = 0; i < count; i++)
+            {
+                var key = (K)SerializationManager.DeserializeInner(typeof(K), stream);
+                var value = (V)SerializationManager.DeserializeInner(typeof(V), stream);
+                dict[key] = value;
+            }
+
+            var retVal = new ReadOnlyDictionary<K, V>(dict);
+            DeserializationContext.Current.RecordObject(retVal);
+            return retVal;
+        }
+
+        internal static object CopyReadOnlyDictionary<K, V>(object original)
+        {
+            if (typeof(K).IsOrleansShallowCopyable() && typeof(V).IsOrleansShallowCopyable())
+            {
+                return original;
+            }
+
+            var dict = (ReadOnlyDictionary<K, V>)original;
+            var innerDict = new Dictionary<K, V>(dict.Count);
+            foreach (var pair in dict)
+            {
+                innerDict[(K)SerializationManager.DeepCopyInner(pair.Key)] = (V)SerializationManager.DeepCopyInner(pair.Value);
+            }
+
+            var retVal = new ReadOnlyDictionary<K, V>(innerDict);
+            SerializationContext.Current.RecordObject(original, retVal);
+            return retVal;
+        }
+
         internal static void SerializeStringObjectDictionary(object original, BinaryTokenStreamWriter stream, Type expected)
         {
             var dict = (Dictionary<string, object>)original;
