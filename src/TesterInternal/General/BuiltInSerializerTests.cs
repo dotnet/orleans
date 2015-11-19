@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
@@ -79,6 +80,26 @@ namespace UnitTests.SerializerTests
             source2[27] = DateTime.Now.AddHours(2);
             deserialized = OrleansSerializationLoop(source2);
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
+        }
+        
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Serialize_ReadOnlyDictionary()
+        {
+            SerializationManager.UseStandardSerializer = false;
+
+            Dictionary<string, string> source1 = new Dictionary<string, string>();
+            source1["Hello"] = "Yes";
+            source1["Goodbye"] = "No";
+            var readOnlySource1 = new ReadOnlyDictionary<string, string>(source1);
+            var deserialized = OrleansSerializationLoop(readOnlySource1);
+            ValidateReadOnlyDictionary(readOnlySource1, deserialized, "string/string");
+
+            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>();
+            source2[3] = DateTime.Now;
+            source2[27] = DateTime.Now.AddHours(2);
+            var readOnlySource2 = new ReadOnlyDictionary<int, DateTime>(source2);
+            deserialized = OrleansSerializationLoop(readOnlySource2);
+            ValidateReadOnlyDictionary(readOnlySource2, deserialized, "int/date");
         }
 
         [Serializable]
@@ -369,6 +390,17 @@ namespace UnitTests.SerializerTests
             var source = new[] {source1, source2, source3};
             object deserialized = OrleansSerializationLoop(source);
             ValidateArrayOfArrayOfArrays(source, deserialized, "int");
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Serialize_ReadOnlyCollection()
+        {
+            SerializationManager.UseStandardSerializer = false;
+
+            var source1 = new List<string> { "Yes", "No" };
+            var collection = new ReadOnlyCollection<string>(source1);
+            var deserialized = OrleansSerializationLoop(collection);
+            ValidateReadOnlyCollectionList(collection, deserialized, "string/string");
         }
 
         public class UnserializableException : Exception
@@ -1015,12 +1047,26 @@ namespace UnitTests.SerializerTests
         {
             Assert.IsInstanceOfType(deserialized, typeof(Dictionary<K, V>), "Type is wrong after round-trip of " + type + " dict");
             Dictionary<K, V> result = deserialized as Dictionary<K, V>;
+            ValidateDictionaryContent(source, result, type);
+        }
+
+        private void ValidateDictionaryContent<K, V>(IDictionary<K, V> source, IDictionary<K, V> result, string type)
+        {
             Assert.AreEqual(source.Count, result.Count, "Count is wrong after round-trip of " + type + " dict");
             foreach (var pair in source)
             {
-                Assert.IsTrue(result.ContainsKey(pair.Key), "Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " dict");
-                Assert.AreEqual<V>(pair.Value, result[pair.Key], "Key " + pair.Key.ToString() + " has wrong value after round-trip of " + type + " dict");
+                Assert.IsTrue(result.ContainsKey(pair.Key),
+                    "Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " dict");
+                Assert.AreEqual<V>(pair.Value, result[pair.Key],
+                    "Key " + pair.Key.ToString() + " has wrong value after round-trip of " + type + " dict");
             }
+        }
+
+        private void ValidateReadOnlyDictionary<K, V>(ReadOnlyDictionary<K, V> source, object deserialized, string type)
+        {
+            Assert.IsInstanceOfType(deserialized, typeof(ReadOnlyDictionary<K, V>), "Type is wrong after round-trip of " + type + " dict");
+            ReadOnlyDictionary<K, V> result = deserialized as ReadOnlyDictionary<K, V>;
+            ValidateDictionaryContent(source, result, type);
         }
 
         private void ValidateSortedDictionary<K, V>(SortedDictionary<K, V> source, object deserialized, string type)
@@ -1061,7 +1107,13 @@ namespace UnitTests.SerializerTests
             }
         }
 
-        private void ValidateList<T>(List<T> expected, List<T> result, string type)
+        private void ValidateReadOnlyCollectionList<T>(ReadOnlyCollection<T> expected, object deserialized, string type)
+        {
+            Assert.IsInstanceOfType(deserialized, typeof(ReadOnlyCollection<T>), "Type is wrong after round-trip of " + type + " array");
+            ValidateList(expected, deserialized as IList<T>, type);
+        }
+
+        private void ValidateList<T>(IList<T> expected, IList<T> result, string type)
         {
             Assert.AreEqual(expected.Count, result.Count, "Count is wrong after round-trip of " + type + " list");
             for (int i = 0; i < expected.Count; i++)
