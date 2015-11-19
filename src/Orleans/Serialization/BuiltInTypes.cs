@@ -23,6 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Net;
@@ -41,6 +42,74 @@ namespace Orleans.Serialization
         #endregion
 
         #region Generic collections
+        internal static void SerializeGenericReadOnlyCollection(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var generics = t.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(t, "SerializeReadOnlyCollection", "DeserializeReadOnlyCollection", "DeepCopyReadOnlyCollection", generics);
+
+            concretes.Item1(original, stream, expected);
+        }
+
+        internal static object DeserializeGenericReadOnlyCollection(Type expected, BinaryTokenStreamReader stream)
+        {
+            var generics = expected.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(expected, "SerializeReadOnlyCollection", "DeserializeReadOnlyCollection", "DeepCopyReadOnlyCollection", generics);
+
+            return concretes.Item2(expected, stream);
+        }
+
+        internal static object CopyGenericReadOnlyCollection(object original)
+        {
+            Type t = original.GetType();
+            var generics = t.GetGenericArguments();
+            var concretes = RegisterConcreteMethods(t, "SerializeReadOnlyCollection", "DeserializeReadOnlyCollection", "DeepCopyReadOnlyCollection", generics);
+
+            return concretes.Item3(original);
+        }
+
+        internal static void SerializeReadOnlyCollection<T>(object obj, BinaryTokenStreamWriter stream, Type expected)
+        {
+            var collection = (ReadOnlyCollection<T>)obj;
+            stream.Write(collection.Count);
+            foreach (var element in collection)
+            {
+                SerializationManager.SerializeInner(element, stream, typeof(T));
+            }
+        }
+
+        internal static object DeserializeReadOnlyCollection<T>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var count = stream.ReadInt();
+            var list = new List<T>(count);
+
+            DeserializationContext.Current.RecordObject(list);
+            for (var i = 0; i < count; i++)
+            {
+                list.Add((T)SerializationManager.DeserializeInner(typeof(T), stream));
+            }
+
+            var ret = new ReadOnlyCollection<T>(list);
+            DeserializationContext.Current.RecordObject(ret);
+            return ret;
+        }
+
+        internal static object DeepCopyReadOnlyCollection<T>(object original)
+        {
+            var collection = (ReadOnlyCollection<T>)original;
+
+            if (typeof(T).IsOrleansShallowCopyable())
+            {
+                return original;
+            }
+
+            var innerList = new List<T>(collection.Count);
+            innerList.AddRange(collection.Select(element => (T)SerializationManager.DeepCopyInner(element)));
+
+            var retVal = new ReadOnlyCollection<T>(innerList);
+            SerializationContext.Current.RecordObject(original, retVal);
+            return retVal;
+        }
 
         #region Lists
 
