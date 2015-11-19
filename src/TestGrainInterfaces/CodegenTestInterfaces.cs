@@ -42,6 +42,17 @@ namespace UnitTests.GrainInterfaces
         [AlwaysInterleave]
         Task AlwaysInterleave();
     }
+
+    public interface ISerializationGenerationGrain : IGrainWithIntegerKey
+    {
+        Task<SomeStruct> RoundTripStruct(SomeStruct input);
+        Task<SomeAbstractClass> RoundTripClass(SomeAbstractClass input);
+        Task<ISomeInterface> RoundTripInterface(ISomeInterface input);
+        Task<SomeAbstractClass.SomeEnum> RoundTripEnum(SomeAbstractClass.SomeEnum input);
+
+        Task SetState(SomeAbstractClass input);
+        Task<SomeAbstractClass> GetState();
+    }
 }
 
 public class Outsider { }
@@ -82,6 +93,84 @@ namespace UnitTests.GrainInterfaces
         {
             return base.GetHashCode();
         }
+    }
+
+    [Serializable]
+    public struct SomeStruct
+    {
+        public Guid Id { get; set; }
+        public int PublicValue { get; set; }
+        public int ValueWithPrivateSetter { get; private set; }
+        public int ValueWithPrivateGetter { private get; set; }
+        private int PrivateValue { get; set; }
+        public readonly int ReadonlyField;
+
+        public SomeStruct(int readonlyField)
+            : this()
+        {
+            this.ReadonlyField = readonlyField;
+        }
+
+        public int GetValueWithPrivateGetter()
+        {
+            return this.ValueWithPrivateGetter;
+        }
+
+        public int GetPrivateValue()
+        {
+            return this.PrivateValue;
+        }
+
+        public void SetPrivateValue(int value)
+        {
+            this.PrivateValue = value;
+        }
+
+        public void SetValueWithPrivateSetter(int value)
+        {
+            this.ValueWithPrivateSetter = value;
+        }
+    }
+
+    public interface ISomeInterface { int Int { get; set; } }
+
+    [Serializable]
+    public abstract class SomeAbstractClass : ISomeInterface
+    {
+        public abstract int Int { get; set; }
+
+        public List<ISomeInterface> Interfaces { get; set; }
+
+        public List<SomeAbstractClass> Classes { get; set; }
+
+        [Serializable]
+        public enum SomeEnum
+        {
+            None,
+
+            Something,
+
+            SomethingElse
+        }
+    }
+
+    public class OuterClass
+    {
+        [Serializable]
+        public class SomeConcreteClass : SomeAbstractClass
+        {
+            public override int Int { get; set; }
+
+            public string String { get; set; }
+        }
+    }
+
+    [Serializable]
+    public class AnotherConcreteClass : SomeAbstractClass
+    {
+        public override int Int { get; set; }
+
+        public string AnotherString { get; set; }
     }
 
     [Serializable]
