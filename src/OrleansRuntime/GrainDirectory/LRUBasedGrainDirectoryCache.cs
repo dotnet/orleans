@@ -53,12 +53,13 @@ namespace Orleans.Runtime.GrainDirectory
             cache.Clear();
         }
 
-        public bool LookUp(GrainId key, out TValue result)
+        public bool LookUp(GrainId key, out TValue result, out int version)
         {
+            version = default(int);
             return cache.TryGetValue(key, out result);
         }
 
-        public List<Tuple<GrainId, TValue, int>> KeyValues
+        public IReadOnlyList<Tuple<GrainId, TValue, int>> KeyValues
         {
             get
             {

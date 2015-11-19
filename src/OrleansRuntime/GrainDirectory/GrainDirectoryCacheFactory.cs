@@ -70,13 +70,14 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public bool LookUp(GrainId key, out TValue result)
+        public bool LookUp(GrainId key, out TValue result, out int version)
         {
             result = default(TValue);
+            version = default(int);
             return false;
         }
 
-        public List<Tuple<GrainId, TValue, int>> KeyValues
+        public IReadOnlyList<Tuple<GrainId, TValue, int>> KeyValues
         {
             get { return EmptyList; }
         }
