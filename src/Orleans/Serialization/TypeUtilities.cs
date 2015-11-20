@@ -265,6 +265,11 @@ namespace Orleans.Serialization
                 return IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly);
             }
 
+            if (typeInfo.GetCustomAttribute<SkipSerializerGenerationAttribute>(true) != null)
+            {
+                return true;
+            }
+
             var result = typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily;
             
             return result;
