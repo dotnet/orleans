@@ -46,7 +46,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.Name = name;
             providerRuntime = (IStreamProviderRuntime) providerUtilitiesManager;
             string fireAndForgetDeliveryStr;
-            fireAndForgetDelivery = !config.Properties.TryGetValue(FIRE_AND_FORGET_DELIVERY, out fireAndForgetDeliveryStr) || Boolean.Parse(fireAndForgetDeliveryStr);
+            fireAndForgetDelivery = config.Properties.TryGetValue(FIRE_AND_FORGET_DELIVERY, out fireAndForgetDeliveryStr) ? Boolean.Parse(fireAndForgetDeliveryStr) : false;
 
             logger = providerRuntime.GetLogger(this.GetType().Name);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}.", Name, fireAndForgetDelivery);
