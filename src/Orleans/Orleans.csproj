@@ -123,7 +123,6 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
-    <Compile Include="Serialization\SkipSerializerGenerationAttribute.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Serialization\NonSerializableAttribute.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
