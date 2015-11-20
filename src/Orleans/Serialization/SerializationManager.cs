@@ -1865,8 +1865,7 @@ namespace Orleans.Serialization
 
             // add the serializer to the dictionary, even if it's null to signify that we already performed
             // the search and found none
-            typeToExternalSerializerDictionary.TryAdd(t, serializer);
-            if (serializer != null)
+            if (typeToExternalSerializerDictionary.TryAdd(t, serializer) && serializer != null)
             {
                 // we need to register the type, otherwise exceptions are thrown about types not being found
                 Register(t, serializer.DeepCopy, serializer.Serialize, serializer.Deserialize, true);
@@ -2002,7 +2001,7 @@ namespace Orleans.Serialization
                     if (t.IsArray)
                         return HasOrleansSerialization(t.GetElementType());
 
-                    return t == typeof(string) || serializers.ContainsKey(t.TypeHandle);
+                    return t == typeof(string) || serializers.ContainsKey(t.TypeHandle) || typeToExternalSerializerDictionary.ContainsKey(t);
             }
         }
 
@@ -2196,7 +2195,7 @@ namespace Orleans.Serialization
                     line.Append(" copier");
                     discardLine = false;
                 }
-                if (serializers.ContainsKey(typeHandle))
+                if (deserializers.ContainsKey(typeHandle))
                 {
                     line.Append(" deserializer");
                     discardLine = false;
@@ -2229,6 +2228,8 @@ namespace Orleans.Serialization
                 return;
             }
 
+            externalSerializers.Clear();
+            typeToExternalSerializerDictionary.Clear();
             providerTypes.ForEach(
                 type =>
                 {
