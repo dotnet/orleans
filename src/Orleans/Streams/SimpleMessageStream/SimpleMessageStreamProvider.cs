@@ -36,7 +36,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IStreamProviderRuntime      providerRuntime;
         private bool                        fireAndForgetDelivery;
         internal const string               FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
-        internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = false;
         internal const StreamPubSubType     DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
 
         public bool IsRewindable { get { return false; } }
@@ -46,7 +45,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.Name = name;
             providerRuntime = (IStreamProviderRuntime) providerUtilitiesManager;
             string fireAndForgetDeliveryStr;
-            fireAndForgetDelivery = !config.Properties.TryGetValue(FIRE_AND_FORGET_DELIVERY, out fireAndForgetDeliveryStr) || Boolean.Parse(fireAndForgetDeliveryStr);
+            fireAndForgetDelivery = config.Properties.TryGetValue(FIRE_AND_FORGET_DELIVERY, out fireAndForgetDeliveryStr) && Boolean.Parse(fireAndForgetDeliveryStr);
 
             logger = providerRuntime.GetLogger(this.GetType().Name);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}.", Name, fireAndForgetDelivery);
