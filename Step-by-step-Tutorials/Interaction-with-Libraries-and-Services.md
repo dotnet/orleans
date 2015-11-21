@@ -70,7 +70,7 @@ Next create some client code to connect to the Orleans Silo, and retrieve the gr
 OrleansClient.Initialize("LocalConfiguration.xml");
 
 // retrieve the MSFT stock
-var grain = GrainClient.GrainFactory.GetGrain<IStockGrain>("MSFT");
+var grain = GrainClient.GetGrain<IStockGrain>("MSFT");
 var price = grain.GetPrice().Result;
 Console.WriteLine(price);
 
