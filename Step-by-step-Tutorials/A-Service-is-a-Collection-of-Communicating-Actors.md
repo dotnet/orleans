@@ -126,14 +126,15 @@ In the client _(Program.cs)_, we can add a few lines to create a couple of emplo
 ``` csharp
 Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
 
-var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
-var e1 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
-var e2 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
-var e3 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
-var e4 = GrainClient.GrainFactory.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var grainFactory = GrainClient.GrainFactory;
+var e0 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e1 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e2 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e3 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e4 = grainFactory.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
 
-var m0 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.NewGuid());
-var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.NewGuid());
+var m0 = grainFactory.GetGrain<IManager>(Guid.NewGuid());
+var m1 = grainFactory.GetGrain<IManager>(Guid.NewGuid());
 var m0e = m0.AsEmployee().Result;
 var m1e = m1.AsEmployee().Result;
 
