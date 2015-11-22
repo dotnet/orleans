@@ -61,6 +61,7 @@
     <Reference Include="FluentAssertions.Core">
       <HintPath>..\packages\FluentAssertions.4.0.0\lib\net45\FluentAssertions.Core.dll</HintPath>
     </Reference>
+    <Reference Include="FSharp.Core, Version=4.4.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.Data.Edm">
       <HintPath>$(SolutionDir)packages\Microsoft.Data.Edm.5.6.0\lib\net40\Microsoft.Data.Edm.dll</HintPath>
@@ -130,6 +131,8 @@
     <Compile Include="SerializationTests.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
     <Compile Include="ExceptionPropagationTests.cs" />
+    <Compile Include="FSharpGrainTests.cs" />
+    <Compile Include="SerializationTests.FSharpTypes.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\ControllableStreamProviderTests.cs" />
@@ -273,6 +276,10 @@
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
+      <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
+      <Name>TestFSharp</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
