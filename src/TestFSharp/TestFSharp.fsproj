@@ -43,7 +43,9 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="..\Build\GlobalAssemblyInfo.fs">
+      <Link>GlobalAssemblyInfo.fs</Link>
+    </Compile>
     <Compile Include="Types.fs" />
     <Compile Include="Grains.fs" />
   </ItemGroup>
