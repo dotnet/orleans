@@ -64,7 +64,6 @@ namespace Orleans.Runtime
         /// 
         public long AvailableMemory { get { return availableMemoryCounter != null ? Convert.ToInt64(availableMemoryCounter.NextValue()) : 0; } }
 
-
         public float CpuUsage { get; private set; }
 
         private static string GCGenCollectionCount
@@ -121,8 +120,9 @@ namespace Orleans.Runtime
                 largeObjectHeapSize = new PerformanceCounter(".NET CLR Memory", "Large Object Heap size", thisProcess, true);
                 promotedFinalizationMemoryFromGen0 = new PerformanceCounter(".NET CLR Memory", "Promoted Finalization-Memory from Gen 0", thisProcess, true);
 #endif
-
-                // For Mono one could use PerformanceCounter("Mono Memory", "Total Physical Memory");
+                
+#if !(DNXCORE50 || __MonoCS__)
+                //.NET on Windows without mono
                 const string Query = "SELECT Capacity FROM Win32_PhysicalMemory";
                 var searcher = new ManagementObjectSearcher(Query);
                 long Capacity = 0;
@@ -133,6 +133,13 @@ namespace Orleans.Runtime
                     throw new Exception("No physical ram installed on machine?");
 
                 TotalPhysicalMemory = Capacity;
+#elif __MonoCS__
+                //Cross platform mono
+                var totalPhysicalMemory = new PerformanceCounter("Mono Memory", "Total Physical Memory");
+                TotalPhysicalMemory = Convert.ToInt64(totalPhysicalMemory.NextValue());
+#elif DNXCORE50
+                //Cross platform CoreCLR
+#endif
                 countersAvailable = true;
             }
             catch (Exception)
@@ -174,6 +181,7 @@ namespace Orleans.Runtime
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_LARGEOBJECTHEAPSIZEKB, () => largeObjectHeapSize.NextValue() / 11024f);
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB, () => promotedFinalizationMemoryFromGen0.NextValue() / 1024f);
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_NUMBEROFINDUCEDGCS, () => numberOfInducedGCs.NextValue());
+
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB, () => (TotalPhysicalMemory / 1024) / 1024);
             if (availableMemoryCounter != null)
             {

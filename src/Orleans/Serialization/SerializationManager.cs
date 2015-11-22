@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -41,6 +42,7 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Serialization
 {
     using System.Diagnostics.CodeAnalysis;
+    using System.Reflection.Emit;
 
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
@@ -67,6 +69,15 @@ namespace Orleans.Serialization
         /// <param name="stream">Input stream to be read from.</param>
         /// <returns>Rehydrated object of the specified Type read from the current position in the input stream.</returns>
         public delegate object Deserializer(Type expected, BinaryTokenStreamReader stream);
+
+        /// <summary>
+        /// The delegate used to set fields in value types.
+        /// </summary>
+        /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
+        /// <typeparam name="TField">The field type.</typeparam>
+        /// <param name="instance">The instance having its field set.</param>
+        /// <param name="value">The value being set.</param>
+        public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
 
         private static readonly string[] safeFailSerializers = { "Orleans.FSharp" };
 
@@ -206,6 +217,7 @@ namespace Orleans.Serialization
 
             // Built-in handlers: enumerables
             Register(typeof(List<>), BuiltInTypes.CopyGenericList, BuiltInTypes.SerializeGenericList, BuiltInTypes.DeserializeGenericList);
+            Register(typeof(ReadOnlyCollection<>), BuiltInTypes.CopyGenericReadOnlyCollection, BuiltInTypes.SerializeGenericReadOnlyCollection, BuiltInTypes.DeserializeGenericReadOnlyCollection);
             Register(typeof(LinkedList<>), BuiltInTypes.CopyGenericLinkedList, BuiltInTypes.SerializeGenericLinkedList, BuiltInTypes.DeserializeGenericLinkedList);
             Register(typeof(HashSet<>), BuiltInTypes.CopyGenericHashSet, BuiltInTypes.SerializeGenericHashSet, BuiltInTypes.DeserializeGenericHashSet);
             Register(typeof(SortedSet<>), BuiltInTypes.CopyGenericSortedSet, BuiltInTypes.SerializeGenericSortedSet, BuiltInTypes.DeserializeGenericSortedSet);
@@ -213,6 +225,7 @@ namespace Orleans.Serialization
             Register(typeof(Queue<>), BuiltInTypes.CopyGenericQueue, BuiltInTypes.SerializeGenericQueue, BuiltInTypes.DeserializeGenericQueue);
 
             // Built-in handlers: dictionaries
+            Register(typeof(ReadOnlyDictionary<,>), BuiltInTypes.CopyGenericReadOnlyDictionary, BuiltInTypes.SerializeGenericReadOnlyDictionary, BuiltInTypes.DeserializeGenericReadOnlyDictionary);
             Register(typeof(Dictionary<,>), BuiltInTypes.CopyGenericDictionary, BuiltInTypes.SerializeGenericDictionary, BuiltInTypes.DeserializeGenericDictionary);
             Register(typeof(Dictionary<string, object>), BuiltInTypes.CopyStringObjectDictionary, BuiltInTypes.SerializeStringObjectDictionary, BuiltInTypes.DeserializeStringObjectDictionary);
             Register(typeof(SortedDictionary<,>), BuiltInTypes.CopyGenericSortedDictionary, BuiltInTypes.SerializeGenericSortedDictionary,
@@ -2048,6 +2061,107 @@ namespace Orleans.Serialization
         }
 
         #endregion
+
+        public static Delegate GetGetter(FieldInfo field)
+        {
+            return GetGetDelegate(
+                field,
+                typeof(Func<,>).MakeGenericType(field.DeclaringType, field.FieldType),
+                new[] { field.DeclaringType });
+        }
+
+        /// <summary>
+        /// Returns a delegate to get the value of a specified field.
+        /// </summary>
+        /// <param name="field">
+        /// The field.
+        /// </param>
+        /// <param name="delegateType">The delegate type.</param>
+        /// <param name="parameterTypes">The parameter types.</param>
+        /// <returns>A delegate to get the value of a specified field.</returns>
+        private static Delegate GetGetDelegate(FieldInfo field, Type delegateType, Type[] parameterTypes)
+        {
+            var declaringType = field.DeclaringType;
+            if (declaringType == null)
+            {
+                throw new InvalidOperationException("Field " + field.Name + " does not have a declaring type.");
+            }
+
+            // Create a method to hold the generated IL.
+            var method = new DynamicMethod(
+                field.Name + "Get",
+                field.FieldType,
+                parameterTypes,
+                declaringType.Module,
+                true);
+
+            // Emit IL to return the value of the Transaction property.
+            var emitter = method.GetILGenerator();
+            emitter.Emit(OpCodes.Ldarg_0);
+            emitter.Emit(OpCodes.Ldfld, field);
+            emitter.Emit(OpCodes.Ret);
+
+            return method.CreateDelegate(delegateType);
+        }
+
+        /// <summary>
+        /// Returns a delegate to set the value of this field for an instance.
+        /// </summary>
+        /// <returns>A delegate to set the value of this field for an instance.</returns>
+        public static Delegate GetReferenceSetter(FieldInfo field)
+        {
+            var delegateType = typeof(Action<,>).MakeGenericType(field.DeclaringType, field.FieldType);
+            return GetSetDelegate(field, delegateType, new[] { field.DeclaringType, field.FieldType });
+        }
+
+        /// <summary>
+        /// Returns a delegate to set the value of this field for an instance.
+        /// </summary>
+        /// <returns>A delegate to set the value of this field for an instance.</returns>
+        public static Delegate GetValueSetter(FieldInfo field)
+        {
+            var declaringType = field.DeclaringType;
+            if (declaringType == null)
+            {
+                throw new InvalidOperationException("Field " + field.Name + " does not have a declaring type.");
+            }
+
+            // Value types need to be passed by-ref.
+            var parameterTypes = new[] { declaringType.MakeByRefType(), field.FieldType };
+            var delegateType = typeof(ValueTypeSetter<,>).MakeGenericType(field.DeclaringType, field.FieldType);
+
+            return GetSetDelegate(field, delegateType, parameterTypes);
+        }
+
+        /// <summary>
+        /// Returns a delegate to set the value of a specified field.
+        /// </summary>
+        /// <param name="field">
+        /// The field.
+        /// </param>
+        /// <param name="delegateType">The delegate type.</param>
+        /// <param name="parameterTypes">The parameter types.</param>
+        /// <returns>A delegate to set the value of a specified field.</returns>
+        private static Delegate GetSetDelegate(FieldInfo field, Type delegateType, Type[] parameterTypes)
+        {
+            var declaringType = field.DeclaringType;
+            if (declaringType == null)
+            {
+                throw new InvalidOperationException("Field " + field.Name + " does not have a declaring type.");
+            }
+
+            // Create a method to hold the generated IL.
+            var method = new DynamicMethod(field.Name + "Set", null, parameterTypes, declaringType.Module, true);
+
+            // Emit IL to return the value of the Transaction property.
+            var emitter = method.GetILGenerator();
+            emitter.Emit(OpCodes.Ldarg_0);
+            emitter.Emit(OpCodes.Ldarg_1);
+            emitter.Emit(OpCodes.Stfld, field);
+            emitter.Emit(OpCodes.Ret);
+
+            return method.CreateDelegate(delegateType);
+        }
 
         /// <summary>
         /// Internal test method to do a round-trip Serialize+Deserialize loop
