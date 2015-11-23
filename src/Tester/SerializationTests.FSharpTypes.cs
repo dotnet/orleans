@@ -52,7 +52,7 @@ namespace UnitTests.General
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_Some()
         {
             var input = FSharpOption<int>.Some(0);
@@ -60,7 +60,7 @@ namespace UnitTests.General
             Assert.IsTrue(output.Equals(input));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_None()
         {
             var input = FSharpOption<int>.None;
@@ -76,7 +76,7 @@ namespace UnitTests.General
             Assert.IsTrue(output.Equals(input));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofIntOption_Some()
         {
             var input = RecordOfIntOption.ofInt(1);
