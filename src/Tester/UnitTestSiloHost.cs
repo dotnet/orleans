@@ -39,6 +39,7 @@ namespace UnitTests.Tester
     [DeploymentItem("ClientConfigurationForTesting.xml")]
     [DeploymentItem("TestGrainInterfaces.dll")]
     [DeploymentItem("TestGrains.dll")]
+    [DeploymentItem("TesterExternalModels.dll")]
     [DeploymentItem("OrleansCodeGenerator.dll")]
     public class UnitTestSiloHost : TestingSiloHost
     {
