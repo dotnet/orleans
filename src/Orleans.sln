@@ -156,6 +156,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansDependencyInjection", "OrleansDependencyInjection\OrleansDependencyInjection.csproj", "{58CF4453-987A-4ED5-8640-7B27838C12FD}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestFSharp", "TestFSharp\TestFSharp.fsproj", "{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
