@@ -7,7 +7,7 @@
     <ProjectGuid>ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>TestFSharpGrains</RootNamespace>
-    <AssemblyName>TestFSharpGrains</AssemblyName>
+    <AssemblyName>TestFSharp</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -21,7 +21,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\TestFSharpGrains.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\TestFSharp.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,9 +30,9 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\TestFSharpGrains.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\TestFSharp.XML</DocumentationFile>
   </PropertyGroup>
-  <Import Project="..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets" />  
+  <Import Project="..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets" />
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.fs">
       <Link>GlobalAssemblyInfo.fs</Link>
