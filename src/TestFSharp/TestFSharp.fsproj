@@ -6,7 +6,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>TestFSharpGrains</RootNamespace>
+    <RootNamespace>TestFSharp</RootNamespace>
     <AssemblyName>TestFSharp</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
@@ -32,28 +32,6 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\TestFSharp.XML</DocumentationFile>
   </PropertyGroup>
-  <Choose>
-    <When Condition="Exists('..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
-      <PropertyGroup >
-        <FSharpTargetsPath>..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargetsPath>
-      </PropertyGroup>
-    </When>
-    <Otherwise>
-      <Choose>
-        <When Condition="'$(VisualStudioVersion)' == '11.0'">
-          <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')">
-            <FSharpTargetsPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets</FSharpTargetsPath>
-          </PropertyGroup>
-        </When>
-        <Otherwise>
-          <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\FSharp\Microsoft.FSharp.Targets')">
-            <FSharpTargetsPath>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\FSharp\Microsoft.FSharp.Targets</FSharpTargetsPath>
-          </PropertyGroup>
-        </Otherwise>
-      </Choose>
-    </Otherwise>
-  </Choose>
-  <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.fs">
       <Link>GlobalAssemblyInfo.fs</Link>
@@ -82,11 +60,57 @@
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
+
+  <!--BEGIN: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
+  <Choose>
+    <When Condition="Exists('..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
+      <PropertyGroup>
+        <FSharpTargets>..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargets>
+        <PackagesRestored>true</PackagesRestored>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <FSharpTargets>$(MSBuildBinPath)\Microsoft.Common.targets</FSharpTargets>
+        <PackagesRestored>false</PackagesRestored>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+
+  <Target
+      Name="CreateManifestResourceNames"
+      Condition="'@(EmbeddedResource)' != '' And '$(PackagesRestored)' == 'false'" >
   </Target>
-  <Target Name="AfterBuild">
+  
+  <Target 
+    Name="CoreCompile" 
+    Condition ="'$(PackagesRestored)' == 'false'"
+    Inputs="$(MSBuildAllProjects);
+            @(CompileBefore);
+            @(Compile);                               
+            @(CompileAfter);
+            @(_CoreCompileResourceInputs);
+            @(ManifestNonResxWithNoCultureOnDisk);
+            $(ApplicationIcon);
+            $(AssemblyOriginatorKeyFile);
+            @(ReferencePath);
+            @(CompiledLicenseFile);
+            @(EmbeddedDocumentation); 
+            $(Win32Resource);
+            $(Win32Manifest);
+            @(CustomAdditionalCompileInputs);
+            $(VersionFile);
+            $(KeyOriginatorFile)"
+    Outputs="@(DocFileItem);
+              @(IntermediateAssembly);
+              @(_DebugSymbolsIntermediatePath);                 
+              $(NonExistentFile);
+              @(CustomAdditionalCompileOutputs)"
+  >
+    <!--Recursively invoking the build allows for the discovery of restored packages-->
+    <!--Note that we are only attempting this once, in order to avoid an infinite loop-->
+    <MSBuild Condition="'$(HasBuilt)' == ''" Projects="$(ProjectPath)" Properties="HasBuilt=true;Platform=$(Platform);Configuration=$(Configuration)" ContinueOnError="false" />
   </Target>
-  -->
+  <Import Project="$(FSharpTargets)"/>
+  <!--END: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
 </Project>
