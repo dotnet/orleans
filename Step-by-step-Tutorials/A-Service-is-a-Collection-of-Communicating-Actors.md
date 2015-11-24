@@ -92,7 +92,7 @@ public class Manager : Orleans.Grain, IManager
 {
     public override Task ActivateAsync()
     {
-        _me = this.GetGrain<IEmployee>(this.GetPrimaryKey());
+        _me = this.GrainFactory.GetGrain<IEmployee>(this.GetPrimaryKey());
         return base.ActivateAsync();
     }
 
