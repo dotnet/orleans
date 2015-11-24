@@ -387,6 +387,8 @@ namespace Orleans.CodeGenerator
                                 type.GetParseableName());
                         }
 
+                        GrainInterfaceData.ValidateInterfaceRules(type);
+
                         namespaceMembers.Add(GrainReferenceGenerator.GenerateClass(type, onEncounteredType));
                         namespaceMembers.Add(GrainMethodInvokerGenerator.GenerateClass(type));
                     }

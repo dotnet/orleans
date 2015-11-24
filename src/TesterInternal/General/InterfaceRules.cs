@@ -131,56 +131,56 @@ namespace UnitTests.General
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_VoidMethod()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestGrain_VoidMethod));
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_VoidMethod));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_IntMethod()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestGrain_IntMethod));
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_IntMethod));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_IntProperty()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestGrain_IntProperty));
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_IntProperty));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_PropertySetter()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestGrain_PropertySetter));
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_PropertySetter));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_Observer_NonVoidMethod()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestObserver_NonVoidMethod));
+            GrainInterfaceData.ValidateInterface(typeof(ITestObserver_NonVoidMethod));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_Observer_Property()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestObserver_Property));
+            GrainInterfaceData.ValidateInterface(typeof(ITestObserver_Property));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_OutArgument()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestGrain_OutArgument));
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_OutArgument));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_RefArgument()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(ITestGrain_RefArgument));
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_RefArgument));
         }
 
         #endregion
@@ -191,28 +191,28 @@ namespace UnitTests.General
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_ObserverGrain_VoidMethod()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(IInheritedGrain_ObserverGrain_VoidMethod));
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_VoidMethod));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_ObserverGrain_IntMethod()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(IInheritedGrain_ObserverGrain_IntMethod));
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_IntMethod));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_ObserverGrain_IntProperty()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(IInheritedGrain_ObserverGrain_IntProperty));
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_IntProperty));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
         public void InterfaceRules_ObserverGrain_PropertySetter()
         {
-            new GrainInterfaceData(Language.CSharp, typeof(IInheritedGrain_ObserverGrain_PropertySetter));
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_PropertySetter));
         }
 
         #endregion
