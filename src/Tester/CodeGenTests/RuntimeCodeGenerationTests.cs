@@ -61,7 +61,8 @@ namespace Tester.CodeGenTests
                 Id = Guid.NewGuid(),
                 @if = new List<@event> { new @event { Id = Guid.NewGuid() } },
                 PrivateId = Guid.NewGuid(),
-                @public = new @event { Id = Guid.NewGuid() }
+                @public = new @event { Id = Guid.NewGuid() },
+                Enum = @event.@enum.@int
             };
 
             var actual = await grain.SetState(expected);
