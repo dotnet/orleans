@@ -39,14 +39,16 @@ namespace Orleans.Providers
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
 
-        public ClientProviderRuntime(IGrainFactory grainFactory) 
+        public ClientProviderRuntime(IGrainFactory grainFactory, IServiceProvider serviceProvider) 
         {
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
             GrainFactory = grainFactory;
+            ServiceProvider = serviceProvider;
         }
 
         public IGrainFactory GrainFactory { get; private set; }
+        public IServiceProvider ServiceProvider { get; private set; }
 
         public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {

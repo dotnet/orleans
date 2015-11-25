@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -22,25 +22,18 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Threading.Tasks;
-using Orleans.Providers;
-using Orleans.Runtime;
 
-namespace Orleans.Streams
+namespace Orleans.Providers
 {
     /// <summary>
-    /// Adapter factory.  This should create an adapter from the stream provider configuration
+    /// Default service provider.
+    /// This should be replaced with a minimal Dependency Injection system, once a stable version is available.
     /// </summary>
-    public interface IQueueAdapterFactory
+    public class DefaultServiceProvider : IServiceProvider
     {
-        void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider);
-
-        Task<IQueueAdapter> CreateAdapter();
-
-        IQueueAdapterCache GetQueueAdapterCache();
-
-        IStreamQueueMapper GetStreamQueueMapper();
-
-        Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
+        public object GetService(Type serviceType)
+        {
+            return Activator.CreateInstance(serviceType);
+        }
     }
 }

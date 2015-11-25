@@ -64,6 +64,11 @@ namespace Orleans.Providers
         /// Factory for getting references to grains.
         /// </summary>
         IGrainFactory GrainFactory { get; }
+
+        /// <summary>
+        /// Service provider for dependency injection
+        /// </summary>
+        IServiceProvider ServiceProvider { get; }
     }
 
     /// <summary>
