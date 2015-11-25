@@ -132,6 +132,7 @@ namespace Orleans.Runtime.Configuration
         public int GatewaySenderQueues { get; set; }
         public int ClientSenderBuckets { get; set; }
         public bool UseStandardSerializer { get; set; }
+        public bool UseJsonFallbackSerializer { get; set; }
 
         public int BufferPoolBufferSize { get; set; }
         public int BufferPoolMaxSize { get; set; }
@@ -226,6 +227,8 @@ namespace Orleans.Runtime.Configuration
             }
             sb.AppendFormat("       Use standard (.NET) serializer: {0}", UseStandardSerializer)
                 .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
+            sb.AppendFormat("       Use fallback json serializer: {0}", UseJsonFallbackSerializer)
+                .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
             sb.AppendFormat("       Buffer Pool Buffer Size: {0}", BufferPoolBufferSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Max Size: {0}", BufferPoolMaxSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Preallocation Size: {0}", BufferPoolPreallocationSize).AppendLine();
@@ -298,6 +301,13 @@ namespace Orleans.Runtime.Configuration
                                               "invalid boolean value for the UseStandardSerializer attribute on the Messaging element");
             }
 
+            if (child.HasAttribute("UseJsonFallbackSerializer"))
+            {
+                UseJsonFallbackSerializer =
+                    ConfigUtilities.ParseBool(child.GetAttribute("UseJsonFallbackSerializer"),
+                                              "invalid boolean value for the UseJsonFallbackSerializer attribute on the Messaging element");
+            }
+            
             //--
             if (child.HasAttribute("BufferPoolBufferSize"))
             {

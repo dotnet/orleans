@@ -24,7 +24,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using Microsoft.WindowsAzure.Storage.Queue;
+using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -35,21 +37,39 @@ namespace Orleans.Providers.Streams.AzureQueue
     [Serializable]
     internal class AzureQueueBatchContainer : IBatchContainer
     {
+        [JsonProperty]
         private EventSequenceToken sequenceToken;
+
+        [JsonProperty]
         private readonly List<object> events;
+
+        [JsonProperty]
         private readonly Dictionary<string, object> requestContext;
 
         [NonSerialized]
         // Need to store reference to the original AQ CloudQueueMessage to be able to delete it later on.
         // Don't need to serialize it, since we are never interested in sending it to stream consumers.
         internal CloudQueueMessage CloudQueueMessage;
-        
+
         public Guid StreamGuid { get; private set; }
+
         public String StreamNamespace { get; private set; }
 
-        public StreamSequenceToken SequenceToken 
+        public StreamSequenceToken SequenceToken
         {
             get { return sequenceToken; }
+        }
+
+        [JsonConstructor]
+        private AzureQueueBatchContainer(
+            Guid streamGuid, 
+            String streamNamespace,
+            List<object> events,
+            Dictionary<string, object> requestContext, 
+            EventSequenceToken sequenceToken)
+            : this(streamGuid, streamNamespace, events, requestContext)
+        {
+            this.sequenceToken = sequenceToken;
         }
 
         private AzureQueueBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)

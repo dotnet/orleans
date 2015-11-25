@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using Newtonsoft.Json;
 
 namespace Orleans.Runtime
 {
@@ -37,6 +38,7 @@ namespace Orleans.Runtime
             get { return Grain != null && Activation != null && Silo != null; }
         }
 
+        [JsonConstructor]
         private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation)
         {
             Silo = silo;

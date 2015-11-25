@@ -29,7 +29,7 @@ namespace UnitTests.SerializerTests
         public void InitializeForTesting()
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            SerializationManager.Initialize(false, null);
+            SerializationManager.Initialize(false, null, false);
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
@@ -665,7 +665,7 @@ namespace UnitTests.SerializerTests
         private static int staticFilterValue4 = 44;
 
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
-        public void Serialize_Func()
+        public virtual void Serialize_Func()
         {
             int instanceFilterValue2 = staticFilterValue2;
 
@@ -705,7 +705,7 @@ namespace UnitTests.SerializerTests
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
-        public void Serialize_Predicate()
+        public virtual void Serialize_Predicate()
         {
             int instanceFilterValue2 = staticFilterValue2;
 

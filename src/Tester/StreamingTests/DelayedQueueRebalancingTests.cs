@@ -93,7 +93,10 @@ namespace UnitTests.StreamingTests
 
             object[] results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.AreEqual(numExpectedSilos, results.Length, "numExpectedSilos-" + callContext);
-            int[] numAgents = results.Cast<int>().ToArray();
+
+            // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
+            // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824 
+            var numAgents = results.Select(Convert.ToInt32).ToArray();
             logger.Info("Got back NumberRunningAgents: {0}." + Utils.EnumerableToString(numAgents));
             foreach (var agents in numAgents)
             {
