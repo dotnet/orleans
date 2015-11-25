@@ -37,9 +37,10 @@ namespace Orleans.Runtime.Storage
         private ProviderLoader<IStorageProvider> storageProviderLoader;
         private IProviderRuntime providerRuntime;
 
-        public StorageProviderManager(IGrainFactory grainFactory)
+        public StorageProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider)
         {
             GrainFactory = grainFactory;
+            ServiceProvider = serviceProvider;
         }
 
         internal Task LoadStorageProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
@@ -90,6 +91,7 @@ namespace Orleans.Runtime.Storage
         }
 
         public IGrainFactory GrainFactory { get; private set; }
+        public IServiceProvider ServiceProvider { get; private set; }
 
         /// <summary>
         /// Get list of providers loaded in this silo.

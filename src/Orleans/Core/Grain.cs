@@ -65,6 +65,8 @@ namespace Orleans
 
         protected IGrainFactory GrainFactory { get; private set; }
 
+        protected IServiceProvider ServiceProvider { get; private set; }
+
         internal IGrainIdentity Identity;
 
         /// <summary>
@@ -87,6 +89,7 @@ namespace Orleans
             Identity = identity;
             Runtime = runtime;
             GrainFactory = runtime.GrainFactory;
+            ServiceProvider = runtime.ServiceProvider;
         }
 
         

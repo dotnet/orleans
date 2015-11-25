@@ -53,7 +53,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         public const string DEPLOYMENT_ID = "DeploymentId";
 
         /// <summary> Init the factory.</summary>
-        public virtual void Init(IProviderConfiguration config, string providerName, Logger logger)
+        public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
         {
             if (config == null) throw new ArgumentNullException("config");
             if (!config.Properties.TryGetValue(DATA_CONNECTION_STRING, out dataConnectionString))

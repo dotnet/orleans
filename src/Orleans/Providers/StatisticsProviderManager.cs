@@ -44,7 +44,8 @@ namespace Orleans.Providers
         }
 
         public IGrainFactory GrainFactory { get { return runtime.GrainFactory; }}
-        
+        public IServiceProvider ServiceProvider { get { return runtime.ServiceProvider; } }
+
         public async Task<string> LoadProvider(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
             statisticsProviderLoader = new ProviderLoader<IProvider>();
