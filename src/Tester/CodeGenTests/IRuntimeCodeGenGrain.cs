@@ -52,6 +52,12 @@ namespace Tester.CodeGenTests
     {
         private static readonly IEqualityComparer<@event> EventComparerInstance = new EventEqualityComparer();
 
+        public enum @enum
+        {
+            @async,
+            @int,
+        }
+
         /// <summary>
         /// A public field.
         /// </summary>
@@ -66,6 +72,11 @@ namespace Tester.CodeGenTests
         /// A property with a reserved keyword type and identifier.
         /// </summary>
         public @event @public { get; set; }
+
+        /// <summary>
+        /// Gets or sets the enum.
+        /// </summary>
+        public @enum Enum { get; set; }
 
         /// <summary>
         /// A property with a reserved keyword generic type and identifier.
@@ -153,7 +164,7 @@ namespace Tester.CodeGenTests
                 }
             }
 
-            return this.privateId.Equals(other.privateId) && this.Id.Equals(other.Id);
+            return this.privateId.Equals(other.privateId) && this.Id.Equals(other.Id) && this.Enum == other.Enum;
         }
 
         private sealed class EventEqualityComparer : IEqualityComparer<@event>

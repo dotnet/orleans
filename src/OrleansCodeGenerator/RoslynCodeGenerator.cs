@@ -317,36 +317,31 @@ namespace Orleans.CodeGenerator
 
             var members = new List<MemberDeclarationSyntax>();
 
+            // If any KnownAssemblies have been specified, include them during code generation.
+            var knownAssemblies =
+                assemblies.SelectMany(_ => _.GetCustomAttributes<KnownAssemblyAttribute>())
+                    .Select(_ => _.Assembly)
+                    .Distinct()
+                    .ToSet();
+            if (knownAssemblies.Count > 0)
+            {
+                knownAssemblies.IntersectWith(assemblies);
+                assemblies = knownAssemblies.ToList();
+            }
+
             // Get types from assemblies which reference Orleans and are not generated assemblies.
             var includedTypes = new HashSet<Type>();
-            foreach (var type in assemblies.SelectMany(_ => _.DefinedTypes))
+            for (var i = 0; i < assemblies.Count; i++)
             {
-                // The module containing the serializer.
-                var module = runtime ? null : type.Module;
-                var typeInfo = type.GetTypeInfo();
-
-                // Every type which is encountered must be considered for serialization.
-                if (!typeInfo.IsNested && !typeInfo.IsGenericParameter && typeInfo.IsSerializable)
+                var assembly = assemblies[i];
+                foreach (var attribute in assembly.GetCustomAttributes<KnownTypeAttribute>())
                 {
-                    // If a type was encountered which can be accessed, process it for serialization.
-                    var isAccessibleForSerialization =
-                        !TypeUtilities.IsTypeIsInaccessibleForSerialization(type, module, targetAssembly);
-                    if (isAccessibleForSerialization)
-                    {
-                        includedTypes.Add(type);
-                        SerializerGenerationManager.RecordTypeToGenerate(type);
-                    }
+                    ConsiderType(attribute.Type, runtime, targetAssembly, includedTypes);
                 }
 
-                // Collect the types which require code generation.
-                if (GrainInterfaceData.IsGrainInterface(type))
+                foreach (var type in assembly.DefinedTypes)
                 {
-                    if (Logger.IsVerbose2)
-                    {
-                        Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
-                    }
-
-                    includedTypes.Add(type);
+                    ConsiderType(type, runtime, targetAssembly, includedTypes);
                 }
             }
 
@@ -365,12 +360,7 @@ namespace Orleans.CodeGenerator
                     Action<Type> onEncounteredType = encounteredType =>
                     {
                         // If a type was encountered which can be accessed, process it for serialization.
-                        var isAccessibleForSerialization =
-                            !TypeUtilities.IsTypeIsInaccessibleForSerialization(encounteredType, module, targetAssembly);
-                        if (isAccessibleForSerialization)
-                        {
-                            SerializerGenerationManager.RecordTypeToGenerate(encounteredType);
-                        }
+                        SerializerGenerationManager.RecordTypeToGenerate(encounteredType, module, targetAssembly);
                     };
 
                     if (Logger.IsVerbose2)
@@ -398,20 +388,6 @@ namespace Orleans.CodeGenerator
                     Type toGen;
                     while (SerializerGenerationManager.GetNextTypeToProcess(out toGen))
                     {
-                        // Filter types which are inaccessible by the serialzation module/assembly.
-                        var skipSerialzerGeneration =
-                            toGen.GetAllFields()
-                                .Any(
-                                    field =>
-                                    TypeUtilities.IsTypeIsInaccessibleForSerialization(
-                                        field.FieldType,
-                                        module,
-                                        targetAssembly));
-                        if (skipSerialzerGeneration)
-                        {
-                            continue;
-                        }
-
                         if (!runtime)
                         {
                             if (first)
@@ -460,6 +436,38 @@ namespace Orleans.CodeGenerator
                 SourceAssemblies = assemblies,
                 Syntax = members.Count > 0 ? SF.CompilationUnit().AddMembers(members.ToArray()) : null
             };
+        }
+
+        private static void ConsiderType(
+            Type type,
+            bool runtime,
+            Assembly targetAssembly,
+            ISet<Type> includedTypes)
+        {
+            // The module containing the serializer.
+            var module = runtime ? null : type.Module;
+            var typeInfo = type.GetTypeInfo();
+
+            // Every type which is encountered must be considered for serialization.
+            if (!typeInfo.IsNested && !typeInfo.IsGenericParameter && typeInfo.IsSerializable)
+            {
+                // If a type was encountered which can be accessed, process it for serialization.
+                if (SerializerGenerationManager.RecordTypeToGenerate(type, module, targetAssembly))
+                {
+                    includedTypes.Add(type);
+                }
+            }
+
+            // Collect the types which require code generation.
+            if (GrainInterfaceData.IsGrainInterface(type))
+            {
+                if (Logger.IsVerbose2)
+                {
+                    Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
+                }
+
+                includedTypes.Add(type);
+            }
         }
 
         /// <summary>

@@ -354,8 +354,10 @@ namespace Orleans.CodeGenerator
         private static MethodDeclarationSyntax GenerateGetMethodNameMethod(Type grainType)
         {
             // Get the method with the correct type.
-            var method = typeof(GrainReference).GetMethods(
-                BindingFlags.NonPublic | BindingFlags.Instance).Where(m=>m.Name == "GetMethodName").FirstOrDefault();
+            var method =
+                typeof(GrainReference)
+                    .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
+                    .FirstOrDefault(m => m.Name == "GetMethodName");
 
             var methodDeclaration =
                 method.GetDeclarationSyntax()
