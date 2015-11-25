@@ -20,6 +20,7 @@ namespace TesterExternalModels
     public class EnumClass
     {
         public IEnumerable<MyEnum> EnumsList { get; set; }
+
     }
 
     [Serializable]
