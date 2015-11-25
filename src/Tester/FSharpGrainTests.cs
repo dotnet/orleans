@@ -22,19 +22,14 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Globalization;
 using System.Threading.Tasks;
+using Microsoft.FSharp.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.TestingHost;
+
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using System.Collections.Generic;
-using TestGrainInterfaces;
 using UnitTests.FSharpTypes;
-using Microsoft.FSharp.Core;
-using Microsoft.FSharp.Collections;
 
 namespace UnitTests.General
 {
@@ -76,7 +71,7 @@ namespace UnitTests.General
         }
 
         /// F# record without Serializable and Immutable attributes applied - yields a more meaningful error message
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_Record_ofIntOption_Some_WithNoAttributes()
         {
             await PingTest<RecordOfIntOptionWithNoAttributes>(RecordOfIntOptionWithNoAttributes.ofInt(1));
@@ -84,7 +79,7 @@ namespace UnitTests.General
 
         /// F# record with Serializable and Immutable attributes applied - grain call times out,
         /// Debugging the test reveals the same root cause as for FSharpGrains_Record_ofIntOption_WithNoAttributes
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_Record_ofIntOption_Some()
         {
             await PingTest<RecordOfIntOption>(RecordOfIntOption.ofInt(1));
@@ -103,7 +98,7 @@ namespace UnitTests.General
             await PingTest<GenericRecord<int>>(input);
         }
 
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_GenericRecord_ofIntOption_Some()
         {
             var input = GenericRecord<FSharpOption<int>>.ofT(FSharpOption<int>.Some(0));
@@ -117,14 +112,14 @@ namespace UnitTests.General
             await PingTest<GenericRecord<FSharpOption<int>>>(input);
         }
 
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_IntOption_Some()
         {
             var input = FSharpOption<int>.Some(0);
             await PingTest<FSharpOption<int>>(input);
         }
 
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_IntOption_None()
         {
             var input = FSharpOption<int>.None;
