@@ -400,7 +400,7 @@ namespace Orleans.Runtime.Scheduler
 
             var stats = Utils.EnumerableToString(workgroupDirectory.Values.OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), Environment.NewLine);
             if (stats.Length > 0)
-                logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.SchedulerStatistics, 
+                logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.SchedulerStatistics, 
                     "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
                     RunQueue.Length, WorkItemGroupCount, stats);
         }
@@ -427,7 +427,7 @@ namespace Orleans.Runtime.Scheduler
             foreach (var workgroup in workgroupDirectory.Values)
                 sb.AppendLine(workgroup.DumpStatus());
             
-            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.SchedulerStatus, sb.ToString());
+            logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.SchedulerStatus, sb.ToString());
         }
     }
 }

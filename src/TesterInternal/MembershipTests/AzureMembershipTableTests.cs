@@ -53,9 +53,9 @@ namespace UnitTests.MembershipTests
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Logger.Severity.Verbose3);
-            TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Logger.Severity.Verbose3);
-            TraceLogger.AddTraceLevelOverride("Storage", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("Storage", Severity.Verbose3);
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);

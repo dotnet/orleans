@@ -56,7 +56,7 @@ namespace UnitTests.MembershipTests
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("SqlServerMembershipTableTests", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("SqlServerMembershipTableTests", Severity.Verbose3);
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);

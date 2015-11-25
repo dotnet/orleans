@@ -415,7 +415,7 @@ namespace Orleans.Streams
 
         private void Log(ErrorCode logCode, string format, params object[] args)
         {
-            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, logCode, format, args);
+            logger.LogWithoutBulkingAndTruncating(Severity.Info, logCode, format, args);
         }
     }
 }
