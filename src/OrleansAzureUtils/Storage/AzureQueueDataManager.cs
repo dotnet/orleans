@@ -130,12 +130,12 @@ namespace Orleans.AzureUtils
             {
                 // Retrieve a reference to a queue.
                 // Not sure if this is a blocking call or not. Did not find an alternative async API. Should probably use BeginListQueuesSegmented.
-                queue = queueOperationsClient.GetQueueReference(QueueName);
+                var myQueue = queueOperationsClient.GetQueueReference(QueueName);
 
                 // Create the queue if it doesn't already exist.
 
-                bool didCreate = await Task<bool>.Factory.FromAsync(queue.BeginCreateIfNotExists, queue.EndCreateIfNotExists, null);
-
+                bool didCreate = await Task<bool>.Factory.FromAsync(myQueue.BeginCreateIfNotExists, myQueue.EndCreateIfNotExists, null);
+                queue = myQueue;
                 logger.Info(ErrorCode.AzureQueue_01, "{0} Azure storage queue {1}", (didCreate ? "Created" : "Attached to"), QueueName);
             }
             catch (Exception exc)
