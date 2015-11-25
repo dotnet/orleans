@@ -156,6 +156,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansDependencyInjection"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterExternalModels", "TesterExternalModels\TesterExternalModels.csproj", "{29A111B5-EAFD-445D-B5DE-D44B59C8C8B7}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestFSharp", "TestFSharp\TestFSharp.fsproj", "{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -242,6 +244,10 @@ Global
 		{29A111B5-EAFD-445D-B5DE-D44B59C8C8B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{29A111B5-EAFD-445D-B5DE-D44B59C8C8B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{29A111B5-EAFD-445D-B5DE-D44B59C8C8B7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,4 +1,4 @@
-/*
+﻿(*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -19,19 +19,32 @@ THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
 OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+*)
 
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
-using TesterExternalModels;
+namespace UnitTests.FSharpTypes
 
-namespace UnitTests.GrainInterfaces
-{
-    public interface IExternalTypeGrain : IGrainWithIntegerKey
-    {
-        Task GetAbstractModel(IEnumerable<AbstractModel> list);
-        
-        Task<EnumClass> GetEnumModel();
-    }
-}
+open System
+open Orleans.Concurrency
+
+[<Serializable; Immutable>]
+type SingleCaseDU = 
+    private 
+    | SingleCaseDU of int
+    static member ofInt i = SingleCaseDU i
+
+[<Serializable; Immutable>]
+type Record = { A: SingleCaseDU } with
+    static member ofInt x = { A = SingleCaseDU.ofInt x }
+
+[<Serializable; Immutable>]
+type RecordOfIntOption = { A: int option } with
+    static member Empty = { A = None }
+    static member ofInt x = { A = Some x}
+
+type RecordOfIntOptionWithNoAttributes = { A: int option } with
+    static member Empty = { A = None }
+    static member ofInt x = { A = Some x}
+
+[<Serializable; Immutable>]
+type GenericRecord<'T> = { Value: 'T } with
+    static member ofT x = { Value = x }
