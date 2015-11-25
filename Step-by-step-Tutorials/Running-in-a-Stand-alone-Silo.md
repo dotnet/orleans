@@ -34,8 +34,7 @@ static void Main(string[] args)
 }
 ```
 
-If you set the grain collection project as a startup project and hit F5, you will notice that it's started and hosted by a silo called "OrleansHost."
-Alternatively you can create a console application and add reference to Microsoft.Orleans.OrleansHost NuGet package. The package contains OrleansHost.exe which can be set up in Debug / Start external programs project settings.
+Now you should add reference to Microsoft.Orleans.OrleansHost NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library.
 OrleansHost.exe is a ready-made host executable intended for running Orleans code on Windows Server (Azure has a different host). 
 It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
 

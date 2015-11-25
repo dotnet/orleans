@@ -55,6 +55,11 @@ public class ChatUser: Grain
 ```
 More details can be found in the [Streams Programming APIs](Streams-Programming-APIs).
 
+## Quick Start sample
+
+The [Quick Start Sample](Streams-Quick-Start) is a good overview of the overall workflow of using streams in an application.
+After reading it you should return back to this page and read the rest of the material to get a good understanding of the concepts.
+
 ## Stream Providers
 
 Streams can come via physical channels of various shapes and forms and can have different semantics. Orleans Streaming is designed to support this diversity via the concept of **Stream Providers**, which is an extensibility point in the system. Orleans currently has implementation of two stream providers: TCP based **Simple Message Stream Provider** and Azure Queue based **Azure Queue Stream Provider**.
@@ -72,11 +77,6 @@ Individual event delivery guarantees depend on individual stream providers. Some
 **Events Delivery Order**:
 Event order also depends on a particular stream provider. In SMS streams, the producer explicitelly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in failure cases. Applications can also control their own stream delivery ordering, by using `StreamSequenceToken`.
 
--------------------------
-
-## Streams Programming APIs
-
-[Description of Streams Programming APIs](Streams-Programming-APIs).
 
 ## Code Samples
 
@@ -85,10 +85,6 @@ An example of how to use streaming APIs within a grain can be found [here](https
 ## Streams Implementation
 
 The [Orleans Streams Implementation](Streams-Implementation) provides a high level overview of the internal implementation.
-
-## Stream Providers
-
-[Stream Providers](Stream-Providers) describes currently implemented Steam Providers.
 
 ## Streams Extensibility
 
