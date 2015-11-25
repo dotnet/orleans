@@ -134,6 +134,7 @@
     <Compile Include="RelationalUtilities\RelationalStorageForTesting.cs" />
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="RequestContextTest.cs" />
+    <Compile Include="SerializationOrderTests.cs" />
     <Compile Include="SerializationTests.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
     <Compile Include="ExceptionPropagationTests.cs" />
