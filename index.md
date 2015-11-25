@@ -28,6 +28,18 @@ Coverage of the new and changed features since the original September 2014 previ
 
 * **[Getting Started with Orleans](Getting-Started-With-Orleans)**
 This section will introduce the basic concepts of the Orleans programming model as well as the basics of how to provide the runtime with the configuration parameters that it needs in order to function properly.
+  
+  * [Core Concepts](Getting-Started-With-Orleans/Core-Concepts)
+  * [Asynchrony and Tasks](Getting-Started-With-Orleans/Asynchrony-and-Tasks)
+  * [Grains](Getting-Started-With-Orleans/Grains) (a.k.a. Actors)
+  * [Silos](Getting-Started-With-Orleans/Silos)
+  * [Clients](Getting-Started-With-Orleans/Clients)
+  * [Client Observers](Getting-Started-With-Orleans/Observers)
+  * [Developing a Grain](Getting-Started-With-Orleans/Developing-a-Grain)
+  * [Developing a Client](Getting-Started-With-Orleans/Developing-a-Client)
+  * [Running the Application](Getting-Started-With-Orleans/Running-the-Application)
+
+
 
 * **[Step-by-step Tutorials](Step-by-step-Tutorials)** - Complementing the "Getting Started" guide, this section will take you through a series of samples and hands-on tutorials that teach you the core concepts, as well as some advanced ones through hands-on experience.
 
