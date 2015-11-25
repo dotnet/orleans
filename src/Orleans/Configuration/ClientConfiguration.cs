@@ -104,8 +104,8 @@ namespace Orleans.Runtime.Configuration
 
         public string CustomGatewayProviderAssemblyName { get; set; }
 
-        public Logger.Severity DefaultTraceLevel { get; set; }
-        public IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; private set; }
+        public Severity DefaultTraceLevel { get; set; }
+        public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
         public bool WriteMessagingTraces { get; set; }
         public bool TraceToConsole { get; set; }
         public int LargeMessageWarningThreshold { get; set; }
@@ -203,8 +203,8 @@ namespace Orleans.Runtime.Configuration
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            DefaultTraceLevel = Logger.Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
+            DefaultTraceLevel = Severity.Info;
+            TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
             WriteMessagingTraces = false;
@@ -326,6 +326,9 @@ namespace Orleans.Runtime.Configuration
                                 Port = ConfigUtilities.ParseInt(child.GetAttribute("Port"),
                                     "Invalid integer value for the Port attribute on the LocalAddress element");
                             }
+                            break;
+                        case "Telemetry":
+                            ConfigUtilities.ParseTelemetry(child);
                             break;
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))

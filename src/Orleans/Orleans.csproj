@@ -134,6 +134,18 @@
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
+    <Compile Include="Telemetry\Consumers\ConsoleTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\Consumers\FileTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\Consumers\TraceTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IDependencyTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IEventTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IExceptionTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IMetricTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IRequestTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\ITelemetryConsumer.cs" />
+    <Compile Include="Telemetry\ITraceTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\Severity.cs" />
+    <Compile Include="Telemetry\TraceParserUtils.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />
@@ -298,7 +310,6 @@
     <Compile Include="Core\GrainAttributes.cs" />
     <Compile Include="CodeGeneration\GrainFactoryBase.cs" />
     <Compile Include="Runtime\IClientObserverRegistrar.cs" />
-    <Compile Include="Logging\LogWriters.cs" />
     <Compile Include="Logging\ILogConsumer.cs" />
     <Compile Include="CodeGeneration\ActivationAttribute.cs" />
     <Compile Include="Core\IGrainObserver.cs" />
@@ -371,6 +382,7 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
     <PropertyGroup Condition="'$(BuildNumber)' == ''">

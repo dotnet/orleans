@@ -103,7 +103,7 @@ namespace Orleans.CodeGenerator
                 if (logger.IsVerbose3)
                 {
                     logger.LogWithoutBulkingAndTruncating(
-                        Logger.Severity.Verbose3,
+                        Severity.Verbose3,
                         ErrorCode.CodeGenSourceGenerated,
                         "Generating assembly {0} with source:\n{1}",
                         assemblyName,

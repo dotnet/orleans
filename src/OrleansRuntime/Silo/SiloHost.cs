@@ -467,7 +467,7 @@ namespace Orleans.Runtime.Host
             Config = config;
 
             if (Verbose > 0)
-                Config.Defaults.DefaultTraceLevel = (Logger.Severity.Verbose - 1 + Verbose);
+                Config.Defaults.DefaultTraceLevel = (Severity.Verbose - 1 + Verbose);
             
 
             if (!String.IsNullOrEmpty(DeploymentId))

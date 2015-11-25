@@ -187,7 +187,7 @@ namespace Orleans.Runtime
                 }
             }
             var report = sb.ToString();
-            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.Loader_GrainTypeFullList, report);
+            logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.Loader_GrainTypeFullList, report);
         }
     }
 }

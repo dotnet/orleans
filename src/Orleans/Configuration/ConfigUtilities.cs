@@ -41,6 +41,57 @@ namespace Orleans.Runtime.Configuration
     /// </summary>
     public static class ConfigUtilities
     {
+        internal static void ParseTelemetry(XmlElement root)
+        {
+            foreach (var node in root.ChildNodes)
+            {
+                var grandchild = node as XmlElement;
+                if (grandchild == null) continue;
+
+                if (!grandchild.LocalName.Equals("TelemetryConsumer"))
+                {
+                    continue;
+                }
+                else
+                {
+                    if (!grandchild.HasAttribute("Type"))
+                        throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
+
+                    if (!grandchild.HasAttribute("Assembly"))
+                        throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
+
+                    var className = grandchild.Attributes["Type"].Value;
+                    var assemblyName = new AssemblyName(grandchild.Attributes["Assembly"].Value);
+
+                    Assembly assembly = null;
+                    try
+                    {
+                        assembly = Assembly.Load(assemblyName);
+                        
+                        var pluginType = assembly.GetType(className);
+                        if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
+
+                        var args = grandchild.Attributes.Cast<XmlAttribute>().Where(a => a.Value != "Type" && a.Value != "Assembly").ToArray();
+
+                        var plugin = Activator.CreateInstance(pluginType, args);
+                        
+                        if (plugin is ITelemetryConsumer)
+                        {
+                            Logger.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
+                        }
+                        else
+                        {
+                            throw new InvalidCastException("TelemetryConsumer class " + className + " must implement one of Orleans.Runtime.ITelemetryConsumer based interfaces");
+                        }
+                    }
+                    catch (Exception exc)
+                    {
+                        throw new TypeLoadException("Cannot load TelemetryConsumer class " + className + " from assembly " + assembly + " - Error=" + exc);
+                    }
+                }
+            }
+        }
+
         internal static void ParseTracing(ITraceConfiguration config, XmlElement root, string nodeName)
         {
             if (root.HasAttribute("DefaultTraceLevel"))
@@ -85,7 +136,7 @@ namespace Orleans.Runtime.Configuration
 
                 if (grandchild.LocalName.Equals("TraceLevelOverride") && grandchild.HasAttribute("TraceLevel") && grandchild.HasAttribute("LogPrefix"))
                 {
-                    config.TraceLevelOverrides.Add(new Tuple<string, Logger.Severity>(grandchild.GetAttribute("LogPrefix"),
+                    config.TraceLevelOverrides.Add(new Tuple<string, Severity>(grandchild.GetAttribute("LogPrefix"),
                         ParseSeverity(grandchild.GetAttribute("TraceLevel"),
                             "Invalid trace level TraceLevel attribute value on TraceLevelOverride element for " + nodeName + " prefix " +
                             grandchild.GetAttribute("LogPrefix"))));
@@ -391,10 +442,10 @@ namespace Orleans.Runtime.Configuration
             return s;
         }
 
-        internal static Logger.Severity ParseSeverity(string input, string errorMessage)
+        internal static Severity ParseSeverity(string input, string errorMessage)
         {
-            Logger.Severity s;
-            if (!Enum.TryParse<Logger.Severity>(input, out s))
+            Severity s;
+            if (!Enum.TryParse<Severity>(input, out s))
             {
                 throw new FormatException(errorMessage + ". Tried to parse " + input);
             }
