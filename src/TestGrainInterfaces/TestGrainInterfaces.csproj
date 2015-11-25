@@ -65,6 +65,7 @@
     <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="CodegenTestInterfaces.cs" />
+    <Compile Include="IExternalTypeGrain.cs" />
     <Compile Include="IStatelessWorkerGrain.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />
@@ -84,6 +85,10 @@
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TesterExternalModels\TesterExternalModels.csproj">
+      <Project>{29A111B5-EAFD-445D-B5DE-D44B59C8C8B7}</Project>
+      <Name>TesterExternalModels</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

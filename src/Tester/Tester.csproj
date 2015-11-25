@@ -121,6 +121,7 @@
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />
+    <Compile Include="ExternalTypesTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
@@ -282,6 +283,10 @@
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TesterExternalModels\TesterExternalModels.csproj">
+      <Project>{29A111B5-EAFD-445D-B5DE-D44B59C8C8B7}</Project>
+      <Name>TesterExternalModels</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
       <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>

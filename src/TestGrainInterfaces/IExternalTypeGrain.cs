@@ -21,36 +21,17 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using TesterExternalModels;
 
 namespace UnitTests.GrainInterfaces
 {
-    public interface ISampleStreaming_ProducerGrain : IGrainWithGuidKey
+    public interface IExternalTypeGrain : IGrainWithIntegerKey
     {
-        Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
-
-        Task StartPeriodicProducing();
-
-        Task StopPeriodicProducing();
-
-        Task<int> GetNumberProduced();
-
-        Task ClearNumberProduced();
-        Task Produce();
-    }
-
-    public interface ISampleStreaming_ConsumerGrain : IGrainWithGuidKey
-    {
-        Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
-
-        Task StopConsuming();
-
-        Task<int> GetNumberConsumed();
-    }
-
-    public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
-    {
+        Task GetAbstractModel(IEnumerable<AbstractModel> list);
+        
+        Task<EnumClass> GetEnumModel();
     }
 }

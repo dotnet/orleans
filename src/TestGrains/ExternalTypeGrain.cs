@@ -22,35 +22,33 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Collections;
 using Orleans;
+using Orleans.Runtime;
+using TesterExternalModels;
+using UnitTests.GrainInterfaces;
 
-namespace UnitTests.GrainInterfaces
+
+namespace UnitTests.Grains
 {
-    public interface ISampleStreaming_ProducerGrain : IGrainWithGuidKey
+    /// <summary>
+    /// A simple grain that allows to set two arguments and then multiply them.
+    /// </summary>
+    public class ExternalTypeGrain : Grain, IExternalTypeGrain
     {
-        Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
+        public async Task GetAbstractModel(IEnumerable<AbstractModel> list)
+        {
+            Console.WriteLine("GetAbstractModel: Success");
+        }
 
-        Task StartPeriodicProducing();
-
-        Task StopPeriodicProducing();
-
-        Task<int> GetNumberProduced();
-
-        Task ClearNumberProduced();
-        Task Produce();
-    }
-
-    public interface ISampleStreaming_ConsumerGrain : IGrainWithGuidKey
-    {
-        Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
-
-        Task StopConsuming();
-
-        Task<int> GetNumberConsumed();
-    }
-
-    public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
-    {
+        public async Task<EnumClass> GetEnumModel()
+        {
+            return new EnumClass(){EnumsList = new List<MyEnum>() {MyEnum.FirstOption}};
+        }
     }
 }
