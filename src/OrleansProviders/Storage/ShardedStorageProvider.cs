@@ -137,27 +137,27 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ReadStateAsync"/>
-        public Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public Task ReadStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            int num = FindStorageShard(grainType, grainReference);
+            int num = FindStorageShard(grainType.FullName, grainReference);
             IStorageProvider provider = storageProviders[num];
             return provider.ReadStateAsync(grainType, grainReference, grainState);
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#WriteStateAsync"/>
-        public Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public Task WriteStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            int num = FindStorageShard(grainType, grainReference);
+            int num = FindStorageShard(grainType.FullName, grainReference);
             IStorageProvider provider = storageProviders[num];
             return provider.WriteStateAsync(grainType, grainReference, grainState);
         }
 
         /// <summary> Deleet / Clear state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ClearStateAsync"/>
-        public Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public Task ClearStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            int num = FindStorageShard(grainType, grainReference);
+            int num = FindStorageShard(grainType.FullName, grainReference);
             IStorageProvider provider = storageProviders[num];
             return provider.ClearStateAsync(grainType, grainReference, grainState);
         }

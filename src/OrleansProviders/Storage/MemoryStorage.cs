@@ -125,9 +125,9 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ReadStateAsync"/>
-        public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public virtual async Task ReadStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            var keys = MakeKeys(grainType, grainReference);
+            var keys = MakeKeys(grainType.FullName, grainReference);
 
             if (Log.IsVerbose2) Log.Verbose2("Read Keys={0}", StorageProviderUtils.PrintKeys(keys));
             
@@ -142,9 +142,9 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#WriteStateAsync"/>
-        public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public virtual async Task WriteStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            var keys = MakeKeys(grainType, grainReference);
+            var keys = MakeKeys(grainType.FullName, grainReference);
             var data = grainState.AsDictionary();
             string receivedEtag = grainState.Etag;
 
@@ -162,9 +162,9 @@ namespace Orleans.Storage
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ClearStateAsync"/>
-        public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public virtual async Task ClearStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            var keys = MakeKeys(grainType, grainReference);
+            var keys = MakeKeys(grainType.FullName, grainReference);
             string eTag = grainState.Etag; // TOD: Should this be 'null' for always Delete?
 
             if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), eTag);

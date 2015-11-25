@@ -87,9 +87,9 @@ namespace Orleans.SqlUtils.StorageProvider
             return TaskDone.Done;
         }
 
-        async Task IStorageProvider.ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        async Task IStorageProvider.ReadStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            var grainIdentity = GrainIdentity.FromGrainReference(grainType, grainReference);
+            var grainIdentity = GrainIdentity.FromGrainReference(grainType.FullName, grainReference);
 
             if (_ignore)
                 return;
@@ -100,12 +100,12 @@ namespace Orleans.SqlUtils.StorageProvider
         }
 
 
-        async Task IStorageProvider.WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        async Task IStorageProvider.WriteStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
             if (_ignore)
                 return;
 
-            var grainIdentity = GrainIdentity.FromGrainReference(grainType, grainReference);
+            var grainIdentity = GrainIdentity.FromGrainReference(grainType.FullName, grainReference);
             await _dataManager.UpsertStateAsync(grainIdentity, grainState.AsDictionary());
         }
 
@@ -117,9 +117,9 @@ namespace Orleans.SqlUtils.StorageProvider
         /// <param name="grainReference"></param>
         /// <param name="grainState"></param>
         /// <returns></returns>
-        Task IStorageProvider.ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        Task IStorageProvider.ClearStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
-            Log.Verbose2("ClearStateAsync {0} {1} {2}", grainType, grainReference.ToKeyString(), grainState.Etag);
+            Log.Verbose2("ClearStateAsync {0} {1} {2}", grainType.FullName, grainReference.ToKeyString(), grainState.Etag);
 
             return TaskDone.Done;
         }

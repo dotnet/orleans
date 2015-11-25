@@ -674,7 +674,7 @@ namespace Orleans.Runtime
                     SetupStorageProvider(data);
 
                     data.GrainInstance.GrainState = state;
-                    data.GrainInstance.Storage = new GrainStateStorageBridge(data.GrainTypeName, data.GrainInstance, data.StorageProvider);
+                    data.GrainInstance.Storage = new GrainStateStorageBridge(grainType, data.GrainInstance, data.StorageProvider);
                 }
             }
 
@@ -741,7 +741,7 @@ namespace Orleans.Runtime
                     var grainRef = result.GrainReference;
 
                     await scheduler.RunOrQueueTask(() =>
-                        result.StorageProvider.ReadStateAsync(grainType, grainRef, state),
+                        result.StorageProvider.ReadStateAsync(result.GrainInstanceType, grainRef, state),
                         new SchedulingContext(result));
 
                     sw.Stop();

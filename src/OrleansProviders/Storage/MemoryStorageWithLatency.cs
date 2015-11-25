@@ -84,17 +84,17 @@ namespace Orleans.Storage
             await MakeFixedLatencyCall(() => base.Close());
         }
 
-        public override async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public override async Task ReadStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ReadStateAsync(grainType, grainReference, grainState));
         }
 
-        public override async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public override async Task WriteStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.WriteStateAsync(grainType, grainReference, grainState));
         }
 
-        public override async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public override async Task ClearStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ClearStateAsync(grainType, grainReference, grainState));
         }
