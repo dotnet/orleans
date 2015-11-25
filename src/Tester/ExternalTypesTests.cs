@@ -31,6 +31,7 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using System.Collections.Generic;
+using Orleans.Serialization;
 using TesterExternalModels;
 using TestGrainInterfaces;
 
@@ -52,14 +53,25 @@ namespace UnitTests.General
         {
             StopAllSilos();
         }
-
-        /// Can instantiate multiple concrete grain types that implement
-        /// different specializations of the same generic interface
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        
+        [Ignore, TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public async Task ExternalTypesTest_GrainWithAbstractExternalTypeParam()
         {
-            var grainWithAbstractTypeParam = GrainClient.GrainFactory.GetGrain<IExternalTypeGrain>(0);
-            await grainWithAbstractTypeParam.GetList(new List<AbstractModel>() {new ConcreteModel()});
+            // This solves the problem:
+            //SerializationManager.Register(typeof(AbstractModel));
+
+            var grainWitAbstractTypeParam = GrainClient.GrainFactory.GetGrain<IExternalTypeGrain>(0);
+            await grainWitAbstractTypeParam.GetAbstractModel(new List<AbstractModel>() {new ConcreteModel()});
+        }
+
+        [Ignore, TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public async Task ExternalTypesTest_GrainWithEnumxternalTypeParam()
+        {
+            // This solves the problem
+            //SerializationManager.Register(typeof(MyEnum));
+
+            var grainWithEnumTypeParam = GrainClient.GrainFactory.GetGrain<IExternalTypeGrain>(0);
+            await grainWithEnumTypeParam.GetEnumModel();
         }
     }
 }

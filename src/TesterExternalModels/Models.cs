@@ -15,4 +15,16 @@ namespace TesterExternalModels
     public class ConcreteModel : AbstractModel
     {        
     }
+
+    [Serializable]
+    public class EnumClass
+    {
+        public IEnumerable<MyEnum> EnumsList { get; set; }
+    }
+
+    [Serializable]
+    public enum MyEnum
+    {
+        FirstOption
+    }
 }

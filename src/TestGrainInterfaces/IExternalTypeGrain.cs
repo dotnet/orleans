@@ -30,6 +30,9 @@ namespace UnitTests.GrainInterfaces
 {
     public interface IExternalTypeGrain : IGrainWithIntegerKey
     {
-        Task GetList(IEnumerable<AbstractModel> list);
+        Task GetAbstractModel(IEnumerable<AbstractModel> list);
+
+
+        Task<EnumClass> GetEnumModel();
     }
 }

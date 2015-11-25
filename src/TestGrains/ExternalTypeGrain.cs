@@ -41,9 +41,14 @@ namespace UnitTests.Grains
     /// </summary>
     public class ExternalTypeGrain : Grain, IExternalTypeGrain
     {
-        public async Task GetList(IEnumerable<AbstractModel> list)
+        public async Task GetAbstractModel(IEnumerable<AbstractModel> list)
         {
-            Console.WriteLine("ExternalTypeGrain: Success");
+            Console.WriteLine("GetAbstractModel: Success");
+        }
+
+        public async Task<EnumClass> GetEnumModel()
+        {
+            return new EnumClass(){EnumsList = new List<MyEnum>() {MyEnum.FirstOption}};
         }
     }
 }
