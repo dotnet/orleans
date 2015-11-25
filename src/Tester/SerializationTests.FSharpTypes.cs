@@ -22,21 +22,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 
-using System;
-using System.Globalization;
+using Microsoft.FSharp.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Orleans.CodeGeneration;
 using Orleans.Serialization;
-using UnitTests.GrainInterfaces;
-using System.Collections.Generic;
-using Orleans.TestingHost;
-using System.Runtime.Serialization;
 
 using UnitTests.FSharpTypes;
-using Microsoft.FSharp.Core;
-using Microsoft.FSharp.Collections;
 
 namespace UnitTests.General
 {
@@ -52,7 +42,7 @@ namespace UnitTests.General
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_Some()
         {
             var input = FSharpOption<int>.Some(0);
@@ -60,7 +50,7 @@ namespace UnitTests.General
             Assert.IsTrue(output.Equals(input));
         }
 
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_None()
         {
             var input = FSharpOption<int>.None;
@@ -76,7 +66,7 @@ namespace UnitTests.General
             Assert.IsTrue(output.Equals(input));
         }
 
-        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, /*TestCategory("BVT"),*/ TestCategory("Failures"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofIntOption_Some()
         {
             var input = RecordOfIntOption.ofInt(1);
