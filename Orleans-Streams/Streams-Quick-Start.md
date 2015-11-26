@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Orleans Streams Programming APIs
+title: Orleans Streams Quick Start
 ---
 {% include JB/setup %}
 
