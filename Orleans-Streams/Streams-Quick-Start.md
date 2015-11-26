@@ -29,8 +29,8 @@ Now we can create streams, send data using them as producers and also receive da
 Producing events for streams is relatively easy. You should first get access to the stream provider which you defined in the config above (`SMSProvider`) and then choose a stream and push data to it.
 
 ``` csharp
-//Create a GUID based on our GUID as a grain
-var guid = this.GetPrimaryKey();
+//Pick a guid for a chat room grain and chat room stream
+var guid = some guid identifying the chat room 
 //Get one of the providers which we defined in config
 var streamProvider = GetStreamProvider("SMSProvider");
 //Get the reference to a stream
@@ -39,7 +39,7 @@ var stream = streamProvider.GetStream<int>(guid, "RANDOMDATA");
 
 As you can see our stream has a GUID and a namespace. This will make it easy to identify unique streams. For example, in a chat room namespace can "Rooms" and GUID be the owning RoomGrain's GUID.
 
-Here we use the grain's GUID to create the stream. Now using the `OnNext` method of the stream we can push data to it. Let's do it inside a timer and using random numbers. You could use any other data type for the stream as well.
+Here we use the GUID of some known chat room. Now using the `OnNext` method of the stream we can push data to it. Let's do it inside a timer and using random numbers. You could use any other data type for the stream as well.
 
 ``` csharp
 RegisterTimer(s =>
