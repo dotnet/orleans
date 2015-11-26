@@ -99,8 +99,7 @@ The consumer can now resume all of them, or unsubscribe from some if he wishes t
 
 By default, stream consumer has to explicitly subscribe to the stream. This subscription would usually be triggered by some external message that the grain (or client) receive that instructs them to subscribe. For example, in a chat service when user joins a chat room his grain receives a `JoinChatGroup` message with the chat name and it will cause the user grain to subscribe to this chat stream.
 
-In addition, Orleans Streams also support **"Implicit Subscriptions"**. In this model the grain does not explicitely subscribe to the stream. This grain is subscribed automatically, implicitly, just based on its grain identity and an `ImplicitStreamSubscription` attribute. Implicit subscriptions main value is allowing the stream activity to trigger the grain activation (hence triggering the subscription) automaticaly.
-For example, using SMS streams, if one grain wanted to produce a stream and another grain process this stream, the producer  would need to know the identity of the consumer grain and make a grain call to it telling it to subscribe to the stream. Only after that it can start sending events. Instead, using implicit subscriptions, the producer can just start producing events onto a stream, and the consumer grain will automatically be activated and subscribe to the stream. In that case, the producer doesn't care at all who is reading the events.
+In addition, Orleans Streams also support **"Implicit Subscriptions"**. In this model the grain does not explicitely subscribe to the stream. This grain is subscribed automatically, implicitly, just based on its grain identity and an `ImplicitStreamSubscription` attribute. 
 
 Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream whose identity is GUID XXX and `"MyStreamNamespace"` namespace, it should be delivered to grain whose identity is XXX of type `MyGrainType`. That is, the runtime maps stream `<XXX, MyStreamNamespace>` to consumer grain `<XXX, MyGrainType>`.
 
@@ -202,6 +201,7 @@ Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub co
 ```
 
 That way Pub-Sub data will be durably stored in Azure Table.
+For initial development you can use the memory storage as well.
 In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.
 
 ### Configuration<a name="Configuration"></a>
@@ -229,4 +229,4 @@ public void RegisterStreamProvider<T>(string providerName, IDictionary<string, s
 on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
 
 ##Next
-[Orleans Stream Providers](Stream-Providers)
+[Quick Start Sample](Streams-Quick-Start)
