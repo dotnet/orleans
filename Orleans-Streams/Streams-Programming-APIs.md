@@ -229,4 +229,4 @@ public void RegisterStreamProvider<T>(string providerName, IDictionary<string, s
 on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
 
 ##Next
-[Quick Start Sample](Streams-Quick-Start)
+[Orleans Stream Providers](Stream-Providers)
