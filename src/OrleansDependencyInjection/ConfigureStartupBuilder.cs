@@ -25,6 +25,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Framework.DependencyInjection;
+using Orleans.Providers;
 using Orleans.Runtime.Management;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.ReminderService;
@@ -126,14 +127,6 @@ namespace Orleans.Runtime.Startup
             }
 
             return methodInfo;
-        }
-
-        private class DefaultServiceProvider : IServiceProvider
-        {
-            public object GetService(Type serviceType)
-            {
-                return Activator.CreateInstance(serviceType);
-            }
         }
 
         IServiceProvider IStartupBuilder.ConfigureStartup(string startupTypeName)

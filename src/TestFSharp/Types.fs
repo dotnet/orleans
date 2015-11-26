@@ -1,4 +1,4 @@
-﻿/*
+﻿(*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -19,37 +19,32 @@ THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
 OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+*)
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
-using Orleans.Concurrency;
-using Orleans.Runtime;
+namespace UnitTests.FSharpTypes
 
-namespace TestInternalGrainInterfaces
-{
-    internal interface IStressTestGrain : IGrainWithIntegerKey
-    {
-        Task<string> GetLabel();
+open System
+open Orleans.Concurrency
 
-        Task SetLabel(string label);
+[<Serializable; Immutable>]
+type SingleCaseDU = 
+    private 
+    | SingleCaseDU of int
+    static member ofInt i = SingleCaseDU i
 
-        Task PingOthers(long[] others);
+[<Serializable; Immutable>]
+type Record = { A: SingleCaseDU } with
+    static member ofInt x = { A = SingleCaseDU.ofInt x }
 
-        Task<List<Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>>>> LookUpMany(SiloAddress destination, List<Tuple<GrainId, int>> grainAndETagList, int retries = 0);
+[<Serializable; Immutable>]
+type RecordOfIntOption = { A: int option } with
+    static member Empty = { A = None }
+    static member ofInt x = { A = Some x}
 
-        Task Send(byte[] data);
+type RecordOfIntOptionWithNoAttributes = { A: int option } with
+    static member Empty = { A = None }
+    static member ofInt x = { A = Some x}
 
-        Task<byte[]> Echo(byte[] data);
-
-        Task Ping(byte[] data);
-
-        Task PingWithDelay(byte[] data, TimeSpan delay);
-
-        Task<IStressTestGrain> GetGrainReference();
-
-        Task DeactivateSelf();
-    }
-}
+[<Serializable; Immutable>]
+type GenericRecord<'T> = { Value: 'T } with
+    static member ofT x = { Value = x }

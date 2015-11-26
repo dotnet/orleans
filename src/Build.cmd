@@ -31,7 +31,7 @@ set PROJ=%CMDHOME%\Orleans.sln
 SET CONFIGURATION=Debug
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-"%MSBUILDEXE%" /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -40,7 +40,7 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 SET CONFIGURATION=Release
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-"%MSBUILDEXE%" /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
@@ -53,7 +53,7 @@ set STEP=VSIX
 @REM Install Visual Studio SDK and uncomment the following lines 
 @REM to build Visual Studio project templates.
 @REM
-@REM "%MSBUILDEXE%" /m /p:Configuration=%CONFIGURATION% "%CMDHOME%\OrleansVSTools\OrleansVSTools.sln"
+@REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%CMDHOME%\OrleansVSTools\OrleansVSTools.sln"
 @REM xcopy /s /y %CMDHOME%\SDK\VSIX %OutDir%\VSIX\
 @REM @if ERRORLEVEL 1 GOTO :ErrorStop
 @REM @echo BUILD ok for VSIX package for %PROJ%

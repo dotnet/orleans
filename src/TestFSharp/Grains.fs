@@ -1,4 +1,4 @@
-﻿/*
+﻿(*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -19,33 +19,19 @@ THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
 OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+*)
 
+namespace UnitTests.FSharpGrains
 
-using System.Threading.Tasks;
-using Orleans;
-using TestInternalGrainInterfaces;
+open System.Threading.Tasks
+open UnitTests.GrainInterfaces
+open Orleans
 
-namespace TestInternalGrains
-{
-    public class ProxyGrain : Grain, IProxyGrain
-    {
-        private ITestGrain proxy;
+type Generic1ArgumentGrain<'T>() = 
+    inherit Grain()
 
-        public Task CreateProxy(long key)
-        {
-            proxy = GrainFactory.GetGrain<ITestGrain>(key);
-            return TaskDone.Done;
-        }
+    interface INonGenericBase with 
+        member x.Ping() = TaskDone.Done
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(this.RuntimeIdentity);
-        }
-
-        public Task<string> GetProxyRuntimeInstanceId()
-        {
-            return proxy.GetRuntimeInstanceId();
-        }
-    }
-}
+    interface IGeneric1Argument<'T> with 
+        member x.Ping(t:'T) = Task.FromResult(t);

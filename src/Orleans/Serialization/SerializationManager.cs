@@ -95,7 +95,7 @@ namespace Orleans.Serialization
 
         private static readonly HashSet<Type> registeredTypes;
         private static readonly List<IExternalSerializer> externalSerializers;
-        private static readonly ConcurrentDictionary<Type, byte> typesWithNoExternalSerializers;
+        private static readonly ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
         private static readonly Dictionary<string, Type> types;
         private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
@@ -199,7 +199,7 @@ namespace Orleans.Serialization
 
             registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
-            typesWithNoExternalSerializers = new ConcurrentDictionary<Type, byte>();
+            typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
             types = new Dictionary<string, Type>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
@@ -883,18 +883,18 @@ namespace Orleans.Serialization
 
             object copy;
 
-            var copier = GetCopier(t);
-            if (copier != null)
+            IExternalSerializer serializer;
+            if (TryLookupExternalSerializer(t, out serializer))
             {
-                copy = copier(original);
+                copy = serializer.DeepCopy(original);
                 SerializationContext.Current.RecordObject(original, copy);
                 return copy;
             }
 
-            IExternalSerializer serializer;
-            if (TryFindAndRegisterExternalSerializer(t, out serializer))
+            var copier = GetCopier(t);
+            if (copier != null)
             {
-                copy = serializer.DeepCopy(original);
+                copy = copier(original);
                 SerializationContext.Current.RecordObject(original, copy);
                 return copy;
             }
@@ -1131,19 +1131,19 @@ namespace Orleans.Serialization
                 return;
             }
 
+            IExternalSerializer serializer;
+            if (TryLookupExternalSerializer(t, out serializer))
+            {
+                stream.WriteTypeHeader(t, expected);
+                serializer.Serialize(obj, stream, expected);
+                return;
+            }
+
             Serializer ser = GetSerializer(t);
             if (ser != null)
             {
                 stream.WriteTypeHeader(t, expected);
                 ser(obj, stream, expected);
-                return;
-            }
-
-            IExternalSerializer serializer;
-            if (TryFindAndRegisterExternalSerializer(t, out serializer))
-            {
-                stream.WriteTypeHeader(t, expected);
-                serializer.Serialize(obj, stream, expected);
                 return;
             }
 
@@ -1478,18 +1478,18 @@ namespace Orleans.Serialization
                     return result;
                 }
 
-                var deser = GetDeserializer(resultType);
-                if (deser != null)
+                IExternalSerializer serializer;
+                if (TryLookupExternalSerializer(resultType, out serializer))
                 {
-                    result = deser(resultType, stream);
+                    result = serializer.Deserialize(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);
                     return result;
                 }
 
-                IExternalSerializer serializer;
-                if (TryFindAndRegisterExternalSerializer(resultType, out serializer))
+                var deser = GetDeserializer(resultType);
+                if (deser != null)
                 {
-                    result = serializer.Deserialize(resultType, stream);
+                    result = deser(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);
                     return result;
                 }
@@ -1846,27 +1846,32 @@ namespace Orleans.Serialization
             throw new SerializationException(String.Format("Unexpected token {0} parsing message headers", token));
         }
 
-        private static bool TryFindAndRegisterExternalSerializer(Type t, out IExternalSerializer serializer)
+        private static bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)
         {
-            if (externalSerializers.Count == 0 || typesWithNoExternalSerializers.ContainsKey(t))
+            // essentially a no-op if there are no external serializers registered
+            if (externalSerializers.Count == 0)
             {
                 serializer = null;
                 return false;
             }
 
-            serializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
-            if (serializer == null)
+            // the associated serializer will be null if there are no external serializers that handle this type
+            if (typeToExternalSerializerDictionary.TryGetValue(t, out serializer))
             {
-                typesWithNoExternalSerializers.TryAdd(t, 0);
-                return false;
+                return serializer != null;
             }
 
-            Register(
-                t,
-                serializer.DeepCopy,
-                serializer.Serialize,
-                serializer.Deserialize);
-            return true;
+            serializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
+
+            // add the serializer to the dictionary, even if it's null to signify that we already performed
+            // the search and found none
+            if (typeToExternalSerializerDictionary.TryAdd(t, serializer) && serializer != null)
+            {
+                // we need to register the type, otherwise exceptions are thrown about types not being found
+                Register(t, serializer.DeepCopy, serializer.Serialize, serializer.Deserialize, true);
+            }
+   
+            return serializer != null;
         }
 
         #endregion
@@ -1996,7 +2001,7 @@ namespace Orleans.Serialization
                     if (t.IsArray)
                         return HasOrleansSerialization(t.GetElementType());
 
-                    return t == typeof(string) || serializers.ContainsKey(t.TypeHandle);
+                    return t == typeof(string) || serializers.ContainsKey(t.TypeHandle) || typeToExternalSerializerDictionary.ContainsKey(t);
             }
         }
 
@@ -2190,7 +2195,7 @@ namespace Orleans.Serialization
                     line.Append(" copier");
                     discardLine = false;
                 }
-                if (serializers.ContainsKey(typeHandle))
+                if (deserializers.ContainsKey(typeHandle))
                 {
                     line.Append(" deserializer");
                     discardLine = false;
@@ -2209,7 +2214,7 @@ namespace Orleans.Serialization
             }
 
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
-            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
+            logger.LogWithoutBulkingAndTruncating(Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
         }
         
         /// <summary>
@@ -2223,6 +2228,8 @@ namespace Orleans.Serialization
                 return;
             }
 
+            externalSerializers.Clear();
+            typeToExternalSerializerDictionary.Clear();
             providerTypes.ForEach(
                 type =>
                 {

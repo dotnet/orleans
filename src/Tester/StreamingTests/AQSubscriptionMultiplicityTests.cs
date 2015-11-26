@@ -24,10 +24,12 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
@@ -53,9 +55,10 @@ namespace UnitTests.StreamingTests
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
         }
 
-        public override void AdjustForTest(Orleans.Runtime.Configuration.ClientConfiguration config)
+        public override void AdjustForTest(ClientConfiguration config)
         {
             config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName, new Dictionary<string, string>());
+            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
             base.AdjustForTest(config);
         }
 

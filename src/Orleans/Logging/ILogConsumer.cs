@@ -45,7 +45,7 @@ namespace Orleans.Runtime
         /// <param name="eventCode">Numeric event code for this log entry. May be zero, meaning 'Unspecified'. 
         /// In general, all log entries at severity=Error or greater should specify an explicit error code value.</param>
         void Log(
-            Logger.Severity severity,
+            Severity severity,
             TraceLogger.LoggerType loggerType,
             string caller,
             string message,

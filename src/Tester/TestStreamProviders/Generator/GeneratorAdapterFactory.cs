@@ -40,7 +40,7 @@ namespace Tester.TestStreamProviders.Generator
     public class GeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter
     {
         public const string GeneratorConfigTypeName = "StreamGeneratorConfigType";
-        private readonly IServiceProvider serviceProvider;
+        private IServiceProvider serviceProvider;
         private GeneratorAdapterConfig adapterConfig;
         private IStreamGeneratorConfig generatorConfig;
         private IStreamQueueMapper streamQueueMapper;
@@ -50,27 +50,10 @@ namespace Tester.TestStreamProviders.Generator
         public bool IsRewindable { get { return true; } }
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadOnly; } }
 
-        //TODO: Killme when Orleans service provider is accessable to the appication layer.
-        private class TempServiceProvider : IServiceProvider{ public object GetService(Type serviceType) { return Activator.CreateInstance(serviceType); } }
-        private static readonly IServiceProvider DefaultServiceProvider = new TempServiceProvider();
-
-        public GeneratorAdapterFactory()
-            : this(DefaultServiceProvider)
-        {
-        }
-
-        public GeneratorAdapterFactory(IServiceProvider serviceProvider)
-        {
-            if (serviceProvider == null)
-            {
-                throw new ArgumentNullException("serviceProvider");
-            }
-            this.serviceProvider = serviceProvider;
-        }
-
-        public void Init(IProviderConfiguration providerConfig, string providerName, Logger log)
+        public void Init(IProviderConfiguration providerConfig, string providerName, Logger log, IServiceProvider svcProvider)
         {
             this.logger = log;
+            this.serviceProvider = svcProvider;
             adapterConfig = new GeneratorAdapterConfig(providerName);
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             generatorConfig = serviceProvider.GetService(adapterConfig.GeneratorConfigType) as IStreamGeneratorConfig;
