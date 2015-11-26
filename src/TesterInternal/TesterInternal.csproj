@@ -90,7 +90,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="General\BuiltInSerializerTests.cs" />
-    <Compile Include="General\FallbackSerializationTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
     <Compile Include="General\FallbackBuiltInSerializationTests.cs" />
@@ -106,7 +105,7 @@
     <Compile Include="RemindersTest\MySqlRemindersTableTests.cs" />
     <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
-    <Compile Include="General\SerializationTests.cs" />
+    <Compile Include="General\InternalSerializationTests.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
