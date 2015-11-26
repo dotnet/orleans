@@ -26,14 +26,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
-
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;
@@ -102,6 +99,7 @@ namespace Orleans.Serialization
         private static readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
 
 
+        private static IExternalSerializer fallbackSerializer;
         private static readonly TraceLogger logger;
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
 
@@ -147,16 +145,29 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null)
+        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, bool useJsonFallbackSerializer = false)
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             AssemblyProcessor.Initialize();
             RegisterSerializationProviders(serializationProviders);
+            fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
         }
 
-        internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders)
+        internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
         {
             UseStandardSerializer = useStandardSerializer;
+
+#if DNXCORE50
+            if (!useJsonFallbackSerializer)
+            {
+                logger.Warn(ErrorCode.SerMgr_UnavailableSerializer,
+                    "Cann't use binary formatter as fallback serializer while running on .Net Core, will use Json.Net instead");
+            }
+
+            useJsonFallbackSerializer = true;
+#endif
+            fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+
             if (StatisticsCollector.CollectSerializationStats)
             {
                 const CounterStorage store = CounterStorage.LogOnly;
@@ -1120,13 +1131,9 @@ namespace Orleans.Serialization
                 {
                     SerializeArray((Array)obj, stream, expected, et);
                 }
-                else if (et.GetTypeInfo().IsSerializable)
-                {
-                    FallbackSerializer(obj, stream);
-                }
                 else
                 {
-                    FallbackSerializer(obj, stream);
+                    FallbackSerializer(obj, stream, et);
                 }
                 return;
             }
@@ -1149,7 +1156,7 @@ namespace Orleans.Serialization
 
             if (typeInfo.IsSerializable)
             {
-                FallbackSerializer(obj, stream);
+                FallbackSerializer(obj, stream, t);
                 return;
             }
 
@@ -1164,7 +1171,7 @@ namespace Orleans.Serialization
                 var foo = new Exception(String.Format("Non-serializable exception of type {0}: {1}" + Environment.NewLine + "at {2}",
                                                       t.OrleansTypeName(), rawException.Message,
                                                       rawException.StackTrace));
-                FallbackSerializer(foo, stream);
+                FallbackSerializer(foo, stream, t);
                 return;
             }
 
@@ -1878,7 +1885,7 @@ namespace Orleans.Serialization
 
         #region Fallback serializer and deserializer
 
-        private static void FallbackSerializer(object raw, BinaryTokenStreamWriter stream)
+        private static void FallbackSerializer(object raw, BinaryTokenStreamWriter stream, Type t)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1888,17 +1895,8 @@ namespace Orleans.Serialization
                 FallbackSerializations.Increment();
             }
 
-            var formatter = new BinaryFormatter();
-            byte[] bytes;
-            using (var memoryStream = new MemoryStream())
-            {
-                formatter.Serialize(memoryStream, raw);
-                memoryStream.Flush();
-                bytes = memoryStream.ToArray();
-            }
             stream.Write(SerializationTokenType.Fallback);
-            stream.Write(bytes.Length);
-            stream.Write(bytes);
+            fallbackSerializer.Serialize(raw, stream, t);
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -1916,22 +1914,34 @@ namespace Orleans.Serialization
                 timer.Start();
                 FallbackDeserializations.Increment();
             }
-
-            var n = stream.ReadInt();
-            var bytes = stream.ReadBytes(n);
-            var formatter = new BinaryFormatter();
-            object ret = null;
-            using (var memoryStream = new MemoryStream(bytes))
-            {
-                ret = formatter.Deserialize(memoryStream);
-            }
-
+            var retVal = fallbackSerializer.Deserialize(null, stream);
             if (timer != null)
             {
                 timer.Stop();
                 FallbackDeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
-            return ret;
+
+            return retVal;
+        }
+
+        private static IExternalSerializer GetFallbackSerializer(bool useJsonSerializer)
+        {
+            IExternalSerializer serializer;
+            if (useJsonSerializer)
+            {
+                serializer = new OrleansJsonSerializer();
+            }
+            else
+            {
+#if DNXCORE50
+                throw new OrleansException("Can't use binary formatter as fallback serializer while running on .Net Core");
+#else
+                serializer = new BinaryFormatterSerializer();
+#endif
+            }
+
+            serializer.Initialize(logger);
+            return serializer;
         }
 
         private static Assembly OnResolveEventHandler(Object sender, ResolveEventArgs arg)
@@ -1955,23 +1965,13 @@ namespace Orleans.Serialization
                 FallbackCopies.Increment();
             }
 
-            var formatter = new BinaryFormatter();
-            object ret = null;
-            using (var memoryStream = new MemoryStream())
-            {
-                formatter.Serialize(memoryStream, obj);
-                memoryStream.Flush();
-                memoryStream.Seek(0, SeekOrigin.Begin);
-                formatter.Binder = DynamicBinder.Instance;
-                ret = formatter.Deserialize(memoryStream);
-            }
-
+            var retVal = fallbackSerializer.DeepCopy(obj);
             if (StatisticsCollector.CollectSerializationStats)
             {
                 timer.Stop();
                 FallbackCopiesTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
-            return ret;
+            return retVal;
         }
 
         #endregion
@@ -2244,39 +2244,6 @@ namespace Orleans.Serialization
                         logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);
                     }
                 });
-        }
-        
-        /// <summary>
-        /// This appears necessary because the BinaryFormatter by default will not see types
-        /// that are defined by the InvokerGenerator.
-        /// Needs to be public since it used by generated client code.
-        /// </summary>
-        class DynamicBinder : SerializationBinder
-        {
-            public static readonly SerializationBinder Instance = new DynamicBinder();
-
-            private readonly Dictionary<string, Assembly> assemblies = new Dictionary<string, Assembly>();
-
-            public override Type BindToType(string assemblyName, string typeName)
-            {
-                lock (this.assemblies)
-                {
-                    Assembly result;
-                    if (!this.assemblies.TryGetValue(assemblyName, out result))
-                    {
-                        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                            this.assemblies[assembly.GetName().FullName] = assembly;
-
-                        // in some cases we have to explicitly load the assembly even though it seems to be already loaded but for some reason it's not listed in AppDomain.CurrentDomain.GetAssemblies()
-                        if (!this.assemblies.TryGetValue(assemblyName, out result))
-                            this.assemblies[assemblyName] = Assembly.Load(new AssemblyName(assemblyName));
-
-                        result = this.assemblies[assemblyName];
-                    }
-
-                    return result.GetType(typeName);
-                }
-            }
         }
 
         public struct SerializerMethods

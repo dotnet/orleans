@@ -21,6 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -89,14 +90,16 @@ namespace UnitTests.StreamingTests
 
             var states = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
             Assert.AreEqual(2, states.Length);
-            foreach (var state in states.Cast<PersistentStreamProviderState>())
+            foreach (var state in states)
             {
-                Assert.AreEqual(expectedState, state);
+                PersistentStreamProviderState providerState;
+                Enum.TryParse(state.ToString(), out providerState);
+                Assert.AreEqual(expectedState, providerState);
             }
 
             var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.AreEqual(2, numAgents.Length);
-            int totalNumAgents = numAgents.Cast<int>().Sum();
+            int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
             if (expectedState == PersistentStreamProviderState.AgentsStarted)
             {
                 Assert.AreEqual(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, totalNumAgents);

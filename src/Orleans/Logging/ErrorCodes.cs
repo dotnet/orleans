@@ -903,6 +903,7 @@ namespace Orleans
         SerMgr_IgnoreAssembly                   = SerializationManagerBase + 8,
         SerMgr_TypeRegistrationFailureIgnore    = SerializationManagerBase + 9,
         SerMgr_ArtifactReport                   = SerializationManagerBase + 10,
+        SerMgr_UnavailableSerializer            = SerializationManagerBase + 11,
 
         WatchdogBase                            = Runtime + 2600,
         Watchdog_ParticipantThrownException     = WatchdogBase + 1,

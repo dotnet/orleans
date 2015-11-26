@@ -39,6 +39,7 @@ namespace UnitTests.OrleansRuntime
         public void InitializeForTesting()
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            SerializationManager.Initialize(false, null, false);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
