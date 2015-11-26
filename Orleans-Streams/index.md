@@ -53,12 +53,17 @@ public class ChatUser: Grain
     }
 }
 ```
-More details can be found in the [Streams Programming APIs](Streams-Programming-APIs).
 
-## Quick Start sample
+-----------------------------------
 
-The [Quick Start Sample](Streams-Quick-Start) is a good overview of the overall workflow of using streams in an application.
-After reading it you should return back to this page and read the rest of the material to get a good understanding of the concepts.
+## Quick Start Sample
+
+The [Quick Start Sample](Streams-Quick-Start) is a good quick overview of the overall workflow of using streams in the application.
+After reading it you should read the [Streams Programming APIs](Streams-Programming-APIs) to get a deeper understanding of the concepts.
+
+## Streams Programming APIs
+
+A [Streams Programming APIs](Streams-Programming-APIs) provides detailed description of the programming APIs.
 
 ## Stream Providers
 
