@@ -351,7 +351,7 @@ namespace Orleans.Runtime
         {
             if (debugContext == null && USE_DEBUG_CONTEXT)
             {
-                debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+                debugContext = string.Intern(GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments));
             }
 
             // Call any registered client pre-call interceptor function.
