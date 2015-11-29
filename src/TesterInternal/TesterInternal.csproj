@@ -106,6 +106,7 @@
     <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="General\InternalSerializationTests.cs" />
+    <Compile Include="Serialization\SerializerGenerationTests.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
