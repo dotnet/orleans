@@ -30,7 +30,7 @@ namespace UnitTests.General
     /// Tests for the serialization system.
     /// </summary>
     [TestClass]
-    public class FallbackSerializationTests : SerializationTests
+    public class JsonFallbackSerializationTests : SerializationTests
     {
         /// <summary>
         /// Initializes the system for testing.

@@ -40,7 +40,7 @@ namespace UnitTests.General
     /// Tests for the serialization system.
     /// </summary>
     [TestClass]
-    public class SerializationTests
+    public class InternalSerializationTests
     {
         /// <summary>
         /// Initializes the system for testing.
