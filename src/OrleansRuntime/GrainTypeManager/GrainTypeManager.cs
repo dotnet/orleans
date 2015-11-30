@@ -252,26 +252,37 @@ namespace Orleans.Runtime
             private readonly Type baseInvokerType;
             private IGrainMethodInvoker invoker;
             private readonly Dictionary<string, IGrainMethodInvoker> cachedGenericInvokers;
+            private readonly object cachedGenericInvokersLockObj;
 
             public InvokerData(Type invokerType)
             {
                 baseInvokerType = invokerType;
-                if(invokerType.GetTypeInfo().IsGenericType)
+                if (invokerType.GetTypeInfo().IsGenericType)
+                {
                     cachedGenericInvokers = new Dictionary<string, IGrainMethodInvoker>();
+                    cachedGenericInvokersLockObj = new object();;
+                }
             }
 
             public IGrainMethodInvoker GetInvoker(string genericGrainType = null)
             {
                 if (String.IsNullOrEmpty(genericGrainType))
                     return invoker ?? (invoker = (IGrainMethodInvoker) Activator.CreateInstance(baseInvokerType));
-                
-                if (cachedGenericInvokers.ContainsKey(genericGrainType))
-                    return cachedGenericInvokers[genericGrainType];
+                lock (cachedGenericInvokersLockObj)
+                {
+                    if (cachedGenericInvokers.ContainsKey(genericGrainType))
+                        return cachedGenericInvokers[genericGrainType];
+                }
 
                 var typeArgs = TypeUtils.GenericTypeArgs(genericGrainType);
                 var concreteType = baseInvokerType.MakeGenericType(typeArgs);
                 var inv = (IGrainMethodInvoker) Activator.CreateInstance(concreteType);
-                cachedGenericInvokers[genericGrainType] = inv;
+                lock (cachedGenericInvokersLockObj)
+                {
+                    if (!cachedGenericInvokers.ContainsKey(genericGrainType))
+                        cachedGenericInvokers[genericGrainType] = inv;
+                }
+
                 return inv;
             }
         }
