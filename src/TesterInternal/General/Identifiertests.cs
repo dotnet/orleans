@@ -49,6 +49,7 @@ namespace UnitTests.General
         [TestInitialize]
         public void InitializeForTesting()
         {
+            SerializationManager.InitializeForTesting();
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
