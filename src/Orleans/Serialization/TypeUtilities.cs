@@ -225,9 +225,9 @@ namespace Orleans.Serialization
             }
         }
 
-        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module fromModule, Assembly fromAssembly)
+        public static bool IsTypeIsInaccessibleForSerialization(Type type, Module fromModule, Assembly fromAssembly)
         {
-            var typeInfo = t.GetTypeInfo();
+            var typeInfo = type.GetTypeInfo();
 
             if (!typeInfo.IsVisible && typeInfo.IsConstructedGenericType)
             {
@@ -265,7 +265,7 @@ namespace Orleans.Serialization
                 return IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly);
             }
 
-            var result = typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily;
+            var result = typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
             
             return result;
         }
