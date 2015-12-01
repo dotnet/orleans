@@ -293,7 +293,11 @@ namespace Orleans.Runtime
             {
                 Close();
                 LogConsumers = new ConcurrentBag<ILogConsumer>();
-                if (loggerStoreInternCache != null) loggerStoreInternCache.StopAndClear();
+                TelemetryConsumers = new ConcurrentBag<ITelemetryConsumer>();
+
+                if (loggerStoreInternCache != null) 
+                    loggerStoreInternCache.StopAndClear();
+                
                 BulkMessageInterval = defaultBulkMessageInterval;
                 BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
                 IsInitialized = false;
