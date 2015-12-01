@@ -21,6 +21,8 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System.Linq;
+
 namespace Orleans.CodeGenerator
 {
     using System;
@@ -129,7 +131,18 @@ namespace Orleans.CodeGenerator
             }
 
             if (TypeUtils.HasAllSerializationMethods(t)) return false;
-            
+
+            // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
+            var skipSerialzerGeneration = t.GetAllFields()
+                .Any(
+                    field => !field.IsNotSerialized &&
+                        TypeUtilities.IsTypeIsInaccessibleForSerialization(
+                            field.FieldType,
+                            module,
+                            targetAssembly));
+            if (skipSerialzerGeneration)
+                return true;
+
             TypesToProcess.Add(t);
             return true;
         }
