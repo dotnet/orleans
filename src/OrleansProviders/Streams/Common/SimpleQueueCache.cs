@@ -66,8 +66,6 @@ namespace Orleans.Providers.Streams.Common
         private const int NUM_CACHE_HISTOGRAM_BUCKETS = 10;
         private readonly int CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
 
-        public QueueId Id { get; private set; }
-
         public int Size 
         {
             get { return cachedMessages.Count; }
@@ -78,9 +76,8 @@ namespace Orleans.Providers.Streams.Common
             get { return CACHE_HISTOGRAM_MAX_BUCKET_SIZE; }
         }
 
-        public SimpleQueueCache(QueueId queueId, int cacheSize, Logger logger)
+        public SimpleQueueCache(int cacheSize, Logger logger)
         {
-            Id = queueId;
             cachedMessages = new LinkedList<SimpleQueueCacheItem>();
             maxCacheSize = cacheSize;
             

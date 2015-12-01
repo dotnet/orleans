@@ -49,12 +49,7 @@ namespace Orleans.Providers.Streams.Common
 
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return caches.AddOrUpdate(queueId, (id) => new SimpleQueueCache(id, cacheSize, logger), (id, queueCache) => queueCache);
-        }
-
-        public int Size
-        {
-            get { return caches.Select(pair => pair.Value.Size).Sum(); }
+            return caches.AddOrUpdate(queueId, (id) => new SimpleQueueCache(cacheSize, logger), (id, queueCache) => queueCache);
         }
 
         public static int ParseSize(IProviderConfiguration config, int defaultSize)

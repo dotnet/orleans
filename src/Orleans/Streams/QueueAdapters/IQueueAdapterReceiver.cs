@@ -32,8 +32,6 @@ namespace Orleans.Streams
     /// </summary>
     public interface IQueueAdapterReceiver
     {
-        QueueId Id { get; }
-
         /// <summary>
         /// Initialize this receiver.
         /// </summary>

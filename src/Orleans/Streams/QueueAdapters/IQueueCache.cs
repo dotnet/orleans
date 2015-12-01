@@ -29,16 +29,6 @@ namespace Orleans.Streams
     public interface IQueueCache
     {
         /// <summary>
-        /// The id of the queue for which this cache is caching data.
-        /// </summary>
-        QueueId Id { get; }
-
-        /// <summary>
-        /// Current cache size.
-        /// </summary>
-        int Size { get; }
-
-        /// <summary>
         /// The limit of the maximum number of items that can be added to the cache in a single AddToCache operation.
         /// </summary>
         int MaxAddCount { get; }
