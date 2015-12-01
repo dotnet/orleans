@@ -160,6 +160,16 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestFSharp", "TestFSharp\Te
 		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalGrains", "TestInternalGrains\TestInternalGrains.csproj", "{4682ABC1-1A51-4794-8012-DA8E59EBC72E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalGrainInterfaces", "TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj", "{2AE67055-F38A-45F0-AEA7-5754F4814EA5}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -246,6 +256,14 @@ Global
 		{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CA8DAB68-17E9-48BF-AFA3-9CCFD4B0A3CD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4682ABC1-1A51-4794-8012-DA8E59EBC72E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4682ABC1-1A51-4794-8012-DA8E59EBC72E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4682ABC1-1A51-4794-8012-DA8E59EBC72E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4682ABC1-1A51-4794-8012-DA8E59EBC72E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2AE67055-F38A-45F0-AEA7-5754F4814EA5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2AE67055-F38A-45F0-AEA7-5754F4814EA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2AE67055-F38A-45F0-AEA7-5754F4814EA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2AE67055-F38A-45F0-AEA7-5754F4814EA5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
