@@ -42,44 +42,40 @@ namespace UnitTests.General
             SerializationManager.InitializeForTesting();
         }
 
-        [Ignore, TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
-        public void SerializationTests_FSharp_IntOption_Some()
+        void RoundtripSerializationTest<T>(T input)
         {
-            var input = FSharpOption<int>.Some(0);
             var output = SerializationManager.RoundTripSerializationForTesting(input);
             Assert.AreEqual(input, output);
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        public void SerializationTests_FSharp_IntOption_Some()
+        {
+            RoundtripSerializationTest(FSharpOption<int>.Some(0));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_None()
         {
-            var input = FSharpOption<int>.None;
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
-            Assert.AreEqual(input, output);
+            RoundtripSerializationTest(FSharpOption<int>.None);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofInt()
         {
-            var input = Record.ofInt(1);
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
-            Assert.AreEqual(input, output);
+            RoundtripSerializationTest(Record.ofInt(1));
         }
 
-        [Ignore, TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofIntOption_Some()
         {
-            var input = RecordOfIntOption.ofInt(1);
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
-            Assert.AreEqual(input, output);
+            RoundtripSerializationTest(RecordOfIntOption.ofInt(1));
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofIntOption_None()
         {
-            var input = RecordOfIntOption.Empty;
-            var output = SerializationManager.RoundTripSerializationForTesting(input);
-            Assert.AreEqual(input, output);
+            RoundtripSerializationTest(RecordOfIntOption.Empty);
         }
     }
 }
