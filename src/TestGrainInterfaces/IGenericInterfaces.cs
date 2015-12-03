@@ -43,6 +43,24 @@ namespace UnitTests.GrainInterfaces
         Task SetB(T b);
     }
 
+    /// <summary>
+    /// Long named grain type, which can cause issues in AzureTableStorage
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    public interface ISimpleGenericGrainUsingAzureTableStorage<T> : IGrainWithIntegerKey
+    {
+        Task<T> EchoAsync(T entity);
+    }
+
+    /// <summary>
+    /// Short named grain type, which shouldn't cause issues in AzureTableStorage
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    public interface ITinyNameGrain<T> : IGrainWithIntegerKey
+    {
+        Task<T> EchoAsync(T entity);
+    }
+
     public interface ISimpleGenericGrainU<U> : IGrainWithIntegerKey
     {
         Task<U> GetA();
