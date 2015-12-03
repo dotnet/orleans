@@ -19,3 +19,5 @@ title: Load balancing in Orleans
 7.	**StreamQueueBalance** balances the responsibility of pulling events from persistence queues across silos in the cluster.
 
 Also notice that **balancing, in a broad sense, does not necessarily mean loss of locality**. One can be balanced and still maintain a good locality. For example, when balancing means sharding/partitioning, you can partition responsibility for a certain logical task, while still maintaining  locality within each partition. That applies both for local and distributed balancing.
+
+Refer to this presentation on [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx) for more details.

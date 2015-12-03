@@ -12,3 +12,5 @@ title: Orleans Presentations
 (http://www.hpts.ws/papers/2013/Bykov.pdf)
 
 * [Orleans Streaming Presentation from Virtual Meetup May 2015](http://dotnet.github.io/orleans/Presentations/Orleans Streaming - Virtual meetup - 5-22-2015.pptx)
+
+* [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx)

@@ -12,4 +12,5 @@ title: Runtime Implemention Details
 
 ### [Relational Storage](Relational-Storage)
 
-### [Load Balancing](Load-Balancing)
+### [Load Balancing](Load-Balancing) and [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx)
+
