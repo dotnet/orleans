@@ -6,13 +6,13 @@ using System.Linq;
 using Orleans.Serialization;
 using Orleans.Runtime;
 
-namespace Tester.ConfigurationTests
+namespace UnitTests.Serialization
 {
     [TestClass]
     public class SerializationProviderTests
     {
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer.xml")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer.xml")]
         public void LoadWithSingleProviderTest()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer.xml");
@@ -21,7 +21,7 @@ namespace Tester.ConfigurationTests
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer2.xml")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer2.xml")]
         public void LoadWithNoProvidersTest()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer2.xml");
@@ -29,7 +29,7 @@ namespace Tester.ConfigurationTests
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer3.xml")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer3.xml")]
         public void LoadWithDuplicateProviders()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer3.xml");
@@ -38,7 +38,7 @@ namespace Tester.ConfigurationTests
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer5.xml")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer5.xml")]
         public void LoadWithMultipleProvider1()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer5.xml");
@@ -48,7 +48,7 @@ namespace Tester.ConfigurationTests
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer6.xml")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer6.xml")]
         [ExpectedException(typeof(FormatException))]
         public void LoadWithClassNotImplementingInterface()
         {
@@ -56,7 +56,7 @@ namespace Tester.ConfigurationTests
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer7.xml")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer7.xml")]
         [ExpectedException(typeof(FormatException))]
         public void LoadWithAbstractClass()
         {
@@ -64,7 +64,7 @@ namespace Tester.ConfigurationTests
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer8.xml")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer8.xml")]
         [ExpectedException(typeof(FormatException))]
         public void LoadWithInvalidConstructorClass()
         {

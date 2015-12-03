@@ -25,10 +25,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using Microsoft.FSharp.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Serialization;
-
 using UnitTests.FSharpTypes;
 
-namespace UnitTests.General
+namespace UnitTests.Serialization
 {
     /// <summary>
     /// Summary description for SerializationTests

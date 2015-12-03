@@ -6,7 +6,7 @@ using Orleans.Runtime;
 using System.Reflection;
 using System.Collections.Generic;
 
-namespace Tester
+namespace UnitTests.Serialization
 {
     [TestClass]
     public class ExternalSerializerTest
@@ -18,13 +18,13 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
-        public void TestCustomSerializerInitialized()
+        public void SerializationTests_CustomSerializerInitialized()
         {
             Assert.IsTrue(FakeSerializer.Initialized, "The fake serializer wasn't discovered");
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
-        public void TestCustomSerializerIsSupportedType()
+        public void SerializationTests_CustomSerializerIsSupportedType()
         {
             var data = new FakeSerialized { SomeData = "some data" };
             SerializationManager.RoundTripSerializationForTesting(data);
@@ -33,7 +33,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
-        public void TestThatSerializeAndDeserializeWereInvoked()
+        public void SerializationTests_ThatSerializeAndDeserializeWereInvoked()
         {
             var data = new FakeSerialized { SomeData = "some data" };
             SerializationManager.RoundTripSerializationForTesting(data);
@@ -42,7 +42,7 @@ namespace Tester
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
-        public void TestThatCopyWasInvoked()
+        public void SerializationTests_ThatCopyWasInvoked()
         {
             var data = new FakeSerialized { SomeData = "some data" };
             SerializationManager.DeepCopy(data);
