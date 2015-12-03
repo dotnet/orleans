@@ -21,10 +21,6 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using Orleans.Streams;
-
 namespace Orleans.Streams
 {
     public interface IQueueAdapterCache
@@ -34,10 +30,5 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="messages"></param>
         IQueueCache CreateQueueCache(QueueId queueId);
-
-        /// <summary>
-        /// Current total size of this cache.
-        /// </summary>
-        int Size { get; }
     }
 }
