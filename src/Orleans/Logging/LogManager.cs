@@ -432,8 +432,9 @@ namespace Orleans.Runtime
                 var process = Process.GetCurrentProcess();
 
                 // It is safe to call DangerousGetHandle() here because the process is already crashing.
+                var handle = GetProcessHandle(process);
                 NativeMethods.MiniDumpWriteDump(
-                    process.Handle,
+                    handle,
                     process.Id,
                     stream.SafeFileHandle.DangerousGetHandle(),
                     dumpType,
@@ -443,6 +444,15 @@ namespace Orleans.Runtime
             }
 
             return new FileInfo(dumpFileName);
+        }
+
+        private static IntPtr GetProcessHandle(Process process)
+        {
+#if NETSTANDARD
+            return process.SafeHandle.DangerousGetHandle();
+#else
+            return process.Handle;
+#endif
         }
 
         /// <summary>
