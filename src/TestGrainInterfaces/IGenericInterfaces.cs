@@ -50,6 +50,8 @@ namespace UnitTests.GrainInterfaces
     public interface ISimpleGenericGrainUsingAzureTableStorage<T> : IGrainWithIntegerKey
     {
         Task<T> EchoAsync(T entity);
+
+        Task ClearState();
     }
 
     /// <summary>
@@ -59,6 +61,8 @@ namespace UnitTests.GrainInterfaces
     public interface ITinyNameGrain<T> : IGrainWithIntegerKey
     {
         Task<T> EchoAsync(T entity);
+
+        Task ClearState();
     }
 
     public interface ISimpleGenericGrainU<U> : IGrainWithIntegerKey

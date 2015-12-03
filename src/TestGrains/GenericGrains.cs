@@ -81,6 +81,11 @@ namespace UnitTests.Grains
             await WriteStateAsync();
             return entity;
         }
+
+        public Task ClearState()
+        {
+            return ClearStateAsync();
+        }
     }
 
     [StorageProvider(ProviderName = "AzureStore")]
@@ -91,6 +96,11 @@ namespace UnitTests.Grains
             State.A = entity;
             await WriteStateAsync();
             return entity;
+        }
+
+        public Task ClearState()
+        {
+            return ClearStateAsync();
         }
     }
 

@@ -67,6 +67,12 @@ namespace UnitTests.General
         [ClassCleanup]
         public static void MyClassCleanup()
         {
+            var needsToBeRemoved1 = GrainFactory.GetGrain<ITinyNameGrain<int>>(42);
+            var needsToBeRemoved2 = GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(42);
+
+            needsToBeRemoved1.ClearState();
+            needsToBeRemoved2.ClearState();
+
             StopAllSilos();
         }
 
@@ -289,14 +295,14 @@ namespace UnitTests.General
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
         {
-            var grain = GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(grainId++);
+            var grain = GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(42);
             await grain.EchoAsync(42);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
         {
-            var grain = GrainFactory.GetGrain<ITinyNameGrain<int>>(grainId++);
+            var grain = GrainFactory.GetGrain<ITinyNameGrain<int>>(42);
             await grain.EchoAsync(42);
         }
 
