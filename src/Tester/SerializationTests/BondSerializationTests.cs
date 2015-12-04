@@ -25,7 +25,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using Bond;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Tester
+namespace UnitTests.Serialization
 {
     using Orleans.Serialization;
     using System.Collections.Generic;

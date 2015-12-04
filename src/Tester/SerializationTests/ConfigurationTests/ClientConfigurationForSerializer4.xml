@@ -8,7 +8,8 @@
   <Statistics MetricsTableWriteInterval="300s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
   <Messaging ResponseTimeout="30s" ClientSenderBuckets="8192" MaxResendCount="0">
     <SerializationProviders>
-      <Provider type="Tester.FakeSerializer, Tester"/>
+      <Provider type="UnitTests.Serialization.FakeSerializer, Tester"/>
+      <Provider type="UnitTests.Serialization.FakeSerializer2, Tester"/>
     </SerializationProviders>
   </Messaging>
 </ClientConfiguration>

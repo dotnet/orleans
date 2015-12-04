@@ -21,25 +21,13 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Runtime.Serialization;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Runtime.Configuration;
-using UnitTests.SerializerTests;
 
-namespace UnitTests.General
+namespace UnitTests.Serialization
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Reflection;
-
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-    using Orleans.CodeGeneration;
-    using Orleans.Runtime;
-    using Orleans.Serialization;
-
-    using UnitTests.GrainInterfaces;
-
     /// <summary>
     /// Tests for the serialization system.
     /// </summary>

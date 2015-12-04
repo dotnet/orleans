@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-namespace UnitTests.General
+namespace UnitTests.Serialization
 {
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using Orleans.Serialization;
@@ -30,7 +30,7 @@ namespace UnitTests.General
     /// Tests for the serialization system.
     /// </summary>
     [TestClass]
-    public class JsonFallbackSerializationTests : SerializationTests
+    public class JsonFallbackSerializationTests : SerializationTestsJsonTypes
     {
         /// <summary>
         /// Initializes the system for testing.

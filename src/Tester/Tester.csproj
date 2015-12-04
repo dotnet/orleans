@@ -120,9 +120,9 @@
     <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
     <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
-    <Compile Include="ConfigurationTests\SerializationProviderTests.cs" />
+    <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />
-    <Compile Include="JsonFallbackSerializationTests.cs" />
+    <Compile Include="SerializationTests\JsonFallbackSerializationTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainActivateDeactivateTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
@@ -137,12 +137,13 @@
     <Compile Include="RelationalUtilities\RelationalStorageForTesting.cs" />
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="RequestContextTest.cs" />
-    <Compile Include="SerializationOrderTests.cs" />
-    <Compile Include="SerializationTests.cs" />
+    <Compile Include="SerializationTests\SerializationOrderTests.cs" />
+    <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
+    <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
     <Compile Include="ExceptionPropagationTests.cs" />
     <Compile Include="FSharpGrainTests.cs" />
-    <Compile Include="SerializationTests.FSharpTypes.cs" />
+    <Compile Include="SerializationTests\SerializationTests.FSharpTypes.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
     <Compile Include="StreamingTests\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\ControllableStreamProviderTests.cs" />
@@ -167,8 +168,8 @@
     <Compile Include="TestStreamProviders\Generator\GeneratorStreamProvider.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
     <Compile Include="TestStreamProviders\Generator\Generators\SimpleGeneratorConfig.cs" />
-    <Compile Include="BondSerializationTests.cs" />
-    <Compile Include="ExternalSerializerTest.cs" />
+    <Compile Include="SerializationTests\BondSerializationTests.cs" />
+    <Compile Include="SerializationTests\ExternalSerializerTest.cs" />
     <Compile Include="UnitTestSiloHost.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -184,28 +185,28 @@
       <Link>OrleansConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer8.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer7.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer6.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer5.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer4.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer3.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer2.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ConfigurationTests\ClientConfigurationForSerializer.xml">
+    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ClientConfigurationForStreamTesting.xml">
