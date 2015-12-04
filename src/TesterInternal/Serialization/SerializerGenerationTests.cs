@@ -23,13 +23,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Serialization;
-using Orleans.TestingHost;
 using Orleans.UnitTest.GrainInterfaces;
-using UnitTests.Tester;
 
 // ReSharper disable NotAccessedVariable
 
-namespace UnitTests.SerializerTests
+namespace UnitTests.Serialization
 {
     /// <summary>
     /// Test the built-in serializers
@@ -44,7 +42,7 @@ namespace UnitTests.SerializerTests
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
-        public void TypeWithInternalNestedClass()
+        public void SerializationTests_TypeWithInternalNestedClass()
         {
             var v = new MyTypeWithAnInternalTypeField();
 

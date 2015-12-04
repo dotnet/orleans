@@ -670,7 +670,7 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Generics"), TestCategory("Serialization")]
-        public async Task Generic_CircularReferenceTest()
+        public async Task SerializationTests_Generic_CircularReferenceTest()
         {
             var grainId = Guid.NewGuid();
             var grain = GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));

@@ -6,40 +6,40 @@ using System.Linq;
 using Orleans.Serialization;
 using Orleans.Runtime;
 
-namespace Tester.ConfigurationTests
+namespace UnitTests.Serialization
 {
     [TestClass]
     public class SerializationProviderTests
     {
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer.xml")]
-        public void LoadWithSingleProviderTest()
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer.xml")]
+        public void SerializationProvider_LoadWithSingleProviderTest()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer.xml");
             Assert.AreEqual(1, clientConfig.SerializationProviders.Count);
             Assert.AreEqual(typeof(FakeSerializer), clientConfig.SerializationProviders.First());
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer2.xml")]
-        public void LoadWithNoProvidersTest()
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer2.xml")]
+        public void SerializationProvider_LoadWithNoProvidersTest()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer2.xml");
             Assert.AreEqual(0, clientConfig.SerializationProviders.Count);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer3.xml")]
-        public void LoadWithDuplicateProviders()
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer3.xml")]
+        public void SerializationProvider_LoadWithDuplicateProviders()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer3.xml");
             Assert.AreEqual(1, clientConfig.SerializationProviders.Count);
             Assert.IsTrue(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer5.xml")]
-        public void LoadWithMultipleProvider1()
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer5.xml")]
+        public void SerializationProvider_LoadWithMultipleProvider1()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer5.xml");
             Assert.AreEqual(2, clientConfig.SerializationProviders.Count);
@@ -47,26 +47,26 @@ namespace Tester.ConfigurationTests
             Assert.IsTrue(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer2)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer6.xml")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer6.xml")]
         [ExpectedException(typeof(FormatException))]
-        public void LoadWithClassNotImplementingInterface()
+        public void SerializationProvider_LoadWithClassNotImplementingInterface()
         {
             ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer6.xml");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer7.xml")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer7.xml")]
         [ExpectedException(typeof(FormatException))]
-        public void LoadWithAbstractClass()
+        public void SerializationProvider_LoadWithAbstractClass()
         {
             ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer7.xml");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
-        [DeploymentItem("ConfigurationTests\\ClientConfigurationForSerializer8.xml")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [DeploymentItem("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer8.xml")]
         [ExpectedException(typeof(FormatException))]
-        public void LoadWithInvalidConstructorClass()
+        public void SerializationProvider_LoadWithInvalidConstructorClass()
         {
             ClientConfiguration.LoadFromFile("ClientConfigurationForSerializer8.xml");
         }

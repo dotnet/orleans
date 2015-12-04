@@ -57,7 +57,10 @@ namespace Tester.TestStreamProviders.Generator
         /// <returns></returns>
         public void WriteProperties(Dictionary<string, string> properties)
         {
-            properties.Add(GeneratorConfigTypeName, GeneratorConfigType.AssemblyQualifiedName);
+            if (GeneratorConfigType != null)
+            {
+                properties.Add(GeneratorConfigTypeName, GeneratorConfigType.AssemblyQualifiedName);
+            }
             properties.Add(TotalQueueCountName, TotalQueueCount.ToString(CultureInfo.InvariantCulture));
         }
 
@@ -68,10 +71,6 @@ namespace Tester.TestStreamProviders.Generator
         public virtual void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
             GeneratorConfigType = providerConfiguration.GetTypeProperty(GeneratorConfigTypeName, null);
-            if (GeneratorConfigType == null)
-            {
-                throw new ArgumentOutOfRangeException("providerConfiguration", "GeneratorConfigType not set.");
-            }
             if (string.IsNullOrWhiteSpace(StreamProviderName))
             {
                 throw new ArgumentOutOfRangeException("providerConfiguration", "StreamProviderName not set.");

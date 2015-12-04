@@ -28,9 +28,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Tester.TestStreamProviders.Controllable;
 using Tester.TestStreamProviders.Generator;
 using Tester.TestStreamProviders.Generator.Generators;
 using TestGrainInterfaces;
@@ -42,26 +44,20 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class StreamGeneratorProviderTests : UnitTestSiloHost
+    public class ControllableStreamGeneratorProviderTests : UnitTestSiloHost
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
         private const string StreamProviderName = GeneratedEventCollectorGrain.StreamProviderName;
+        private static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
         private const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
-
-        private readonly static SimpleGeneratorConfig GeneratorConfig = new SimpleGeneratorConfig
-        {
-            StreamNamespace = StreamNamespace,
-            EventsInStream = 100
-        };
 
         private readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
         {
             TotalQueueCount = 4,
-            GeneratorConfigType = GeneratorConfig.GetType()
         };
 
-        public StreamGeneratorProviderTests()
+        public ControllableStreamGeneratorProviderTests()
             : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
@@ -75,7 +71,6 @@ namespace UnitTests.StreamingTests
             var settings = new Dictionary<string, string>();
             // get initial settings from configs
             AdapterConfig.WriteProperties(settings);
-            GeneratorConfig.WriteProperties(settings);
 
             // add queue balancer setting
             settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
@@ -101,13 +96,49 @@ namespace UnitTests.StreamingTests
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task ValidateGeneratedStreamsTest()
+        public async Task ValidateControllableGeneratedStreamsTest()
         {
-            logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
-            await TestingUtils.WaitUntilAsync(CheckCounters, Timeout);
+            logger.Info("************************ ValidateControllableGeneratedStreamsTest *********************************");
+            await ValidateControllableGeneratedStreams();
         }
 
-        private async Task<bool> CheckCounters(bool assertIsTrue)
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task Validate2ControllableGeneratedStreamsTest()
+        {
+            logger.Info("************************ Validate2ControllableGeneratedStreamsTest *********************************");
+            await ValidateControllableGeneratedStreams();
+            await ValidateControllableGeneratedStreams();
+        }
+
+        public async Task ValidateControllableGeneratedStreams()
+        {
+            try
+            {
+                var generatorConfig = new SimpleGeneratorConfig
+                {
+                    StreamNamespace = StreamNamespace,
+                    EventsInStream = 100
+                };
+
+                var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+                object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+                Assert.AreEqual(2, results.Length, "expected responses");
+                bool[] bResults = results.Cast<bool>().ToArray();
+                foreach (var result in bResults)
+                {
+                    Assert.AreEqual(true, result, "Control command result");
+                }
+
+                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(generatorConfig, assertIsTrue), Timeout);
+            }
+            finally
+            {
+                var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedEventCollectorGrain.ReporterId);
+                reporter.Reset().Ignore();
+            }
+        }
+
+        private async Task<bool> CheckCounters(SimpleGeneratorConfig generatorConfig, bool assertIsTrue)
         {
             var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedEventCollectorGrain.ReporterId);
 
@@ -118,11 +149,11 @@ namespace UnitTests.StreamingTests
                 Assert.AreEqual(AdapterConfig.TotalQueueCount, report.Count, "Stream count");
                 foreach (int eventsPerStream in report.Values)
                 {
-                    Assert.AreEqual(GeneratorConfig.EventsInStream, eventsPerStream, "Events per stream");
+                    Assert.AreEqual(generatorConfig.EventsInStream, eventsPerStream, "Events per stream");
                 }
             }
             else if (AdapterConfig.TotalQueueCount != report.Count ||
-                     report.Values.Any(count => count != GeneratorConfig.EventsInStream))
+                     report.Values.Any(count => count != generatorConfig.EventsInStream))
             {
                 return false;
             }

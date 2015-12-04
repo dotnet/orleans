@@ -22,7 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 
-namespace Tester
+namespace UnitTests.Serialization
 {
     using System;
     using System.Collections.Generic;
