@@ -82,9 +82,9 @@ namespace UnitTests.Grains
             return entity;
         }
 
-        public Task ClearState()
+        public async Task ClearState()
         {
-            return ClearStateAsync();
+            await ClearStateAsync();
         }
     }
 
@@ -98,9 +98,9 @@ namespace UnitTests.Grains
             return entity;
         }
 
-        public Task ClearState()
+        public async Task ClearState()
         {
-            return ClearStateAsync();
+            await ClearStateAsync();
         }
     }
 

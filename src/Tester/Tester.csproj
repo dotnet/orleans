@@ -122,6 +122,7 @@
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />
+    <Compile Include="GenericGrainsInAzureStorageTests.cs" />
     <Compile Include="JsonFallbackSerializationTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainActivateDeactivateTests.cs" />
