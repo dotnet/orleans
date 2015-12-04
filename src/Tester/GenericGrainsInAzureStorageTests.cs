@@ -56,7 +56,7 @@ namespace UnitTests.General
             base.AdjustForTest(config);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Generics")]
+        [TestMethod, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
         [Ignore]
         //This test currently fails, because the name of the interface is too long
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
@@ -68,7 +68,7 @@ namespace UnitTests.General
             //await grain.ClearState();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Generics")]
+        [TestMethod, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
         //This test is identical to the one above, with a shorter name, and passes
         public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
         {
