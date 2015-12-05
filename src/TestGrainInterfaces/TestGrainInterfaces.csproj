@@ -49,6 +49,7 @@
     <Compile Include="ICircularStateTestGrain.cs" />
     <Compile Include="IActivateDeactivateWatcherGrain.cs" />
     <Compile Include="IExceptionGrain.cs" />
+    <Compile Include="IExternalTypeGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGeneratorTestDerivedDerivedGrain.cs" />
     <Compile Include="IGeneratorTestDerivedGrain1.cs" />
