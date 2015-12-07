@@ -71,7 +71,7 @@ namespace Orleans.Runtime.Configuration
                         var pluginType = assembly.GetType(className);
                         if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
 
-                        var args = grandchild.Attributes.Cast<XmlAttribute>().Where(a => a.Value != "Type" && a.Value != "Assembly").ToArray();
+                        var args = grandchild.Attributes.Cast<XmlAttribute>().Where(a => a.LocalName != "Type" && a.LocalName != "Assembly").ToArray();
 
                         var plugin = Activator.CreateInstance(pluginType, args);
                         
