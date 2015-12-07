@@ -538,11 +538,6 @@ namespace Orleans.Runtime
                     }
                 }
 
-                // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
-                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
-
                 bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
                     () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations),
@@ -552,6 +547,12 @@ namespace Orleans.Runtime
                 allSiloProviders.AddRange(BootstrapProviders);
 
                 if (logger.IsVerbose) { logger.Verbose("App bootstrap calls done successfully."); }
+
+                // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
+                // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
+                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 
                 // Now that we're active, we can start the gateway
                 var mc = messageCenter as MessageCenter;
