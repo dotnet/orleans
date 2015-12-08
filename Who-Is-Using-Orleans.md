@@ -34,6 +34,7 @@ Honeywell | <a href="http://honeywell.com/" target="_blank">http://honeywell.com
 Mesh Systems | <a href="http://www.mesh-systems.com/" target="_blank">http://www.mesh-systems.com/</a> | _MESHVista Smart Cloud IoT Platform_ leverages Orleans for back-end services monitoring device state and business logic
 Applicita Limited | <a href="http://www.applicita.com/" target="_blank">http://www.applicita.com/</a> | A number of client projects where extreme scale and performance is required
 
+
 ## Projects and Applications
 
 This list is for projects, websites and applications that are powered by Orleans, or provide extensions to Orleans.
