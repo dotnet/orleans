@@ -88,30 +88,9 @@ A partial list of companies, projects and applications which are using Orleans.
 
 ### Contributing To This Project
 
-* **[Orleans GitHub Repository](https://github.com/dotnet/orleans)** 
-Pull requests are always welcome!
+* Notes and guidelines for people wanting to [contribute code changes to Project Orleans](Contributing).
 
-* **[Ideas for Contributions](Ideas-for-Contributions)**
-
-* **[Intern and Student Projects](Student-Projects)** 
-Some suggestions for possible intern / student projects.
-
-* **[Documentation Guidelines](Documentation-Guidelines)** A style guide for writing documentation for this site.
-
-#### Code Contributions:
-
-This project uses the same contribution process as the other **[DotNet projects](http://dotnet.github.io/)** on GitHub.
-
-* **[DotNet Project Contribution Guidelines](https://github.com/dotnet/corefx/wiki/Contributing)**
-Guidelines and workflow for contributing to DotNet projects on GitHub.
-
-* **[DotNet CLA](https://github.com/dotnet/corefx/wiki/Contribution-License-Agreement-%28CLA%29)**
-Contribution License Agreement for DotNet projects on GitHub.
-
-* **[.NET Framework Design Guidelines](https://github.com/dotnet/corefx/wiki/Framework-Design-Guidelines-Digest)** 
-Some basic API design rules, coding standards, and style guide for .NET Framework APIs.
-
-You are also encouraged to start a technical discussion by filing an new [issue](https://github.com/dotnet/orleans/issues) on GitHub.
+* You are also encouraged to report bugs or start a technical discussion by filing an new [thread](https://github.com/dotnet/orleans/issues) on GitHub.
 
 ## Other Documentation Resources
 
