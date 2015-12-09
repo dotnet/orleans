@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>OrleansSQLUtils</RootNamespace>
     <AssemblyName>OrleansSQLUtils</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -40,11 +40,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Azure.SqlDatabase.ElasticScale.Client">
-      <HintPath>..\packages\Microsoft.Azure.SqlDatabase.ElasticScale.Client.1.1.0\lib\net45\Microsoft.Azure.SqlDatabase.ElasticScale.Client.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Azure.SqlDatabase.ElasticScale.Client.1.1.0\lib\net45\Microsoft.Azure.SqlDatabase.ElasticScale.Client.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.Practices.EnterpriseLibrary.TransientFaultHandling">
-      <HintPath>..\packages\EnterpriseLibrary.TransientFaultHandling.6.0.1304.0\lib\portable-net45+win+wp8\Microsoft.Practices.EnterpriseLibrary.TransientFaultHandling.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\EnterpriseLibrary.TransientFaultHandling.6.0.1304.0\lib\portable-net45+win+wp8\Microsoft.Practices.EnterpriseLibrary.TransientFaultHandling.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -53,7 +53,7 @@
     <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Data" />
     <Reference Include="System.Threading.Tasks.Dataflow">
-      <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.24\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Microsoft.Tpl.Dataflow.4.5.24\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Xml" />

@@ -15,7 +15,7 @@
     <RootNamespace>VSProjectTemplateGrainInterfaceVB</RootNamespace>
     <AssemblyName>VSProjectTemplateGrainInterfaceVB</AssemblyName>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <OptionExplicit>On</OptionExplicit>
     <OptionCompare>Binary</OptionCompare>
     <OptionStrict>Off</OptionStrict>
