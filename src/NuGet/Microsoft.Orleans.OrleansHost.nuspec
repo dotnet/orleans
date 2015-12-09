@@ -23,9 +23,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansHost.exe" target="lib\net45" />
-    <file src="OrleansHost.pdb" target="lib\net45" />
-    <file src="OrleansHost.exe.config" target="lib\net45" />
+    <file src="OrleansHost.exe" target="lib\net451" />
+    <file src="OrleansHost.pdb" target="lib\net451" />
+    <file src="OrleansHost.exe.config" target="lib\net451" />
     <file src="$SRC_DIR$OrleansHost\**\*.cs" target="src" />
   </files>
 </package>
