@@ -253,7 +253,48 @@ namespace Orleans.Runtime
 
         public int CompareTo(SiloAddress other)
         {
-            return other == null ? 1 : Generation.CompareTo(other.Generation);
+            if (other == null) return 1;
+            // Compare Generation first. It gives a cheap and fast way to compare, avoiding allocations 
+            // and is also semantically meaningfull - older silos (with smaller Generation) will appear first in the comparison order.
+            // Only if Generations are the same, go on to compare Ports and IPAddress (which is more expansive to compare).
+            // Alternatively, we could compare ConsistentHashCode or UniformHashCode.
+            int comp = Generation.CompareTo(other.Generation);
+            if (comp != 0) return comp;
+
+            comp = Endpoint.Port.CompareTo(other.Endpoint.Port);
+            if (comp != 0) return comp;
+
+            return CompareIpAddresses(Endpoint.Address, other.Endpoint.Address);
+        }
+
+        // Taken from: http://www.codeproject.com/Articles/26550/Extending-the-IPAddress-object-to-allow-relative-c
+        private static int CompareIpAddresses(IPAddress one, IPAddress two)
+        {
+            int returnVal = 0;
+            if (one.AddressFamily == two.AddressFamily)
+            {
+                byte[] b1 = one.GetAddressBytes();
+                byte[] b2 = two.GetAddressBytes();
+
+                for (int i = 0; i < b1.Length; i++)
+                {
+                    if (b1[i] < b2[i])
+                    {
+                        returnVal = -1;
+                        break;
+                    }
+                    else if (b1[i] > b2[i])
+                    {
+                        returnVal = 1;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                returnVal = one.AddressFamily.CompareTo(two.AddressFamily);
+            }
+            return returnVal;
         }
     }
 }
