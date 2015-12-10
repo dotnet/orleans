@@ -285,7 +285,7 @@ namespace UnitTests.General
             var grain = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
             await grain.GetA();
         }
-
+        
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainControlFlow()
         {

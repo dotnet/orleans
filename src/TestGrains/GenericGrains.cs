@@ -72,6 +72,38 @@ namespace UnitTests.Grains
         }
     }
 
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class SimpleGenericGrainUsingAzureTableStorage<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureTableStorage<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
+        }
+    }
+
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class TinyNameGrain<T> : Grain<SimpleGenericGrainState<T>>, ITinyNameGrain<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
+        }
+    }
+
     public class SimpleGenericGrainUState<U> : GrainState
     {
         public U A { get; set; }
