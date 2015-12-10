@@ -187,6 +187,66 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Core.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Core.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.CounterControl.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.CounterControl.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansHost.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansHost.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansProviders.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansProviders.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Server.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Server.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.0.0\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Common.1.0.0\Microsoft.CodeAnalysis.Common.1.0.0.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.Common.1.0.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\Microsoft.CodeAnalysis.CSharp.1.0.0\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\Microsoft.Framework.DependencyInjection.1.0.0-beta8\Microsoft.Framework.DependencyInjection.1.0.0-beta8.nupkg">
+      <Link>Packages\Microsoft.Framework.DependencyInjection.1.0.0-beta8.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta8\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta8.nupkg">
+      <Link>Packages\Microsoft.Framework.DependencyInjection.Abstractions.1.0.0-beta8.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\Newtonsoft.Json.6.0.8\Newtonsoft.Json.6.0.8.nupkg">
+      <Link>Packages\Newtonsoft.Json.6.0.8.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\System.Collections.Immutable.1.1.36\System.Collections.Immutable.1.1.36.nupkg">
+      <Link>Packages\System.Collections.Immutable.1.1.36.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\packages\System.Reflection.Metadata.1.0.21\System.Reflection.Metadata.1.0.21.nupkg">
+      <Link>Packages\System.Reflection.Metadata.1.0.21.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
     <None Include="OrleansVSTools.snk" />
     <None Include="packages.config" />
     <None Include="source.extension.vsixmanifest">
