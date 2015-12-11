@@ -59,7 +59,6 @@
     <None Include="App.config" />
     <None Include="AssemblyInfo.cs" />
     <None Include="Program.cs" />
-    <None Include="packages.config.txt" />
     <None Include="ProjectTemplate.csproj" />
     <None Include="DevTestServerConfiguration.xml" />
     <None Include="DevTestClientConfiguration.xml" />
@@ -67,6 +66,7 @@
   <ItemGroup>
     <VSTemplate Include="VSProjectSiloHost.vstemplate">
       <OutputSubPath>Orleans</OutputSubPath>
+      <SubType>Designer</SubType>
     </VSTemplate>
   </ItemGroup>
   <ItemGroup>
