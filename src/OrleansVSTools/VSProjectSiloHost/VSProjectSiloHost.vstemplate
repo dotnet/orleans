@@ -20,7 +20,15 @@
       <ProjectItem ReplaceParameters="true" TargetFileName="DevTestServerConfiguration.xml">DevTestServerConfiguration.xml</ProjectItem>
       <ProjectItem ReplaceParameters="true" TargetFileName="OrleansHostWrapper.cs">OrleansHostWrapper.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" OpenInEditor="true">Program.cs</ProjectItem>
-      <ProjectItem ReplaceParameters="false" TargetFileName="packages.config">packages.config.txt</ProjectItem>
     </Project>
   </TemplateContent>
+  <WizardExtension>
+    <Assembly>NuGet.VisualStudio.Interop, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
+    <FullClassName>NuGet.VisualStudio.TemplateWizard</FullClassName>
+  </WizardExtension>
+  <WizardData>
+    <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
+      <package id="Microsoft.Orleans.Server" version="1.0.10" />
+    </packages>
+  </WizardData>
 </VSTemplate>
