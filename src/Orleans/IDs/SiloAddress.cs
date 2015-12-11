@@ -267,7 +267,12 @@ namespace Orleans.Runtime
             return CompareIpAddresses(Endpoint.Address, other.Endpoint.Address);
         }
 
-        // Taken from: http://www.codeproject.com/Articles/26550/Extending-the-IPAddress-object-to-allow-relative-c
+        // The comparions code is taken from: http://www.codeproject.com/Articles/26550/Extending-the-IPAddress-object-to-allow-relative-c
+        // Also note that this comparison does not handle semantic equivalence  of IPv4 and IPv6 addresses.
+        // In particular, 127.0.0.1 and::1 are semanticaly the same, but not syntacticaly.
+        // For more information refer to: http://stackoverflow.com/questions/16618810/compare-ipv4-addresses-in-ipv6-notation 
+        // and http://stackoverflow.com/questions/22187690/ip-address-class-getaddressbytes-method-putting-octets-in-odd-indices-of-the-byt
+        // and dual stack sockets, described at https://msdn.microsoft.com/en-us/library/system.net.ipaddress.maptoipv6(v=vs.110).aspx
         private static int CompareIpAddresses(IPAddress one, IPAddress two)
         {
             int returnVal = 0;
