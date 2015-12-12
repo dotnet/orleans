@@ -31,6 +31,7 @@ namespace Orleans.CodeGenerator
     using System.Reflection;
     using System.Threading.Tasks;
 
+    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -105,6 +106,7 @@ namespace Orleans.CodeGenerator
                     CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix)
                     .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
                     .AddBaseListTypes(baseTypes.ToArray())
+                    .AddConstraintClauses(grainType.GetTypeConstraintSyntax())
                     .AddMembers(members.ToArray())
                     .AddAttributeLists(SF.AttributeList().AddAttributes(attributes.ToArray()));
             if (genericTypes.Length > 0)

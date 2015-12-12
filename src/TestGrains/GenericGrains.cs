@@ -609,4 +609,23 @@ namespace UnitTests.Grains
             return Task.FromResult(RuntimeIdentity);
         }
     }
+
+    public class GenericGrainWithContraints<A, B>: Grain, IGenericGrainWithConstraints<A, B> where A : ICollection<B>, new()
+    {
+        private A collection;
+
+        public override Task OnActivateAsync()
+        {
+            collection = new A();
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetCount() { return Task.FromResult(collection.Count); }
+
+        public Task Add(B item)
+        {
+            collection.Add(item);
+            return TaskDone.Done;
+        }
+    }
 }
