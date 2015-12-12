@@ -153,14 +153,14 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public async Task ReadStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
             if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_ReadingData, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, pk, grainReference, tableName);
             string partitionKey = pk;
-            string rowKey = grainType;
+            string rowKey = grainType.FullName;
             GrainStateRecord record = await tableDataManager.Read(partitionKey, rowKey);
             if (record != null)
             {
@@ -176,7 +176,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public async Task WriteStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -184,7 +184,7 @@ namespace Orleans.Storage
             if (Log.IsVerbose3)
                 Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.Etag, tableName);
 
-            var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
+            var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType.FullName };
             ConvertToStorageFormat(grainState, entity);
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.Etag };
             try
@@ -207,13 +207,13 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IStorageProvider.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public async Task ClearStateAsync(Type grainType, GrainReference grainReference, GrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
             if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.Etag, isDeleteStateOnClear, tableName);
-            var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
+            var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType.FullName };
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.Etag };
             string operation = "Clearing";
             try
