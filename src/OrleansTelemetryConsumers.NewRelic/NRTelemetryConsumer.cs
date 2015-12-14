@@ -37,7 +37,7 @@ namespace Orleans.TelemetryConsumers.NewRelic
 
         public void TrackDependency(string dependencyName, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
         {
-            NRClient.RecordResponseTimeMetric($"{dependencyName}\\{commandName}", (long)duration.TotalMilliseconds);
+            NRClient.RecordResponseTimeMetric(string.Format("{0}\\{1}", dependencyName, commandName), (long)duration.TotalMilliseconds);
         }
 
         public void TrackEvent(string eventName, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
