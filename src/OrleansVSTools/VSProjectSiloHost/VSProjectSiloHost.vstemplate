@@ -33,8 +33,8 @@
       <package id="Microsoft.CodeAnalysis.Analyzers" version="1.0.0" />
       <package id="Microsoft.CodeAnalysis.Common" version="1.0.0" />
       <package id="Microsoft.CodeAnalysis.CSharp" version="1.0.0" />
-      <package id="Microsoft.Framework.DependencyInjection" version="1.0.0-beta8" />
-      <package id="Microsoft.Framework.DependencyInjection.Abstractions" version="1.0.0-beta8" />
+      <package id="Microsoft.Extensions.DependencyInjection" version="1.0.0-rc1-final" />
+      <package id="Microsoft.Extensions.DependencyInjection.Abstractions" version="1.0.0-rc1-final" />
       <package id="Microsoft.Orleans.Core" version="1.1.0" />
       <package id="Microsoft.Orleans.CounterControl" version="1.1.0" />
       <package id="Microsoft.Orleans.OrleansCodeGenerator" version="1.1.0" />
