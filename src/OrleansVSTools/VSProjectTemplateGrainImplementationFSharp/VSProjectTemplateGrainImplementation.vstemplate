@@ -5,7 +5,7 @@
     <Description>A project for defining a collection of grain classes to be distributed as a unit</Description>
     <Icon>Orleans.ico</Icon>
     <ProjectType>FSharp</ProjectType>
-    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
     <SortOrder>1000</SortOrder>
     <TemplateID>Orleans.Templates.Project.GrainClass</TemplateID>
     <TemplateGroupID>Orleans</TemplateGroupID>

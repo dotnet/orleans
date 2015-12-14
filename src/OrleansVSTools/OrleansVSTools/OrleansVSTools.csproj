@@ -247,6 +247,14 @@
       <Link>Packages\System.Reflection.Metadata.1.0.21.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Grains.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Templates.Grains.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
     <None Include="OrleansVSTools.snk" />
     <None Include="packages.config" />
     <None Include="source.extension.vsixmanifest">

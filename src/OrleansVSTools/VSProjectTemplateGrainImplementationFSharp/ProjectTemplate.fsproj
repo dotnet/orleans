@@ -71,4 +71,3 @@
   <Import Project="$(FSharpTargetsPath)" />
   <Import Project="$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.10\build\Microsoft.Orleans.Templates.Grains.targets" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.Templates.Grains.1.0.10\build\Microsoft.Orleans.Templates.Grains.targets')" />
 </Project>
-
