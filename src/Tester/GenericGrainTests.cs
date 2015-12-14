@@ -676,5 +676,17 @@ namespace UnitTests.General
             var grain = GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));
             var c1 = await grain.GetState();
         }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
+        public async Task Generic_GrainWithTypeConstraints()
+        {
+            var grainId = Guid.NewGuid().ToString();
+            var grain = GrainFactory.GetGrain<IGenericGrainWithConstraints<List<int>, int>>(grainId);
+            var result = await grain.GetCount();
+            Assert.AreEqual(0, result);
+            await grain.Add(42);
+            result = await grain.GetCount();
+            Assert.AreEqual(1, result);
+        }
     }
 }

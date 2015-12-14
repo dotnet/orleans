@@ -210,4 +210,11 @@ namespace UnitTests.GrainInterfaces
         Task<T> LongRunningTask(T t, TimeSpan delay);
         Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
     }
+
+    public interface IGenericGrainWithConstraints<A, B> : IGrainWithStringKey where A : ICollection<B>, new()
+    {
+        Task<int> GetCount();
+
+        Task Add(B item);
+    }
 }
