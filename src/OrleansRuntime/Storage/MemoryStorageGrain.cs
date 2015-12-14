@@ -27,24 +27,24 @@ namespace Orleans.Storage
             return TaskDone.Done;
         }
 
-        public Task<IDictionary<string, object>> ReadStateAsync(string grainType, string grainId)
+        public Task<Tuple<IDictionary<string, object>, string>> ReadStateAsync(string grainType, string grainId)
         {
             GrainStateStore storage = GetStoreForGrain(grainType);
-            var state = storage.GetGrainState(grainId);
-            return Task.FromResult(state);
+            var stateTuple = storage.GetGrainState(grainId);
+            return Task.FromResult(stateTuple);
         }
 
-        public Task WriteStateAsync(string grainType, string grainId, IDictionary<string, object> grainState)
+        public Task<string> WriteStateAsync(string grainType, string grainId, IDictionary<string, object> grainState, string eTag)
         {
             GrainStateStore storage = GetStoreForGrain(grainType);
-            storage.UpdateGrainState(grainId, grainState);
-            return TaskDone.Done;
+            string newETag = storage.UpdateGrainState(grainId, grainState, eTag);
+            return Task.FromResult(newETag);
         }
 
-        public Task DeleteStateAsync(string grainType, string grainId)
+        public Task DeleteStateAsync(string grainType, string grainId, string eTag)
         {
             GrainStateStore storage = GetStoreForGrain(grainType);
-            storage.DeleteGrainState(grainId);
+            storage.DeleteGrainState(grainId, eTag);
             return TaskDone.Done;
         }
 
@@ -61,23 +61,55 @@ namespace Orleans.Storage
 
         private class GrainStateStore
         {
-            private readonly IDictionary<string, IDictionary<string, object>> grainStateStorage = new Dictionary<string, IDictionary<string, object>>();
-
-            public IDictionary<string, object> GetGrainState(string grainId)
+            private readonly IDictionary<string, Tuple<IDictionary<string, object>, long>> grainStateStorage = new Dictionary<string, Tuple<IDictionary<string, object>, long>>();
+            
+            public Tuple<IDictionary<string, object>, string> GetGrainState(string grainId)
             {
-                IDictionary<string, object> state;
-                grainStateStorage.TryGetValue(grainId, out state);
-                return state;
+                Tuple<IDictionary<string, object>, long> state;
+                if(grainStateStorage.TryGetValue(grainId, out state))
+                    return Tuple.Create(state.Item1, state.Item2.ToString());
+                else
+                    return Tuple.Create<IDictionary<string, object>, string>(null, null); // upon first read, return null/invalid etag, to mimic Azure Storage.
             }
 
-            public void UpdateGrainState(string grainId, IDictionary<string, object> state)
+            public string UpdateGrainState(string grainId, IDictionary<string, object> state, string receivedEtag)
             {
-                grainStateStorage[grainId] = state;
+                long currentETag = 0;
+                Tuple<IDictionary<string, object>, long> oldState;
+                if (grainStateStorage.TryGetValue(grainId, out oldState)) {
+                    currentETag = oldState.Item2;
+                }
+                ValidateEtag(currentETag, receivedEtag);
+                currentETag++;
+                grainStateStorage[grainId] = Tuple.Create(state, currentETag);
+                return currentETag.ToString();
             }
 
-            public void DeleteGrainState(string grainId)
+            public void DeleteGrainState(string grainId, string receivedEtag)
             {
+                long currentETag = 0;
+                Tuple<IDictionary<string, object>, long> oldState;
+                if (grainStateStorage.TryGetValue(grainId, out oldState)){
+                    currentETag = oldState.Item2;
+                }
+                ValidateEtag(currentETag, receivedEtag);
                 grainStateStorage.Remove(grainId);
+            }
+
+            private void ValidateEtag(long currentETag, string receivedEtag)
+            {
+                if (receivedEtag == null) // first write
+                {
+                    if (currentETag > 0) 
+                        new InconsistentStateException(
+                            string.Format("Etag mismatch durign Write: Expected = {0} Received = null", currentETag.ToString()));
+                }
+                else // non first write
+                {
+                    if (receivedEtag != currentETag.ToString())
+                        throw new InconsistentStateException(
+                            string.Format("Etag mismatch durign Write: Expected = {0} Received = {1}", currentETag.ToString(), receivedEtag));
+                }
             }
         }
     }
