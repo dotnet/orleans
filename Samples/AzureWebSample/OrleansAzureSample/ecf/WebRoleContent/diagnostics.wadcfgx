@@ -30,11 +30,11 @@
       </DiagnosticMonitorConfiguration>
     </WadCfg>
     <!--<StorageAccount>MyStorageAccount</StorageAccount>-->
-    <StorageAccount></StorageAccount>
+    <StorageAccount>devstoreaccount1</StorageAccount>
   </PublicConfig>
   <PrivateConfig xmlns="http://schemas.microsoft.com/ServiceHosting/2010/10/DiagnosticsConfiguration">
     <!--<StorageAccount name="MyStorageAccount" endpoint="https://core.windows.net/" />-->
-    <StorageAccount name="" key="" endpoint="" />
+    <StorageAccount name="devstoreaccount1" key="Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==" />
   </PrivateConfig>
   <IsEnabled>true</IsEnabled>
 </DiagnosticsConfiguration>
