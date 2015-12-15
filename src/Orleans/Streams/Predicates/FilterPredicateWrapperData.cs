@@ -50,6 +50,9 @@ namespace Orleans.Streams
         [NonSerialized]
         private StreamFilterPredicate predicateFunc;
 
+        // constructor used by serializator
+        private FilterPredicateWrapperData() { }
+
         internal FilterPredicateWrapperData(object filterData, StreamFilterPredicate pred)
         {
             CheckFilterPredicateFunc(pred); // Assert expected pre-conditions are always true.
