@@ -86,6 +86,7 @@
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
+    <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="Serialization\FallbackBuiltInSerializationTests.cs" />
     <Compile Include="MembershipTests\MySqlMembershipTableTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
@@ -112,6 +113,7 @@
     <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
     <Compile Include="StorageTests\AzureQueueDataManagerTests.cs" />
     <Compile Include="MembershipTests\ZookeeperMembershipTableTests.cs" />
+    <Compile Include="GeoClusterTests\TestingClusterHost.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">

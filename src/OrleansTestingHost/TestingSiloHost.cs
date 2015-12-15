@@ -493,6 +493,12 @@ namespace Orleans.TestingHost
 
         private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
+            return StartOrleansSilo(this, type, options, instanceCount, shared);
+        }
+
+        // This is a static version that can be called without a TestingSiloHost object (host = null)
+        public static SiloHandle StartOrleansSilo(TestingSiloHost host, Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
             if (options.SiloConfigFile == null)
@@ -504,8 +510,8 @@ namespace Orleans.TestingHost
                 config.LoadFromFile(options.SiloConfigFile.FullName);
             }
 
-            int basePort = options.BasePort < 0 ? BasePort : options.BasePort;
 
+            int basePort = options.BasePort < 0 ? BasePort : options.BasePort;
 
             if (config.Globals.SeedNodes.Count > 0 && options.BasePort < 0)
             {
@@ -557,14 +563,20 @@ namespace Orleans.TestingHost
 
             if (nodeConfig.ProxyGatewayEndpoint != null && nodeConfig.ProxyGatewayEndpoint.Address != null)
             {
-                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, ProxyBasePort + instanceCount);
+                int proxyBasePort = options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort;
+                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, proxyBasePort + instanceCount);
             }
 
             config.Globals.ExpectedClusterSize = 2;
 
             config.Overrides[siloName] = nodeConfig;
 
-            AdjustForTest(config);
+            if (host != null)
+                host.AdjustForTest(config);
+
+            if (options.ConfigurationCustomizer != null)
+                options.ConfigurationCustomizer(config);
+
 
             WriteLog("Starting a new silo in app domain {0} with config {1}", siloName, config.ToString(siloName));
             AppDomain appDomain;

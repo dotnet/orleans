@@ -10,6 +10,7 @@ using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using UnitTests.Tester;
 
 namespace UnitTests.StorageTests
 {
@@ -50,11 +51,7 @@ namespace UnitTests.StorageTests
         {
             TraceLogger.Initialize(new NodeConfiguration());
 
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if(!StorageEmulator.TryStart())
-            {
-                Console.WriteLine("Azure Storage Emulator could not be started.");
-            }
+            UnitTestSiloHost.CheckForAzureStorage();
         }
 
         // Use TestInitialize to run code before running each test 

@@ -33,6 +33,26 @@ namespace UnitTests.Tester
         {
         }
 
+        public static void CheckForAzureStorage()
+        {
+            bool usingLocalWAS = StorageTestConstants.UsingAzureLocalStorageEmulator;
+
+            if (!usingLocalWAS)
+            {
+                string msg = "Tests are using Azure Cloud Storage, not local WAS emulator.";
+                Console.WriteLine(msg);
+                return;
+            }
+
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if (!StorageEmulator.TryStart())
+            {
+                string errorMsg = "Azure Storage Emulator could not be started.";
+                Console.WriteLine(errorMsg);
+                Assert.Inconclusive(errorMsg);
+            }
+        }
+
         protected static string DumpTestContext(TestContext context)
         {
             StringBuilder sb = new StringBuilder();

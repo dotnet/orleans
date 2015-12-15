@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using Orleans.Runtime.Configuration;
 
@@ -17,12 +18,15 @@ namespace Orleans.TestingHost
         public bool PickNewDeploymentId { get; set; }
         public bool PropagateActivityId { get; set; }
         public int BasePort { get; set; }
+        public int ProxyBasePort { get; set; }
         public string MachineName { get; set; }
         public int LargeMessageWarningThreshold { get; set; }
         public GlobalConfiguration.LivenessProviderType LivenessType { get; set; }
         public bool ParallelStart { get; set; }
         public GlobalConfiguration.ReminderServiceProviderType ReminderServiceType { get; set; }
         public string DataConnectionString { get; set; }
+        public Action<ClusterConfiguration> ConfigurationCustomizer { get; set; }
+
 
         public TestingSiloOptions()
         {
@@ -33,6 +37,7 @@ namespace Orleans.TestingHost
             StartClient = true;
             PickNewDeploymentId = true;
             BasePort = -1; // use default from configuration file
+            ProxyBasePort = -1; 
             MachineName = ".";
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
