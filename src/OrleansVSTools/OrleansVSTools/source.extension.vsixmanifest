@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.0.10" Language="en-US" Publisher="Microsoft" />
+    <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.1.0" Language="en-US" Publisher="Microsoft" />
     <DisplayName>Microsoft Orleans Tools for Visual Studio</DisplayName>
     <Description xml:space="preserve">Microsoft Orleans Tools for Visual Studio 2012, 2013, 2015
 C#, VB, F#  Project templates and item templates
-</Description>
+    </Description>
     <MoreInfo>htts://github.com/dotnet/orleans/</MoreInfo>
     <License>License.txt</License>
     <Icon>Orleans-nuget.png</Icon>
@@ -19,9 +19,12 @@ C#, VB, F#  Project templates and item templates
     <InstallationTarget Version="[14.0,15.0)" Id="Microsoft.VisualStudio.Enterprise" />
     <InstallationTarget Version="[14.0,15.0)" Id="Microsoft.VisualStudio.Community" />
   </Installation>
+  <Reference Id="NuPackToolsVsix.Microsoft.67e54e40-0ae3-42c5-a949-fddf5739e7a5" MinVersion="1.7.30402.9028">
+    <Name>NuGet Package Manager</Name>
+    <MoreInfoUrl>http://docs.nuget.org/</MoreInfoUrl>
+  </Reference>
   <Dependencies>
-    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5,)" />
-    <Dependency Id="Microsoft.VisualStudio.MPF.11.0" DisplayName="Visual Studio MPF 11.0" d:Source="Installed" Version="11.0" />
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5.1,)" />
   </Dependencies>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementation" d:TargetPath="|VSProjectTemplateGrainImplementation;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
@@ -36,5 +39,22 @@ C#, VB, F#  Project templates and item templates
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
     <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceVB" d:TargetPath="|VSItemTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementationFSharp" d:TargetPath="|VSProjectTemplateGrainImplementationFSharp;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
+    <Asset Type="Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final.nupkg" d:Source="File" Path="Packages\Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final" d:Source="File" Path="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.Core.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.CounterControl.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.CounterControl.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.OrleansHost.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansHost.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.OrleansProviders.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansProviders.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.Server.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Server.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.Templates.Grains.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Templates.Grains.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="Newtonsoft.Json.6.0.8.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.6.0.8.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="System.Collections.Immutable.1.1.36.nupkg" d:Source="File" Path="Packages\System.Collections.Immutable.1.1.36.nupkg" d:VsixSubPath="Packages" />
+    <Asset Type="System.Reflection.Metadata.1.0.21.nupkg" d:Source="File" Path="Packages\System.Reflection.Metadata.1.0.21.nupkg" d:VsixSubPath="Packages" />
   </Assets>
 </PackageManifest>

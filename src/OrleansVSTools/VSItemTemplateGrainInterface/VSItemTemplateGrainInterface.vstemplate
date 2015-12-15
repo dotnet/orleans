@@ -4,16 +4,15 @@
     <Name>Orleans Grain Interface</Name>
     <Description>An empty grain communication interface</Description>
     <Icon>Orleans.ico</Icon>
-    <TemplateID>Orleans.Templates.Item.GrainInterface</TemplateID>
-    <!--<TemplateGroupID>Orleans</TemplateGroupID>-->
-    <ShowByDefault>true</ShowByDefault>
     <ProjectType>CSharp</ProjectType>
-    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <TemplateID>Orleans.Templates.Item.GrainInterface</TemplateID>
+    <ShowByDefault>true</ShowByDefault>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
     <DefaultName>IMyGrain.cs</DefaultName>
   </TemplateData>
   <TemplateContent>
-		<References>
+    <References>
       <Reference>
         <Assembly>System</Assembly>
       </Reference>

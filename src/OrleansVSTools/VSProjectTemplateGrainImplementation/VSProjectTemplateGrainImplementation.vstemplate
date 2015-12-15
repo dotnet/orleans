@@ -5,21 +5,38 @@
     <Description>A project for defining a collection of grain classes to be distributed as a unit</Description>
     <Icon>Orleans.ico</Icon>
     <ProjectType>CSharp</ProjectType>
-    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
     <SortOrder>1000</SortOrder>
     <TemplateID>Orleans.Templates.Project.GrainClass</TemplateID>
     <TemplateGroupID>Orleans</TemplateGroupID>
     <ShowByDefault>false</ShowByDefault>
     <CreateNewFolder>true</CreateNewFolder>
-    <DefaultName>Grain1</DefaultName>
+    <DefaultName>Grains</DefaultName>
     <ProvideDefaultName>true</ProvideDefaultName>
+    <PromptForSaveOnCreation>true</PromptForSaveOnCreation>
   </TemplateData>
   <TemplateContent>
     <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
       <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" TargetFileName="Properties\orleans.codegen.cs">orleans.codegen.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" OpenInEditor="true">Grain1.cs</ProjectItem>
-      <ProjectItem ReplaceParameters="false" TargetFileName="packages.config">packages.config.txt</ProjectItem>
     </Project>
   </TemplateContent>
+  <WizardExtension>
+    <Assembly>NuGet.VisualStudio.Interop, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
+    <FullClassName>NuGet.VisualStudio.TemplateWizard</FullClassName>
+  </WizardExtension>
+  <WizardData>
+    <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
+      <package id="Microsoft.CodeAnalysis.Analyzers" version="1.0.0" />
+      <package id="Microsoft.CodeAnalysis.Common" version="1.0.0" />
+      <package id="Microsoft.CodeAnalysis.CSharp" version="1.0.0" />
+      <package id="Microsoft.Orleans.Core" version="1.1.0" />
+      <package id="Microsoft.Orleans.Templates.Grains" version="1.1.0" />
+      <package id="Microsoft.Orleans.OrleansCodeGenerator" version="1.1.0" />
+      <package id="Newtonsoft.Json" version="6.0.8" />
+      <package id="System.Collections.Immutable" version="1.1.36" />
+      <package id="System.Reflection.Metadata" version="1.0.21" />
+    </packages>
+  </WizardData>
 </VSTemplate>

@@ -72,6 +72,38 @@ namespace UnitTests.Grains
         }
     }
 
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class SimpleGenericGrainUsingAzureTableStorage<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureTableStorage<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
+        }
+    }
+
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class TinyNameGrain<T> : Grain<SimpleGenericGrainState<T>>, ITinyNameGrain<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
+        }
+    }
+
     public class SimpleGenericGrainUState<U> : GrainState
     {
         public U A { get; set; }
@@ -575,6 +607,25 @@ namespace UnitTests.Grains
         public Task<string> GetRuntimeInstanceId()
         {
             return Task.FromResult(RuntimeIdentity);
+        }
+    }
+
+    public class GenericGrainWithContraints<A, B>: Grain, IGenericGrainWithConstraints<A, B> where A : ICollection<B>, new()
+    {
+        private A collection;
+
+        public override Task OnActivateAsync()
+        {
+            collection = new A();
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetCount() { return Task.FromResult(collection.Count); }
+
+        public Task Add(B item)
+        {
+            collection.Add(item);
+            return TaskDone.Done;
         }
     }
 }

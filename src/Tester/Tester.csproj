@@ -124,7 +124,7 @@
     <Compile Include="ExternalTypesTests.cs" />
     <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />
-    <Compile Include="SerializationTests\JsonFallbackSerializationTests.cs" />
+    <Compile Include="GenericGrainsInAzureStorageTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainActivateDeactivateTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
@@ -139,6 +139,7 @@
     <Compile Include="RelationalUtilities\RelationalStorageForTesting.cs" />
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="RequestContextTest.cs" />
+    <Compile Include="SerializationTests\JsonFallbackSerializationTests.cs" />
     <Compile Include="SerializationTests\SerializationOrderTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
