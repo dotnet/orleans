@@ -10,7 +10,7 @@ namespace AdventureSetup
         static int Main(string [] args)
         {
             var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            string mapFileName = path + @"\..\..\AdventureMap.json";
+            string mapFileName = Path.Combine (path, "AdventureMap.json");
 
             switch (args.Length)
             {
@@ -39,7 +39,7 @@ namespace AdventureSetup
                 AppDomainInitializerArguments = args,
             });
 
-            Orleans.GrainClient.Initialize("ClientConfiguration.xml");
+            GrainClient.Initialize("ClientConfiguration.xml");
 
             Console.WriteLine("Map file name is '{0}'.", mapFileName);
             Console.WriteLine("Setting up Adventure, please wait ...");

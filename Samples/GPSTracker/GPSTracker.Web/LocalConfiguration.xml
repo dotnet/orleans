@@ -4,5 +4,5 @@
 	For a detailed reference, see "Orleans Configuration Reference.html".
 -->
 <ClientConfiguration xmlns="urn:orleans">
-	<Gateway Address="localhost" Port="30000"  Proxied="true" />
+	<Gateway Address="localhost" Port="40000"  Proxied="true" />
 </ClientConfiguration>

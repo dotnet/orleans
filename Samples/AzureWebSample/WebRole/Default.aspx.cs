@@ -18,6 +18,7 @@ namespace Orleans.Azure.Samples.Web
                     {
                         throw new FileNotFoundException(string.Format("Cannot find Orleans client config file for initialization at {0}", clientConfigFile.FullName), clientConfigFile.FullName);
                     }
+
                     AzureClient.Initialize(clientConfigFile);
                 }
             }
