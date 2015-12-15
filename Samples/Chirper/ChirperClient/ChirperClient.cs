@@ -47,7 +47,7 @@ namespace Orleans.Samples.Chirper.Client
                 else
                 {
                     // ... and then subscribe to receive any new chirps
-                    viewer = await ChirperViewerFactory.CreateObjectReference(this);
+                    viewer = await GrainClient.GrainFactory.CreateObjectReference<IChirperViewer>(this);
                     if (!this.IsPublisher) Console.WriteLine("Listening for new chirps...");
                     await account.ViewerConnect(viewer);
                     // Sleeps forwever, so Ctrl-C to exit
