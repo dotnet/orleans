@@ -1,16 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
-<!-- 
-	This is a sample client configuration file. 
-	For a detailed reference, see "Orleans Configuration Reference.html".
--->
 <ClientConfiguration xmlns="urn:orleans">
-  <!--<GatewayProvider ProviderType="WindowsFabric"/>
-  <WindowsFabric WindowsFabricServiceName="fabric:/OrleansSilo/svc1" /> 
-  <Gateway Address="localhost" Port="19000"/>-->
-  <GatewayProvider ProviderType="Config"/>
-  <Gateway Address="localhost" Port="30000"/>
-  <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true"/>
-  <Tracing DefaultTraceLevel="Warning" TraceToConsole="true" TraceToFile="{0}-{1}.log">
+  <Gateway Address="localhost" Port="40000"/>
+  <!-- To turn tracing off, set DefaultTraceLevel="Off" and have no overrides.
+    For the trace log file name, {0} is replaced by "Client" and {1} is the current time. -->
+  <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" WriteMessagingTraces="false" BulkMessageLimit="1000">
+    <TraceLevelOverride LogPrefix="Runtime" TraceLevel="Info" />
     <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+    <TraceLevelOverride LogPrefix="AssemblyLoader" TraceLevel="Warning" />
   </Tracing>
+  <Statistics MetricsTableWriteInterval="300s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
+  <Messaging ResponseTimeout="30s" ClientSenderBuckets="8192" MaxResendCount="0"/>
 </ClientConfiguration>
