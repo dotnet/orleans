@@ -16,7 +16,7 @@ The `GetGrain()` method is used for getting a grain reference for a particular I
 As was already mentioned, grains cannot be explicitly created or deleted.
 
 ``` csharp
-OrleansClient.Initialize(); 
+GrainClient.Initialize(); 
 
 // Hardcoded player ID 
 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
@@ -34,7 +34,7 @@ See the Key Concepts section for more details on the various ways to use `Task`s
 
 ## Find or create grains
 
-After establishing a connection by calling `OrleansClient.Initialize()`, static methods in the generic factory class may be used to get a reference to a grain, such as `GrainClient.GrainFactory.GetGrain<IPlayerGrain>()` for the `PlayerGrain`. The grain interface is passed as a type argument to `GrainFactory.GetGrain<T>()`.
+After establishing a connection by calling `GrainClient.Initialize()`, static methods in the generic factory class may be used to get a reference to a grain, such as `GrainClient.GrainFactory.GetGrain<IPlayerGrain>()` for the `PlayerGrain`. The grain interface is passed as a type argument to `GrainFactory.GetGrain<T>()`.
 
 ## Sending messages to grains
 
@@ -81,7 +81,7 @@ namespace PlayerWatcher
         { 
             try 
             { 
-                OrleansClient.Initialize(); 
+                GrainClient.Initialize(); 
   
                 // Hardcoded player ID 
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}"); 
