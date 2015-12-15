@@ -38,31 +38,28 @@ namespace UnitTests.StreamingTests
             : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
+                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                AdjustConfig = config =>
+                {
+                    var settings = new Dictionary<string, string>();
+                    // get initial settings from configs
+                    AdapterConfig.WriteProperties(settings);
+
+                    // add queue balancer setting
+                    settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+
+                    // add pub/sub settting
+                    settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+
+                    // register stream provider
+                    config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+
+                    // make sure all node configs exist, for dynamic cluster queue balancer
+                    config.GetConfigurationForNode("Primary");
+                    config.GetConfigurationForNode("Secondary_1");
+                }
             })
         {
-        }
-
-        public override void AdjustForTest(ClusterConfiguration config)
-        {
-            var settings = new Dictionary<string, string>();
-            // get initial settings from configs
-            AdapterConfig.WriteProperties(settings);
-
-            // add queue balancer setting
-            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
-
-            // add pub/sub settting
-            settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-            // register stream provider
-            config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-            // make sure all node configs exist, for dynamic cluster queue balancer
-            config.GetConfigurationForNode("Primary");
-            config.GetConfigurationForNode("Secondary_1");
-
-            base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run

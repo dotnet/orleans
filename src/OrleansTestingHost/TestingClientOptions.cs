@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost
 {
@@ -15,6 +16,7 @@ namespace Orleans.TestingHost
         public List<IPEndPoint> Gateways { get; set; }
         public int PreferedGatewayIndex { get; set; }
         public bool PropagateActivityId { get; set; }
+        public Action<ClientConfiguration> AdjustConfig { get; set; }
 
         public TestingClientOptions()
         {

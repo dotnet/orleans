@@ -27,21 +27,19 @@ namespace UnitTests.StreamingTests
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                AdjustConfig = config =>
+                        {
+                            var settings = new Dictionary<string, string>
+                            {
+                                {PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE,StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString()},
+                                {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
+                            };
+                                    config.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
+            config.GetConfigurationForNode("Primary");
+                                    config.GetConfigurationForNode("Secondary_1");
+                        }
             })
         {
-        }
-
-        public override void AdjustForTest(ClusterConfiguration config)
-        {
-            var settings = new Dictionary<string, string>
-            {
-                {PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE,StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString()},
-                {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
-            };
-            config.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
-            config.GetConfigurationForNode("Primary");
-            config.GetConfigurationForNode("Secondary_1");
-            base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run

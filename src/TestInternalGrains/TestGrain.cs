@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using TestInternalGrainInterfaces;
 
@@ -96,7 +95,7 @@ namespace TestInternalGrains
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task<string> GetActivationId()
@@ -168,7 +167,7 @@ namespace TestInternalGrains
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task<string> GetActivationId()

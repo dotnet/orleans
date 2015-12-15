@@ -8,6 +8,8 @@ using Orleans.TestingHost;
 using TestInternalGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using UnitTests.GrainInterfaces;
+
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -168,6 +170,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             string activation2 = await grain.DoSomething();
 
             Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
+
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 

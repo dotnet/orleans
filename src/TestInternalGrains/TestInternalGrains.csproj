@@ -45,6 +45,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActivateDeactivateTestGrain.cs" />
+    <Compile Include="EchoTaskGrain.cs" />
+    <Compile Include="ErrorGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
 	<Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -54,6 +56,14 @@
     <Compile Include="TestGrain.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrleansManager\OrleansManager.csproj">
+      <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
+      <Name>OrleansManager</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
@@ -61,6 +71,10 @@
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
       <Name>TestGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj">
+      <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
+      <Name>TestGrains</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
       <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>

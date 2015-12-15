@@ -52,5 +52,10 @@ namespace UnitTests.Tester
             sb.AppendFormat(@" ]").AppendLine();
             return sb.ToString();
         }
+
+        protected static int GetRandomGrainId()
+        {
+            return random.Next();
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using Orleans.Runtime.Configuration;
 
@@ -23,6 +24,7 @@ namespace Orleans.TestingHost
         public bool ParallelStart { get; set; }
         public GlobalConfiguration.ReminderServiceProviderType ReminderServiceType { get; set; }
         public string DataConnectionString { get; set; }
+        public Action<ClusterConfiguration> AdjustConfig { get; set; }
 
         public TestingSiloOptions()
         {

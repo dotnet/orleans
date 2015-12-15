@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
@@ -117,7 +116,7 @@ namespace TestInternalGrains
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task<byte[]> Echo(byte[] data)
@@ -289,7 +288,7 @@ namespace TestInternalGrains
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task Ping(byte[] data)
