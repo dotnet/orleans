@@ -1,30 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 
-    This is a sample silo configuration file for use by an Azure worker role acting as an Orleans silo. 
-    The comments illustrate common customizations.
-    Elements and attributes with no comments should not usually need to be modified.
-    For a detailed reference, see "Orleans Configuration Reference.html".
--->
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
-    <Liveness LivenessType="AzureTable" />
     <StorageProviders>
-      <Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="UseDevelopmentStorage=true" />
+      <Provider Type="Orleans.Storage.MemoryStorage" Name="PubSubStore" NumStorageGrains="1"/>
+      <!--<Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />-->
+      <!-- To use Azure storage, uncomment one of the following lines: -->
+      <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="UseDevelopmentStorage=true" />-->
+      <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY" />-->
     </StorageProviders>
+    <StreamProviders>
+      <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
+      <!--<Provider Type="Orleans.Providers.Streams.Persistent.AzureQueueStreamProvider" Name="AzureQueueProvider" DataConnectionString=""/> -->
+    </StreamProviders>
+    <SeedNode Address="localhost" Port="22222"/>
+    <Messaging ResponseTimeout="30s"/>
   </Globals>
   <Defaults>
-    <!--
-	  To turn tracing off, set DefaultTraceLevel="Off" and have no overrides. To see a minimum of messages, set DefaultTraceLevel="Error".
-      For the trace log file name, {0} is the silo name and {1} is the current time. 
-      Setting WriteTraces to true will cause detailed performance information to be collected and logged about the individual steps in the
-      message lifecycle. This may be useful debugging performance issues.
-      -->
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" >
-	  <!--
-	    To get more detailed application logging, you can change the TraceLevel attribute value to "Verbose" or "Verbose2".
-	    Depending on the log levels you have used in your code, this will cause additional messages to be written to the log.
-	    -->
-      <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+    <Networking Address="localhost" Port="22222"/>
+    <ProxyingGateway Address="localhost" Port="40000" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
+       <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+       <!--
+       <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
+       <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose" />
+       <TraceLevelOverride LogPrefix="AssemblyLoader.Silo" TraceLevel="Warning" />
+       -->
     </Tracing>
+    <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
   </Defaults>
 </OrleansConfiguration>
+
+

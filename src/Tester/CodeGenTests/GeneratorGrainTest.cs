@@ -31,11 +31,6 @@ namespace Tester.CodeGenTests
             StopAllSilos();
         }
 
-        private static int GetRandomGrainId()
-        {
-            return random.Next();
-        }
-
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public async Task CodeGenRoundTripSerialization()
         {

@@ -34,13 +34,13 @@ namespace Orleans.TestingHost
     /// </remarks>
     public abstract class TestingSiloHost
     {
-        protected static SiloHandle Primary = null;
-        protected static SiloHandle Secondary = null;
+        public static SiloHandle Primary { get; private set; }
+        public static SiloHandle Secondary { get; private set; }
         protected static readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         protected static readonly Dictionary<string, byte[]> additionalAssemblies = new Dictionary<string, byte[]>();
 
-        protected readonly TestingSiloOptions siloInitOptions;
-        protected readonly TestingClientOptions clientInitOptions;
+        protected TestingSiloOptions siloInitOptions { get; private set; }
+        protected TestingClientOptions clientInitOptions { get; private set; }
 
         private static TimeSpan _livenessStabilizationTime;
 
@@ -94,6 +94,11 @@ namespace Orleans.TestingHost
         /// </summary>
         protected TestingSiloHost(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
         {
+            DeployTestingSiloHost(siloOptions, clientOptions);
+        }
+
+        private void DeployTestingSiloHost(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
+        {
             siloInitOptions = siloOptions;
             clientInitOptions = clientOptions;
 
@@ -128,6 +133,12 @@ namespace Orleans.TestingHost
                     string.Format("Exception during test initialization: {0}",
                         TraceLogger.PrintException(baseExc)));
             }
+        }
+
+        public void RedeployTestingSiloHost(TestingSiloOptions siloOptions = null, TestingClientOptions clientOptions = null)
+        {
+            StopAllSilos();
+            DeployTestingSiloHost(siloOptions ?? new TestingSiloOptions(), clientOptions ?? new TestingClientOptions());
         }
 
         /// <summary>
@@ -334,13 +345,21 @@ namespace Orleans.TestingHost
             return null;
         }
 
-        public virtual void AdjustForTest(ClusterConfiguration config)
+        public static void AdjustForTest(ClusterConfiguration config, TestingSiloOptions options)
         {
+            if (options.AdjustConfig != null) {
+                options.AdjustConfig(config);
+            }
+
             config.AdjustForTestEnvironment();
         }
 
-        public virtual void AdjustForTest(ClientConfiguration config)
+        public static void AdjustForTest(ClientConfiguration config, TestingClientOptions options)
         {
+            if (options.AdjustConfig != null) {
+                options.AdjustConfig(config);
+            }
+
             config.AdjustForTestEnvironment();
         }
 
@@ -433,7 +452,8 @@ namespace Orleans.TestingHost
                 {
                     Secondary = await handles[1];
                 }
-            }else
+            }
+            else
             {
                 if (doStartPrimary)
                 {
@@ -484,7 +504,7 @@ namespace Orleans.TestingHost
                 {
                     clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
                 }
-                AdjustForTest(clientConfig);
+                AdjustForTest(clientConfig, clientOptions);
 
                 GrainClient.Initialize(clientConfig);
                 GrainFactory = GrainClient.GrainFactory;
@@ -571,12 +591,7 @@ namespace Orleans.TestingHost
 
             config.Overrides[siloName] = nodeConfig;
 
-            if (host != null)
-                host.AdjustForTest(config);
-
-            if (options.ConfigurationCustomizer != null)
-                options.ConfigurationCustomizer(config);
-
+            AdjustForTest(config, options);
 
             WriteLog("Starting a new silo in app domain {0} with config {1}", siloName, config.ToString(siloName));
             AppDomain appDomain;

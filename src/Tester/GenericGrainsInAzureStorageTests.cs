@@ -13,24 +13,26 @@ namespace UnitTests.General
     public class GenericGrainsInAzureStorageTests : UnitTestSiloHost
     {
         public GenericGrainsInAzureStorageTests()
-            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
+            : base(new TestingSiloOptions
+            {
+                StartPrimary = true,
+                StartSecondary = false,
+                AdjustConfig = config =>
+                {
+                    const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage";
+                    const string myProviderName = "AzureStore";
+                    var properties = new Dictionary<string, string>();
+                    properties.Add("DataConnectionString", "UseDevelopmentStorage=true");
+                    config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
+                }
+            })
         {
         }
-        
+
         [ClassCleanup]
         public static void MyClassCleanup()
         {
             StopAllSilos();
-        }
-        
-        public override void AdjustForTest(ClusterConfiguration config)
-        {
-            const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage";
-            const string myProviderName = "AzureStore";
-            var properties = new Dictionary<string, string>();
-            properties.Add("DataConnectionString", "UseDevelopmentStorage=true");
-            config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
-            base.AdjustForTest(config);
         }
 
         [TestMethod, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]

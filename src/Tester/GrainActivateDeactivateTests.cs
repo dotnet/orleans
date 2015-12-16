@@ -3,11 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestInternalGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -168,6 +168,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             string activation2 = await grain.DoSomething();
 
             Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
+
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 

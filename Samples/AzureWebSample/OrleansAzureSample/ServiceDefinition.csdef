@@ -1,13 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ServiceDefinition name="OrleansAzureSample" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition" schemaVersion="2015-04.2.6">
   <WorkerRole name="OrleansAzureSilos" vmsize="Medium">
-    <Imports></Imports>
+    <Imports>
+    </Imports>
     <ConfigurationSettings>
       <Setting name="DataConnectionString" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" />
     </ConfigurationSettings>
     <Endpoints>
-      <InternalEndpoint name="OrleansSiloEndpoint" protocol="tcp" port="11111" />
-      <InternalEndpoint name="OrleansProxyEndpoint" protocol="tcp" port="30000" />
+      <InternalEndpoint name="OrleansSiloEndpoint" protocol="tcp" port="22222" />
+      <InternalEndpoint name="OrleansProxyEndpoint" protocol="tcp" port="40000" />
     </Endpoints>
     <!--
     <Startup>
@@ -16,9 +18,11 @@
     -->
   </WorkerRole>
   <WebRole name="WebRole" vmsize="ExtraSmall">
-    <Imports></Imports>
+    <Imports>
+    </Imports>
     <ConfigurationSettings>
       <Setting name="DataConnectionString" />
+      <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" />
     </ConfigurationSettings>
     <Sites>
       <Site name="Web">

@@ -24,15 +24,15 @@ namespace UnitTests.StreamingTests
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+            }, new TestingClientOptions()
+            {
+                AdjustConfig = config =>
+                {
+                    config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName, new Dictionary<string, string>());
+                },
             })
         {
             runner = new SubscriptionMultiplicityTestRunner(SMSStreamProviderName, GrainClient.Logger);
-        }
-
-        public override void AdjustForTest(Orleans.Runtime.Configuration.ClientConfiguration config)
-        {
-            config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName, new Dictionary<string,string>());
- 	        base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run

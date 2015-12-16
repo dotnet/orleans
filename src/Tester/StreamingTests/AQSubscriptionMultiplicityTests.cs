@@ -27,16 +27,16 @@ namespace UnitTests.StreamingTests
             {
                 StartFreshOrleans = true,
                 SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+            }, new TestingClientOptions()
+            {
+                AdjustConfig = config =>
+                {
+                    config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName, new Dictionary<string, string>());
+                    config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
+                },
             })
         {
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
-        }
-
-        public override void AdjustForTest(ClientConfiguration config)
-        {
-            config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName, new Dictionary<string, string>());
-            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
-            base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run

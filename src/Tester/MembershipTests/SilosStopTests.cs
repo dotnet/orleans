@@ -19,7 +19,12 @@ namespace UnitTests.MembershipTests
             {
                 StartFreshOrleans = true,
                 StartPrimary = true,
-                StartSecondary = true
+                StartSecondary = true,
+                AdjustConfig = config => {
+                    config.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
+                    config.Globals.NumMissedProbesLimit = 1;
+                    config.Globals.NumVotesForDeathDeclaration = 1;
+                }
             })
         {
         }
@@ -28,14 +33,6 @@ namespace UnitTests.MembershipTests
         public static void MyClassCleanup()
         {
             StopAllSilos();
-        }
-
-        public override void AdjustForTest(ClusterConfiguration config)
-        {
-            base.AdjustForTest(config);
-            config.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
-            config.Globals.NumMissedProbesLimit = 1;
-            config.Globals.NumVotesForDeathDeclaration = 1;
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Liveness")]
