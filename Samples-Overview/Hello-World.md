@@ -34,7 +34,7 @@ The class inherits from an Orleans-defined base class, and implements the commun
  The client, which orchestrates the grain code and is found in Program.cs, looks like this:
 
 ``` csharp
-Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
 var friend = HelloWorldInterfaces.HelloFactory.GetGrain(0);
 Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
 ```

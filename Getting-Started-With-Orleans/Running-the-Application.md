@@ -17,10 +17,10 @@ The client library provides a subset of the Orleans programming model for writin
 
 ## Connecting to a Gateway
 
-To establish a connection, a client calls `OrleansClient.Initialize()`. 
+To establish a connection, a client calls `GrainClient.Initialize()`. 
 This will connect to the gateway silo at the IP address and port specified in the _ClientConfiguration.xml_ file. 
 This file must be placed in the same directory as the _Orleans.dll_ library used by the client. 
-As an alternative, a configuration object can be passed to `OrleansClient.Initialize()` programmatically instead of loading it from a file.
+As an alternative, a configuration object can be passed to `GrainClient.Initialize()` programmatically instead of loading it from a file.
 
 ## Configuring the Client
 
