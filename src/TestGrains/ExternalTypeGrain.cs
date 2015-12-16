@@ -17,14 +17,15 @@ namespace UnitTests.Grains
     /// </summary>
     public class ExternalTypeGrain : Grain, IExternalTypeGrain
     {
-        public async Task GetAbstractModel(IEnumerable<NameObjectCollectionBase> list)
+        public Task GetAbstractModel(IEnumerable<NameObjectCollectionBase> list)
         {
             Console.WriteLine("GetAbstractModel: Success");
+            return TaskDone.Done;
         }
 
-        public async Task<EnumClass> GetEnumModel()
+        public Task<EnumClass> GetEnumModel()
         {
-            return new EnumClass() { EnumsList = new List<DateTimeKind>() { DateTimeKind.Local } };
+            return Task.FromResult( new EnumClass() { EnumsList = new List<DateTimeKind>() { DateTimeKind.Local } });
         }
     }
 }

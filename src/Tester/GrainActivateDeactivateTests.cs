@@ -3,12 +3,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestInternalGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using UnitTests.GrainInterfaces;
 
 
 namespace UnitTests.ActivationsLifeCycleTests

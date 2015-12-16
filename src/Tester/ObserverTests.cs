@@ -48,11 +48,6 @@ namespace UnitTests.General
             return GrainFactory.GetGrain<ISimpleObserverableGrain>(GetRandomGrainId());
         }
 
-        private static int GetRandomGrainId()
-        {
-            return random.Next();
-        }
-
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ObserverTest_SimpleNotification()
         {
