@@ -123,7 +123,7 @@ public Task<string> SayHello()
 
 OK, we're nearly done. 
 All we need is a bit of client code, which we will return to _Program.cs_ in order to add. 
-In place of the comment following the call to `OrleansClient.Initialize()`, add these two lines:
+In place of the comment following the call to `GrainClient.Initialize()`, add these two lines:
 
 
 ``` csharp

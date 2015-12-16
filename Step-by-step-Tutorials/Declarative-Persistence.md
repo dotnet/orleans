@@ -25,7 +25,7 @@ The modified `Main` program looks like this:
 static void Main(string[] args)
 {
      ...
-    Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
 
     var ids = new string[] { 
         "42783519-d64e-44c9-9c29-399e3afaa625", 

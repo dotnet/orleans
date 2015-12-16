@@ -67,7 +67,7 @@ public class StockGrain : Orleans.Grain, IStockGrain
 Next create some client code to connect to the Orleans Silo, and retrieve the grain state:
 
 ``` csharp
-OrleansClient.Initialize("LocalConfiguration.xml");
+GrainClient.Initialize("LocalConfiguration.xml");
 
 // retrieve the MSFT stock
 var grain = GrainClient.GrainFactory.GetGrain<IStockGrain>("MSFT");

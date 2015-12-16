@@ -124,7 +124,7 @@ The role of `OnActivateAsync()` will be explained later on; for now, you may con
 In the client _(Program.cs)_, we can add a few lines to create a couple of employees and their manager:
 
 ``` csharp
-Orleans.OrleansClient.Initialize("DevTestClientConfiguration.xml");
+Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
 
 var grainFactory = GrainClient.GrainFactory;
 var e0 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
