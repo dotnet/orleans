@@ -55,6 +55,10 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
+      <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
+      <Name>TestGrainInterfaces</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->

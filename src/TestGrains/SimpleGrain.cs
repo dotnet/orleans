@@ -17,6 +17,8 @@ namespace UnitTests.Grains
     /// </summary>
     public class SimpleGrain : Grain, ISimpleGrain 
     {
+        public const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
+
         protected Logger logger;
         protected int A { get; set; }
         protected int B { get; set; }
