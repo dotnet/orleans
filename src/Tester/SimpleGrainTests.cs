@@ -24,11 +24,6 @@ namespace UnitTests.General
             return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
         }
 
-        private static int GetRandomGrainId()
-        {
-            return random.Next();
-        }
-
         [ClassCleanup]
         public static void MyClassCleanup()
         {

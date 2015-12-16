@@ -25,11 +25,6 @@ namespace UnitTests.General
         {
         }
 
-        private static int GetRandomGrainId()
-        {
-            return random.Next();
-        }
-
         [ClassCleanup]
         public static void MyClassCleanup()
         {
