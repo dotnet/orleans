@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -39,7 +38,6 @@ namespace Orleans.Storage
         private static int counter;
         private readonly int id;
         private const string STATE_STORE_NAME = "MemoryStorage";
-        private string etag;
         private Lazy<IMemoryStorageGrain>[] storageGrains;
 
         /// <summary> Name of this storage provider instance. </summary>
@@ -110,10 +108,11 @@ namespace Orleans.Storage
             
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
-            IDictionary<string, object> state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
-            if (state != null)
+            Tuple<IDictionary<string, object>, string> result = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
+            if (result != null && result.Item1 != null)
             {
-                grainState.SetAll(state);
+                grainState.SetAll(result.Item1);
+                grainState.Etag = result.Item2;
             }
         }
 
@@ -123,18 +122,15 @@ namespace Orleans.Storage
         {
             var keys = MakeKeys(grainType, grainReference);
             var data = grainState.AsDictionary();
-            string receivedEtag = grainState.Etag;
+            string prevEtag = grainState.Etag;
 
-            if (Log.IsVerbose2) Log.Verbose2("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, data, receivedEtag));
+            if (Log.IsVerbose2) Log.Verbose2("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, data, prevEtag));
 
-            if (receivedEtag != null && receivedEtag != etag)
-                throw new InconsistentStateException(string.Format("Etag mismatch durign Write: Expected = {0} Received = {1}", etag, receivedEtag));
-            
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, data);
+            string newEtag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, data, prevEtag);
 
-            etag = NewEtag();
+            grainState.Etag = newEtag;
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
@@ -142,18 +138,13 @@ namespace Orleans.Storage
         public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
-            string eTag = grainState.Etag; // TOD: Should this be 'null' for always Delete?
+            string prevEtag = grainState.Etag; // TOD: Should this be 'null' for always Delete?
 
-            if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), eTag);
+            if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), prevEtag);
 
-            if (eTag != null && eTag != etag)
-                throw new InconsistentStateException(string.Format("Etag mismatch durign Delete: Expected = {0} Received = {1}", this.etag, eTag));
-            
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key);
-
-            etag = NewEtag();
+            await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, prevEtag);
         }
 
         #endregion
@@ -229,11 +220,6 @@ namespace Orleans.Storage
                 };
             }
             return compareClause;
-        }
-
-        private static string NewEtag()
-        {
-            return DateTime.UtcNow.ToString(CultureInfo.InvariantCulture);
         }
     }
 }
