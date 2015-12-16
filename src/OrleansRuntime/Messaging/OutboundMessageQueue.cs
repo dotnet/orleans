@@ -102,6 +102,13 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
+                // check for simulation of lost messages
+                if(Silo.CurrentSilo.TestHookup.ShouldDrop(msg))
+                {
+                    logger.Info(ErrorCode.Messaging_SimulatedMessageLoss, "Message blocked by test");
+                    messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message blocked by test");
+                }
+
                 // Prioritize system messages
                 switch (msg.Category)
                 {

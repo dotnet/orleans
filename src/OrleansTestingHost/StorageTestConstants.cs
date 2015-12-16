@@ -55,6 +55,19 @@ namespace Orleans.TestingHost
             DataConnectionString = DEFAULT_STORAGE_DATA_CONNECTION_STRING;
         }
 
+        public static bool UsingAzureLocalStorageEmulator
+        {
+            get
+            {
+                string connString = DataConnectionString;
+                bool usingLocalWAS = DEFAULT_STORAGE_DATA_CONNECTION_STRING.Equals(connString, StringComparison.OrdinalIgnoreCase);
+                //string msg = string.Format("Using Azure local storage emulator = {0}", usingLocalWAS);
+                //Console.WriteLine(msg);
+                //Trace.WriteLine(msg);
+                return usingLocalWAS;
+            }
+        }
+
         public static string GetZooKeeperConnectionString()
         {
             return "127.0.0.1:2181";

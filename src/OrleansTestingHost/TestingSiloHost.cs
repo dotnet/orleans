@@ -56,7 +56,7 @@ namespace Orleans.TestingHost
 
         public static IGrainFactory GrainFactory { get; private set; }
 
-        public Logger logger
+        public Logger logger 
         {
             get { return GrainClient.Logger; }
         }
@@ -178,7 +178,7 @@ namespace Orleans.TestingHost
         {
             TimeSpan stabilizationTime = _livenessStabilizationTime;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-            await Task.Delay(stabilizationTime);
+            await Task.Delay(stabilizationTime);           
             WriteLog("WaitForLivenessToStabilize is done sleeping");
         }
 
@@ -345,7 +345,7 @@ namespace Orleans.TestingHost
             return null;
         }
 
-        public void AdjustForTest(ClusterConfiguration config, TestingSiloOptions options)
+        public static void AdjustForTest(ClusterConfiguration config, TestingSiloOptions options)
         {
             if (options.AdjustConfig != null) {
                 options.AdjustConfig(config);
@@ -354,7 +354,7 @@ namespace Orleans.TestingHost
             config.AdjustForTestEnvironment();
         }
 
-        public void AdjustForTest(ClientConfiguration config, TestingClientOptions options)
+        public static void AdjustForTest(ClientConfiguration config, TestingClientOptions options)
         {
             if (options.AdjustConfig != null) {
                 options.AdjustConfig(config);
@@ -432,7 +432,7 @@ namespace Orleans.TestingHost
 
             if (options.ParallelStart)
             {
-                var handles = new List<Task<SiloHandle>>();
+                var handles = new List<Task<SiloHandle>>();     
                 if (doStartPrimary)
                 {
                     int instanceCount = InstanceCounter++;
@@ -499,7 +499,7 @@ namespace Orleans.TestingHost
                 {
                     clientConfig.ResponseTimeout = clientOptions.ResponseTimeout;
                 }
-
+                
                 if (options.LargeMessageWarningThreshold > 0)
                 {
                     clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
@@ -513,6 +513,12 @@ namespace Orleans.TestingHost
 
         private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
+            return StartOrleansSilo(this, type, options, instanceCount, shared);
+        }
+
+        // This is a static version that can be called without a TestingSiloHost object (host = null)
+        public static SiloHandle StartOrleansSilo(TestingSiloHost host, Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        {
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
             if (options.SiloConfigFile == null)
@@ -524,8 +530,8 @@ namespace Orleans.TestingHost
                 config.LoadFromFile(options.SiloConfigFile.FullName);
             }
 
-            int basePort = options.BasePort < 0 ? BasePort : options.BasePort;
 
+            int basePort = options.BasePort < 0 ? BasePort : options.BasePort;
 
             if (config.Globals.SeedNodes.Count > 0 && options.BasePort < 0)
             {
@@ -556,7 +562,7 @@ namespace Orleans.TestingHost
             }
 
             _livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
-
+            
             string siloName;
             switch (type)
             {
@@ -577,7 +583,8 @@ namespace Orleans.TestingHost
 
             if (nodeConfig.ProxyGatewayEndpoint != null && nodeConfig.ProxyGatewayEndpoint.Address != null)
             {
-                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, ProxyBasePort + instanceCount);
+                int proxyBasePort = options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort;
+                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, proxyBasePort + instanceCount);
             }
 
             config.Globals.ExpectedClusterSize = 2;
@@ -681,9 +688,9 @@ namespace Orleans.TestingHost
                 "OrleansRuntime.dll", typeof(Silo).FullName, false,
                 BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
                 new object[] { });
-
+            
             appDomain.UnhandledException += ReportUnobservedException;
-
+            
             return silo;
         }
 

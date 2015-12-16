@@ -7,6 +7,7 @@ using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage.Table.Protocol;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
+using UnitTests.Tester;
 
 namespace UnitTests.StorageTests
 {
@@ -25,11 +26,7 @@ namespace UnitTests.StorageTests
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
         {
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if(!StorageEmulator.TryStart())
-            {
-                Console.WriteLine("Azure Storage Emulator could not be started.");
-            }
+            UnitTestSiloHost.CheckForAzureStorage();
         }
 
         [TestInitialize]

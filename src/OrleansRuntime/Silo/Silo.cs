@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -897,6 +898,37 @@ namespace Orleans.Runtime
             internal void SuppressFastKillInHandleProcessExit()
             {
                 ExecuteFastKillInProcessExit = false;
+            }
+
+            // store silos for which we simulate faulty communication
+            // number indicates how many percent of requests are lost
+            internal ConcurrentDictionary<IPEndPoint, double> SimulatedMessageLoss; 
+
+            internal void BlockSiloCommunication(IPEndPoint destination, double lost_percentage)
+            {
+                if (SimulatedMessageLoss == null)
+                    SimulatedMessageLoss = new ConcurrentDictionary<IPEndPoint, double>();
+
+                SimulatedMessageLoss[destination] = lost_percentage;
+            }
+
+            internal void UnblockSiloCommunication()
+            {
+                SimulatedMessageLoss = null;
+            }
+
+            SafeRandom random = new SafeRandom();
+
+            internal bool ShouldDrop(Message msg)
+            {
+                if (SimulatedMessageLoss != null)
+                {
+                    double blockedpercentage = 0.0;
+                    Silo.CurrentSilo.TestHookup.SimulatedMessageLoss.TryGetValue(msg.TargetSilo.Endpoint, out blockedpercentage);
+                    return (random.NextDouble() * 100 < blockedpercentage);
+                }
+                else
+                    return false;
             }
 
             // this is only for white box testing - use RuntimeClient.Current.SendRequest instead

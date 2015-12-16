@@ -21,6 +21,7 @@ namespace Orleans.TestingHost
         /// </summary>
         private const string storageEmulatorProcessName27OlderThan = "WAStorageEmulator";
         private const string storageEmulatorProcessName27OrNewer = "Windows Azure Storage Emulator Service";
+        private const string storageEmulatorProcessNameAlt = "AzureStorageEmulator";
 
         //The file names aren't the same as process names.
         private const string storageEmulatorFilename27OlderThan = "WAStorageEmulator.exe";
@@ -167,7 +168,11 @@ namespace Orleans.TestingHost
         /// <returns></returns>
         private static Process GetStorageEmulatorProcess()
         {
-            return Process.GetProcessesByName(storageEmulatorProcessName27OrNewer).Concat(Process.GetProcessesByName(storageEmulatorProcessName27OlderThan)).FirstOrDefault(p => p != null);
+            var a = Process.GetProcessesByName(storageEmulatorProcessName27OrNewer);
+            var b = Process.GetProcessesByName(storageEmulatorProcessName27OlderThan);
+            var c = Process.GetProcessesByName(storageEmulatorProcessNameAlt);
+
+            return a.Concat(b).Concat(c).FirstOrDefault(p => p != null);
         }
         
                 
