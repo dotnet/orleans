@@ -6,6 +6,7 @@ namespace Orleans.CodeGeneration
     using System.Reflection;
 
     using Orleans.CodeGenerator;
+    using Orleans.Serialization;
     using Orleans.Runtime;
 
     /// <summary>
@@ -115,6 +116,7 @@ namespace Orleans.CodeGeneration
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", outputFileName);
 
             var codeGenerator = RoslynCodeGenerator.Instance;
+            SerializationManager.RegisterBuiltInSerializers();
             using (var sourceWriter = new StreamWriter(outputFileName))
             {
                 sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
