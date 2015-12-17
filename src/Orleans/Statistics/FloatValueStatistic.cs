@@ -13,7 +13,7 @@ namespace Orleans.Runtime
         public string Name { get; private set; }
         public CounterStorage Storage { get; private set; }
 
-        private readonly Func<float> fetcher;
+        private Func<float> fetcher;
         private Func<float, float> valueConverter;
 
         static FloatValueStatistic()
@@ -61,6 +61,21 @@ namespace Orleans.Runtime
                 var ctr = new FloatValueStatistic(name.Name, f) { Storage = storage };
                 registeredStatistics[name.Name] = ctr;
                 return ctr;
+            }
+        }
+
+        static public void Delete(StatisticName name)
+        {
+            lock (lockable)
+            {
+                FloatValueStatistic stat;
+                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                {
+                    registeredStatistics.Remove(name.Name);
+                    // Null the fetcher delegate to prevent memory leaks via undesirable reference capture by the fetcher lambda.
+                    stat.fetcher = null;
+                    stat.valueConverter = null;
+                }
             }
         }
 

@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         public string Name { get; private set; }
         public CounterStorage Storage { get; private set; }
 
-        private readonly Func<string> fetcher;
+        private Func<string> fetcher;
 
         static StringValueStatistic()
         {
@@ -50,11 +50,17 @@ namespace Orleans.Runtime
             }
         }
 
-        static public bool Delete(string name)
+        static public void Delete(string name)
         {
             lock (lockable)
             {
-                return registeredStatistics.Remove(name);
+                StringValueStatistic stat;
+                if (registeredStatistics.TryGetValue(name, out stat))
+                {
+                    registeredStatistics.Remove(name);
+                    // Null the fetcher delegate to prevent memory leaks via undesirable reference capture by the fetcher lambda.
+                    stat.fetcher = null;
+                }
             }
         }
 

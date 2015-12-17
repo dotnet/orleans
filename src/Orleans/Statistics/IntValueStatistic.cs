@@ -13,7 +13,7 @@ namespace Orleans.Runtime
         public string Name { get; private set; }
         public CounterStorage Storage { get; private set; }
 
-        private readonly Func<long> fetcher;
+        private Func<long> fetcher;
 
         static IntValueStatistic()
         {
@@ -49,6 +49,20 @@ namespace Orleans.Runtime
                 registeredStatistics[name.Name] = ctr;
                 return ctr;
             }
+        }
+
+        static public void Delete(StatisticName name)
+        {
+            lock (lockable)
+            {
+                IntValueStatistic stat;
+                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                {
+                    registeredStatistics.Remove(name.Name);
+                    // Null the fetcher delegate to prevent memory leaks via undesirable reference capture by the fetcher lambda.
+                    stat.fetcher = null;
+                }
+            }   
         }
 
         /// <summary>

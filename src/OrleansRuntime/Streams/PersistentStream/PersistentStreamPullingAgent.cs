@@ -34,7 +34,7 @@ namespace Orleans.Streams
 
         internal readonly QueueId QueueId;
         private bool IsShutdown { get { return timer == null; } }
-
+        private string StatisticUniquePostfix { get { return streamProviderName + "." + QueueId; } }
 
         internal PersistentStreamPullingAgent(
             GrainId id, 
@@ -61,11 +61,9 @@ namespace Orleans.Streams
             logger.Info((int)ErrorCode.PersistentStreamPullingAgent_01, 
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
                 GetType().Name, GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
-
-            string statUniquePostfix = strProviderName + "." + QueueId;
-            numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, statUniquePostfix));
-            numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, statUniquePostfix));
-            IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, statUniquePostfix), () => pubSubCache.Count);
+            numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
+            numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
+            IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);
             // TODO: move queue cache size statistics tracking into queue cache implementation once Telemetry APIs and LogStatistics have been reconciled.
             //IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE, statUniquePostfix), () => queueCache != null ? queueCache.Size : 0);
         }
@@ -183,6 +181,8 @@ namespace Orleans.Streams
                     "Failed to unregister myself as stream producer to some streams taht used to be in my responsibility.", exc);
             }
             pubSubCache.Clear();
+            IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix));          
+            //IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE, StatisticUniquePostfix));
         }
 
         public Task AddSubscriber(
