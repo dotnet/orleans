@@ -124,6 +124,7 @@
     <Compile Include="ExternalTypesTests.cs" />
     <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />
+    <Compile Include="DuplicateActivationsTests.cs" />
     <Compile Include="GenericGrainsInAzureStorageTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainActivateDeactivateTests.cs" />

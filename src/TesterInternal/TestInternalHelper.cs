@@ -2,9 +2,9 @@
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 
-namespace UnitTests
+namespace UnitTests.TesterInternal
 {
-    public class TestHelper
+    public class TestInternalHelper
     {
         internal static OrleansTaskScheduler InitializeSchedulerForTesting(ISchedulingContext context)
         {

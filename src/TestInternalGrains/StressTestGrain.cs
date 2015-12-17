@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using TestInternalGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
-namespace TestInternalGrains
+namespace UnitTests.Grains
 {
     internal class StressTestGrain : Grain, IStressTestGrain
     {
@@ -142,11 +142,8 @@ namespace TestInternalGrains
                 {
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain).PingMutableArray(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingMutableArray(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingMutableArray(data, -1, false);
             }
             return TaskDone.Done;
         }
@@ -160,11 +157,8 @@ namespace TestInternalGrains
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableArray(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingImmutableArray(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingImmutableArray(data, -1, false);
             }
             return TaskDone.Done;
         }
@@ -178,11 +172,8 @@ namespace TestInternalGrains
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingMutableDictionary(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingMutableDictionary(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingMutableDictionary(data, -1, false);
             }
             return TaskDone.Done;
         }
@@ -197,11 +188,8 @@ namespace TestInternalGrains
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableDictionary(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingImmutableDictionary(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingImmutableDictionary(data, -1, false);
             }
             return TaskDone.Done;
         }
@@ -309,11 +297,8 @@ namespace TestInternalGrains
                 {
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain).PingMutableArray(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingMutableArray(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingMutableArray(data, -1, false);
             }
             return TaskDone.Done;
         }
@@ -327,11 +312,8 @@ namespace TestInternalGrains
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableArray(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingImmutableArray(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingImmutableArray(data, -1, false);
             }
             return TaskDone.Done;
         }
@@ -345,11 +327,8 @@ namespace TestInternalGrains
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingMutableDictionary(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingMutableDictionary(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingMutableDictionary(data, -1, false);
             }
             return TaskDone.Done;
         }
@@ -364,11 +343,8 @@ namespace TestInternalGrains
                     return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableDictionary(data, -1, false);
                 }
-                else
-                {
-                    return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
-                        .PingImmutableDictionary(data, -1, false);
-                }
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                    .PingImmutableDictionary(data, -1, false);
             }
             return TaskDone.Done;
         }

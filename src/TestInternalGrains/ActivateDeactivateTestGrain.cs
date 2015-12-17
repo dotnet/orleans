@@ -4,10 +4,9 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
-using TestInternalGrainInterfaces;
 using UnitTests.GrainInterfaces;
 
-namespace TestInternalGrains
+namespace UnitTests.Grains
 {
     internal class SimpleActivateDeactivateTestGrain : Grain, ISimpleActivateDeactivateTestGrain
     {
@@ -386,7 +385,7 @@ namespace TestInternalGrains
             {
                 throw new ArgumentException("Bad data: Null label returned");
             }
-            return this.Data.ActivationId.ToString();
+            return Data.ActivationId.ToString();
         }
 
         public async Task ForwardCall(IBadActivateDeactivateTestGrain otherGrain)

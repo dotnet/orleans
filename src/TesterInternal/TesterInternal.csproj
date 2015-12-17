@@ -88,22 +88,35 @@
     <Compile Include="AsyncPipelineTests.cs" />
     <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
     <Compile Include="Async_TimingTests.cs" />
+    <Compile Include="ClientAddressableTests.cs" />
+    <Compile Include="ClientInitTests.cs" />
+    <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
+    <Compile Include="CodeGeneratorTests.cs" />
     <Compile Include="ConcurrencyTests.cs" />
+    <Compile Include="ConfigTests.cs" />
     <Compile Include="ErrorGrainTest.cs" />
+    <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
-    <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
+	<Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
+	<Compile Include="GeoClusterTests\TestingClusterHost.cs" />
     <Compile Include="Serialization\FallbackBuiltInSerializationTests.cs" />
+    <Compile Include="GrainReferenceCacheTests.cs" />
+    <Compile Include="GrainReferenceCastTests.cs" />
     <Compile Include="GrainReferenceTest.cs" />
     <Compile Include="MembershipTests\MySqlMembershipTableTests.cs" />
-    <Compile Include="InterlockedFlag.cs" />
     <Compile Include="LocalErrorGrain.cs" />
+    <Compile Include="MockStatsCollectors.cs" />
+    <Compile Include="MockStorageProvider.cs" />
+    <Compile Include="MultifacetGrainTest.cs" />
+    <Compile Include="OrleansHostProgTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
     <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
     <Compile Include="OrleansTaskSchedulerAdvancedTests.cs" />
     <Compile Include="OrleansTaskSchedulerBasicTests.cs" />
+    <Compile Include="PolymorphicInterfaceTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -115,6 +128,7 @@
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="General\InternalSerializationTests.cs" />
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
+    <Compile Include="StatsTests.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
@@ -126,9 +140,9 @@
     <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
     <Compile Include="StorageTests\AzureQueueDataManagerTests.cs" />
     <Compile Include="MembershipTests\ZookeeperMembershipTableTests.cs" />
+    <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestConstants.cs" />
-    <Compile Include="TestHelper.cs" />
-    <Compile Include="GeoClusterTests\TestingClusterHost.cs" />
+    <Compile Include="TestInternalHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
@@ -187,6 +201,10 @@
       <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
       <Name>TestGrains</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestHelper\TestHelper.csproj">
+      <Project>{9b0976c1-92f7-4ace-841d-7a49ebdcbe3f}</Project>
+      <Name>TestHelper</Name>
+    </ProjectReference>
     <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
       <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>
       <Name>TestInternalGrainInterfaces</Name>
@@ -221,8 +239,65 @@
       <Link>OrleansConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="ClientConfig_AzureWebRole.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ClientConfig_NewAzure.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config_ActivationCollectorTests.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_Azure_Default.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_DevStorage.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_LogConsumers-ClientConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_LogConsumers-OrleansConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_NewAzure.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_NonTimestampedLogFileNames.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_OldAzure.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_Azure1.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_Azure2.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_Memory2.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageProvider_SomeConfig.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StreamProviders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_TestSiloConfig.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DevTestClientConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DevTestServerConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="MockStats_ClientConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="MockStats_ServerConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

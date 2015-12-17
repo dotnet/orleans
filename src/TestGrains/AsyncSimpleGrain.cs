@@ -7,7 +7,7 @@ namespace UnitTests.Grains
     /// <summary>
     /// A simple grain that allows to set two agruments and then multiply them.
     /// </summary>
-    public class AsyncSimpleGrain : UnitTests.Grains.SimpleGrain, ISimpleGrainWithAsyncMethods
+    public class AsyncSimpleGrain : SimpleGrain, ISimpleGrainWithAsyncMethods
     {
         TaskCompletionSource<int> resolver;
 

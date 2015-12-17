@@ -6,13 +6,12 @@ using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
-namespace TestInternalGrains
+namespace UnitTests.Grains
 {
-
     /// <summary>
     /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
-    public class ErrorGrain : UnitTests.Grains.SimpleGrain, IErrorGrain
+    public class ErrorGrain : SimpleGrain, IErrorGrain
     {
         private int counter;
 

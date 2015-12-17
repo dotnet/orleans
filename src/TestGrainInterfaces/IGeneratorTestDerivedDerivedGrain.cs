@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace TestGrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     [Serializable]
     public class ReplaceArguments

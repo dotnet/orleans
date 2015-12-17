@@ -21,3 +21,4 @@ using Orleans.CodeGeneration;
 
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
+[assembly: InternalsVisibleTo("TesterInternal")]

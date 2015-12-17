@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 
-namespace TestInternalGrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     internal interface IStressTestGrain : IGrainWithIntegerKey
     {
