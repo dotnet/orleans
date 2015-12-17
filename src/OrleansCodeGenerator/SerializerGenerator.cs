@@ -9,6 +9,7 @@ namespace Orleans.CodeGenerator
     using System.Runtime.Serialization;
     using System.Text.RegularExpressions;
 
+    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -327,16 +328,11 @@ namespace Orleans.CodeGenerator
             Expression<Action> getValueSetter = () => SerializationManager.GetValueSetter(default(FieldInfo));
 
             // Expressions for specifying binding flags.
-            var flags = SF.IdentifierName("System").Member("Reflection").Member("BindingFlags");
-            var publicFlag = flags.Member(BindingFlags.Public.ToString());
-            var nonPublicFlag = flags.Member(BindingFlags.NonPublic.ToString());
-            var instanceFlag = flags.Member(BindingFlags.Instance.ToString());
-            var bindingFlags =
-                SF.ParenthesizedExpression(
-                    SF.BinaryExpression(
-                        SyntaxKind.BitwiseOrExpression,
-                        publicFlag,
-                        SF.BinaryExpression(SyntaxKind.BitwiseOrExpression, nonPublicFlag, instanceFlag)));
+            var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
+                   SyntaxKind.BitwiseOrExpression,
+                   BindingFlags.Instance,
+                   BindingFlags.NonPublic,
+                   BindingFlags.Public);
 
             // Add each field and initialize it.
             foreach (var field in fields)
@@ -457,13 +453,63 @@ namespace Orleans.CodeGenerator
             else
             {
                 // Create an unformatted object.
-                Expression<Func<object>> getUninitializedObject =
+#if DNXCORE50
+                var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
+                    SyntaxKind.BitwiseOrExpression,
+                    BindingFlags.Instance,
+                    BindingFlags.NonPublic,
+                    BindingFlags.Public);
+                var nullLiteralExpressionArgument = SF.Argument(SF.LiteralExpression(SyntaxKind.NullLiteralExpression));
+                var typeArg = SF.Argument(SF.TypeOfExpression(typeInfo.GetTypeSyntax()));
+                var bindingFlagsArg = SF.Argument(bindingFlags);
+                var binderArg = nullLiteralExpressionArgument;
+                ArgumentSyntax ctorArgumentsArg;
+                var cons = typeInfo.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .OrderBy(p => p.GetParameters().Count()).FirstOrDefault();
+                var consParameters = cons != null ? cons.GetParameters().Select(p => p.ParameterType).ToArray() : null;
+                if (consParameters != null && consParameters.Length > 0)
+                {
+                    var separatedSyntaxList = new SeparatedSyntaxList<ExpressionSyntax>();
+                    separatedSyntaxList = consParameters
+                        .Aggregate(separatedSyntaxList, (current, t) => current.Add(SF.DefaultExpression(t.GetTypeInfo().GetTypeSyntax())));
+                    ctorArgumentsArg = SF.Argument(separatedSyntaxList.GetArrayCreationWithInitializerSyntax(
+                        SF.PredefinedType(SF.Token(SyntaxKind.ObjectKeyword))));
+                }
+                else
+                {
+                    ctorArgumentsArg = nullLiteralExpressionArgument;
+                }
+
+                var cultureInfoArg = SF.Argument(
+                    SF.IdentifierName("System").Member("Globalization").Member("CultureInfo").Member("InvariantCulture"));
+                var createInstanceArguments = new []
+                {
+                    typeArg,
+                    bindingFlagsArg,
+                    binderArg,
+                    ctorArgumentsArg,
+                    cultureInfoArg
+                };
+
+                Expression<Func<object>> getUninitializedObject = () => Activator.CreateInstance(
+                    default(Type), 
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null,
+                    null,
+                    System.Globalization.CultureInfo.InvariantCulture);
+                result = SF.CastExpression(
+                    type.GetTypeSyntax(),
+                    getUninitializedObject.Invoke()
+                        .AddArgumentListArguments(createInstanceArguments));
+#else
+                Expression<Func<object>> getUninitializedObject = 
                     () => FormatterServices.GetUninitializedObject(default(Type));
                 result = SF.CastExpression(
                     type.GetTypeSyntax(),
                     getUninitializedObject.Invoke()
                         .AddArgumentListArguments(
                             SF.Argument(SF.TypeOfExpression(typeInfo.GetTypeSyntax()))));
+#endif
             }
 
             return result;

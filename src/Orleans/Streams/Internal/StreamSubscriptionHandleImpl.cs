@@ -23,6 +23,9 @@ namespace Orleans.Streams
         public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
+        // constructor used by serializator
+        private StreamSubscriptionHandleImpl() { }
+
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
             : this(subscriptionId, null, streamImpl, null, null)
         {

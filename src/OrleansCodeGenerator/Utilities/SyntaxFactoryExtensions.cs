@@ -6,6 +6,7 @@ namespace Orleans.CodeGenerator.Utilities
     using System.Linq.Expressions;
     using System.Reflection;
 
+    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -84,6 +85,79 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             return plainName.ToIdentifierName();
+        }
+
+        /// <summary>
+        /// Returns <see cref="ParenthesizedExpressionSyntax"/>  representing parenthesized binary expression of  <paramref name="bindingFlags"/>.
+        /// </summary>
+        /// <param name="operationKind">
+        /// The kind of the binary expression.
+        /// </param> 
+        /// <param name="bindingFlags">
+        /// The binding flags.
+        /// </param>
+        /// <returns>
+        /// <see cref="ParenthesizedExpressionSyntax"/> representing parenthesized binary expression of <paramref name="bindingFlags"/>.
+        /// </returns>
+        public static ParenthesizedExpressionSyntax GetBindingFlagsParenthesizedExpressionSyntax(SyntaxKind operationKind, params BindingFlags[] bindingFlags)
+        {
+            if (bindingFlags.Length < 2)
+            {
+                throw new ArgumentOutOfRangeException(
+                    "bindingFlags", 
+                    string.Format("Can't create parenthesized binary expression with {0} arguments", bindingFlags.Length));
+            }
+
+            var flags = SyntaxFactory.IdentifierName("System").Member("Reflection").Member("BindingFlags");
+            var bindingFlagsBinaryExpression = SyntaxFactory.BinaryExpression(
+                operationKind,
+                flags.Member(bindingFlags[0].ToString()),
+                flags.Member(bindingFlags[1].ToString()));
+            for (var i = 2; i < bindingFlags.Length; i++)
+            {
+                bindingFlagsBinaryExpression = SyntaxFactory.BinaryExpression(
+                    operationKind,
+                    bindingFlagsBinaryExpression,
+                    flags.Member(bindingFlags[i].ToString()));
+            }
+
+            return SyntaxFactory.ParenthesizedExpression(bindingFlagsBinaryExpression);
+        }
+
+        /// <summary>
+        /// Returns <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
+        /// </summary>
+        /// <param name="separatedSyntaxList">
+        /// Args used in initialization.
+        /// </param>
+        /// <param name="arrayType">
+        /// The array type.
+        /// </param>
+        /// <returns>
+        /// <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
+        /// </returns>
+        public static ArrayCreationExpressionSyntax GetArrayCreationWithInitializerSyntax(this SeparatedSyntaxList<ExpressionSyntax> separatedSyntaxList, TypeSyntax arrayType)
+        {
+            var arrayRankSizes =
+                new SeparatedSyntaxList<ExpressionSyntax>().Add(SyntaxFactory.OmittedArraySizeExpression(
+                    SyntaxFactory.Token(SyntaxKind.OmittedArraySizeExpressionToken)));
+
+            var arrayRankSpecifier = SyntaxFactory.ArrayRankSpecifier(
+                SyntaxFactory.Token(SyntaxKind.OpenBracketToken),
+                arrayRankSizes,
+                SyntaxFactory.Token(SyntaxKind.CloseBracketToken));
+
+            var arrayRankSpecifierSyntaxList = new SyntaxList<ArrayRankSpecifierSyntax>().Add(arrayRankSpecifier);
+
+            var arrayCreationExpressionSyntax = SyntaxFactory.ArrayCreationExpression(
+                SyntaxFactory.Token(SyntaxKind.NewKeyword),
+                SyntaxFactory.ArrayType(arrayType, arrayRankSpecifierSyntaxList),
+                SyntaxFactory.InitializerExpression(SyntaxKind.ArrayInitializerExpression,
+                    SyntaxFactory.Token(SyntaxKind.OpenBraceToken),
+                    separatedSyntaxList,
+                    SyntaxFactory.Token(SyntaxKind.CloseBraceToken)));
+
+            return arrayCreationExpressionSyntax;
         }
 
         /// <summary>
