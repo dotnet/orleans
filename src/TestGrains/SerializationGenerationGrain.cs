@@ -10,6 +10,11 @@ namespace TestGrains
     using UnitTests.GrainInterfaces;
     public class SerializationGenerationGrain : Grain<SerializationGenerationGrain.MyState>, ISerializationGenerationGrain
     {
+        public Task<object> RoundTripObject(object input)
+        {
+            return Task.FromResult(input);
+        }
+
         public Task<SomeStruct> RoundTripStruct(SomeStruct input)
         {
             return Task.FromResult(input);
