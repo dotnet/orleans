@@ -9,17 +9,17 @@
     </Tracing>
   </Defaults>
   <Override Node="Primary">
-    <Networking Port="11111" />
-    <ProxyingGateway Address="localhost" Port="30000" />
+    <Networking Port="22222" />
+    <ProxyingGateway Address="localhost" Port="40000" />
   </Override>
   <Override Node="Secondary_1">
-    <Networking Port="11112" />
-    <ProxyingGateway Address="localhost" Port="30001" />
+    <Networking Port="22223" />
+    <ProxyingGateway Address="localhost" Port="40001" />
   </Override>
   <Override Node="Node2">
-    <Networking Port="11113" />
+    <Networking Port="22224" />
   </Override>
   <Override Node="Node3">
-    <Networking Port="11114" />
+    <Networking Port="22225" />
   </Override>
 </OrleansConfiguration>

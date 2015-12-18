@@ -364,7 +364,7 @@ namespace Orleans.TestingHost
 
             config.AdjustForTestEnvironment();
         }
-
+       
         #region Private methods
 
         /// <summary>
@@ -534,6 +534,7 @@ namespace Orleans.TestingHost
             }
 
             int basePort = options.BasePort < 0 ? BasePort : options.BasePort;
+
 
             if (config.Globals.SeedNodes.Count > 0 && options.BasePort < 0)
             {

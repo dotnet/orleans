@@ -139,10 +139,11 @@ namespace UnitTests.Grains
             logger.Info("OnActivateAsync");
 
             // Spawn Task to run on default .NET thread pool
-            Task task = Task.Factory.StartNew(() =>
+            var task = Task.Factory.StartNew(() =>
             {
                 logger.Info("Started-OnActivateAsync-SubTask");
-                Assert.IsTrue(TaskScheduler.Current == TaskScheduler.Default, "Running under default .NET Task scheduler");
+                Assert.IsTrue(TaskScheduler.Current == TaskScheduler.Default,
+                    "Running under default .NET Task scheduler");
                 Assert.IsTrue(doingActivate, "Still doing Activate in Sub-Task");
                 logger.Info("Finished-OnActivateAsync-SubTask");
             }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
@@ -211,7 +212,7 @@ namespace UnitTests.Grains
         {
             logger = GetLogger();
 
-            var startMe = 
+            var startMe =
                 new Task(
                     () =>
                     {
@@ -241,7 +242,7 @@ namespace UnitTests.Grains
                     }
                     catch (Exception exc)
                     {
-                        string msg = "RecordActivateCall failed with error " + exc;
+                        var msg = "RecordActivateCall failed with error " + exc;
                         logger.Error(0, msg);
                         Assert.Fail(msg);
                     }
@@ -270,14 +271,15 @@ namespace UnitTests.Grains
 
             logger.Info("Started-OnDeactivateAsync");
             return watcher.RecordDeactivateCall(Data.ActivationId.ToString())
-            .ContinueWith((Task t) =>
-            {
-                Assert.IsFalse(t.IsFaulted, "RecordDeactivateCall failed");
-                Assert.IsTrue(doingDeactivate, "Doing Deactivate");
-                Thread.Sleep(TimeSpan.FromSeconds(1));
-                doingDeactivate = false;
-            })
-            .ContinueWith((Task t) => logger.Info("Finished-OnDeactivateAsync"), TaskContinuationOptions.ExecuteSynchronously);
+                .ContinueWith((Task t) =>
+                {
+                    Assert.IsFalse(t.IsFaulted, "RecordDeactivateCall failed");
+                    Assert.IsTrue(doingDeactivate, "Doing Deactivate");
+                    Thread.Sleep(TimeSpan.FromSeconds(1));
+                    doingDeactivate = false;
+                })
+                .ContinueWith((Task t) => logger.Info("Finished-OnDeactivateAsync"),
+                    TaskContinuationOptions.ExecuteSynchronously);
         }
 
         public Task<string> DoSomething()
@@ -377,7 +379,7 @@ namespace UnitTests.Grains
         public async Task<string> DoSomething()
         {
             logger.Info("DoSomething");
-            Guid guid = Guid.NewGuid();
+            var guid = Guid.NewGuid();
             await grain.SetLabel(guid.ToString());
             var label = await grain.GetLabel();
 
@@ -393,6 +395,5 @@ namespace UnitTests.Grains
             logger.Info("ForwardCall to " + otherGrain);
             await otherGrain.ThrowSomething();
         }
-
     }
 }

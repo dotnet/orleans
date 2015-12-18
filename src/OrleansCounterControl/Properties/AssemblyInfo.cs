@@ -22,3 +22,4 @@ using Orleans.CodeGeneration;
 
 [assembly: SkipCodeGeneration]
 [assembly: InternalsVisibleTo("UnitTests")]
+[assembly: InternalsVisibleTo("TesterInternal")]

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.TestingHost;
@@ -81,6 +82,49 @@ namespace UnitTests.Tester
         protected static int GetRandomGrainId()
         {
             return random.Next();
+        }
+
+        public static double CalibrateTimings()
+        {
+            const int NumLoops = 10000;
+            TimeSpan baseline = TimeSpan.FromTicks(80); // Baseline from jthelin03D
+            int n;
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < NumLoops; i++)
+            {
+                n = i;
+            }
+            sw.Stop();
+            double multiple = 1.0 * sw.ElapsedTicks / baseline.Ticks;
+            Console.WriteLine("CalibrateTimings: {0} [{1} Ticks] vs {2} [{3} Ticks] = x{4}",
+                sw.Elapsed, sw.ElapsedTicks,
+                baseline, baseline.Ticks,
+                multiple);
+            return multiple > 1.0 ? multiple : 1.0;
+        }
+
+        public static TimeSpan TimeRun(int numIterations, TimeSpan baseline, string what, Action action)
+        {
+            var stopwatch = new Stopwatch();
+
+            long startMem = GC.GetTotalMemory(true);
+            stopwatch.Start();
+
+            action();
+
+            stopwatch.Stop();
+            long stopMem = GC.GetTotalMemory(false);
+            long memUsed = stopMem - startMem;
+            TimeSpan duration = stopwatch.Elapsed;
+
+            string timeDeltaStr = "";
+            if (baseline > TimeSpan.Zero)
+            {
+                double delta = (duration - baseline).TotalMilliseconds / baseline.TotalMilliseconds;
+                timeDeltaStr = String.Format("-- Change = {0}%", 100.0 * delta);
+            }
+            Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
+            return duration;
         }
     }
 }

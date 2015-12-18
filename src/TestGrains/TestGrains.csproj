@@ -68,6 +68,7 @@
     <Compile Include="GeneratorTestDerivedGrain2.cs" />
     <Compile Include="GeneratorTestGrain.cs" />
     <Compile Include="GenericGrains.cs" />
+    <Compile Include="GetGrainGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
