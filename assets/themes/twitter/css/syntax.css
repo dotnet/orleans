@@ -31,3 +31,43 @@
 .sr { color: #a31515 } /* Literal.String.Regex */
 .s1 { color: #a31515 } /* Literal.String.Single */
 .ss { color: #a31515 } /* Literal.String.Symbol */
+
+body{
+  font-family: lato,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size:18px;
+}
+
+.jumbotron {
+  background-color: #333;
+  background-image:url("../../../../Images/background.jpg");
+  background-repeat: no-repeat;
+  background-size: 100%;
+  
+}
+
+.jumbotron .h1, .jumbotron h1{
+  color:white
+}
+
+.title {
+  color:white
+}
+.title:hover {
+  color:white
+}
+.header{
+  background-color: #333;
+  background-image:url("../../../../Images/background.jpg");
+  background-repeat: no-repeat;
+  background-size: 100%;  
+}
+
+.subtitle{
+  font-size:28px;
+  color:white;
+}
+.options{
+  margin-top:50px;
+  text-align: center;
+}
+
