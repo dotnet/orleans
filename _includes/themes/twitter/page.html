@@ -4,15 +4,12 @@
 	</div>
 </div>
 
-<div class="row">
-	<div class="container">
-  		<h1>{{ page.title }} {% if page.tagline %} <small>{{ page.tagline }}</small>{% endif %}</h1>
-	</div>
-</div>
-
 <div class="container">
 	<div class="row">
 		<div class="col-md-3 menu">{% include menu.html %}</div>
-		<div class="col-md-9">{{ content }}</div>
+		<div class="col-md-9">
+			<h1>{{ page.title }} {% if page.tagline %} <small>{{ page.tagline }}</small>{% endif %}</h1>
+			{{ content }}
+		</div>
 	</div>
 </div>
