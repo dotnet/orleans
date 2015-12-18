@@ -31,30 +31,7 @@ C#, VB, F#  Project templates and item templates
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterface" d:TargetPath="|VSProjectTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
     <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterface" d:TargetPath="|VSItemTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
     <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainImplementation" d:TargetPath="|VSItemTemplateGrainImplementation;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainImplementationVB" d:TargetPath="|VSItemTemplateGrainImplementationVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementationVB" d:TargetPath="|VSProjectTemplateGrainImplementationVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
     <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplatePersistedGrain" d:TargetPath="|VSItemTemplatePersistedGrain;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplatePersistedGrainVB" d:TargetPath="|VSItemTemplatePersistedGrainVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectSiloHost" d:TargetPath="|VSProjectSiloHost;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceVB" d:TargetPath="|VSItemTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementationFSharp" d:TargetPath="|VSProjectTemplateGrainImplementationFSharp;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
-    <Asset Type="Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final.nupkg" d:Source="File" Path="Packages\Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final" d:Source="File" Path="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.Core.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.CounterControl.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.CounterControl.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.OrleansHost.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansHost.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.OrleansProviders.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansProviders.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.Server.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Server.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.Templates.Grains.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Templates.Grains.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="Newtonsoft.Json.6.0.8.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.6.0.8.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="System.Collections.Immutable.1.1.36.nupkg" d:Source="File" Path="Packages\System.Collections.Immutable.1.1.36.nupkg" d:VsixSubPath="Packages" />
-    <Asset Type="System.Reflection.Metadata.1.0.21.nupkg" d:Source="File" Path="Packages\System.Reflection.Metadata.1.0.21.nupkg" d:VsixSubPath="Packages" />
   </Assets>
 </PackageManifest>
