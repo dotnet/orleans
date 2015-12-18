@@ -22,6 +22,7 @@ namespace UnitTests.GrainInterfaces
 
     public interface ISerializationGenerationGrain : IGrainWithIntegerKey
     {
+        Task<object> RoundTripObject(object input);
         Task<SomeStruct> RoundTripStruct(SomeStruct input);
         Task<SomeAbstractClass> RoundTripClass(SomeAbstractClass input);
         Task<ISomeInterface> RoundTripInterface(ISomeInterface input);
@@ -175,5 +176,12 @@ namespace UnitTests.GrainInterfaces
         {
             return base.GetHashCode();
         }
+    }
+
+    [Serializable]
+    public class ClassWithStructConstraint<T>
+        where T : struct
+    {
+        public T Value { get; set; }
     }
 }

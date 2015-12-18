@@ -84,6 +84,12 @@ namespace Tester.CodeGenTests
             const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
             var actualEnum = await grain.RoundTripEnum(ExpectedEnum);
             Assert.AreEqual(ExpectedEnum, actualEnum);
+
+            // Test serialization of a generic class which has a value-type constraint.
+            var expectedStructConstraintObject = new ClassWithStructConstraint<int> { Value = 38 };
+            var actualStructConstraintObject =
+                (ClassWithStructConstraint<int>)await grain.RoundTripObject(expectedStructConstraintObject);
+            Assert.AreEqual(expectedStructConstraintObject.Value, actualStructConstraintObject.Value);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain")]
