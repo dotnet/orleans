@@ -2,12 +2,12 @@
 using System.Threading.Tasks;
 using Orleans;
 
-namespace TestGrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public enum ReturnCode
     {
         OK = 0,
-        Fail = 1,
+        Fail = 1
     }
 
     [Serializable]

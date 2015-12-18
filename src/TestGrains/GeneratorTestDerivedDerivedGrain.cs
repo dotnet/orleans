@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using TestGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
-namespace TestGrains
+namespace UnitTests.Grains
 {
     public class GeneratorTestDerivedDerivedGrain : GeneratorTestDerivedGrain2, IGeneratorTestDerivedDerivedGrain
     {

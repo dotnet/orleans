@@ -1,9 +1,9 @@
 ﻿using System.Threading.Tasks;
-using TestGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
-namespace TestGrains
+namespace UnitTests.Grains
 {
-    public class GeneratorTestDerivedGrain1 : TestGrains.GeneratorTestGrain, IGeneratorTestDerivedGrain1
+    public class GeneratorTestDerivedGrain1 : GeneratorTestGrain, IGeneratorTestDerivedGrain1
     {
         public Task<byte[]> ByteAppend(byte[] data)
         {

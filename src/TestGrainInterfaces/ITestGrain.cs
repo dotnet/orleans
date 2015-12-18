@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 
-namespace TestInternalGrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public interface ITestGrain : IGrainWithIntegerKey
     {

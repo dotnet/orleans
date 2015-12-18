@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.Concurrency;
 using Orleans.Runtime;
+using UnitTests.TestHelper;
 
 namespace UnitTests.AsyncPrimitivesTests
 {

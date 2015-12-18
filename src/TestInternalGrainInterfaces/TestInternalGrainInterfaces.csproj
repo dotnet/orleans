@@ -7,7 +7,7 @@
     <ProjectGuid>{2AE67055-F38A-45F0-AEA7-5754F4814EA5}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>TestInternalGrainInterfaces</RootNamespace>
+    <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <AssemblyName>TestInternalGrainInterfaces</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -43,6 +43,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IClientAddressableTestClientObject.cs" />
+    <Compile Include="IClientAddressableTestGrain.cs" />
+    <Compile Include="IClientAddressableTestProducer.cs" />
+    <Compile Include="IClientAddressableTestRendezvousGrain.cs" />
+    <Compile Include="IMultifacetFactoryTestGrain.cs" />
+    <Compile Include="IMultifacetTestGrain.cs" />
     <Compile Include="IStressTestGrain.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

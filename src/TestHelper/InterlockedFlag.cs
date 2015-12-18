@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading;
 
-namespace Orleans.Concurrency
+namespace UnitTests.TestHelper
 {
     [Serializable]
-    internal sealed class InterlockedFlag
+    public sealed class InterlockedFlag
     {
         private int _value;
 

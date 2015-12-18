@@ -7,6 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
+using UnitTests.TesterInternal;
 
 namespace UnitTests.SchedulerTests
 {
@@ -44,7 +45,7 @@ namespace UnitTests.SchedulerTests
             int n = 0;
             bool insideTask = false;
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
 
             Console.WriteLine("Running Main in Context=" + RuntimeContext.Current);
             orleansTaskScheduler.QueueWorkItem(new ClosureWorkItem(() =>
@@ -80,7 +81,7 @@ namespace UnitTests.SchedulerTests
             int n = 0;
             bool insideTask = false;
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
 
             var result = new TaskCompletionSource<bool>();
 
@@ -130,7 +131,7 @@ namespace UnitTests.SchedulerTests
         [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_MainTurnWait_Test()
         {
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext());
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext());
             var promise = Task.Factory.StartNew(() =>
             {
                 Thread.Sleep(1000);
@@ -165,7 +166,7 @@ namespace UnitTests.SchedulerTests
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
 
             var result1 = new TaskCompletionSource<bool>();
             var result2 = new TaskCompletionSource<bool>();
@@ -208,7 +209,7 @@ namespace UnitTests.SchedulerTests
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler masterScheduler = orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler masterScheduler = orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             WorkItemGroup workItemGroup = orleansTaskScheduler.GetWorkItemGroup(context);
             ActivationTaskScheduler activationScheduler = workItemGroup.TaskRunner;
 
@@ -345,7 +346,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_Current_TaskScheduler()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler orleansTaskScheduler = orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler activationScheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             // RuntimeContext.InitializeThread(masterScheduler);
@@ -443,7 +444,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_ContinueWith_1_Test()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
 
             var result = new TaskCompletionSource<bool>();
             int n = 0;
@@ -474,7 +475,7 @@ namespace UnitTests.SchedulerTests
             stopwatch.Start();
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
 
             // ReSharper disable AccessToModifiedClosure
             orleansTaskScheduler.QueueWorkItem(new ClosureWorkItem(() =>
@@ -517,7 +518,7 @@ namespace UnitTests.SchedulerTests
         [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_ContinueWith_2_OrleansSched()
         {
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext());
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext());
 
             var result1 = new TaskCompletionSource<bool>();
             var result2 = new TaskCompletionSource<bool>();
@@ -560,7 +561,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_SchedulingContext()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             var result = new TaskCompletionSource<bool>();

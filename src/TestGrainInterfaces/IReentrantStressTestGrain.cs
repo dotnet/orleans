@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 
-namespace TestInternalGrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public interface IReentrantStressTestGrain : IGrainWithIntegerKey
     {

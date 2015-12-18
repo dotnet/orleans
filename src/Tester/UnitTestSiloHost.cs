@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.TestingHost;
@@ -24,6 +23,12 @@ namespace UnitTests.Tester
         public UnitTestSiloHost() // : base()
         {
         }
+
+        public UnitTestSiloHost(bool startFreshOrleans)
+            : base(startFreshOrleans)
+        {
+        }
+
         public UnitTestSiloHost(TestingSiloOptions siloOptions)
             : base(siloOptions)
         {

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Serialization;
-using TestGrainInterfaces;
+using UnitTests.Grains;
 using UnitTests.Tester;
 
 namespace Tester.CodeGenTests
@@ -89,7 +89,8 @@ namespace Tester.CodeGenTests
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain")]
         public async Task GeneratorGrainControlFlow()
         {
-            IGeneratorTestGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), "TestGrains.GeneratorTestGrain");
+            var grainName = typeof (GeneratorTestGrain).FullName;
+            IGeneratorTestGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
             
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.IsTrue(isNull);
@@ -151,7 +152,8 @@ namespace Tester.CodeGenTests
         [TestMethod, TestCategory("Functional"), TestCategory("GetGrain")]
         public async Task GeneratorDerivedGrain2ControlFlow()
         {
-            IGeneratorTestDerivedGrain2 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), "TestGrains.GeneratorTestDerivedGrain2");
+            var grainName = typeof (GeneratorTestDerivedGrain2).FullName;
+            IGeneratorTestDerivedGrain2 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), grainName);
 
             bool boolPromise = await grain.StringIsNullOrEmpty();
             Assert.IsTrue(boolPromise);

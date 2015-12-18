@@ -4,9 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using TestInternalGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
-namespace TestInternalGrains
+namespace UnitTests.Grains
 {
     internal class TestGrain : Grain, ITestGrain
     {
@@ -19,7 +19,7 @@ namespace TestInternalGrains
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
-            logger = base.GetLogger("TestGrain " + base.Data.Address.ToString());
+            logger = GetLogger("TestGrain " + Data.Address);
             label = this.GetPrimaryKeyLong().ToString();
             logger.Info("OnActivateAsync");
 
@@ -142,7 +142,7 @@ namespace TestInternalGrains
             //    throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKey().ToString();
-            logger = base.GetLogger("GuidTestGrain " + base.Data.Address.ToString());
+            logger = GetLogger("GuidTestGrain " + Data.Address);
             logger.Info("OnActivateAsync");
 
             return TaskDone.Done;

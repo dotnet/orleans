@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
-using TestGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
-namespace TestGrains
+namespace UnitTests.Grains
 {
-    public class GeneratorTestDerivedGrain2 : TestGrains.GeneratorTestGrain, IGeneratorTestDerivedGrain2
+    public class GeneratorTestDerivedGrain2 : GeneratorTestGrain, IGeneratorTestDerivedGrain2
     {
         public Task<string> StringConcat(string str1, string str2, string str3)
         {

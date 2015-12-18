@@ -49,10 +49,13 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AsyncSimpleGrain.cs" />
+    <Compile Include="CatalogTestGrain.cs" />
     <Compile Include="ChainedGrain.cs" />
     <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ConcurrentGrain.cs" />
+    <Compile Include="DerivedServiceType.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="ExternalTypeGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
@@ -70,15 +73,16 @@
     <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
     <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
     <Compile Include="MyObserverSubscriptionManager.cs" />
+    <Compile Include="PolymorphicTestGrain.cs" />
     <Compile Include="PromiseForwardGrain.cs" />
     <Compile Include="ProxyGrain.cs" />
     <Compile Include="SerializationGenerationGrain.cs" />
+    <Compile Include="ServiceType.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
     <Compile Include="SampleStreamingGrain.cs" />
     <Compile Include="SimpleDIGrain.cs" />
-    <Compile Include="SimpleGrainWithAsyncMethods.cs" />
     <Compile Include="SQLAdapter\CustomerGrain.cs" />
     <Compile Include="SQLAdapter\DeviceGrain.cs" />
     <Compile Include="SQLAdapter\ICustomerState.cs" />
