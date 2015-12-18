@@ -71,3 +71,13 @@ body{
   text-align: center;
 }
 
+.menu{
+  font-size:16px;
+  color: #666;
+}
+
+.menu h2{
+  text-transform: uppercase;
+  font-size: 14px;
+  font-weight:bold;
+}
