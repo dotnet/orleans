@@ -98,6 +98,7 @@
     <Compile Include="CounterTests.cs" />
     <Compile Include="ErrorGrainTest.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
+    <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="ManagementGrainTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
