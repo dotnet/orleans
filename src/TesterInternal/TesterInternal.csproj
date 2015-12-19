@@ -90,6 +90,7 @@
     <Compile Include="Async_TimingTests.cs" />
     <Compile Include="ConcurrencyTests.cs" />
     <Compile Include="ErrorGrainTest.cs" />
+    <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
