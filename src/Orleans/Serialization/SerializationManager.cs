@@ -768,6 +768,21 @@ namespace Orleans.Serialization
             MethodInfo deserializer;
 
             var concreteSerializerType = genericSerializerType.MakeGenericType(concreteType.GetGenericArguments());
+            var typeAlreadyRegistered = false;
+            
+            lock (registeredTypes)
+            {
+                typeAlreadyRegistered = registeredTypes.Contains(concreteSerializerType);
+            }
+            
+            if (typeAlreadyRegistered)
+            {
+                return new SerializerMethods(
+                    GetCopier(concreteSerializerType),
+                    GetSerializer(concreteSerializerType),
+                    GetDeserializer(concreteSerializerType));
+            }
+
             GetSerializationMethods(concreteSerializerType, out copier, out serializer, out deserializer);
             var concreteCopier = (DeepCopier)copier.CreateDelegate(typeof(DeepCopier));
             var concreteSerializer = (Serializer)serializer.CreateDelegate(typeof(Serializer));
