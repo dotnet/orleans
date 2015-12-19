@@ -4,10 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.TestingHost;
-using TestInternalGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -19,6 +17,12 @@ namespace UnitTests.ActivationsLifeCycleTests
         public GrainActivateDeactivateTests()
             : base(new TestingSiloOptions { StartFreshOrleans = true, StartSecondary = false }) // Only need single silo
         {
+        }
+
+        [ClassCleanup]
+        public static void ClassCleanup()
+        {
+            StopAllSilos();
         }
 
         [TestInitialize]
@@ -36,12 +40,6 @@ namespace UnitTests.ActivationsLifeCycleTests
                 watcher.Clear().Wait();
                 watcher = null;
             }
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate")]

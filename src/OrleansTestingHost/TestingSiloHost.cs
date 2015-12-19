@@ -41,6 +41,8 @@ namespace Orleans.TestingHost
 
         protected TestingSiloOptions siloInitOptions { get; private set; }
         protected TestingClientOptions clientInitOptions { get; private set; }
+        protected ClientConfiguration ClientConfig { get; private set; }
+        protected GlobalConfiguration Globals { get; private set; }
 
         private static TimeSpan _livenessStabilizationTime;
 
@@ -56,7 +58,7 @@ namespace Orleans.TestingHost
 
         public static IGrainFactory GrainFactory { get; private set; }
 
-        public Logger logger 
+        public Logger logger
         {
             get { return GrainClient.Logger; }
         }
@@ -178,7 +180,7 @@ namespace Orleans.TestingHost
         {
             TimeSpan stabilizationTime = _livenessStabilizationTime;
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-            await Task.Delay(stabilizationTime);           
+            await Task.Delay(stabilizationTime);
             WriteLog("WaitForLivenessToStabilize is done sleeping");
         }
 
@@ -432,7 +434,7 @@ namespace Orleans.TestingHost
 
             if (options.ParallelStart)
             {
-                var handles = new List<Task<SiloHandle>>();     
+                var handles = new List<Task<SiloHandle>>();
                 if (doStartPrimary)
                 {
                     int instanceCount = InstanceCounter++;
@@ -499,12 +501,13 @@ namespace Orleans.TestingHost
                 {
                     clientConfig.ResponseTimeout = clientOptions.ResponseTimeout;
                 }
-                
+
                 if (options.LargeMessageWarningThreshold > 0)
                 {
                     clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
                 }
                 AdjustForTest(clientConfig, clientOptions);
+                this.ClientConfig = clientConfig;
 
                 GrainClient.Initialize(clientConfig);
                 GrainFactory = GrainClient.GrainFactory;
@@ -529,7 +532,6 @@ namespace Orleans.TestingHost
             {
                 config.LoadFromFile(options.SiloConfigFile.FullName);
             }
-
 
             int basePort = options.BasePort < 0 ? BasePort : options.BasePort;
 
@@ -562,7 +564,12 @@ namespace Orleans.TestingHost
             }
 
             _livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
-            
+
+            if (host != null)
+            {
+                host.Globals = config.Globals;
+            }
+
             string siloName;
             switch (type)
             {
@@ -688,9 +695,9 @@ namespace Orleans.TestingHost
                 "OrleansRuntime.dll", typeof(Silo).FullName, false,
                 BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
                 new object[] { });
-            
+
             appDomain.UnhandledException += ReportUnobservedException;
-            
+
             return silo;
         }
 

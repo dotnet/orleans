@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace TestGrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public interface IGeneratorTestDerivedGrain1 : IGeneratorTestGrain
     {

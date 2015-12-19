@@ -7,7 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using TestInternalGrainInterfaces;
+using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
 #pragma warning disable 618

@@ -3,7 +3,6 @@ using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
-
     public interface IChainedGrain : IGrainWithIntegerKey
     {
         Task<int> GetId();

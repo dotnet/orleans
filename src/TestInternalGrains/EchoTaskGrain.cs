@@ -9,7 +9,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
-namespace Echo.Grains
+namespace UnitTests.Grains
 {
     public class EchoTaskGrainState : GrainState
     {

@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using UnitTests.TesterInternal;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -60,7 +61,7 @@ namespace UnitTests.SchedulerTests
         {
             InitSchedulerLogging();
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
 
             int expected = 2;
             bool done = false;
@@ -79,7 +80,7 @@ namespace UnitTests.SchedulerTests
         {
             InitSchedulerLogging();
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler masterScheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
             ActivationTaskScheduler activationScheduler = masterScheduler.GetWorkItemGroup(cntx).TaskRunner;
 
             int expected = 2;
@@ -100,7 +101,7 @@ namespace UnitTests.SchedulerTests
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             int n = 0;
@@ -127,7 +128,7 @@ namespace UnitTests.SchedulerTests
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler orleansTaskScheduler = TestHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
 
             int n = 0;
@@ -154,7 +155,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_TplFifoTest_TaskScheduler()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
             ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(cntx).TaskRunner;
 
             int n = 0;
@@ -181,7 +182,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_StartTask_1()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();;
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
@@ -208,7 +209,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_StartTask_2()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
@@ -237,7 +238,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_StartTask_Wrapped()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
 
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
@@ -278,7 +279,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_StartTask_Wait_Wrapped()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
 
             const int NumTasks = 100;
 
@@ -334,7 +335,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_ClosureWorkItem_Wait()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(cntx);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(cntx);
 
             const int NumTasks = 10;
 
@@ -384,7 +385,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_TaskWorkItem_CurrentScheduler()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(context).TaskRunner;
 
             var result0 = new TaskCompletionSource<bool>();
@@ -431,7 +432,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_ClosureWorkItem_SpecificScheduler()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(context);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler activationScheduler = scheduler.GetWorkItemGroup(context).TaskRunner;
 
             var result0 = new TaskCompletionSource<bool>();
@@ -511,7 +512,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_NewTask_ContinueWith_Wrapped_OrleansTaskScheduler()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(rootContext);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext);
 
             Task wrapped = new Task(() =>
             {
@@ -545,7 +546,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_NewTask_ContinueWith_TaskScheduler()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(rootContext);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext);
 
             Console.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                 SynchronizationContext.Current, TaskScheduler.Current);
@@ -573,7 +574,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_StartNew_ContinueWith_TaskScheduler()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(rootContext);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext);
 
             Console.WriteLine("#0 - StartNew - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                 SynchronizationContext.Current, TaskScheduler.Current);
@@ -600,7 +601,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_SubTaskExecutionSequencing()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(rootContext);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext);
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
             scheduler.RegisterWorkContext(context);
@@ -658,7 +659,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_Task_RequestContext_NewTask_ContinueWith()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(rootContext);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext);
 
             const string key = "K";
             int val = TestConstants.random.Next();
@@ -704,7 +705,7 @@ namespace UnitTests.SchedulerTests
         public void Sched_AC_RequestContext_StartNew_ContinueWith()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
-            OrleansTaskScheduler scheduler = TestHelper.InitializeSchedulerForTesting(rootContext);
+            OrleansTaskScheduler scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext);
 
             const string key = "A";
             int val = TestConstants.random.Next();
