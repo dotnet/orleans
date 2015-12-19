@@ -87,10 +87,10 @@ namespace UnitTests.GrainInterfaces
         string ProviderName { get; }
     }
     
-    internal class UnitTestStreamNamespace
+    public class UnitTestStreamNamespace
     {
-        internal const string DefaultStreamNamespace = "DefaultStreamNamespace";
-        internal const string StreamReliabilityNamespace = "StreamReliabilityNamespace";
-        internal const string StreamLifecycleTestsNamespace = "UnitTest.Streaming.LifecycleTests";
+        public const string DefaultStreamNamespace = "DefaultStreamNamespace";
+        public const string StreamReliabilityNamespace = "StreamReliabilityNamespace";
+        public const string StreamLifecycleTestsNamespace = "UnitTest.Streaming.LifecycleTests";
     }
 }
