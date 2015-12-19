@@ -71,7 +71,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.EventSourcing.nuspec = NuGet\Microsoft.Orleans.EventSourcing.nuspec
 		NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec = NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec
-		NuGet\Microsoft.Orleans.OrleansGoogleCloudPlatformUtils.nuspec = NuGet\Microsoft.Orleans.OrleansGoogleCloudPlatformUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansHost.nuspec = NuGet\Microsoft.Orleans.OrleansHost.nuspec
 		NuGet\Microsoft.Orleans.OrleansManager.nuspec = NuGet\Microsoft.Orleans.OrleansManager.nuspec
 		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
@@ -178,7 +177,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.A
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.NewRelic", "OrleansTelemetryConsumers.NewRelic\OrleansTelemetryConsumers.NewRelic.csproj", "{CCE2639F-5D20-429F-947F-B904CF745E92}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansGoogleCloudPlatformUtils", "OrleansGoogleCloudPlatformUtils\OrleansGoogleCloudPlatformUtils.csproj", "{B9196CB5-D356-4228-B73F-143F2EB80C64}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansGoogleUtils", "OrleansGoogleUtils\OrleansGoogleUtils.csproj", "{B9196CB5-D356-4228-B73F-143F2EB80C64}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
