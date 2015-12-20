@@ -67,6 +67,10 @@
       <HintPath>$(SolutionDir)packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Google.Protobuf">
+      <HintPath>$(SolutionDir)packages\Google.Protobuf.3.0.0-alpha4\lib\portable-net45+netcore45+wpa81+wp8\Google.Protobuf.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.Azure.KeyVault.Core">
       <HintPath>$(SolutionDir)packages\Microsoft.Azure.KeyVault.Core.1.0.0\lib\net40\Microsoft.Azure.KeyVault.Core.dll</HintPath>
       <Private>True</Private>
@@ -141,6 +145,9 @@
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="RequestContextTest.cs" />
     <Compile Include="SerializationTests\JsonFallbackSerializationTests.cs" />
+    <Compile Include="SerializationTests\ProtobufSerializationTests\Addressbook.cs" />
+    <Compile Include="SerializationTests\ProtobufSerializationTests\Counter.cs" />
+    <Compile Include="SerializationTests\ProtobufSerializationTests\ProtobufSerializationTests.cs" />
     <Compile Include="SerializationTests\SerializationOrderTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
@@ -261,6 +268,10 @@
       <Project>{58cf4453-987a-4ed5-8640-7b27838c12fd}</Project>
       <Name>OrleansDependencyInjection</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansGoogleUtils\OrleansGoogleUtils.csproj">
+      <Project>{b9196cb5-d356-4228-b73f-143f2eb80c64}</Project>
+      <Name>OrleansGoogleUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansHost\OrleansHost.csproj">
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>
       <Name>OrleansHost</Name>
@@ -320,6 +331,9 @@
     </None>
     <None Include="packages.config" />
     <None Include="ReadMe.md" />
+    <None Include="SerializationTests\ProtobufSerializationTests\counter.proto" />
+    <None Include="SerializationTests\ProtobufSerializationTests\addressbook.proto" />
+    <None Include="SerializationTests\ProtobufSerializationTests\GenerateProtos.cmd" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

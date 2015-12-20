@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -50,6 +50,7 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "Tester\Tester.csproj", "{591EF75B-D3B0-403D-830C-39D032A73404}"
 	ProjectSection(ProjectDependencies) = postProject
 		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
+		{B9196CB5-D356-4228-B73F-143F2EB80C64} = {B9196CB5-D356-4228-B73F-143F2EB80C64}
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{856B8FB9-194E-4F5C-9D9D-A35EB82387FC}"
@@ -176,6 +177,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.A
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.NewRelic", "OrleansTelemetryConsumers.NewRelic\OrleansTelemetryConsumers.NewRelic.csproj", "{CCE2639F-5D20-429F-947F-B904CF745E92}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansGoogleUtils", "OrleansGoogleUtils\OrleansGoogleUtils.csproj", "{B9196CB5-D356-4228-B73F-143F2EB80C64}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -278,6 +281,10 @@ Global
 		{CCE2639F-5D20-429F-947F-B904CF745E92}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CCE2639F-5D20-429F-947F-B904CF745E92}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CCE2639F-5D20-429F-947F-B904CF745E92}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9196CB5-D356-4228-B73F-143F2EB80C64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9196CB5-D356-4228-B73F-143F2EB80C64}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9196CB5-D356-4228-B73F-143F2EB80C64}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9196CB5-D356-4228-B73F-143F2EB80C64}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
