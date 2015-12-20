@@ -8,11 +8,11 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    internal class TestGrain : Grain, ITestGrain
+    public class TestGrain : Grain, ITestGrain
     {
         private string label;
         private Logger logger;
-        private IDisposable timer; 
+        private IDisposable timer;
 
         public override Task OnActivateAsync()
         {
@@ -76,16 +76,16 @@ namespace UnitTests.Grains
             string bar1 = null;
             RequestContext.Set("jarjar", "binks");
 
-            Task task = Task.Factory.StartNew(() =>
+            var task = Task.Factory.StartNew(() =>
             {
-                bar1 = (string)RequestContext.Get("jarjar");
+                bar1 = (string) RequestContext.Get("jarjar");
                 logger.Info("bar = {0}.", bar1);
             });
 
             string bar2 = null;
-            Task ac = Task.Factory.StartNew(() =>
+            var ac = Task.Factory.StartNew(() =>
             {
-                bar2 = (string)RequestContext.Get("jarjar");
+                bar2 = (string) RequestContext.Get("jarjar");
                 logger.Info("bar = {0}.", bar2);
             });
 
@@ -110,8 +110,8 @@ namespace UnitTests.Grains
 
         public Task<IGrain[]> GetMultipleGrainInterfaces_Array()
         {
-            IGrain[] grains = new IGrain[5];
-            for (int i = 0; i < grains.Length; i++)
+            var grains = new IGrain[5];
+            for (var i = 0; i < grains.Length; i++)
             {
                 grains[i] = GrainFactory.GetGrain<ITestGrain>(i);
             }
@@ -120,8 +120,8 @@ namespace UnitTests.Grains
 
         public Task<List<IGrain>> GetMultipleGrainInterfaces_List()
         {
-            IGrain[] grains = new IGrain[5];
-            for (int i = 0; i < grains.Length; i++)
+            var grains = new IGrain[5];
+            for (var i = 0; i < grains.Length; i++)
             {
                 grains[i] = GrainFactory.GetGrain<ITestGrain>(i);
             }
@@ -147,6 +147,7 @@ namespace UnitTests.Grains
 
             return TaskDone.Done;
         }
+
         #region Implementation of ITestGrain
 
         public Task<Guid> GetKey()

@@ -94,8 +94,11 @@
     <Compile Include="CodeGeneratorTests.cs" />
     <Compile Include="ConcurrencyTests.cs" />
     <Compile Include="ConfigTests.cs" />
+    <Compile Include="CounterControlProgTests.cs" />
+    <Compile Include="CounterTests.cs" />
     <Compile Include="ErrorGrainTest.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
+    <Compile Include="ManagementGrainTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
@@ -107,8 +110,10 @@
     <Compile Include="GrainReferenceTest.cs" />
     <Compile Include="MembershipTests\MySqlMembershipTableTests.cs" />
     <Compile Include="LocalErrorGrain.cs" />
+    <Compile Include="ManagementAgentTests.cs" />
     <Compile Include="MockStatsCollectors.cs" />
-    <Compile Include="MockStorageProvider.cs" />
+    <Compile Include="StorageTests\LocalStoreTests.cs" />
+    <Compile Include="StorageTests\MockStorageProvider.cs" />
     <Compile Include="MultifacetGrainTest.cs" />
     <Compile Include="OrleansHostProgTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
@@ -133,8 +138,14 @@
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
     <Compile Include="MembershipTests\MembershipTablePluginTests.cs" />
+    <Compile Include="StorageTests\PersistenceGrainTests.cs" />
+    <Compile Include="StorageTests\PersistenceGrainTests_AzureStore.cs" />
+    <Compile Include="StorageTests\PersistenceProviderTests.cs" />
     <Compile Include="StorageTests\SQLAdapter\SampleGrainStateMapFactory.cs" />
     <Compile Include="StorageTests\SQLAdapter\ShardTests.cs" />
+    <Compile Include="StorageTests\StorageProviders\BaseJSONStorageProvider.cs" />
+    <Compile Include="StorageTests\StorageProviders\FileStorageProvider.cs" />
+    <Compile Include="StorageTests\StorageProviders\IJSONStateDataManager.cs" />
     <Compile Include="StorageTests\UnitTestAzureTableDataManager.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerTests.cs" />
     <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
@@ -293,6 +304,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="MockStats_ServerConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

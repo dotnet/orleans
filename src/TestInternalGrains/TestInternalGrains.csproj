@@ -54,6 +54,7 @@
     <Compile Include="InterlockedFlag.cs" />
     <Compile Include="MultifacetFactoryTestGrain.cs" />
     <Compile Include="MultifacetTestGrain.cs" />
+    <Compile Include="PersistenceTestGrains.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
