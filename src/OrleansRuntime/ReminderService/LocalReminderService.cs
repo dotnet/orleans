@@ -1,12 +1,11 @@
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.ConsistentRing;
-
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -36,10 +35,10 @@ namespace Orleans.Runtime.ReminderService
         private readonly TimeSpan initTimeout;
 
         internal LocalReminderService(
-            SiloAddress addr, 
-            GrainId id, 
-            IConsistentRingProvider ring, 
-            OrleansTaskScheduler localScheduler, 
+            SiloAddress addr,
+            GrainId id,
+            IConsistentRingProvider ring,
+            OrleansTaskScheduler localScheduler,
             IReminderTable reminderTable,
             GlobalConfiguration config,
             TimeSpan initTimeout)
@@ -105,7 +104,7 @@ namespace Orleans.Runtime.ReminderService
             }
             foreach (LocalReminderData r in localReminders.Values)
                 r.StopReminder(logger);
-            
+
             // for a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
             // currently, this is taken care of by periodically reading the reminder table
             return TaskDone.Done;
@@ -155,7 +154,7 @@ namespace Orleans.Runtime.ReminderService
 
             await DoResponsibilitySanityCheck(grainRef, "RemoveReminder");
 
-            // it may happen that we dont have this reminder locally ... even then, we attempt to remove the reminder from the reminder 
+            // it may happen that we dont have this reminder locally ... even then, we attempt to remove the reminder from the reminder
             // table ... the periodic mechanism will stop this reminder at any silo's LocalReminderService that might have this reminder locally
 
             // remove from persistent/memory store
@@ -186,7 +185,7 @@ namespace Orleans.Runtime.ReminderService
         {
             if(logger.IsVerbose) logger.Verbose(ErrorCode.RS_GetReminder,"GetReminder: GrainReference={0} ReminderName={1}", grainRef.ToDetailedString(), reminderName);
             var entry = await reminderTable.ReadRow(grainRef, reminderName);
-            return entry.ToIGrainReminder();
+            return entry == null ? null : entry.ToIGrainReminder();
         }
 
         public async Task<List<IGrainReminder>> GetReminders(GrainReference grainRef)
@@ -255,7 +254,7 @@ namespace Orleans.Runtime.ReminderService
                 ReminderTableData table = await reminderTable.ReadRows(srange.Begin, srange.End); // get all reminders, even the ones we already have
 
                 // if null is a valid value, it means that there's nothing to do.
-                if (null == table && reminderTable is MockReminderTable) return; 
+                if (null == table && reminderTable is MockReminderTable) return;
 
                 var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>(localReminders); // shallow copy
                 if (logger.IsVerbose) logger.Verbose("For range {0}, I read in {1} reminders from table. LocalTableSequence {2}, CachedSequence {3}", range.ToString(), table.Reminders.Count, localTableSequence, cachedSequence);
@@ -388,7 +387,7 @@ namespace Orleans.Runtime.ReminderService
         {
             var reminder = (LocalReminderData)rem;
 
-            if (!localReminders.ContainsKey(reminder.Identity) // we have already stopped this timer 
+            if (!localReminders.ContainsKey(reminder.Identity) // we have already stopped this timer
                 || reminder.Timer == null) // this timer was unregistered, and is waiting to be gc-ied
                 return;
 
@@ -402,7 +401,7 @@ namespace Orleans.Runtime.ReminderService
         {
             if (status != ReminderServiceStatus.Started)
                 await startedTask.Task;
-            
+
             if (!myRange.InRange(grainRef))
             {
                 logger.Warn(ErrorCode.RS_NotResponsible, "I shouldn't have received request '{0}' for {1}. It is not in my responsibility range: {2}",
@@ -432,12 +431,12 @@ namespace Orleans.Runtime.ReminderService
             private readonly TimeSpan period;
             private GrainReference GrainRef {  get { return Identity.GrainRef; } }
             private string ReminderName { get { return Identity.ReminderName; } }
-            
+
             internal ReminderIdentity Identity { get; private set; }
             internal string ETag;
             internal GrainTimer Timer;
             internal long LocalSequenceNumber; // locally, we use this for resolving races between the periodic table reader, and any concurrent local register/unregister requests
-            
+
             internal LocalReminderData(ReminderEntry entry)
             {
                 Identity = new ReminderIdentity(entry.GrainRef, entry.ReminderName);
@@ -461,7 +460,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (Timer != null)
                     Timer.Dispose();
-                
+
                 Timer = null;
             }
 
@@ -513,8 +512,8 @@ namespace Orleans.Runtime.ReminderService
                     stopwatch.Restart();
 
                     var after = DateTime.UtcNow;
-                    if (logger.IsVerbose2) 
-                        logger.Verbose2("Tick triggered for {0}, dt {1} sec, next@~ {2}", this.ToString(), (after - before).TotalSeconds, 
+                    if (logger.IsVerbose2)
+                        logger.Verbose2("Tick triggered for {0}, dt {1} sec, next@~ {2}", this.ToString(), (after - before).TotalSeconds,
                             // the next tick isn't actually scheduled until we return control to
                             // AsyncSafeTimer but we can approximate it by adding the period of the reminder
                             // to the after time.
@@ -524,7 +523,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     var after = DateTime.UtcNow;
                     logger.Error(
-                        ErrorCode.RS_Tick_Delivery_Error, 
+                        ErrorCode.RS_Tick_Delivery_Error,
                         String.Format("Could not deliver reminder tick for {0}, next {1}.",  this.ToString(), after + period),
                             exc);
                     // What to do with repeated failures to deliver a reminder's ticks?

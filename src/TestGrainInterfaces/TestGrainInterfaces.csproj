@@ -74,6 +74,7 @@
     <Compile Include="IPromiseForwardGrain.cs" />
     <Compile Include="IProxyGrain.cs" />
     <Compile Include="IReentrantStressTestGrain.cs" />
+    <Compile Include="IReminderTestGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
     <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
