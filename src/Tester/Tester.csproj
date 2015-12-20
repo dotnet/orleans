@@ -123,6 +123,7 @@
     <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="ConfigurationTests\SerializationProviderTests.cs" />
+    <Compile Include="ReminderTest.cs" />
     <Compile Include="DeactivationTests.cs" />
     <Compile Include="JsonFallbackSerializationTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
