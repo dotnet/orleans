@@ -40,6 +40,11 @@ namespace Orleans.Runtime
             return stat;
         }
 
+        static public void Delete(StatisticName name)
+        {
+            FloatValueStatistic.Delete(name);
+        }
+
         protected AverageValueStatistic(StatisticName name)
         {
             Name = name.Name;

@@ -82,6 +82,18 @@ namespace Orleans.Runtime
             }
         }
 
+        static public void Delete(StatisticName name)
+        {
+            lock (classLock)
+            {
+                AverageTimeSpanStatistic stat;
+                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                {
+                    registeredStatistics.Remove(name.Name);
+                }
+            }
+        }
+
         public static void AddCounters(List<ICounter> list, Func<ICounter, bool> predicate)
         {
             lock (classLock)
