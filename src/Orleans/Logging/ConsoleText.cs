@@ -6,14 +6,12 @@ namespace Orleans.Runtime
     {
         public static void WriteError(string msg)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(msg);
-            Console.ResetColor();
+            WriteLine(ConsoleColor.Red, msg);
         }
 
         public static void WriteError(string msg, Exception exc)
         {
-            String logMsg = 
+            var logMsg = 
                 msg 
                 + Environment.NewLine
                 + "Exception = " + exc 
@@ -24,9 +22,7 @@ namespace Orleans.Runtime
 
         public static void WriteWarning(string msg)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine(msg);
-            Console.ResetColor();
+            WriteLine(ConsoleColor.Yellow, msg);
         }
 
         public static void WriteStatus(string msg)
@@ -46,12 +42,20 @@ namespace Orleans.Runtime
 
         public static void WriteLine(string msg)
         {
-            Console.WriteLine(msg);
+            try
+            {
+                Console.WriteLine(msg);
+            }
+            catch (ObjectDisposedException){}
         }
 
         public static void WriteLine(string format, params object[] args)
         {
-            Console.WriteLine(format,args);
+            try
+            {
+                Console.WriteLine(format, args);
+            }
+            catch (ObjectDisposedException){}
         }
 
         private static void WriteLine(ConsoleColor color, string msg)
@@ -59,31 +63,38 @@ namespace Orleans.Runtime
             bool doResetColor = false;
             try
             {
-                Console.ForegroundColor = color;
-                doResetColor = true;
-            }
-            catch (Exception errorIgnored)
-            {
-                Console.WriteLine("Ignoring error from Console.ForegroundColor : " + errorIgnored);
-            }
-
-            try
-            {
-                Console.WriteLine(msg);
-            }
-            finally
-            {
-                if (doResetColor)
+                try
                 {
-                    try
+                    Console.ForegroundColor = color;
+                    doResetColor = true;
+                }
+                catch (Exception errorIgnored)
+                {
+                    Console.WriteLine("Ignoring error from Console.ForegroundColor : " + errorIgnored);
+                }
+
+                try
+                {
+                    Console.WriteLine(msg);
+                }
+                finally
+                {
+                    if (doResetColor)
                     {
-                        Console.ResetColor();
-                    }
-                    catch (Exception errorIgnored)
-                    {
-                        Console.WriteLine("Ignoring error from Console.ResetColor : " + errorIgnored);
+                        try
+                        {
+                            Console.ResetColor();
+                        }
+                        catch (Exception errorIgnored)
+                        {
+                            Console.WriteLine("Ignoring error from Console.ResetColor : " + errorIgnored);
+                        }
                     }
                 }
+            }
+            catch (ObjectDisposedException)
+            {
+                // Console may have already been disposed, so eating ObjectDisposedException exception.
             }
         }
     }
