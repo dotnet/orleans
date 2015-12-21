@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Host
 
         private static void DumpCommandLineArgs(string[] args)
         {
-            ConsoleText.WriteUsage(string.Format("Environement.CommandLine=[{0}]", Environment.CommandLine));
+            ConsoleText.WriteUsage(string.Format("Environment.CommandLine=[{0}]", Environment.CommandLine));
 
             if (args == null || args.Length == 0)
             {
@@ -56,9 +56,9 @@ namespace Orleans.Runtime.Host
                     ConsoleText.WriteUsage(string.Format("args[{0}]='{1}'", i, args[i]));
                 
                 string[] cmdArgs = Environment.GetCommandLineArgs();
-                ConsoleText.WriteUsage(string.Format("Called with Environement.CommandLineArgs.Length={0}", cmdArgs.Length));
+                ConsoleText.WriteUsage(string.Format("Called with Environment.CommandLineArgs.Length={0}", cmdArgs.Length));
                 for (int i = 0; i < cmdArgs.Length; i++)
-                    ConsoleText.WriteUsage(string.Format("Environement.CommandLineArgs[{0}]='{1}'", i, cmdArgs[i]));
+                    ConsoleText.WriteUsage(string.Format("Environment.CommandLineArgs[{0}]='{1}'", i, cmdArgs[i]));
             }
         }
     }
