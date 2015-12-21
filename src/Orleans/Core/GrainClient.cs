@@ -12,6 +12,8 @@ using Orleans.Streams;
 
 namespace Orleans
 {
+    using System.Runtime.ExceptionServices;
+
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
@@ -202,9 +204,24 @@ namespace Orleans
                     tcs.SetException(exc); // Break promise
                 }
             };
+
             // Queue Init call to thread pool thread
             ThreadPool.QueueUserWorkItem(doInit, null);
-            CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            try
+            {
+                CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            }
+            catch (AggregateException ae)
+            {
+                // Flatten the aggregate exception, which can be deeply nested.
+                ae = ae.Flatten();
+
+                // If there is just one exception in the aggregate exception, throw that, otherwise throw the entire
+                // flattened aggregate exception.
+                var innerExceptions = ae.InnerExceptions;
+                var exceptionToThrow = innerExceptions.Count == 1 ? innerExceptions[0] : ae;
+                ExceptionDispatchInfo.Capture(exceptionToThrow).Throw();
+            }
         }
 
         /// <summary>
