@@ -27,11 +27,17 @@ namespace Orleans.Runtime
         {
             var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
+            var cwd = Directory.GetCurrentDirectory();
             var directories = new Dictionary<string, SearchOption>
                     {
                         { exeRoot, SearchOption.TopDirectoryOnly },
                         { appRoot, SearchOption.AllDirectories }
                     };
+
+            if (!directories.ContainsKey(cwd))
+            {
+                directories.Add(cwd, SearchOption.TopDirectoryOnly);
+            }
 
             AssemblyLoaderPathNameCriterion[] excludeCriteria =
                 {
