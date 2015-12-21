@@ -587,7 +587,10 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericGrainWithContraints<A, B>: Grain, IGenericGrainWithConstraints<A, B> where A : ICollection<B>, new()
+    public class GenericGrainWithContraints<A, B, C>: Grain, IGenericGrainWithConstraints<A, B, C>
+        where A : ICollection<B>, new()
+        where B : struct
+        where C : class
     {
         private A collection;
 
@@ -603,6 +606,11 @@ namespace UnitTests.Grains
         {
             collection.Add(item);
             return TaskDone.Done;
+        }
+
+        public Task<C> RoundTrip(C value)
+        {
+            return Task.FromResult(value);
         }
     }
 }
