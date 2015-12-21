@@ -490,6 +490,7 @@ namespace UnitTests.Grains
         private TaskScheduler _scheduler;
         private Logger logger;
         private bool executing;
+        private Task outstandingWriteStateOperation;
 
         public override Task OnActivateAsync()
         {
@@ -498,6 +499,22 @@ namespace UnitTests.Grains
             logger = GetLogger("ReentrentGrainWithState-" + Identity);
             executing = false;
             return base.OnActivateAsync();
+        }
+
+        // When reentrant grain is doing WriteStateAsync, etag violations are posssible due to concurent writes.
+        // The solution is to serialize all writes, and make sure only a single write is outstanind at any moment in time.
+        // No deadlocks are posssible with that approach, since all WriteStateAsync go to the store, which does not issue call into grains,
+        // thus cycle of calls is not posssible.
+        // Implementaton: need to use While and not if, due to the same "early check becomes later invalid" standard problem, like in conditional variables.
+        private async Task PerformSerializedStateUpdate()
+        {
+            while (outstandingWriteStateOperation != null)
+            {
+                await outstandingWriteStateOperation;
+            }
+            outstandingWriteStateOperation = WriteStateAsync();
+            await outstandingWriteStateOperation;
+            outstandingWriteStateOperation = null;
         }
 
         public Task Setup(IReentrentGrainWithState other)
@@ -509,33 +526,33 @@ namespace UnitTests.Grains
 
         public async Task SetOne(int val)
         {
-            logger.Info("SetOne");
+            logger.Info("SetOne Start");
             CheckRuntimeEnvironment();
             var iStr = val.ToString(CultureInfo.InvariantCulture);
             State.One = val;
             State.DictOne[iStr] = val;
             State.DictTwo[iStr] = val;
             CheckRuntimeEnvironment();
-            await WriteStateAsync();
+            await PerformSerializedStateUpdate();
             CheckRuntimeEnvironment();
         }
 
         public async Task SetTwo(int val)
         {
-            logger.Info("SetTwo");
+            logger.Info("SetTwo Start");
             CheckRuntimeEnvironment();
             var iStr = val.ToString(CultureInfo.InvariantCulture);
             State.Two = val;
             State.DictTwo[iStr] = val;
             State.DictOne[iStr] = val;
             CheckRuntimeEnvironment();
-            await WriteStateAsync();
+            await PerformSerializedStateUpdate();
             CheckRuntimeEnvironment();
         }
 
         public async Task Test1()
         {
-            logger.Info("Test1");
+            logger.Info(" ==================================== Test1 Started");
             CheckRuntimeEnvironment();
             for (var i = 1*Multiple; i < 2*Multiple; i++)
             {
@@ -543,7 +560,7 @@ namespace UnitTests.Grains
                 await t1;
                 CheckRuntimeEnvironment();
 
-                var t2 = WriteStateAsync();
+                var t2 = PerformSerializedStateUpdate();
                 await t2;
                 CheckRuntimeEnvironment();
 
@@ -551,16 +568,17 @@ namespace UnitTests.Grains
                 await t3;
                 CheckRuntimeEnvironment();
 
-                var t4 = WriteStateAsync();
+                var t4 = PerformSerializedStateUpdate();
                 await t4;
                 CheckRuntimeEnvironment();
             }
             CheckRuntimeEnvironment();
+            logger.Info(" ==================================== Test1 Done");
         }
 
         public async Task Test2()
         {
-            logger.Info("\n\n\n\n====================================Test2");
+            logger.Info("==================================== Test2 Started");
             CheckRuntimeEnvironment();
             for (var i = 2*Multiple; i < 3*Multiple; i++)
             {
@@ -568,7 +586,7 @@ namespace UnitTests.Grains
                 await t1;
                 CheckRuntimeEnvironment();
 
-                var t2 = WriteStateAsync();
+                var t2 = PerformSerializedStateUpdate();
                 await t2;
                 CheckRuntimeEnvironment();
 
@@ -576,11 +594,12 @@ namespace UnitTests.Grains
                 await t3;
                 CheckRuntimeEnvironment();
 
-                var t4 = WriteStateAsync();
+                var t4 = PerformSerializedStateUpdate();
                 await t4;
                 CheckRuntimeEnvironment();
             }
             CheckRuntimeEnvironment();
+            logger.Info(" ==================================== Test2 Done");
         }
 
         public async Task Task_Delay(bool doStart)
