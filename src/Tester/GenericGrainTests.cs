@@ -653,7 +653,7 @@ namespace UnitTests.General
         public async Task Generic_GrainWithTypeConstraints()
         {
             var grainId = Guid.NewGuid().ToString();
-            var grain = GrainFactory.GetGrain<IGenericGrainWithConstraints<List<int>, int>>(grainId);
+            var grain = GrainFactory.GetGrain<IGenericGrainWithConstraints<List<int>, int, string>>(grainId);
             var result = await grain.GetCount();
             Assert.AreEqual(0, result);
             await grain.Add(42);
