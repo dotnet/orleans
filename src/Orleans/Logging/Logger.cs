@@ -73,7 +73,7 @@ namespace Orleans.Runtime
         /// <summary> Output the specified message at <c>Warning</c> log level with the specified log id value. </summary>
         public abstract void Warn(int logCode, string format, params object[] args);
         /// <summary> Output the specified message and Exception at <c>Warning</c> log level with the specified log id value. </summary>
-        public abstract void Warn(int logCode, string message, Exception exception);
+        public abstract void Warn(int logCode, string message, Exception exception = null);
         /// <summary> Output the specified message at <c>Info</c> log level with the specified log id value. </summary>
         public abstract void Info(int logCode, string format, params object[] args);
         /// <summary> Output the specified message at <c>Verbose</c> log level with the specified log id value. </summary>
