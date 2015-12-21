@@ -167,7 +167,7 @@ namespace Orleans.Runtime
                 {
                     var bufferSize = Math.Max(id - allStatisticsFromSpecificThread.Count, BUFFER_SIZE);
 
-                    allStatisticsFromSpecificThread.AddRange(new ReferenceLong[bufferSize]);
+                    allStatisticsFromSpecificThread.AddRange(new ReferenceLong[bufferSize+1]);
                 }
 
                 var orleansValue = allStatisticsFromSpecificThread[id];
