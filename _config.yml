@@ -13,7 +13,7 @@ redcarpet:
 # Themes are encouraged to use these universal variables 
 # so be sure to set them if your theme uses them.
 #
-title : Microsoft Project Orleans
+title : Microsoft Orleans
 tagline: Community Contributions for Windows Azure
 author :
   name : Microsoft Research
