@@ -1,4 +1,4 @@
 @echo OFF
 @setlocal
 
-@Echo Build.cmd - Nothing to see here, move along people.
+@Echo Build.cmd - No-op build file to stop the CI server from breaking

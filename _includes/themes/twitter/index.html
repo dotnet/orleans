@@ -1,12 +1,13 @@
 <div class="jumbotron">
     <div class="container">
       <h1 class="title">{{ page.title }} {% if page.tagline %} <br/><small class="subtitle">{{ page.tagline }}</small>{% endif %}</h1>
+      <div class="options">
+        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Get the code</a> <a class="btn btn-lg btn-primary" href="What's-new-in-Orleans">Read the documentation</a>
+      </div>
     </div>
 </div>
 
-<div class="row">
-  <div class="container">
-    {{ content }}
-  </div>
+<div class="container">
+  {{ content }}
 </div>
 

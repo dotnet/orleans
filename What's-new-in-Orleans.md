@@ -4,6 +4,34 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+# [v1.1.0](https://github.com/dotnet/orleans/releases/tag/v1.1.0) December 14nd 2015
+
+### Release notes
+
+* New Roslyn-based codegen, compile time and run time
+* Public APIs:
+  * Core API for Event Sourcing
+  * Most methods of `Grain` class are now virtual
+  * ASP.NET vNext style Dependency Injection for grains
+  * New telemetry API
+* Portability:
+  * Support for C# 6.0
+  * Improved support for F# and VB
+  * Code adjustments towards CoreCLR compliance
+  * Orleans assemblies are not strong-named anymore
+* SQL:
+  * `OrleansSQLUtils.dll` for SQL-related functionality
+  * MySQL is now supported as a cluster membership store
+  * Storage provider for SQL Server
+* Serialization:
+  * Support for pluggable external serializers
+  * Bond serializer plugin
+  * Support for Json.Net as a fallback serializer
+  * Added `[KnownType]` attribute for generating serializers for arbitrary types
+* Upgraded to Azure Storage 5.0
+* Upgraded to .NET 4.5.1
+Ot * her fixes and improvements
+
 # [v1.0.10](https://github.com/dotnet/orleans/releases/tag/v1.0.10) September 22nd 2015
 
 ### Release notes
