@@ -1,6 +1,6 @@
 ---
 layout: index
-title: Microsoft Project Orleans
+title: Microsoft Orleans
 tagline: A straightforward approach to building distributed, high-scale applications in .NET
 ---
 {% include JB/setup %}
