@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Contributing to Project Orleans
+title: Contributing to Orleans
 ---
 {% include JB/setup %}
 
@@ -8,7 +8,7 @@ Some notes and guidelines for developers wanting to contribute to Project Orlean
 
 # Contributing To This Project
 
-Here are some pointers for anyone looking for mini-features and work items that would make a positive contribution to Project Orleans. 
+Here are some pointers for anyone looking for mini-features and work items that would make a positive contribution to Orleans. 
 
 These are just a few ideas, so if you think of something else that would be useful, then spin up a [discussion thread](https://github.com/dotnet/orleans/issues) on GitHub to discuss the proposal, and go for it!
 
@@ -49,7 +49,7 @@ There are lots of other useful documents on the [.NET CoreCLR](https://github.co
 
 ## Source Code Organization
 
-Project Orleans has not religiously followed a "One Class Per File" rule, but instead we have tried to use pragmatic judgment to maximize the change of "code understand-ability" for developers on the team. 
+Orleans has not religiously followed a "One Class Per File" rule, but instead we have tried to use pragmatic judgment to maximize the change of "code understand-ability" for developers on the team. 
 If lots of small-ish classes share a "common theme" and/or are always dealt with together, then it is OK to place those into one source code file in most cases. 
 See for example the various "log consumer" classes were originally placed in single source file, as they represented a single unit of code comprehension.
 
