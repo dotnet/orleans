@@ -3,9 +3,12 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Net;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Runtime;
@@ -15,8 +18,6 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
-    using System.Diagnostics.CodeAnalysis;
-    using System.Reflection.Emit;
 
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
@@ -74,7 +75,7 @@ namespace Orleans.Serialization
         private static Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static Dictionary<RuntimeTypeHandle, Serializer> serializers;
         private static Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
-
+        private static ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private static IExternalSerializer fallbackSerializer;
         private static TraceLogger logger;
@@ -190,7 +191,7 @@ namespace Orleans.Serialization
             lock (registerBuiltInSerializerLockObj)
             {
                 if (IsBuiltInSerializersRegistered)
-                {
+        {
                     return;
                 }
 
@@ -205,6 +206,7 @@ namespace Orleans.Serialization
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
+            grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
             logger = TraceLogger.GetLogger("SerializationManager", TraceLogger.LoggerType.Runtime);
             UseStandardSerializer = false; // Default
 
@@ -738,13 +740,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            // TODO: Optimize grain creation, eg using expression trees or IL.
-            var nonGenericConstructor =
-                type.GetConstructor(
-                    BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
-                    null,
-                    new[] { typeof(GrainReference) },
-                    null);
+            var defaultCtorDelegate = CreateGrainRefConstructorDelegate(type, null);
 
             // Register GrainReference serialization methods.
             Register(
@@ -753,26 +749,51 @@ namespace Orleans.Serialization
                 GrainReference.SerializeGrainReference,
                 (expected, stream) =>
                 {
-                    ConstructorInfo constructor;
-                    if (expected.IsConstructedGenericType)
+                    Func<GrainReference, GrainReference> ctorDelegate;
+                    var deserialized = (GrainReference)GrainReference.DeserializeGrainReference(expected, stream);
+                    if (expected.IsConstructedGenericType == false)
                     {
-                        var referenceType = type.MakeGenericType(expected.GenericTypeArguments);
-                        constructor =
-                            referenceType.GetConstructor(
+                        return defaultCtorDelegate(deserialized);
+                    }
+
+                    if (!grainRefConstructorDictionary.TryGetValue(expected, out ctorDelegate))
+                    {
+                        ctorDelegate = CreateGrainRefConstructorDelegate(type, expected.GenericTypeArguments);
+                        grainRefConstructorDictionary.TryAdd(expected, ctorDelegate);
+                    }
+
+                    return ctorDelegate(deserialized);
+                });
+        }
+
+        private static Func<GrainReference, GrainReference> CreateGrainRefConstructorDelegate(Type type, Type[] genericArgs)
+                    {
+            if (type.IsGenericType)
+            {
+                if (type.IsConstructedGenericType == false && genericArgs == null)
+                {
+                    return null;
+                }
+
+                type = type.MakeGenericType(genericArgs);
+            }
+
+            var constructor =
+                type.GetConstructor(
                                 BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
                                 null,
                                 new[] { typeof(GrainReference) },
                                 null);
-                    }
-                    else
-                    {
-                        constructor = nonGenericConstructor;
+
+            var ctorParam = Expression.Parameter(typeof(GrainReference), "grainRef");
+            var lambda = Expression.Lambda(
+                typeof(Func<,>).MakeGenericType(typeof(GrainReference), type),
+                Expression.New(constructor, ctorParam),
+                true,
+                ctorParam);
+            return (Func<GrainReference, GrainReference>)lambda.Compile();
                     }
 
-                    var deserialized = (IAddressable)GrainReference.DeserializeGrainReference(expected, stream);
-                    return (IAddressable)constructor.Invoke(new object[] { deserialized });
-                });
-        }
 
         private static SerializerMethods RegisterConcreteSerializer(Type concreteType, Type genericSerializerType)
         {
