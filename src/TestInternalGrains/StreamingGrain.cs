@@ -338,7 +338,7 @@ namespace UnitTests.Grains
 
         public Task AddNewConsumerGrain(Guid consumerGrainId)
         {
-            var grain = _grainFactory.GetGrain<IStreaming_ConsumerGrain>(consumerGrainId, "UnitTestGrains.Streaming_ConsumerGrain");
+            var grain = _grainFactory.GetGrain<IStreaming_ConsumerGrain>(consumerGrainId, "UnitTests.Grains.Streaming_ConsumerGrain");
             return grain.BecomeConsumer(_streamId, _providerName, _streamNamespace);
         }
 
