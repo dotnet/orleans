@@ -330,7 +330,15 @@ namespace Orleans.Streams
                         IList<IBatchContainer> purgedItems;
                         if (queueCache.TryPurgeFromCache(out purgedItems))
                         {
-                            await rcvr.MessagesDeliveredAsync(purgedItems);
+                            try
+                            {
+                                await rcvr.MessagesDeliveredAsync(purgedItems);
+                            }
+                            catch (Exception exc)
+                            {
+                                logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_27, 
+                                    String.Format("Exception calling MessagesDeliveredAsync on queue {0}. Ignoring.", myQueueId), exc);
+                            }
                         }
                     }
 
