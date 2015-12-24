@@ -67,17 +67,19 @@ namespace Orleans.Serialization
 
         #region Privates
 
-        private static readonly HashSet<Type> registeredTypes;
-        private static readonly List<IExternalSerializer> externalSerializers;
-        private static readonly ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
-        private static readonly Dictionary<string, Type> types;
-        private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
-        private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
-        private static readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
+        private static HashSet<Type> registeredTypes;
+        private static List<IExternalSerializer> externalSerializers;
+        private static ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
+        private static Dictionary<string, Type> types;
+        private static Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
+        private static Dictionary<RuntimeTypeHandle, Serializer> serializers;
+        private static Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
 
 
         private static IExternalSerializer fallbackSerializer;
-        private static readonly TraceLogger logger;
+        private static TraceLogger logger;
+        private static bool IsBuiltInSerializersRegistered;
+        private static readonly object registerBuiltInSerializerLockObj = new object();
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
 
         // Semi-constants: type handles for simple types
@@ -124,6 +126,7 @@ namespace Orleans.Serialization
 
         public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, bool useJsonFallbackSerializer = false)
         {
+            RegisterBuiltInSerializers();
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             AssemblyProcessor.Initialize();
             RegisterSerializationProviders(serializationProviders);
@@ -132,6 +135,7 @@ namespace Orleans.Serialization
 
         internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
         {
+            RegisterBuiltInSerializers();
             UseStandardSerializer = useStandardSerializer;
 
 #if DNXCORE50
@@ -181,10 +185,19 @@ namespace Orleans.Serialization
             RegisterSerializationProviders(serializationProviders);
         }
 
-        static SerializationManager()
+        internal static void RegisterBuiltInSerializers()
         {
-            AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
+            lock (registerBuiltInSerializerLockObj)
+            {
+                if (IsBuiltInSerializersRegistered)
+                {
+                    return;
+                }
 
+                IsBuiltInSerializersRegistered = true;
+            }
+
+            AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
             registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
             typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
