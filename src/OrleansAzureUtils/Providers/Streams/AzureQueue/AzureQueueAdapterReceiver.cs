@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -16,6 +17,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private AzureQueueDataManager queue;
         private long lastReadMessage;
         private Task outstandingTask;
+        private readonly TraceLogger logger;
 
         public QueueId Id { get; private set; }
 
@@ -36,6 +38,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             
             Id = queueId;
             this.queue = queue;
+            logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Provider);
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -95,7 +98,15 @@ namespace Orleans.Providers.Streams.AzureQueue
                 if (messages.Count == 0 || queueRef==null) return;
                 List<CloudQueueMessage> cloudQueueMessages = messages.Cast<AzureQueueBatchContainer>().Select(b => b.CloudQueueMessage).ToList();
                 outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queueRef.DeleteQueueMessage));
-                await outstandingTask;
+                try
+                {
+                    await outstandingTask;
+                }
+                catch (Exception exc)
+                {
+                    logger.Warn((int)ErrorCode.AzureQueue_15,
+                        string.Format("Exception upon DeleteQueueMessage on queue {0}. Ignoring.", Id), exc);
+                }
             }
             finally
             {
