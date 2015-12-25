@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -68,7 +69,7 @@ namespace Orleans.Messaging
         internal bool Running { get; private set; }
 
         internal readonly GatewayManager GatewayManager;
-        internal readonly RuntimeQueue<Message> PendingInboundMessages;
+        internal readonly BlockingCollection<Message> PendingInboundMessages;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
@@ -91,7 +92,7 @@ namespace Orleans.Messaging
             Running = false;
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
-            PendingInboundMessages = new RuntimeQueue<Message>();
+            PendingInboundMessages = new BlockingCollection<Message>();
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];

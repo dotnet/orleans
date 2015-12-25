@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 
 
 namespace Orleans.Runtime.Messaging
@@ -6,7 +7,7 @@ namespace Orleans.Runtime.Messaging
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
     internal class InboundMessageQueue : IInboundMessageQueue
     {
-        private readonly RuntimeQueue<Message>[] messageQueues;
+        private readonly BlockingCollection<Message>[] messageQueues;
         private readonly TraceLogger log;
         private readonly QueueTrackingStatistic[] queueTracking;
 
@@ -25,12 +26,12 @@ namespace Orleans.Runtime.Messaging
         internal InboundMessageQueue()
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
-            messageQueues = new RuntimeQueue<Message>[n];
+            messageQueues = new BlockingCollection<Message>[n];
             queueTracking = new QueueTrackingStatistic[n];
             int i = 0;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
             {
-                messageQueues[i] = new RuntimeQueue<Message>();
+                messageQueues[i] = new BlockingCollection<Message>();
                 if (StatisticsCollector.CollectQueueStats)
                 {
                     var queueName = "IncomingMessageAgent." + category;

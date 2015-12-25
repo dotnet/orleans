@@ -235,7 +235,6 @@
     <Compile Include="Statistics\QueueTrackingStatistic.cs" />
     <Compile Include="Statistics\StatisticsCollector.cs" />
     <Compile Include="Statistics\ThreadTrackingStatistic.cs" />
-    <Compile Include="Runtime\RuntimeQueue.cs" />
     <Compile Include="Statistics\TimeInterval.cs" />
     <Compile Include="Statistics\MessagingProcessingStatisticsGroup.cs" />
     <Compile Include="Messaging\GatewayClientReceiver.cs" />

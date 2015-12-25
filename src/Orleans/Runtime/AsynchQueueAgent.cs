@@ -1,6 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-
+using System.Linq;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -8,14 +9,14 @@ namespace Orleans.Runtime
     internal abstract class AsynchQueueAgent<T> : AsynchAgent, IDisposable where T : IOutgoingMessage
     {
         private readonly IMessagingConfiguration config;
-        private RuntimeQueue<T> requestQueue;
+        private BlockingCollection<T> requestQueue;
         private QueueTrackingStatistic queueTracking;
 
         protected AsynchQueueAgent(string nameSuffix, IMessagingConfiguration cfg)
             : base(nameSuffix)
         {
             config = cfg;
-            requestQueue = new RuntimeQueue<T>();
+            requestQueue = new BlockingCollection<T>();
             if (StatisticsCollector.CollectQueueStats)
             {
                 queueTracking = new QueueTrackingStatistic(base.Name);

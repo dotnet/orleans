@@ -65,8 +65,6 @@ namespace Orleans.Runtime
 
         public const int DEFAULT_LOGGER_BULK_MESSAGE_LIMIT = 5;
 
-        public static readonly bool USE_BLOCKING_COLLECTION = true;
-
         private static readonly Dictionary<GrainId, string> singletonSystemTargetNames = new Dictionary<GrainId, string>
         {
             {DirectoryServiceId, "DirectoryService"},
