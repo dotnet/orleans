@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Threading;
 
@@ -73,7 +50,7 @@ namespace Orleans.Runtime
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
             Log = TraceLogger.GetLogger(Name, TraceLogger.LoggerType.Runtime);
-            AppDomain.CurrentDomain.DomainUnload += new EventHandler(CurrentDomain_DomainUnload);
+            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -94,7 +71,10 @@ namespace Orleans.Runtime
         {
             try
             {
-                Stop();
+                if (State != ThreadState.Stopped)
+                {
+                    Stop();
+                }
             }
             catch (Exception exc)
             {
@@ -138,6 +118,7 @@ namespace Orleans.Runtime
                         State = ThreadState.Stopped;
                     }
                 }
+                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
             }
             catch (Exception exc)
             {
@@ -151,6 +132,23 @@ namespace Orleans.Runtime
         {
             if(t!=null)
                 t.Abort(stateInfo);
+        }
+
+        public void Join(TimeSpan timeout)
+        {
+            try
+            {
+                var agentThread = t;
+                if (agentThread != null)
+                {
+                    bool joined = agentThread.Join(timeout);
+                    Log.Verbose("{0} the agent thread {1} after {2} time.", joined ? "Joined" : "Did not join", Name, timeout);
+                }
+            }catch(Exception exc)
+            {
+                // ignore. Just make sure Join does not throw.
+                Log.Verbose("Ignoring error during Join: {0}", exc);
+            }
         }
 
         protected abstract void Run();

@@ -23,8 +23,8 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansTestingHost.dll" target="lib\net45" />
-    <file src="OrleansTestingHost.pdb" target="lib\net45" />
+    <file src="OrleansTestingHost.dll" target="lib\net451" />
+    <file src="OrleansTestingHost.pdb" target="lib\net451" />
     
     <file src="ClientConfigurationForTesting.xml" target="content" />
     <file src="OrleansConfigurationForTesting.xml" target="content" />

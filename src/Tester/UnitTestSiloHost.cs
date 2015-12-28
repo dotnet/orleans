@@ -1,28 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
-using System.IO;
+using System.Diagnostics;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.TestingHost;
@@ -40,11 +17,19 @@ namespace UnitTests.Tester
     [DeploymentItem("TestGrainInterfaces.dll")]
     [DeploymentItem("TestGrains.dll")]
     [DeploymentItem("OrleansCodeGenerator.dll")]
+    [DeploymentItem("TestInternalGrainInterfaces.dll")]
+    [DeploymentItem("TestInternalGrains.dll")]
     public class UnitTestSiloHost : TestingSiloHost
     {
         public UnitTestSiloHost() // : base()
         {
         }
+
+        public UnitTestSiloHost(bool startFreshOrleans)
+            : base(startFreshOrleans)
+        {
+        }
+
         public UnitTestSiloHost(TestingSiloOptions siloOptions)
             : base(siloOptions)
         {
@@ -52,6 +37,26 @@ namespace UnitTests.Tester
         public UnitTestSiloHost(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
             : base(siloOptions, clientOptions)
         {
+        }
+
+        public static void CheckForAzureStorage()
+        {
+            bool usingLocalWAS = StorageTestConstants.UsingAzureLocalStorageEmulator;
+
+            if (!usingLocalWAS)
+            {
+                string msg = "Tests are using Azure Cloud Storage, not local WAS emulator.";
+                Console.WriteLine(msg);
+                return;
+            }
+
+            //Starts the storage emulator if not started already and it exists (i.e. is installed).
+            if (!StorageEmulator.TryStart())
+            {
+                string errorMsg = "Azure Storage Emulator could not be started.";
+                Console.WriteLine(errorMsg);
+                Assert.Inconclusive(errorMsg);
+            }
         }
 
         protected static string DumpTestContext(TestContext context)
@@ -72,6 +77,54 @@ namespace UnitTests.Tester
             }
             sb.AppendFormat(@" ]").AppendLine();
             return sb.ToString();
+        }
+
+        protected static int GetRandomGrainId()
+        {
+            return random.Next();
+        }
+
+        public static double CalibrateTimings()
+        {
+            const int NumLoops = 10000;
+            TimeSpan baseline = TimeSpan.FromTicks(80); // Baseline from jthelin03D
+            int n;
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < NumLoops; i++)
+            {
+                n = i;
+            }
+            sw.Stop();
+            double multiple = 1.0 * sw.ElapsedTicks / baseline.Ticks;
+            Console.WriteLine("CalibrateTimings: {0} [{1} Ticks] vs {2} [{3} Ticks] = x{4}",
+                sw.Elapsed, sw.ElapsedTicks,
+                baseline, baseline.Ticks,
+                multiple);
+            return multiple > 1.0 ? multiple : 1.0;
+        }
+
+        public static TimeSpan TimeRun(int numIterations, TimeSpan baseline, string what, Action action)
+        {
+            var stopwatch = new Stopwatch();
+
+            long startMem = GC.GetTotalMemory(true);
+            stopwatch.Start();
+
+            action();
+
+            stopwatch.Stop();
+            long stopMem = GC.GetTotalMemory(false);
+            long memUsed = stopMem - startMem;
+            TimeSpan duration = stopwatch.Elapsed;
+
+            string timeDeltaStr = "";
+            if (baseline > TimeSpan.Zero)
+            {
+                double delta = (duration - baseline).TotalMilliseconds / baseline.TotalMilliseconds;
+                timeDeltaStr = String.Format("-- Change = {0}%", 100.0 * delta);
+            }
+            Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
+            return duration;
         }
     }
 }

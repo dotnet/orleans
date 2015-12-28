@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 namespace Orleans.Runtime
 {
     using System;
@@ -113,8 +90,8 @@ namespace Orleans.Runtime
         /// <param name="assembly">The assembly to process.</param>
         private static void ProcessAssembly(Assembly assembly)
         {
-            // If the assembly is loaded for reflection only or it does not reference Orleans, avoid processing it.
-            if (assembly.ReflectionOnly || !TypeUtils.IsOrleansOrReferencesOrleans(assembly))
+            // If the assembly is loaded for reflection only avoid processing it.
+            if (assembly.ReflectionOnly)
             {
                 return;
             }
@@ -128,12 +105,16 @@ namespace Orleans.Runtime
                 }
             }
 
-            // Code generation occurs in a self-contained assembly, so invoke it separately.
-            CodeGeneratorManager.GenerateAndCacheCodeForAssembly(assembly);
+            // If the assembly does not reference Orleans, avoid generating code for it.
+            if (TypeUtils.IsOrleansOrReferencesOrleans(assembly))
+            {
+                // Code generation occurs in a self-contained assembly, so invoke it separately.
+                CodeGeneratorManager.GenerateAndCacheCodeForAssembly(assembly);
+            }
 
             // Process each type in the assembly.
             var shouldProcessSerialization = SerializationManager.ShouldFindSerializationInfo(assembly);
-            Type[] assemblyTypes;
+            TypeInfo[] assemblyTypes;
             try
             {
                 assemblyTypes = assembly.DefinedTypes.ToArray();
@@ -147,10 +128,7 @@ namespace Orleans.Runtime
                             "AssemblyLoader encountered an exception loading types from assembly '{0}': {1}",
                             assembly.FullName,
                             exception);
-                    Logger.Warn(
-                        ErrorCode.Loader_TypeLoadError_5,
-                        message,
-                        exception);
+                    Logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
                 }
 
                 return;

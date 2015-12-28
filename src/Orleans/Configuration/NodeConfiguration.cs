@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -159,10 +136,10 @@ namespace Orleans.Runtime.Configuration
         private string traceFilePattern;
         /// <summary>
         /// </summary>
-        public Logger.Severity DefaultTraceLevel { get; set; }
+        public Severity DefaultTraceLevel { get; set; }
         /// <summary>
         /// </summary>
-        public IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; private set; }
+        public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
         /// <summary>
         /// </summary>
         public bool WriteMessagingTraces { get; set; }
@@ -280,8 +257,8 @@ namespace Orleans.Runtime.Configuration
             LoadSheddingEnabled = false;
             LoadSheddingLimit = 95;
 
-            DefaultTraceLevel = Logger.Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
+            DefaultTraceLevel = Severity.Info;
+            TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
             WriteMessagingTraces = false;
@@ -327,7 +304,7 @@ namespace Orleans.Runtime.Configuration
             LoadSheddingLimit = other.LoadSheddingLimit;
 
             DefaultTraceLevel = other.DefaultTraceLevel;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>(other.TraceLevelOverrides);
+            TraceLevelOverrides = new List<Tuple<string, Severity>>(other.TraceLevelOverrides);
             TraceToConsole = other.TraceToConsole;
             TraceFilePattern = other.TraceFilePattern;
             TraceFileName = other.TraceFileName;
@@ -511,6 +488,9 @@ namespace Orleans.Runtime.Configuration
                         {
                             StartupTypeName = child.GetAttribute("Type");
                         }
+                        break;
+                    case "Telemetry":
+                        ConfigUtilities.ParseTelemetry(child);
                         break;
                 }
             }

@@ -1,30 +1,9 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using Microsoft.WindowsAzure.Storage.Queue;
+using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -35,21 +14,39 @@ namespace Orleans.Providers.Streams.AzureQueue
     [Serializable]
     internal class AzureQueueBatchContainer : IBatchContainer
     {
+        [JsonProperty]
         private EventSequenceToken sequenceToken;
+
+        [JsonProperty]
         private readonly List<object> events;
+
+        [JsonProperty]
         private readonly Dictionary<string, object> requestContext;
 
         [NonSerialized]
         // Need to store reference to the original AQ CloudQueueMessage to be able to delete it later on.
         // Don't need to serialize it, since we are never interested in sending it to stream consumers.
         internal CloudQueueMessage CloudQueueMessage;
-        
+
         public Guid StreamGuid { get; private set; }
+
         public String StreamNamespace { get; private set; }
 
-        public StreamSequenceToken SequenceToken 
+        public StreamSequenceToken SequenceToken
         {
             get { return sequenceToken; }
+        }
+
+        [JsonConstructor]
+        private AzureQueueBatchContainer(
+            Guid streamGuid, 
+            String streamNamespace,
+            List<object> events,
+            Dictionary<string, object> requestContext, 
+            EventSequenceToken sequenceToken)
+            : this(streamGuid, streamNamespace, events, requestContext)
+        {
+            this.sequenceToken = sequenceToken;
         }
 
         private AzureQueueBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)

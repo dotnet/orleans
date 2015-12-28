@@ -13,24 +13,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans</RootNamespace>
     <AssemblyName>Orleans</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SignAssembly>false</SignAssembly>
-    <PublishUrl>publish\</PublishUrl>
-    <Install>true</Install>
-    <InstallFrom>Disk</InstallFrom>
-    <UpdateEnabled>false</UpdateEnabled>
-    <UpdateMode>Foreground</UpdateMode>
-    <UpdateInterval>7</UpdateInterval>
-    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
-    <UpdatePeriodically>false</UpdatePeriodically>
-    <UpdateRequired>false</UpdateRequired>
-    <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
-    <UseApplicationTrust>false</UseApplicationTrust>
-    <BootstrapperEnabled>true</BootstrapperEnabled>
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
   </PropertyGroup>
@@ -74,6 +59,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Management" />
     <Reference Include="System.Xml" />
@@ -95,9 +84,12 @@
     <Compile Include="CodeGeneration\IGrainMethodInvoker.cs" />
     <Compile Include="CodeGeneration\IRuntimeCodeGenerator.cs" />
     <Compile Include="CodeGeneration\ISourceCodeGenerator.cs" />
+    <Compile Include="CodeGeneration\KnownAssemblyAttribute.cs" />
     <Compile Include="CodeGeneration\Language.cs" />
     <Compile Include="CodeGeneration\OrleansCodeGenerationTargetAttribute.cs" />
+    <Compile Include="CodeGeneration\KnownTypeAttribute.cs" />
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
+    <Compile Include="Providers\DefaultServiceProvider.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
@@ -123,6 +115,8 @@
     <Compile Include="IDs\UniqueKey.cs" />
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
+    <Compile Include="Serialization\OrleansJsonSerializer.cs" />
+    <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Serialization\NonSerializableAttribute.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
@@ -133,6 +127,18 @@
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
+    <Compile Include="Telemetry\Consumers\ConsoleTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\Consumers\FileTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\Consumers\TraceTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IDependencyTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IEventTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IExceptionTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IMetricTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\IRequestTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\ITelemetryConsumer.cs" />
+    <Compile Include="Telemetry\ITraceTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\Severity.cs" />
+    <Compile Include="Telemetry\TraceParserUtils.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />
@@ -229,7 +235,6 @@
     <Compile Include="Statistics\QueueTrackingStatistic.cs" />
     <Compile Include="Statistics\StatisticsCollector.cs" />
     <Compile Include="Statistics\ThreadTrackingStatistic.cs" />
-    <Compile Include="Runtime\RuntimeQueue.cs" />
     <Compile Include="Statistics\TimeInterval.cs" />
     <Compile Include="Statistics\MessagingProcessingStatisticsGroup.cs" />
     <Compile Include="Messaging\GatewayClientReceiver.cs" />
@@ -297,7 +302,6 @@
     <Compile Include="Core\GrainAttributes.cs" />
     <Compile Include="CodeGeneration\GrainFactoryBase.cs" />
     <Compile Include="Runtime\IClientObserverRegistrar.cs" />
-    <Compile Include="Logging\LogWriters.cs" />
     <Compile Include="Logging\ILogConsumer.cs" />
     <Compile Include="CodeGeneration\ActivationAttribute.cs" />
     <Compile Include="Core\IGrainObserver.cs" />

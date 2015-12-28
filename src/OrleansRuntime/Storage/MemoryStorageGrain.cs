@@ -1,29 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Storage
 {
@@ -36,38 +14,47 @@ namespace Orleans.Storage
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
         private IDictionary<string, GrainStateStore> grainStore;
+        private Logger logger;
 
         public override Task OnActivateAsync()
         {
             grainStore = new Dictionary<string, GrainStateStore>();
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for MemoryStorageGrain virtually indefinitely.
+            logger = GetLogger(GetType().Name);
+            logger.Info("OnActivateAsync");
             return TaskDone.Done;
         }
 
         public override Task OnDeactivateAsync()
         {
+            logger.Info("OnDeactivateAsync");
             grainStore = null;
             return TaskDone.Done;
         }
 
-        public Task<IDictionary<string, object>> ReadStateAsync(string grainType, string grainId)
+        public Task<Tuple<IDictionary<string, object>, string>> ReadStateAsync(string stateStore, string grainStoreKey)
         {
-            GrainStateStore storage = GetStoreForGrain(grainType);
-            var state = storage.GetGrainState(grainId);
-            return Task.FromResult(state);
+            if (logger.IsVerbose) logger.Verbose("ReadStateAsync for {0} grain: {1}", stateStore, grainStoreKey);
+            GrainStateStore storage = GetStoreForGrain(stateStore);
+            var stateTuple = storage.GetGrainState(grainStoreKey);
+            return Task.FromResult(stateTuple);
         }
 
-        public Task WriteStateAsync(string grainType, string grainId, IDictionary<string, object> grainState)
+        public Task<string> WriteStateAsync(string stateStore, string grainStoreKey, IDictionary<string, object> grainState, string eTag)
         {
-            GrainStateStore storage = GetStoreForGrain(grainType);
-            storage.UpdateGrainState(grainId, grainState);
-            return TaskDone.Done;
+            if (logger.IsVerbose) logger.Verbose("WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, eTag);
+            GrainStateStore storage = GetStoreForGrain(stateStore);
+            string newETag = storage.UpdateGrainState(grainStoreKey, grainState, eTag);
+            if (logger.IsVerbose) logger.Verbose("Done WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, eTag);
+            return Task.FromResult(newETag);
         }
 
-        public Task DeleteStateAsync(string grainType, string grainId)
+        public Task DeleteStateAsync(string stateStore, string grainStoreKey, string eTag)
         {
-            GrainStateStore storage = GetStoreForGrain(grainType);
-            storage.DeleteGrainState(grainId);
+            if (logger.IsVerbose) logger.Verbose("DeleteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, eTag);
+            GrainStateStore storage = GetStoreForGrain(stateStore);
+            storage.DeleteGrainState(grainStoreKey, eTag);
+            if (logger.IsVerbose) logger.Verbose("Done DeleteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, eTag);
             return TaskDone.Done;
         }
 
@@ -76,7 +63,7 @@ namespace Orleans.Storage
             GrainStateStore storage;
             if (!grainStore.TryGetValue(grainType, out storage))
             {
-                storage = new GrainStateStore();
+                storage = new GrainStateStore(logger);
                 grainStore.Add(grainType, storage);
             }
             return storage;
@@ -84,23 +71,67 @@ namespace Orleans.Storage
 
         private class GrainStateStore
         {
-            private readonly IDictionary<string, IDictionary<string, object>> grainStateStorage = new Dictionary<string, IDictionary<string, object>>();
-
-            public IDictionary<string, object> GetGrainState(string grainId)
+            private Logger logger;
+            private readonly IDictionary<string, Tuple<IDictionary<string, object>, long>> grainStateStorage = new Dictionary<string, Tuple<IDictionary<string, object>, long>>();
+            
+            public GrainStateStore(Logger logger)
             {
-                IDictionary<string, object> state;
-                grainStateStorage.TryGetValue(grainId, out state);
-                return state;
+                this.logger = logger;
             }
 
-            public void UpdateGrainState(string grainId, IDictionary<string, object> state)
+            public Tuple<IDictionary<string, object>, string> GetGrainState(string grainId)
             {
-                grainStateStorage[grainId] = state;
+                Tuple<IDictionary<string, object>, long> state;
+                if(grainStateStorage.TryGetValue(grainId, out state))
+                    return Tuple.Create(state.Item1, state.Item2.ToString());
+                else
+                    return Tuple.Create<IDictionary<string, object>, string>(null, null); // upon first read, return null/invalid etag, to mimic Azure Storage.
             }
 
-            public void DeleteGrainState(string grainId)
+            public string UpdateGrainState(string grainStoreKey, IDictionary<string, object> state, string receivedEtag)
             {
-                grainStateStorage.Remove(grainId);
+                long currentETag = 0;
+                Tuple<IDictionary<string, object>, long> oldState;
+                if (grainStateStorage.TryGetValue(grainStoreKey, out oldState)) {
+                    currentETag = oldState.Item2;
+                }
+                ValidateEtag(currentETag, receivedEtag, grainStoreKey, "Update");
+                currentETag++;
+                grainStateStorage[grainStoreKey] = Tuple.Create(state, currentETag);
+                return currentETag.ToString();
+            }
+
+            public void DeleteGrainState(string grainStoreKey, string receivedEtag)
+            {
+                long currentETag = 0;
+                Tuple<IDictionary<string, object>, long> oldState;
+                if (grainStateStorage.TryGetValue(grainStoreKey, out oldState)){
+                    currentETag = oldState.Item2;
+                }
+                ValidateEtag(currentETag, receivedEtag, grainStoreKey, "Delete");
+                grainStateStorage.Remove(grainStoreKey);
+            }
+
+            private void ValidateEtag(long currentETag, string receivedEtag, string grainStoreKey, string operation)
+            {
+                if (receivedEtag == null) // first write
+                {
+                    if (currentETag > 0)
+                    {
+                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = null", operation, grainStoreKey, currentETag.ToString());
+                        logger.Warn(0, error);
+                        new InconsistentStateException(error);
+                    }
+                }
+                else // non first write
+                {
+                    if (receivedEtag != currentETag.ToString())
+                    {
+                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = {3}", operation, grainStoreKey, currentETag.ToString(), receivedEtag);
+                        logger.Warn(0, error);
+                        throw new InconsistentStateException(error);
+                    }
+                }
             }
         }
     }

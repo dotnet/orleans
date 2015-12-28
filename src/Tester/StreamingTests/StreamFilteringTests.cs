@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -41,8 +18,6 @@ namespace Tester.StreamingTests
     [ExcludeFromCodeCoverage]
     public abstract class StreamFilteringTestsBase : UnitTestSiloHost
     {
-        public TestContext TestContext { get; set; }
-
         protected Guid StreamId;
         protected string StreamNamespace;
         protected string streamProviderName;
@@ -54,34 +29,16 @@ namespace Tester.StreamingTests
         {
         }
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        protected void TestInitialize()
         {
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
-            {
-                Console.WriteLine("Azure Storage Emulator could not be started.");
-            }
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
-        }
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            logger.Info("TestInitialize - {0}", TestContext.TestName);
+            logger.Info("TestInitialize.");
             StreamId = Guid.NewGuid();
-            StreamNamespace = TestContext.TestName;
+            StreamNamespace = Guid.NewGuid().ToString();
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        protected void TestCleanup()
         {
-            logger.Info("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+            logger.Info("TestCleanup.");
 
             if (StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME.Equals(streamProviderName))
             {
@@ -321,6 +278,24 @@ namespace Tester.StreamingTests
         {
         }
 
+        [ClassCleanup]
+        public static void ClassCleanup()
+        {
+            StopAllSilos();
+        }
+
+        [TestInitialize]
+        public new void TestInitialize()
+        {
+            base.TestInitialize();
+        }
+
+        [TestCleanup]
+        public new void TestCleanup()
+        {
+            base.TestCleanup();
+        }
+
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_Basic()
         {
@@ -394,6 +369,25 @@ namespace Tester.StreamingTests
         public StreamFilteringTests_AQ()
             : base(siloOptions, clientOptions)
         {
+        }
+
+
+        [ClassCleanup]
+        public static void ClassCleanup()
+        {
+            StopAllSilos();
+        }
+
+        [TestInitialize]
+        public new void TestInitialize()
+        {
+            base.TestInitialize();
+        }
+
+        [TestCleanup]
+        public new void TestCleanup()
+        {
+            base.TestCleanup();
         }
 
         [Ignore]

@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -360,22 +337,32 @@ namespace Orleans.AzureUtils
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
             if (Logger.IsVerbose2) Logger.Verbose2("{0} table {1} partitionKey {2} rowKey = {3}", operation, TableName, partitionKey, rowKey);
+            T retrievedResult = default(T);
 
             try
             {
-                TableResult retrievedResult = await Task<TableResult>.Factory.FromAsync(
-                    tableReference.BeginExecute,
-                    tableReference.EndExecute,
-                    TableOperation.Retrieve<T>(partitionKey, rowKey),
-                    null);
-                if (retrievedResult == null || retrievedResult.Result == null || AzureStorageUtils.IsNotFoundError((HttpStatusCode)retrievedResult.HttpStatusCode))
+                try
                 {
-                    if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
-                    return null;  // No data
+                    string queryString = TableQuery.CombineFilters(
+                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey),
+                        TableOperators.And,
+                        TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
+                    var query = new TableQuery<T>().Where(queryString);
+                    TableQuerySegment<T> segment = await Task.Factory
+                        .FromAsync<TableQuery<T>, TableContinuationToken, TableQuerySegment<T>>(
+                            tableReference.BeginExecuteQuerySegmented,
+                            tableReference.EndExecuteQuerySegmented<T>, query, null, null);
+                    retrievedResult = segment.Results.SingleOrDefault();
+                }
+                catch (StorageException exception)
+                {
+                    if (!AzureStorageUtils.TableStorageDataNotFound(exception))
+                        throw;
                 }
                 //The ETag of data is needed in further operations.                                        
-                return new Tuple<T, string>(retrievedResult.Result as T, retrievedResult.Etag);
-
+                if (retrievedResult != null) return new Tuple<T, string>(retrievedResult, retrievedResult.ETag);
+                if (Logger.IsVerbose) Logger.Verbose("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
+                return null;  // No data
             }
             finally
             {

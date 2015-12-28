@@ -35,6 +35,8 @@ namespace Orleans.Runtime
 
         IStreamProviderManager StreamProviderManager { get; }
 
+        IServiceProvider ServiceProvider { get; }
+
         Logger GetLogger(string loggerName, TraceLogger.LoggerType logType);
 
         void DeactivateOnIdle(Grain grain);

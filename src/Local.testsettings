@@ -4,6 +4,8 @@
   <Deployment>
     <DeploymentItem filename="Tester\bin\Debug\TestInput\" />
     <DeploymentItem filename="TestInput\" />
+    <DeploymentItem filename="CreateOrleansTables_MySql.sql" />
+    <DeploymentItem filename="CreateOrleansTables_SqlServer.sql" />
   </Deployment>
   <NamingScheme baseName="BuildResults" appendTimeStamp="false" />
   <Scripts setupScript=".\SetupTestScript.cmd" />

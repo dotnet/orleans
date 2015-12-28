@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -46,15 +23,6 @@ namespace Orleans.SqlUtils
         /// The invariant name of the connector for this database.
         /// </summary>
         private readonly string invariantName;
-
-        /// <summary>
-        /// The factory to provide vendor specific functionality.
-        /// </summary>
-        /// <remarks>For more about <see href="http://florianreischl.blogspot.fi/2011/08/adonet-connection-pooling-internals-and.html">ConnectionPool</see>
-        /// and issues with using this factory. Take these notes into account when considering robustness of Orleans!</remarks>
-        private readonly DbProviderFactory factory;
-
-
         /// <summary>
         /// The invariant name of the connector for this database.
         /// </summary>
@@ -87,12 +55,12 @@ namespace Orleans.SqlUtils
         /// <returns></returns>
         public static IRelationalStorage CreateInstance(string invariantName, string connectionString)
         {
-            if(string.IsNullOrWhiteSpace("invariantName"))
+            if(string.IsNullOrWhiteSpace(invariantName))
             {
                 throw new ArgumentException("The name of invariant must contain characters", "invariantName");
             }
 
-            if(string.IsNullOrWhiteSpace("connectionString"))
+            if(string.IsNullOrWhiteSpace(connectionString))
             {
                 throw new ArgumentException("Connection string must contain characters", "connectionString");
             }
@@ -161,7 +129,7 @@ namespace Orleans.SqlUtils
                 throw new ArgumentNullException("selector");
             }
 
-            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, factory, connectionString).ConfigureAwait(continueOnCapturedContext: false)).Item1;
+            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector).ConfigureAwait(continueOnCapturedContext: false)).Item1;
         }
 
 
@@ -192,17 +160,16 @@ namespace Orleans.SqlUtils
                 throw new ArgumentNullException("query");
             }
 
-            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id) => unit, factory, connectionString).ConfigureAwait(continueOnCapturedContext: false)).Item2;
+            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id) => unit).ConfigureAwait(continueOnCapturedContext: false)).Item2;
         }
 
         /// <summary>
-        /// Constructor
+        /// Creates an instance of a database of type <see cref="RelationalStorage"/>.
         /// </summary>
-        /// <param name="invariantName">Name of the invariant</param>
-        /// <param name="connectionString">Connection string</param>
-        protected RelationalStorage(string invariantName, string connectionString)
+        /// <param name="invariantName">The invariant name of the connector for this database.</param>
+        /// <param name="connectionString">The connection string this database should use for database operations.</param>
+        private RelationalStorage(string invariantName, string connectionString)
         {
-            factory = DbProviderFactories.GetFactory(invariantName);
             this.connectionString = connectionString;
             this.invariantName = invariantName;
         }
@@ -237,17 +204,14 @@ namespace Orleans.SqlUtils
         }
 
 
-        private static async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
+        private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
             string query,
             Action<DbCommand> parameterProvider,
             Func<DbCommand, Func<IDataRecord, int, TResult>, Task<Tuple<IEnumerable<TResult>, int>>> executor,
-            Func<IDataRecord, int, TResult> selector,
-            DbProviderFactory factory,
-            string connectionString)
+            Func<IDataRecord, int, TResult> selector)
         {
-            using(var connection = factory.CreateConnection())
+            using (var connection = DbConnectionFactory.CreateConnection(invariantName, connectionString))
             {
-                connection.ConnectionString = connectionString;
                 await connection.OpenAsync().ConfigureAwait(continueOnCapturedContext: false);
                 using(var command = connection.CreateCommand())
                 {

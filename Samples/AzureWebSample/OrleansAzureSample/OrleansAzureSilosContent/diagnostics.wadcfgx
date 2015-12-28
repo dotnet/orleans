@@ -29,10 +29,12 @@
         <Logs scheduledTransferPeriod="PT1M" scheduledTransferLogLevelFilter="Error" />
       </DiagnosticMonitorConfiguration>
     </WadCfg>
-    <StorageAccount>MyStorageAccount</StorageAccount>
+    <!--<StorageAccount>MyStorageAccount</StorageAccount>-->
+    <StorageAccount></StorageAccount>
   </PublicConfig>
   <PrivateConfig xmlns="http://schemas.microsoft.com/ServiceHosting/2010/10/DiagnosticsConfiguration">
-    <StorageAccount name="MyStorageAccount" endpoint="https://core.windows.net/" />
+    <!--<StorageAccount name="MyStorageAccount" endpoint="https://core.windows.net/" />-->
+    <StorageAccount name="" key="" endpoint="" />
   </PrivateConfig>
   <IsEnabled>true</IsEnabled>
 </DiagnosticsConfiguration>

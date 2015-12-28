@@ -10,7 +10,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>VSProjectTemplateGrainImplementationFSharp</RootNamespace>
     <AssemblyName>VSProjectTemplateGrainImplementationFSharp</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <Name>VSProjectTemplateGrainImplementationFSharp</Name>
     <FileAlignment>512</FileAlignment>
     <GeneratePkgDefFile>false</GeneratePkgDefFile>

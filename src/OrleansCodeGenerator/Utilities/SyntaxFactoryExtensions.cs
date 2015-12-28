@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 namespace Orleans.CodeGenerator.Utilities
 {
     using System;
@@ -29,6 +6,7 @@ namespace Orleans.CodeGenerator.Utilities
     using System.Linq.Expressions;
     using System.Reflection;
 
+    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -107,6 +85,79 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             return plainName.ToIdentifierName();
+        }
+
+        /// <summary>
+        /// Returns <see cref="ParenthesizedExpressionSyntax"/>  representing parenthesized binary expression of  <paramref name="bindingFlags"/>.
+        /// </summary>
+        /// <param name="operationKind">
+        /// The kind of the binary expression.
+        /// </param> 
+        /// <param name="bindingFlags">
+        /// The binding flags.
+        /// </param>
+        /// <returns>
+        /// <see cref="ParenthesizedExpressionSyntax"/> representing parenthesized binary expression of <paramref name="bindingFlags"/>.
+        /// </returns>
+        public static ParenthesizedExpressionSyntax GetBindingFlagsParenthesizedExpressionSyntax(SyntaxKind operationKind, params BindingFlags[] bindingFlags)
+        {
+            if (bindingFlags.Length < 2)
+            {
+                throw new ArgumentOutOfRangeException(
+                    "bindingFlags", 
+                    string.Format("Can't create parenthesized binary expression with {0} arguments", bindingFlags.Length));
+            }
+
+            var flags = SyntaxFactory.IdentifierName("System").Member("Reflection").Member("BindingFlags");
+            var bindingFlagsBinaryExpression = SyntaxFactory.BinaryExpression(
+                operationKind,
+                flags.Member(bindingFlags[0].ToString()),
+                flags.Member(bindingFlags[1].ToString()));
+            for (var i = 2; i < bindingFlags.Length; i++)
+            {
+                bindingFlagsBinaryExpression = SyntaxFactory.BinaryExpression(
+                    operationKind,
+                    bindingFlagsBinaryExpression,
+                    flags.Member(bindingFlags[i].ToString()));
+            }
+
+            return SyntaxFactory.ParenthesizedExpression(bindingFlagsBinaryExpression);
+        }
+
+        /// <summary>
+        /// Returns <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
+        /// </summary>
+        /// <param name="separatedSyntaxList">
+        /// Args used in initialization.
+        /// </param>
+        /// <param name="arrayType">
+        /// The array type.
+        /// </param>
+        /// <returns>
+        /// <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
+        /// </returns>
+        public static ArrayCreationExpressionSyntax GetArrayCreationWithInitializerSyntax(this SeparatedSyntaxList<ExpressionSyntax> separatedSyntaxList, TypeSyntax arrayType)
+        {
+            var arrayRankSizes =
+                new SeparatedSyntaxList<ExpressionSyntax>().Add(SyntaxFactory.OmittedArraySizeExpression(
+                    SyntaxFactory.Token(SyntaxKind.OmittedArraySizeExpressionToken)));
+
+            var arrayRankSpecifier = SyntaxFactory.ArrayRankSpecifier(
+                SyntaxFactory.Token(SyntaxKind.OpenBracketToken),
+                arrayRankSizes,
+                SyntaxFactory.Token(SyntaxKind.CloseBracketToken));
+
+            var arrayRankSpecifierSyntaxList = new SyntaxList<ArrayRankSpecifierSyntax>().Add(arrayRankSpecifier);
+
+            var arrayCreationExpressionSyntax = SyntaxFactory.ArrayCreationExpression(
+                SyntaxFactory.Token(SyntaxKind.NewKeyword),
+                SyntaxFactory.ArrayType(arrayType, arrayRankSpecifierSyntaxList),
+                SyntaxFactory.InitializerExpression(SyntaxKind.ArrayInitializerExpression,
+                    SyntaxFactory.Token(SyntaxKind.OpenBraceToken),
+                    separatedSyntaxList,
+                    SyntaxFactory.Token(SyntaxKind.CloseBraceToken)));
+
+            return arrayCreationExpressionSyntax;
         }
 
         /// <summary>
@@ -235,15 +286,15 @@ namespace Orleans.CodeGenerator.Utilities
         /// <summary>
         /// Returns type constraint syntax for the provided generic type argument.
         /// </summary>
-        /// <param name="genericTypeArgument">
+        /// <param name="type">
         /// The type.
         /// </param>
         /// <returns>
         /// Type constraint syntax for the provided generic type argument.
         /// </returns>
-        public static TypeParameterConstraintClauseSyntax[] GetTypeConstraintSyntax(this Type genericTypeArgument)
+        public static TypeParameterConstraintClauseSyntax[] GetTypeConstraintSyntax(this Type type)
         {
-            var typeInfo = genericTypeArgument.GetTypeInfo();
+            var typeInfo = type.GetTypeInfo();
             if (typeInfo.IsGenericTypeDefinition)
             {
                 var constraints = new List<TypeParameterConstraintClauseSyntax>();
@@ -251,6 +302,8 @@ namespace Orleans.CodeGenerator.Utilities
                 {
                     var parameterConstraints = new List<TypeParameterConstraintSyntax>();
                     var attributes = genericParameter.GenericParameterAttributes;
+
+                    // The "class" or "struct" constraints must come first.
                     if (attributes.HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
                     {
                         parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
@@ -260,12 +313,21 @@ namespace Orleans.CodeGenerator.Utilities
                         parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
                     }
 
+                    // Follow with the base class or interface constraints.
                     foreach (var genericType in genericParameter.GetGenericParameterConstraints())
                     {
+                        // If the "struct" constraint was specified, skip the corresponding "ValueType" constraint.
+                        if (genericType == typeof(ValueType))
+                        {
+                            continue;
+                        }
+
                         parameterConstraints.Add(SyntaxFactory.TypeConstraint(genericType.GetTypeSyntax()));
                     }
 
-                    if (attributes.HasFlag(GenericParameterAttributes.DefaultConstructorConstraint))
+                    // The "new()" constraint must be the last constraint in the sequence.
+                    if (attributes.HasFlag(GenericParameterAttributes.DefaultConstructorConstraint)
+                        && !attributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
                     {
                         parameterConstraints.Add(SyntaxFactory.ConstructorConstraint());
                     }

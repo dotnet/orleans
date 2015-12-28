@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -35,6 +12,8 @@ using Orleans.Streams;
 
 namespace Orleans
 {
+    using System.Runtime.ExceptionServices;
+
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
@@ -60,17 +39,29 @@ namespace Orleans
 
         // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
         // That means we are running in side a silo.
-        private static bool IsRunningInsideGrain { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
+        private static bool IsRunningInsideSilo { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
 
-        //TODO: prevent client code from using this from inside a Grain
+        //TODO: prevent client code from using this from inside a Grain or provider
         public static IGrainFactory GrainFactory
         {
             get
             {
-                if (IsRunningInsideGrain)
+                if (IsRunningInsideSilo)
                 {
-                    throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
-                                               "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+                    // just in case, make sure we don't get NullRefExc when checking RuntimeContext.
+                    bool runningInsideGrain = RuntimeContext.Current != null && RuntimeContext.CurrentActivationContext != null
+                        && RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.Activation;
+                    if (runningInsideGrain)
+                    {
+                        throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
+                                 "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+
+                    }
+                    else // running inside provider or else where
+                    {
+                        throw new OrleansException("You are running inside the provider code, on the silo. GrainClient.GrainFactory should only be used on the client side. " +
+                                "Inside the provider code use GrainFactory that is passed via IProviderRuntime (use providerRuntime.GrainFactory).");
+                    }
                 }
 
                 if (!IsInitialized)
@@ -213,9 +204,24 @@ namespace Orleans
                     tcs.SetException(exc); // Break promise
                 }
             };
+
             // Queue Init call to thread pool thread
             ThreadPool.QueueUserWorkItem(doInit, null);
-            CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            try
+            {
+                CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            }
+            catch (AggregateException ae)
+            {
+                // Flatten the aggregate exception, which can be deeply nested.
+                ae = ae.Flatten();
+
+                // If there is just one exception in the aggregate exception, throw that, otherwise throw the entire
+                // flattened aggregate exception.
+                var innerExceptions = ae.InnerExceptions;
+                var exceptionToThrow = innerExceptions.Count == 1 ? innerExceptions[0] : ae;
+                ExceptionDispatchInfo.Capture(exceptionToThrow).Throw();
+            }
         }
 
         /// <summary>

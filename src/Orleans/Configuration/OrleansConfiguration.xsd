@@ -79,6 +79,41 @@
       </xs:annotation>
     </xs:attribute>
   </xs:complexType>
+  <xs:complexType name="Telemetry">
+    <xs:annotation>
+      <xs:documentation>
+        Defines the types that implement the telemetry interfaces.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="TelemetryConsumer" minOccurs="1" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>
+            Defines the type and assembly that implements one of the telemetry consumer interfaces:
+              IDependencyTelemetryConsumer, IEventTelemetryConsumer, IExceptionTelemetryConsumer, 
+              IMetricTelemetryConsumer, IRequestTelemetryConsumer, or ITraceTelemetryConsumer.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:attribute name="Type">
+            <xs:annotation>
+              <xs:documentation>
+                The type that implements one or more of the telemetry consumer interfaces.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="Assembly">
+            <xs:annotation>
+              <xs:documentation>
+                The assembly name containing the type that implements one or more of the
+                telemetry consumer interfaces.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
   <xs:complexType name="SpecificTypeControlInfo">
     <xs:all>
       <xs:element name="Deactivation" minOccurs="1" maxOccurs="1" type="tns:DeactivationLimits">
@@ -980,6 +1015,7 @@
       </xs:element>
       <xs:element name="Statistics" minOccurs="0" type="tns:StatisticsConfiguration" />
       <xs:element name="Limits" minOccurs="0" type="tns:LimitsConfiguration" />
+      <xs:element name="Telemetry" minOccurs="0" maxOccurs="1" type="tns:Telemetry" />
     </xs:sequence>
   </xs:complexType>
   <xs:element name="OrleansConfiguration">
@@ -1082,6 +1118,7 @@
             </xs:attribute>
           </xs:complexType>
         </xs:element>
+        <xs:element name="Telemetry" minOccurs="0" maxOccurs="1" type="tns:Telemetry" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>

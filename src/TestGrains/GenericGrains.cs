@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -69,6 +46,38 @@ namespace UnitTests.Grains
         {
             string retValue = string.Format("{0}x{1}", a, b);
             return Task.FromResult(retValue);
+        }
+    }
+
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class SimpleGenericGrainUsingAzureTableStorage<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureTableStorage<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
+        }
+    }
+
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class TinyNameGrain<T> : Grain<SimpleGenericGrainState<T>>, ITinyNameGrain<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
         }
     }
 
@@ -321,7 +330,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericSelfManagedGrain<T, U> : Grain, IGenericSelfManagedGrain<T, U>
+    public class BasicGenericGrain<T, U> : Grain, IBasicGenericGrain<T, U>
     {
         private T _a;
         private U _b;
@@ -575,6 +584,33 @@ namespace UnitTests.Grains
         public Task<string> GetRuntimeInstanceId()
         {
             return Task.FromResult(RuntimeIdentity);
+        }
+    }
+
+    public class GenericGrainWithContraints<A, B, C>: Grain, IGenericGrainWithConstraints<A, B, C>
+        where A : ICollection<B>, new()
+        where B : struct
+        where C : class
+    {
+        private A collection;
+
+        public override Task OnActivateAsync()
+        {
+            collection = new A();
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetCount() { return Task.FromResult(collection.Count); }
+
+        public Task Add(B item)
+        {
+            collection.Add(item);
+            return TaskDone.Done;
+        }
+
+        public Task<C> RoundTrip(C value)
+        {
+            return Task.FromResult(value);
         }
     }
 }

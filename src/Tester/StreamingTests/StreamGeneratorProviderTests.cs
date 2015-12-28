@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -65,32 +42,28 @@ namespace UnitTests.StreamingTests
             : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
+                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                AdjustConfig = config => {
+                    var settings = new Dictionary<string, string>();
+                    // get initial settings from configs
+                    AdapterConfig.WriteProperties(settings);
+                    GeneratorConfig.WriteProperties(settings);
+
+                    // add queue balancer setting
+                    settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+
+                    // add pub/sub settting
+                    settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+
+                    // register stream provider
+                    config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+
+                    // make sure all node configs exist, for dynamic cluster queue balancer
+                    config.GetConfigurationForNode("Primary");
+                    config.GetConfigurationForNode("Secondary_1");
+                }
             })
         {
-        }
-
-        public override void AdjustForTest(ClusterConfiguration config)
-        {
-            var settings = new Dictionary<string, string>();
-            // get initial settings from configs
-            AdapterConfig.WriteProperties(settings);
-            GeneratorConfig.WriteProperties(settings);
-
-            // add queue balancer setting
-            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
-
-            // add pub/sub settting
-            settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-            // register stream provider
-            config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-            // make sure all node configs exist, for dynamic cluster queue balancer
-            config.GetConfigurationForNode("Primary");
-            config.GetConfigurationForNode("Secondary_1");
-
-            base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run
@@ -100,7 +73,7 @@ namespace UnitTests.StreamingTests
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()
         {
             logger.Info("************************ ValidateGeneratedStreamsTest *********************************");

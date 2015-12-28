@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,7 +30,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal SiloAddress MyAddress { get; private set; }
 
-        internal IGrainDirectoryCache<List<Tuple<SiloAddress, ActivationId>>> DirectoryCache { get; private set; }
+        internal IGrainDirectoryCache<IReadOnlyList<Tuple<SiloAddress, ActivationId>>> DirectoryCache { get; private set; }
         internal GrainDirectoryPartition DirectoryPartition { get; private set; }
 
         public RemoteGrainDirectory RemGrainDirectory { get; private set; }
@@ -111,10 +88,10 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 lock (membershipCache)
                 {
-                    DirectoryCache = GrainDirectoryCacheFactory<List<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(silo.GlobalConfig);
+                    DirectoryCache = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(silo.GlobalConfig);
                 }
             });
-            maintainer = GrainDirectoryCacheFactory<List<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCacheMaintainer(this, DirectoryCache);
+            maintainer = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCacheMaintainer(this, DirectoryCache);
 
             if (silo.GlobalConfig.SeedNodes.Count > 0)
             {
@@ -330,25 +307,16 @@ namespace Orleans.Runtime.GrainDirectory
         protected void AdjustLocalCache(SiloAddress removedSilo)
         {
             // remove all records of activations located on the removed silo
-            foreach (Tuple<GrainId, List<Tuple<SiloAddress, ActivationId>>, int> tuple in DirectoryCache.KeyValues)
+            foreach (Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int> tuple in DirectoryCache.KeyValues)
             {
-                // 2) remove entries owned by me (they should be retrieved from my directory partition)
+                // 2) remove entries now owned by me (they should be retrieved from my directory partition)
                 if (MyAddress.Equals(CalculateTargetSilo(tuple.Item1)))
                 {
                     DirectoryCache.Remove(tuple.Item1);
                 }
 
                 // 1) remove entries that point to activations located on the removed silo
-                if (tuple.Item2.RemoveAll(tuple2 => tuple2.Item1.Equals(removedSilo)) <= 0) continue;
-
-                if (tuple.Item2.Count > 0)
-                {
-                    DirectoryCache.AddOrUpdate(tuple.Item1, tuple.Item2, tuple.Item3);
-                }
-                else
-                {
-                    DirectoryCache.Remove(tuple.Item1);
-                }
+                RemoveActivations(DirectoryCache, tuple.Item1, tuple.Item2, tuple.Item3, t => t.Item1.Equals(removedSilo));
             }
         }
 
@@ -545,7 +513,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 if (!address.Equals(returnedAddress.Item1) || !IsValidSilo(address.Silo)) return returnedAddress.Item1;
 
-                var cached = new List<Tuple<SiloAddress, ActivationId>>( new [] { Tuple.Create(address.Silo, address.Activation) });
+                var cached = new List<Tuple<SiloAddress, ActivationId>>(1) { Tuple.Create(address.Silo, address.Activation) };
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
                 DirectoryCache.AddOrUpdate(address.Grain, cached, returnedAddress.Item2);
                 return returnedAddress.Item1;
@@ -577,12 +545,21 @@ namespace Orleans.Runtime.GrainDirectory
                     // Caching optimization:
                     // cache the result of a successfull RegisterActivation call, only if it is not a duplicate activation.
                     // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
-                    List<Tuple<SiloAddress, ActivationId>> cached;
+                    IReadOnlyList<Tuple<SiloAddress, ActivationId>> cached;
                     if (!DirectoryCache.LookUp(address.Grain, out cached))
                     {
-                        cached = new List<Tuple<SiloAddress, ActivationId>>(1);
+                        cached = new List<Tuple<SiloAddress, ActivationId>>(1)
+                        {
+                            Tuple.Create(address.Silo, address.Activation)
+                        };
                     }
-                    cached.Add(Tuple.Create(address.Silo, address.Activation));
+                    else
+                    {
+                        var newcached = new List<Tuple<SiloAddress, ActivationId>>(cached.Count + 1);
+                        newcached.AddRange(cached);
+                        newcached.Add(Tuple.Create(address.Silo, address.Activation));
+                        cached = newcached;
+                    }
                     // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
                     DirectoryCache.AddOrUpdate(address.Grain, cached, eTag);
                 }
@@ -710,7 +687,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public List<ActivationAddress> GetLocalCacheData(GrainId grain)
         {
-            List<Tuple<SiloAddress, ActivationId>> cached;
+            IReadOnlyList<Tuple<SiloAddress, ActivationId>> cached;
             return DirectoryCache.LookUp(grain, out cached) ? 
                 cached.Select(elem => ActivationAddress.GetAddress(elem.Item1, grain, elem.Item2)).Where(addr => IsValidSilo(addr.Silo)).ToList() : 
                 null;
@@ -791,16 +768,16 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCacheEntry(ActivationAddress activationAddress)
         {
+            int version;
+            IReadOnlyList<Tuple<SiloAddress, ActivationId>> list;
             var grainId = activationAddress.Grain;
             var activationId = activationAddress.Activation;
-            List<Tuple<SiloAddress, ActivationId>> list;
-            if (!DirectoryCache.LookUp(grainId, out list)) return;
 
-            list.RemoveAll(tuple => tuple.Item2.Equals(activationId));
-
-            // if list empty, need to remove from cache
-            if (list.Count == 0)
-                DirectoryCache.Remove(grainId);
+            // look up grain activations
+            if (DirectoryCache.LookUp(grainId, out list, out version))
+            {
+                RemoveActivations(DirectoryCache, grainId, list, version, t => t.Item2.Equals(activationId));
+            }
         }
 
         /// <summary>
@@ -954,6 +931,26 @@ namespace Orleans.Runtime.GrainDirectory
         internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
         {
             return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+        }
+
+        private static void RemoveActivations(IGrainDirectoryCache<IReadOnlyList<Tuple<SiloAddress, ActivationId>>> directoryCache, GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> activations, int version, Func<Tuple<SiloAddress, ActivationId>, bool> doRemove)
+        {
+            int removeCount = activations.Count(doRemove);
+            if (removeCount == 0)
+            {
+                return; // nothing to remove, done here
+            }
+
+            if (activations.Count > removeCount) // still some left, update activation list.  Note: Most of the time there should be only one activation
+            {
+                var newList = new List<Tuple<SiloAddress, ActivationId>>(activations.Count - removeCount);
+                newList.AddRange(activations.Where(t => !doRemove(t)));
+                directoryCache.AddOrUpdate(key, newList, version);
+            }
+            else // no activations left, remove from cache
+            {
+                directoryCache.Remove(key);
+            }
         }
     }
 }

@@ -22,11 +22,6 @@ namespace Tester
             return GrainFactory.GetGrain<T>(GetRandomGrainId());
         }
 
-        private static int GetRandomGrainId()
-        {
-            return random.Next();
-        }
-
         [ClassCleanup]
         public static void MyClassCleanup()
         {

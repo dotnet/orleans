@@ -45,7 +45,6 @@
     <file src="..\..\Binaries\Release\OrleansManager.exe.config" target="Binaries" />
     <file src="..\..\Binaries\Release\*.cmd" target="Binaries" />
     
-    <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Configuration.dll" target="Binaries"/>
     <file src="..\..\Binaries\Release\Microsoft.WindowsAzure.Storage.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.Edm.dll" target="Binaries" />
     <file src="..\..\Binaries\Release\Microsoft.Data.OData.dll" target="Binaries" />

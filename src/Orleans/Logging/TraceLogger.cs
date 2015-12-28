@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -32,7 +9,6 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
@@ -82,7 +58,6 @@ namespace Orleans.Runtime
 
         private static Severity runtimeTraceLevel = Severity.Info;
         private static Severity appTraceLevel = Severity.Info;
-        private static FileInfo logOutputFile;
         private static readonly ConcurrentDictionary<Type, Func<Exception, string>> exceptionDecoders = new ConcurrentDictionary<Type, Func<Exception, string>>();
 
         internal static IPEndPoint MyIPEndPoint { get; set; }
@@ -105,8 +80,6 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// The set of <see cref="ILogConsumer"/> references to write log events to. 
-        /// If any .NET trace listeners are defined in app.config, then <see cref="LogWriterToTrace"/> 
-        /// is automatically added to this list to forward the Orleans log output to those trace listeners.
         /// </summary>
         public static ConcurrentBag<ILogConsumer> LogConsumers { get; private set; }
 
@@ -180,9 +153,13 @@ namespace Orleans.Runtime
             defaultModificationCounter = 0;
             lockable = new object();
             LogConsumers = new ConcurrentBag<ILogConsumer>();
+            TelemetryConsumers = new ConcurrentBag<ITelemetryConsumer>();
             BulkMessageInterval = defaultBulkMessageInterval;
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
         }
+
+        // constructor used by serializator
+        private TraceLogger() {}
 
         /// <summary>
         /// Constructs a TraceLogger with the given name and type.
@@ -203,7 +180,7 @@ namespace Orleans.Runtime
         /// </summary>
         public static bool IsInitialized { get; private set; }
 
-        #pragma warning disable 1574
+#pragma warning disable 1574
         /// <summary>
         /// Initialize the Orleans TraceLogger subsystem in this process / app domain with the specified configuration settings.
         /// </summary>
@@ -214,7 +191,7 @@ namespace Orleans.Runtime
         /// <seealso cref="GrainClient.Initialize()"/>
         /// <seealso cref="Orleans.Host.Azure.Client.AzureClient.Initialize()"/>
         /// <param name="config">Configuration settings to be used for initializing the TraceLogger susbystem state.</param>
-        #pragma warning restore 1574
+#pragma warning restore 1574
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static void Initialize(ITraceConfiguration config, bool configChange = false)
         {
@@ -254,39 +231,33 @@ namespace Orleans.Runtime
                 */
                 if (config.TraceToConsole)
                 {
-                    bool containsConsoleListener = false;
-                    foreach (TraceListener l in Trace.Listeners)
+                    if (!TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
                     {
-                        if (l.GetType() != typeof (ConsoleTraceListener)) continue;
-
-                        containsConsoleListener = true;
-                        break;
-                    }
-                    if (!containsConsoleListener)
-                    {
-                        LogConsumers.Add(new LogWriterToConsole());
+                        TelemetryConsumers.Add(new ConsoleTelemetryConsumer());
                     }
                 }
                 if (!string.IsNullOrEmpty(config.TraceFileName))
                 {
                     try
                     {
-                        logOutputFile = new FileInfo(config.TraceFileName);
-                        var l = new LogWriterToFile(logOutputFile);
-                        LogConsumers.Add(l);
+                        if (!TelemetryConsumers.OfType<FileTelemetryConsumer>().Any())
+                        {
+                            TelemetryConsumers.Add(new FileTelemetryConsumer(config.TraceFileName));
+                        }
                     }
                     catch (Exception exc)
                     {
                         Trace.Listeners.Add(new DefaultTraceListener());
-                        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", logOutputFile, exc);
+                        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", config.TraceFileName, exc);
                     }
                 }
 
                 if (Trace.Listeners.Count > 0)
                 {
-                    // Plumb in log consumer to write to Trace listeners
-                    var traceLogConsumer = new LogWriterToTrace();
-                    LogConsumers.Add(traceLogConsumer);
+                    if (!TelemetryConsumers.OfType<TraceTelemetryConsumer>().Any())
+                    {
+                        TelemetryConsumers.Add(new TraceTelemetryConsumer());
+                    }
                 }
 
                 IsInitialized = true;
@@ -302,7 +273,11 @@ namespace Orleans.Runtime
             {
                 Close();
                 LogConsumers = new ConcurrentBag<ILogConsumer>();
-                if (loggerStoreInternCache != null) loggerStoreInternCache.StopAndClear();
+                TelemetryConsumers = new ConcurrentBag<ITelemetryConsumer>();
+
+                if (loggerStoreInternCache != null) 
+                    loggerStoreInternCache.StopAndClear();
+                
                 BulkMessageInterval = defaultBulkMessageInterval;
                 BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
                 IsInitialized = false;
@@ -376,53 +351,14 @@ namespace Orleans.Runtime
         /// <returns>TraceLogger associated with the specified name</returns>
         internal static TraceLogger GetLogger(string loggerName, LoggerType logType)
         {
-            return loggerStoreInternCache != null ? 
-                loggerStoreInternCache.FindOrCreate(loggerName, () => new TraceLogger(loggerName, logType)) : 
+            return loggerStoreInternCache != null ?
+                loggerStoreInternCache.FindOrCreate(loggerName, () => new TraceLogger(loggerName, logType)) :
                 new TraceLogger(loggerName, logType);
         }
 
         internal static TraceLogger GetLogger(string loggerName)
         {
             return GetLogger(loggerName, LoggerType.Runtime);
-        }
-
-        /// <summary>
-        /// Find the log file associated with the specified TraceLogger
-        /// </summary>
-        /// <param name="loggerName">Name of the TraceLogger to find the log file for</param>
-        /// <returns>File info for the associated log file</returns>
-        internal static FileInfo GetLogFile(string loggerName)
-        {
-            return logOutputFile;
-        }
-
-        /// <summary>
-        /// Search the specified log according to the 
-        /// </summary>
-        /// <param name="logName"></param>
-        /// <param name="searchFrom"></param>
-        /// <param name="searchTo"></param>
-        /// <param name="searchPattern"></param>
-        /// <returns></returns>
-        internal static string[] SearchLogFile(string logName, DateTime searchFrom, DateTime searchTo, Regex searchPattern)
-        {
-            FileInfo file = GetLogFile(logName);
-            string logText;
-            using (var f = new StreamReader(File.OpenRead(file.FullName)))
-            {
-                logText = f.ReadToEnd();
-            }
-
-            // Perform regex search
-            MatchCollection matches = searchPattern.Matches(logText);
-            var matchOutput = new string[matches.Count];
-            int i = 0;
-            foreach (Match m in matches)
-            {
-                matchOutput[i++] = m.Value;
-            }
-
-            return matchOutput;
         }
 
         /// <summary>
@@ -851,6 +787,23 @@ namespace Orleans.Runtime
                         consumer.GetType().FullName, logName, sev, message, errorCode, exception, exc);
                 }
             }
+
+            var formatedTraceMessage = TraceParserUtils.FormatLogMessage(sev, loggerType, logName, message, MyIPEndPoint, exception, errorCode);
+
+            if (exception != null)
+                TrackException(exception);
+
+            TrackTrace(formatedTraceMessage, sev);
+
+            if (logMessageTruncated)
+            {
+                formatedTraceMessage = TraceParserUtils.FormatLogMessage(Severity.Warning, loggerType, logName,
+                    "Previous log message was truncated - Max size = " + MAX_LOG_MESSAGE_SIZE,
+                    MyIPEndPoint, exception,
+                    (int)ErrorCode.Logger_LogMessageTruncated);
+
+                TrackTrace(formatedTraceMessage);
+            }
         }
 
         /// <summary>
@@ -945,14 +898,14 @@ namespace Orleans.Runtime
             string stack = String.Empty;
             if (includeStackTrace && exception.StackTrace != null)
                 stack = String.Format(Environment.NewLine + exception.StackTrace);
-            
+
             string message = exception.Message;
             var excType = exception.GetType();
 
             Func<Exception, string> decoder;
             if (exceptionDecoders.TryGetValue(excType, out decoder))
                 message = decoder(exception);
-            
+
             return String.Format(Environment.NewLine + "Exc level {0}: {1}: {2}{3}",
                 level,
                 exception.GetType(),
@@ -1080,6 +1033,122 @@ namespace Orleans.Runtime
 
             return new FileInfo(dumpFileName);
         }
+
+        #region APM Methods
+
+        public override void TrackDependency(string name, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IDependencyTelemetryConsumer>())
+            {
+                tc.TrackDependency(name, commandName, startTime, duration, success);
+            }
+        }
+
+        public override void TrackEvent(string name, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IEventTelemetryConsumer>())
+            {
+                tc.TrackEvent(name, properties, metrics);
+            }
+        }
+
+        public override void TrackMetric(string name, double value, IDictionary<string, string> properties = null)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IMetricTelemetryConsumer>())
+            {
+                tc.TrackMetric(name, value, properties);
+            }
+        }
+
+        public override void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IMetricTelemetryConsumer>())
+            {
+                tc.TrackMetric(name, value, properties);
+            }
+        }
+
+        public override void IncrementMetric(string name)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IMetricTelemetryConsumer>())
+            {
+                tc.IncrementMetric(name);
+            }
+        }
+
+        public override void IncrementMetric(string name, double value)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IMetricTelemetryConsumer>())
+            {
+                tc.IncrementMetric(name, value);
+            }
+        }
+
+        public override void DecrementMetric(string name)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IMetricTelemetryConsumer>())
+            {
+                tc.DecrementMetric(name);
+            }
+        }
+
+        public override void DecrementMetric(string name, double value)
+        {
+            foreach (var  tc in TelemetryConsumers.OfType<IMetricTelemetryConsumer>())
+            {
+                tc.IncrementMetric(name, value);
+            }
+        }
+
+        public override void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IRequestTelemetryConsumer>())
+            {
+                tc.TrackRequest(name, startTime, duration, responseCode, success);
+            }
+        }
+
+        public override void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<IExceptionTelemetryConsumer>())
+            {
+                tc.TrackException(exception, properties, metrics);
+            }
+        }
+
+        public override void TrackTrace(string message)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<ITraceTelemetryConsumer>())
+            {
+                tc.TrackTrace(message);
+            }
+        }
+
+        public override void TrackTrace(string message, Severity severity)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<ITraceTelemetryConsumer>())
+            {
+                tc.TrackTrace(message, severity);
+            }
+        }
+
+        public override void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<ITraceTelemetryConsumer>())
+            {
+                tc.TrackTrace(message, severity, properties);
+            }
+        }
+
+        public override void TrackTrace(string message, IDictionary<string, string> properties)
+        {
+            foreach (var tc in TelemetryConsumers.OfType<ITraceTelemetryConsumer>())
+            {
+                tc.TrackTrace(message, properties);
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// This custom comparer lets us sort the TraceLevelOverrides list so that the longest prefix comes first
