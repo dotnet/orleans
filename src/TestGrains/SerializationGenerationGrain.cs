@@ -1,3 +1,4 @@
+﻿using System;
 using System.Threading.Tasks;
 
 namespace TestGrains
@@ -47,7 +48,8 @@ namespace TestGrains
             return Task.FromResult(this.State.Classes.FirstOrDefault());
         }
 
-        public class MyState : GrainState
+        [Serializable]
+        public class MyState
         {
             public IList<SomeAbstractClass> Classes { get; set; }
         }

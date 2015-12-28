@@ -352,7 +352,7 @@ namespace UnitTests.StorageTests
             storage.ConvertToStorageFormat(initialState, entity);
             Assert.IsNotNull(entity.Data, "Entity.Data");
             var convertedState = new GrainStateContainingGrainReferences();
-            storage.ConvertFromStorageFormat(convertedState, entity);
+            convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.IsNotNull(convertedState, "Converted state");
             Assert.AreEqual(initialState.Grain, convertedState.Grain, "Grain");
         }
@@ -378,8 +378,7 @@ namespace UnitTests.StorageTests
             storage.InitLogger(logger);
             storage.ConvertToStorageFormat(initialState, entity);
             Assert.IsNotNull(entity.Data, "Entity.Data");
-            var convertedState = new GrainStateContainingGrainReferences();
-            storage.ConvertFromStorageFormat(convertedState, entity);
+            var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.IsNotNull(convertedState, "Converted state");
             Assert.AreEqual(initialState.GrainList.Count, convertedState.GrainList.Count, "GrainList size");
             Assert.AreEqual(initialState.GrainDict.Count, convertedState.GrainDict.Count, "GrainDict size");

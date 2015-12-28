@@ -14,7 +14,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class SimplePersistentGrain_State : GrainState
+    [Serializable]
+    public class SimplePersistentGrain_State
     {
         public int A { get; set; }
         public int B { get; set; }

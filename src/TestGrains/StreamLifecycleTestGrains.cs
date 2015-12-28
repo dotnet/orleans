@@ -11,7 +11,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class StreamLifecycleTestGrainState : GrainState
+    [Serializable]
+    public class StreamLifecycleTestGrainState
     {
         // For producer and consumer 
         // -- only need to store this because of how we run our unit tests against multiple providers
@@ -26,11 +27,9 @@ namespace UnitTests.Grains
         // For consumer only.
         public HashSet<StreamSubscriptionHandle<int>> ConsumerSubscriptionHandles { get; set; }
 
-        public override void SetAll(IDictionary<string, object> values)
+        public StreamLifecycleTestGrainState()
         {
-            base.SetAll(values);
-            if(ConsumerSubscriptionHandles == null)
-                ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
+            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
         }
     }
 

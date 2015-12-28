@@ -70,6 +70,7 @@ namespace UnitTests.StorageTests
         [TestInitialize]
         public void TestInitialize()
         {
+            SerializationManager.InitializeForTesting();
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
         }
 
@@ -160,7 +161,7 @@ namespace UnitTests.StorageTests
 
             // Store initial value in storage
             int initialValue = 567;
-            SetStoredValue(providerName, grainType, grain, "Field1", initialValue);
+            SetStoredValue<PersistenceTestGrainState>(providerName, grainType, grain, "Field1", initialValue);
 
             int readValue = await grain.GetValue();
             Assert.AreEqual(initialValue, readValue, "Read previously stored value");
@@ -178,7 +179,7 @@ namespace UnitTests.StorageTests
 
             // Store initial value in storage
             int initialValue = 567;
-            SetStoredValue(providerName, grainType, grain, "Field1", initialValue);
+            SetStoredValue<PersistenceTestGrainState>(providerName, grainType, grain, "Field1", initialValue);
 
             SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
 
@@ -241,14 +242,14 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(1, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(1, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             await grain.DoWrite(2);
 
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(2, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(2, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
@@ -267,15 +268,15 @@ namespace UnitTests.StorageTests
 
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(0, storageProvider.WriteCount, "StorageProvider #Writes");
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", 42); // Update state data behind grain
 
-            storageProvider.SetValue(grainType, (GrainReference) grain, "Field1", 42); // Update state data behind grain
 
             await grain.DoRead();
 
             Assert.AreEqual(2, storageProvider.ReadCount, "StorageProvider #Reads-2");
             Assert.AreEqual(0, storageProvider.WriteCount, "StorageProvider #Writes-2");
 
-            Assert.AreEqual(42, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(42, ((PersistenceTestGrainState)storageProvider.LastState).Field1, "Store-Field1");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -349,14 +350,14 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(1, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(1, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             await grain.DoWrite(2);
 
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(2, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(2, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
@@ -376,7 +377,7 @@ namespace UnitTests.StorageTests
             await grain.DoDelete();
 
             Assert.AreEqual(1, storageProvider.DeleteCount, "StorageProvider #Deletes");
-            Assert.AreEqual(0, storageProvider.LastState.Count, "Store-AfterDelete-Empty");
+            Assert.AreEqual(null, storageProvider.LastState, "Store-AfterDelete-Empty");
 
             int val = await grain.GetValue(); // Returns current in-memory null data without re-read.
             Assert.AreEqual(0, val, "Value after Delete");
@@ -387,7 +388,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(2, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(2, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
@@ -467,14 +468,14 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(1, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(1, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             await grain.DoWrite(2);
 
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(2, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(2, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             try
             {
@@ -499,7 +500,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(2, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(2, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             try
             {
@@ -524,7 +525,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(3, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            Assert.AreEqual(4, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(4, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
@@ -544,21 +545,21 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
             Assert.AreEqual(0, storageProvider.WriteCount, "StorageProvider #Writes");
 
-            storageProvider.SetValue(grainType, (GrainReference) grain, "Field1", 42); // Update state data behind grain
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", 42);
 
             await grain.DoRead();
 
             Assert.AreEqual(2, storageProvider.ReadCount, "StorageProvider #Reads-2");
             Assert.AreEqual(0, storageProvider.WriteCount, "StorageProvider #Writes-2");
 
-            Assert.AreEqual(42, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(42, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             await grain.DoWrite(43);
 
             Assert.AreEqual(2, storageProvider.ReadCount, "StorageProvider #Reads-2");
             Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes-2");
 
-            Assert.AreEqual(43, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(43, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             try
             {
@@ -583,7 +584,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, storageProvider.ReadCount, "StorageProvider #Reads-2");
             Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes-2");
 
-            Assert.AreEqual(43, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(43, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             try
             {
@@ -608,7 +609,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(3, storageProvider.ReadCount, "StorageProvider #Reads-2");
             Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes-2");
 
-            Assert.AreEqual(43, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(43, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
@@ -626,7 +627,7 @@ namespace UnitTests.StorageTests
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
 
-            storageProvider.SetValue(grainType, (GrainReference) grain, "Field1", expectedVal); // Update state data behind grain
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference) grain, "Field1", expectedVal);
 
             val = await grain.DoRead();
 
@@ -656,7 +657,7 @@ namespace UnitTests.StorageTests
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
 
-            storageProvider.SetValue(grainType, (GrainReference) grain, "Field1", expectedVal); // Update state data behind grain
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
 
             val = await grain.DoRead();
 
@@ -670,10 +671,11 @@ namespace UnitTests.StorageTests
 
             int newVal = 53;
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
-            storageProvider.SetValue(grainType, (GrainReference) grain, "Field1", newVal); // Update state data behind grain
+
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", newVal);
 
             val = await grain.GetValue();
-            Assert.AreEqual(expectedVal, val, "Returned value");
+            Assert.AreEqual(newVal, val, "Returned value");
 
             await grain.DoRead(); // Force re-read
             expectedVal = newVal;
@@ -694,18 +696,19 @@ namespace UnitTests.StorageTests
 
             int expectedVal = 62;
             await grain.DoWrite(expectedVal);
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             const int attemptedVal3 = 63;
             storageProvider.SetErrorInjection(ErrorInjectionPoint.BeforeWrite);
             CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3));
+
             // Stored value unchanged
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
             val = await grain.GetValue();
             // Stored value unchanged
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 #if REREAD_STATE_AFTER_WRITE_FAILED
             Assert.AreEqual(expectedVal, val, "Last value written successfully");
 #else
@@ -725,7 +728,7 @@ namespace UnitTests.StorageTests
 
             int expectedVal = 82;
             await grain.DoWrite(expectedVal);
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             const int attemptedVal4 = 83;
             storageProvider.SetErrorInjection(ErrorInjectionPoint.AfterWrite);
@@ -733,7 +736,7 @@ namespace UnitTests.StorageTests
 
             // Stored value has changed
             expectedVal = attemptedVal4;
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
             val = await grain.GetValue();
             Assert.AreEqual(expectedVal, val, "Returned value");
@@ -753,13 +756,14 @@ namespace UnitTests.StorageTests
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
 
             int expectedVal = 72;
-            storageProvider.SetValue(grainType, (GrainReference)grain, "Field1", expectedVal); // Update state data behind grain
+
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
             val = await grain.DoRead();
             Assert.AreEqual(expectedVal, val, "Returned value");
 
             expectedVal = 73;
             await grain.DoWrite(expectedVal);
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             storageProvider.SetErrorInjection(ErrorInjectionPoint.BeforeRead);
             CheckStorageProviderErrors(grain.DoRead);
@@ -783,16 +787,18 @@ namespace UnitTests.StorageTests
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
 
             int expectedVal = 92;
-            storageProvider.SetValue(grainType, (GrainReference)grain, "Field1", expectedVal); // Update state data behind grain
+
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
             val = await grain.DoRead();
             Assert.AreEqual(expectedVal, val, "Returned value");
 
             expectedVal = 93;
             await grain.DoWrite(expectedVal);
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 
             expectedVal = 94;
-            storageProvider.SetValue(grainType, (GrainReference)grain, "Field1", expectedVal); // Update state data behind grain
+
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.AfterRead);
             CheckStorageProviderErrors(grain.DoRead);
 
@@ -816,14 +822,15 @@ namespace UnitTests.StorageTests
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
 
-            storageProvider.SetValue(grainType, (GrainReference)grain, "Field1", expectedVal); // Update state data behind grain
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
 
             val = await grain.DoRead(false);
 
             Assert.AreEqual(expectedVal, val, "Returned value");
 
             int newVal = expectedVal + 1;
-            storageProvider.SetValue(grainType, (GrainReference)grain, "Field1", newVal); // Update state data behind grain
+
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", newVal);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.BeforeRead);
             val = await grain.DoRead(true);
             Assert.AreEqual(expectedVal, val, "Returned value");
@@ -831,7 +838,8 @@ namespace UnitTests.StorageTests
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
 
             expectedVal = newVal;
-            storageProvider.SetValue(grainType, (GrainReference)grain, "Field1", newVal); // Update state data behind grain
+
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", newVal);
             val = await grain.DoRead(false);
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
@@ -851,7 +859,7 @@ namespace UnitTests.StorageTests
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
 
-            storageProvider.SetValue(grainType, (GrainReference) grain, "Field1", expectedVal); // Update state data behind grain
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
 
             val = await grain.DoRead(false);
 
@@ -885,8 +893,7 @@ namespace UnitTests.StorageTests
 
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
-
-            storageProvider.SetValue(grainType, (GrainReference) grain, "Field1", expectedVal); // Update state data behind grain
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
 
             val = await grain.DoRead(false);
 
@@ -898,7 +905,7 @@ namespace UnitTests.StorageTests
 
             val = await grain.GetValue();
             // Stored value unchanged
-            Assert.AreEqual(expectedVal, storageProvider.LastState["Field1"], "Store-Field1");
+            Assert.AreEqual(expectedVal, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
 #if REREAD_STATE_AFTER_WRITE_FAILED
             Assert.AreEqual(expectedVal, val, "After failed write: Last value written successfully");
 #else
@@ -927,7 +934,8 @@ namespace UnitTests.StorageTests
                 IPersistenceTestGrain grain = GrainClient.GrainFactory.GetGrain<IPersistenceTestGrain>(Guid.NewGuid());
                 Guid guid = grain.GetPrimaryKey();
                 string id = guid.ToString("N");
-                SetStoredValue("test1", grainType, grain, "Field1", expectedVal); // Update state data behind grain
+
+                SetStoredValue<PersistenceTestGrainState>("test1", grainType, grain, "Field1", expectedVal); // Update state data behind grain
                 promises[i] = grain.DoRead();
             }
             await Task.WhenAll(promises);
@@ -1098,7 +1106,7 @@ namespace UnitTests.StorageTests
                 initialState.GrainDict.Add(g.GetPrimaryKey().ToString(), g);
             }
 
-            GrainStateContainingGrainReferences copy = (GrainStateContainingGrainReferences)initialState.DeepCopy();
+            var copy = (GrainStateContainingGrainReferences)SerializationManager.DeepCopy(initialState);
             Assert.AreNotSame(initialState.GrainDict, copy.GrainDict, "Dictionary");
             Assert.AreNotSame(initialState.GrainList, copy.GrainList, "List");
         }
@@ -1121,7 +1129,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < loops; i++)
             {
                 int idx = random.Next(num);
-                tasks.Add(Task.Run(() => { var copy = states[idx].DeepCopy(); }));
+                tasks.Add(Task.Run(() => { var copy = SerializationManager.DeepCopy(states[idx]); }));
                 tasks.Add(Task.Run(() => { var other = SerializationManager.RoundTripSerializationForTesting(states[idx]); }));
             }
             await Task.WhenAll(tasks);
@@ -1202,14 +1210,13 @@ namespace UnitTests.StorageTests
 
         #region Utility functions
         // ---------- Utility functions ----------
-
-        private void SetStoredValue(string providerName, string grainType, IGrain grain, string fieldName, int newValue)
+        private void SetStoredValue<TState>(string providerName, string grainType, IGrain grain, string fieldName, int newValue)
         {
             List<SiloHandle> silos = GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
                 MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHookup.GetStorageProvider(providerName);
-                provider.SetValue(grainType, (GrainReference) grain, fieldName, newValue);
+                provider.SetValue<TState>(grainType, (GrainReference)grain, "Field1", newValue);
             }
         }
 
@@ -1294,56 +1301,17 @@ namespace UnitTests.StorageTests
         #endregion
     }
 
-    public class GrainStateContainingGrainReferences : GrainState
+    [Serializable]
+    public class GrainStateContainingGrainReferences
     {
         public IAddressable Grain { get; set; }
         public List<IAddressable> GrainList { get; set; }
         public Dictionary<string, IAddressable> GrainDict { get; set; }
 
         public GrainStateContainingGrainReferences()
-            : base("System.Object")
         {
             GrainList = new List<IAddressable>();
             GrainDict = new Dictionary<string, IAddressable>();
-        }
-
-        public override IDictionary<string, object> AsDictionary()
-        {
-            Dictionary<string, object> values = new Dictionary<string, object>();
-            values["Grain"] = this.Grain;
-            values["GrainList"] = this.GrainList;
-            values["GrainDict"] = this.GrainDict;
-            return values;
-        }
-
-        public override void SetAll(IDictionary<string, object> values)
-        {
-            object value;
-            if (values.TryGetValue("Grain", out value)) Grain = (value as IAddressable);
-            if (values.TryGetValue("GrainList", out value)) GrainList = (value as List<IAddressable>);
-            if (values.TryGetValue("GrainDict", out value)) GrainDict = (value as Dictionary<string, IAddressable>);
-        }
-
-        [CopierMethod]
-        public static object _Copier(object original)
-        {
-            GrainState input = ((GrainState)(original));
-            return input.DeepCopy();
-        }
-
-        [SerializerMethod]
-        public static void _Serializer(object original, BinaryTokenStreamWriter stream, Type expected)
-        {
-            GrainState input = ((GrainState)(original));
-            input.SerializeTo(stream);
-        }
-
-        [DeserializerMethod]
-        public static object _Deserializer(Type expected, BinaryTokenStreamReader stream)
-        {
-            GrainState result = new GrainStateContainingGrainReferences();
-            result.DeserializeFrom(stream);
-            return result;
         }
     }
 }

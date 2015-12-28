@@ -1,10 +1,12 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Orleans;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class MultifacetFactoryTestGrainState : GrainState
+    [Serializable]
+    public class MultifacetFactoryTestGrainState
     {
         public IMultifacetReader Reader { get; set; }
         public IMultifacetWriter Writer { get; set; }
@@ -13,7 +15,6 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class MultifacetFactoryTestGrain : Grain<MultifacetFactoryTestGrainState>, IMultifacetFactoryTestGrain
     {
-
         public Task<IMultifacetReader> GetReader(IMultifacetTestGrain grain)
         {
             return Task.FromResult<IMultifacetReader>(grain);
