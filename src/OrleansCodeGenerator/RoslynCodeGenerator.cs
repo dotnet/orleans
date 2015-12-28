@@ -425,26 +425,42 @@ namespace Orleans.CodeGenerator
             var module = runtime ? null : type.Module;
             var typeInfo = type.GetTypeInfo();
 
-            // Every type which is encountered must be considered for serialization.
-            if (!typeInfo.IsNested && !typeInfo.IsGenericParameter && typeInfo.IsSerializable)
-            {
-                // If a type was encountered which can be accessed, process it for serialization.
-                if (SerializerGenerationManager.RecordTypeToGenerate(type, module, targetAssembly))
-                {
-                    includedTypes.Add(type);
-                }
-            }
+            // If a type was encountered which can be accessed and is marked as [Serializable], process it for serialization.
+            if (typeInfo.IsSerializable)
+                RecordType(type, module, targetAssembly, includedTypes);
+
+            Type grainStateType;
+            // If a type extends Grain<T>, add T to the list of candidates for serialization
+            if (IsPersistentGrain(typeInfo, out grainStateType))
+                RecordType(grainStateType, module, targetAssembly, includedTypes);
 
             // Collect the types which require code generation.
             if (GrainInterfaceData.IsGrainInterface(type))
             {
-                if (Logger.IsVerbose2)
-                {
-                    Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
-                }
+                if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
 
                 includedTypes.Add(type);
             }
+        }
+
+        private static void RecordType(Type type, Module module, Assembly targetAssembly, ISet<Type> includedTypes)
+        {
+            if (type.IsNested) return;
+
+            if (SerializerGenerationManager.RecordTypeToGenerate(type, module, targetAssembly))
+                includedTypes.Add(type);
+        }
+
+        private static bool IsPersistentGrain(TypeInfo typeInfo, out Type stateType)
+        {
+            stateType = null;
+
+            if (typeInfo.BaseType == null) return false;
+            if (!typeInfo.BaseType.IsGenericType) return false;
+            if (typeof(Grain<>) != typeInfo.BaseType.GetGenericTypeDefinition()) return false;
+
+            stateType = typeInfo.BaseType.GetGenericArguments()[0];
+            return true;
         }
 
         /// <summary>
