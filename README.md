@@ -80,7 +80,7 @@ Call the grain from your Web service (or anywhere else):
 // Get a reference to the IHello grain with id '0'.
 var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
 
-// Send a greeting to the grain an await the response.
+// Send a greeting to the grain and await the response.
 Console.WriteLine(await friend.SayHello("Good morning, my friend!"));
 ```
 

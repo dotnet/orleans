@@ -24,15 +24,13 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
-
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;
@@ -41,6 +39,7 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Serialization
 {
     using System.Diagnostics.CodeAnalysis;
+    using System.Reflection.Emit;
 
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
@@ -68,6 +67,15 @@ namespace Orleans.Serialization
         /// <returns>Rehydrated object of the specified Type read from the current position in the input stream.</returns>
         public delegate object Deserializer(Type expected, BinaryTokenStreamReader stream);
 
+        /// <summary>
+        /// The delegate used to set fields in value types.
+        /// </summary>
+        /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
+        /// <typeparam name="TField">The field type.</typeparam>
+        /// <param name="instance">The instance having its field set.</param>
+        /// <param name="value">The value being set.</param>
+        public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
+
         private static readonly string[] safeFailSerializers = { "Orleans.FSharp" };
 
         /// <summary>
@@ -84,13 +92,14 @@ namespace Orleans.Serialization
 
         private static readonly HashSet<Type> registeredTypes;
         private static readonly List<IExternalSerializer> externalSerializers;
-        private static readonly ConcurrentDictionary<Type, byte> typesWithNoExternalSerializers;
+        private static readonly ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
         private static readonly Dictionary<string, Type> types;
         private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
         private static readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
 
 
+        private static IExternalSerializer fallbackSerializer;
         private static readonly TraceLogger logger;
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
 
@@ -136,16 +145,29 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null)
+        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, bool useJsonFallbackSerializer = false)
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             AssemblyProcessor.Initialize();
             RegisterSerializationProviders(serializationProviders);
+            fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
         }
 
-        internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders)
+        internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
         {
             UseStandardSerializer = useStandardSerializer;
+
+#if DNXCORE50
+            if (!useJsonFallbackSerializer)
+            {
+                logger.Warn(ErrorCode.SerMgr_UnavailableSerializer,
+                    "Cann't use binary formatter as fallback serializer while running on .Net Core, will use Json.Net instead");
+            }
+
+            useJsonFallbackSerializer = true;
+#endif
+            fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+
             if (StatisticsCollector.CollectSerializationStats)
             {
                 const CounterStorage store = CounterStorage.LogOnly;
@@ -188,7 +210,7 @@ namespace Orleans.Serialization
 
             registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
-            typesWithNoExternalSerializers = new ConcurrentDictionary<Type, byte>();
+            typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
             types = new Dictionary<string, Type>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
@@ -206,6 +228,7 @@ namespace Orleans.Serialization
 
             // Built-in handlers: enumerables
             Register(typeof(List<>), BuiltInTypes.CopyGenericList, BuiltInTypes.SerializeGenericList, BuiltInTypes.DeserializeGenericList);
+            Register(typeof(ReadOnlyCollection<>), BuiltInTypes.CopyGenericReadOnlyCollection, BuiltInTypes.SerializeGenericReadOnlyCollection, BuiltInTypes.DeserializeGenericReadOnlyCollection);
             Register(typeof(LinkedList<>), BuiltInTypes.CopyGenericLinkedList, BuiltInTypes.SerializeGenericLinkedList, BuiltInTypes.DeserializeGenericLinkedList);
             Register(typeof(HashSet<>), BuiltInTypes.CopyGenericHashSet, BuiltInTypes.SerializeGenericHashSet, BuiltInTypes.DeserializeGenericHashSet);
             Register(typeof(SortedSet<>), BuiltInTypes.CopyGenericSortedSet, BuiltInTypes.SerializeGenericSortedSet, BuiltInTypes.DeserializeGenericSortedSet);
@@ -213,6 +236,7 @@ namespace Orleans.Serialization
             Register(typeof(Queue<>), BuiltInTypes.CopyGenericQueue, BuiltInTypes.SerializeGenericQueue, BuiltInTypes.DeserializeGenericQueue);
 
             // Built-in handlers: dictionaries
+            Register(typeof(ReadOnlyDictionary<,>), BuiltInTypes.CopyGenericReadOnlyDictionary, BuiltInTypes.SerializeGenericReadOnlyDictionary, BuiltInTypes.DeserializeGenericReadOnlyDictionary);
             Register(typeof(Dictionary<,>), BuiltInTypes.CopyGenericDictionary, BuiltInTypes.SerializeGenericDictionary, BuiltInTypes.DeserializeGenericDictionary);
             Register(typeof(Dictionary<string, object>), BuiltInTypes.CopyStringObjectDictionary, BuiltInTypes.SerializeStringObjectDictionary, BuiltInTypes.DeserializeStringObjectDictionary);
             Register(typeof(SortedDictionary<,>), BuiltInTypes.CopyGenericSortedDictionary, BuiltInTypes.SerializeGenericSortedDictionary,
@@ -870,18 +894,18 @@ namespace Orleans.Serialization
 
             object copy;
 
-            var copier = GetCopier(t);
-            if (copier != null)
+            IExternalSerializer serializer;
+            if (TryLookupExternalSerializer(t, out serializer))
             {
-                copy = copier(original);
+                copy = serializer.DeepCopy(original);
                 SerializationContext.Current.RecordObject(original, copy);
                 return copy;
             }
 
-            IExternalSerializer serializer;
-            if (TryFindAndRegisterExternalSerializer(t, out serializer))
+            var copier = GetCopier(t);
+            if (copier != null)
             {
-                copy = serializer.DeepCopy(original);
+                copy = copier(original);
                 SerializationContext.Current.RecordObject(original, copy);
                 return copy;
             }
@@ -1107,14 +1131,18 @@ namespace Orleans.Serialization
                 {
                     SerializeArray((Array)obj, stream, expected, et);
                 }
-                else if (et.GetTypeInfo().IsSerializable)
-                {
-                    FallbackSerializer(obj, stream);
-                }
                 else
                 {
-                    FallbackSerializer(obj, stream);
+                    FallbackSerializer(obj, stream, et);
                 }
+                return;
+            }
+
+            IExternalSerializer serializer;
+            if (TryLookupExternalSerializer(t, out serializer))
+            {
+                stream.WriteTypeHeader(t, expected);
+                serializer.Serialize(obj, stream, expected);
                 return;
             }
 
@@ -1126,17 +1154,9 @@ namespace Orleans.Serialization
                 return;
             }
 
-            IExternalSerializer serializer;
-            if (TryFindAndRegisterExternalSerializer(t, out serializer))
-            {
-                stream.WriteTypeHeader(t, expected);
-                serializer.Serialize(obj, stream, expected);
-                return;
-            }
-
             if (typeInfo.IsSerializable)
             {
-                FallbackSerializer(obj, stream);
+                FallbackSerializer(obj, stream, t);
                 return;
             }
 
@@ -1151,7 +1171,7 @@ namespace Orleans.Serialization
                 var foo = new Exception(String.Format("Non-serializable exception of type {0}: {1}" + Environment.NewLine + "at {2}",
                                                       t.OrleansTypeName(), rawException.Message,
                                                       rawException.StackTrace));
-                FallbackSerializer(foo, stream);
+                FallbackSerializer(foo, stream, t);
                 return;
             }
 
@@ -1465,18 +1485,18 @@ namespace Orleans.Serialization
                     return result;
                 }
 
-                var deser = GetDeserializer(resultType);
-                if (deser != null)
+                IExternalSerializer serializer;
+                if (TryLookupExternalSerializer(resultType, out serializer))
                 {
-                    result = deser(resultType, stream);
+                    result = serializer.Deserialize(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);
                     return result;
                 }
 
-                IExternalSerializer serializer;
-                if (TryFindAndRegisterExternalSerializer(resultType, out serializer))
+                var deser = GetDeserializer(resultType);
+                if (deser != null)
                 {
-                    result = serializer.Deserialize(resultType, stream);
+                    result = deser(resultType, stream);
                     DeserializationContext.Current.RecordObject(result);
                     return result;
                 }
@@ -1833,34 +1853,39 @@ namespace Orleans.Serialization
             throw new SerializationException(String.Format("Unexpected token {0} parsing message headers", token));
         }
 
-        private static bool TryFindAndRegisterExternalSerializer(Type t, out IExternalSerializer serializer)
+        private static bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)
         {
-            if (externalSerializers.Count == 0 || typesWithNoExternalSerializers.ContainsKey(t))
+            // essentially a no-op if there are no external serializers registered
+            if (externalSerializers.Count == 0)
             {
                 serializer = null;
                 return false;
             }
 
-            serializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
-            if (serializer == null)
+            // the associated serializer will be null if there are no external serializers that handle this type
+            if (typeToExternalSerializerDictionary.TryGetValue(t, out serializer))
             {
-                typesWithNoExternalSerializers.TryAdd(t, 0);
-                return false;
+                return serializer != null;
             }
 
-            Register(
-                t,
-                serializer.DeepCopy,
-                serializer.Serialize,
-                serializer.Deserialize);
-            return true;
+            serializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
+
+            // add the serializer to the dictionary, even if it's null to signify that we already performed
+            // the search and found none
+            if (typeToExternalSerializerDictionary.TryAdd(t, serializer) && serializer != null)
+            {
+                // we need to register the type, otherwise exceptions are thrown about types not being found
+                Register(t, serializer.DeepCopy, serializer.Serialize, serializer.Deserialize, true);
+            }
+   
+            return serializer != null;
         }
 
         #endregion
 
         #region Fallback serializer and deserializer
 
-        private static void FallbackSerializer(object raw, BinaryTokenStreamWriter stream)
+        private static void FallbackSerializer(object raw, BinaryTokenStreamWriter stream, Type t)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1870,17 +1895,8 @@ namespace Orleans.Serialization
                 FallbackSerializations.Increment();
             }
 
-            var formatter = new BinaryFormatter();
-            byte[] bytes;
-            using (var memoryStream = new MemoryStream())
-            {
-                formatter.Serialize(memoryStream, raw);
-                memoryStream.Flush();
-                bytes = memoryStream.ToArray();
-            }
             stream.Write(SerializationTokenType.Fallback);
-            stream.Write(bytes.Length);
-            stream.Write(bytes);
+            fallbackSerializer.Serialize(raw, stream, t);
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -1898,22 +1914,34 @@ namespace Orleans.Serialization
                 timer.Start();
                 FallbackDeserializations.Increment();
             }
-
-            var n = stream.ReadInt();
-            var bytes = stream.ReadBytes(n);
-            var formatter = new BinaryFormatter();
-            object ret = null;
-            using (var memoryStream = new MemoryStream(bytes))
-            {
-                ret = formatter.Deserialize(memoryStream);
-            }
-
+            var retVal = fallbackSerializer.Deserialize(null, stream);
             if (timer != null)
             {
                 timer.Stop();
                 FallbackDeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
-            return ret;
+
+            return retVal;
+        }
+
+        private static IExternalSerializer GetFallbackSerializer(bool useJsonSerializer)
+        {
+            IExternalSerializer serializer;
+            if (useJsonSerializer)
+            {
+                serializer = new OrleansJsonSerializer();
+            }
+            else
+            {
+#if DNXCORE50
+                throw new OrleansException("Can't use binary formatter as fallback serializer while running on .Net Core");
+#else
+                serializer = new BinaryFormatterSerializer();
+#endif
+            }
+
+            serializer.Initialize(logger);
+            return serializer;
         }
 
         private static Assembly OnResolveEventHandler(Object sender, ResolveEventArgs arg)
@@ -1937,23 +1965,13 @@ namespace Orleans.Serialization
                 FallbackCopies.Increment();
             }
 
-            var formatter = new BinaryFormatter();
-            object ret = null;
-            using (var memoryStream = new MemoryStream())
-            {
-                formatter.Serialize(memoryStream, obj);
-                memoryStream.Flush();
-                memoryStream.Seek(0, SeekOrigin.Begin);
-                formatter.Binder = DynamicBinder.Instance;
-                ret = formatter.Deserialize(memoryStream);
-            }
-
+            var retVal = fallbackSerializer.DeepCopy(obj);
             if (StatisticsCollector.CollectSerializationStats)
             {
                 timer.Stop();
                 FallbackCopiesTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
-            return ret;
+            return retVal;
         }
 
         #endregion
@@ -1983,7 +2001,7 @@ namespace Orleans.Serialization
                     if (t.IsArray)
                         return HasOrleansSerialization(t.GetElementType());
 
-                    return t == typeof(string) || serializers.ContainsKey(t.TypeHandle);
+                    return t == typeof(string) || serializers.ContainsKey(t.TypeHandle) || typeToExternalSerializerDictionary.ContainsKey(t);
             }
         }
 
@@ -2049,6 +2067,107 @@ namespace Orleans.Serialization
 
         #endregion
 
+        public static Delegate GetGetter(FieldInfo field)
+        {
+            return GetGetDelegate(
+                field,
+                typeof(Func<,>).MakeGenericType(field.DeclaringType, field.FieldType),
+                new[] { field.DeclaringType });
+        }
+
+        /// <summary>
+        /// Returns a delegate to get the value of a specified field.
+        /// </summary>
+        /// <param name="field">
+        /// The field.
+        /// </param>
+        /// <param name="delegateType">The delegate type.</param>
+        /// <param name="parameterTypes">The parameter types.</param>
+        /// <returns>A delegate to get the value of a specified field.</returns>
+        private static Delegate GetGetDelegate(FieldInfo field, Type delegateType, Type[] parameterTypes)
+        {
+            var declaringType = field.DeclaringType;
+            if (declaringType == null)
+            {
+                throw new InvalidOperationException("Field " + field.Name + " does not have a declaring type.");
+            }
+
+            // Create a method to hold the generated IL.
+            var method = new DynamicMethod(
+                field.Name + "Get",
+                field.FieldType,
+                parameterTypes,
+                declaringType.Module,
+                true);
+
+            // Emit IL to return the value of the Transaction property.
+            var emitter = method.GetILGenerator();
+            emitter.Emit(OpCodes.Ldarg_0);
+            emitter.Emit(OpCodes.Ldfld, field);
+            emitter.Emit(OpCodes.Ret);
+
+            return method.CreateDelegate(delegateType);
+        }
+
+        /// <summary>
+        /// Returns a delegate to set the value of this field for an instance.
+        /// </summary>
+        /// <returns>A delegate to set the value of this field for an instance.</returns>
+        public static Delegate GetReferenceSetter(FieldInfo field)
+        {
+            var delegateType = typeof(Action<,>).MakeGenericType(field.DeclaringType, field.FieldType);
+            return GetSetDelegate(field, delegateType, new[] { field.DeclaringType, field.FieldType });
+        }
+
+        /// <summary>
+        /// Returns a delegate to set the value of this field for an instance.
+        /// </summary>
+        /// <returns>A delegate to set the value of this field for an instance.</returns>
+        public static Delegate GetValueSetter(FieldInfo field)
+        {
+            var declaringType = field.DeclaringType;
+            if (declaringType == null)
+            {
+                throw new InvalidOperationException("Field " + field.Name + " does not have a declaring type.");
+            }
+
+            // Value types need to be passed by-ref.
+            var parameterTypes = new[] { declaringType.MakeByRefType(), field.FieldType };
+            var delegateType = typeof(ValueTypeSetter<,>).MakeGenericType(field.DeclaringType, field.FieldType);
+
+            return GetSetDelegate(field, delegateType, parameterTypes);
+        }
+
+        /// <summary>
+        /// Returns a delegate to set the value of a specified field.
+        /// </summary>
+        /// <param name="field">
+        /// The field.
+        /// </param>
+        /// <param name="delegateType">The delegate type.</param>
+        /// <param name="parameterTypes">The parameter types.</param>
+        /// <returns>A delegate to set the value of a specified field.</returns>
+        private static Delegate GetSetDelegate(FieldInfo field, Type delegateType, Type[] parameterTypes)
+        {
+            var declaringType = field.DeclaringType;
+            if (declaringType == null)
+            {
+                throw new InvalidOperationException("Field " + field.Name + " does not have a declaring type.");
+            }
+
+            // Create a method to hold the generated IL.
+            var method = new DynamicMethod(field.Name + "Set", null, parameterTypes, declaringType.Module, true);
+
+            // Emit IL to return the value of the Transaction property.
+            var emitter = method.GetILGenerator();
+            emitter.Emit(OpCodes.Ldarg_0);
+            emitter.Emit(OpCodes.Ldarg_1);
+            emitter.Emit(OpCodes.Stfld, field);
+            emitter.Emit(OpCodes.Ret);
+
+            return method.CreateDelegate(delegateType);
+        }
+
         /// <summary>
         /// Internal test method to do a round-trip Serialize+Deserialize loop
         /// </summary>
@@ -2076,7 +2195,7 @@ namespace Orleans.Serialization
                     line.Append(" copier");
                     discardLine = false;
                 }
-                if (serializers.ContainsKey(typeHandle))
+                if (deserializers.ContainsKey(typeHandle))
                 {
                     line.Append(" deserializer");
                     discardLine = false;
@@ -2095,7 +2214,7 @@ namespace Orleans.Serialization
             }
 
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
-            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
+            logger.LogWithoutBulkingAndTruncating(Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
         }
         
         /// <summary>
@@ -2109,6 +2228,8 @@ namespace Orleans.Serialization
                 return;
             }
 
+            externalSerializers.Clear();
+            typeToExternalSerializerDictionary.Clear();
             providerTypes.ForEach(
                 type =>
                 {
@@ -2123,39 +2244,6 @@ namespace Orleans.Serialization
                         logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);
                     }
                 });
-        }
-        
-        /// <summary>
-        /// This appears necessary because the BinaryFormatter by default will not see types
-        /// that are defined by the InvokerGenerator.
-        /// Needs to be public since it used by generated client code.
-        /// </summary>
-        class DynamicBinder : SerializationBinder
-        {
-            public static readonly SerializationBinder Instance = new DynamicBinder();
-
-            private readonly Dictionary<string, Assembly> assemblies = new Dictionary<string, Assembly>();
-
-            public override Type BindToType(string assemblyName, string typeName)
-            {
-                lock (this.assemblies)
-                {
-                    Assembly result;
-                    if (!this.assemblies.TryGetValue(assemblyName, out result))
-                    {
-                        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                            this.assemblies[assembly.GetName().FullName] = assembly;
-
-                        // in some cases we have to explicitly load the assembly even though it seems to be already loaded but for some reason it's not listed in AppDomain.CurrentDomain.GetAssemblies()
-                        if (!this.assemblies.TryGetValue(assemblyName, out result))
-                            this.assemblies[assemblyName] = Assembly.Load(new AssemblyName(assemblyName));
-
-                        result = this.assemblies[assemblyName];
-                    }
-
-                    return result.GetType(typeName);
-                }
-            }
         }
 
         public struct SerializerMethods

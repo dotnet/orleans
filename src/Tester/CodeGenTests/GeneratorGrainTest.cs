@@ -8,6 +8,11 @@ using UnitTests.Tester;
 
 namespace Tester.CodeGenTests
 {
+    using System;
+    using System.Collections.Generic;
+
+    using UnitTests.GrainInterfaces;
+
     /// <summary>
     /// Summary description for GrainClientTest
     /// </summary>
@@ -29,6 +34,61 @@ namespace Tester.CodeGenTests
         private static int GetRandomGrainId()
         {
             return random.Next();
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+        public async Task CodeGenRoundTripSerialization()
+        {
+            var grain = GrainClient.GrainFactory.GetGrain<ISerializationGenerationGrain>(GetRandomGrainId());
+
+            // Test struct serialization.
+            var expectedStruct = new SomeStruct(10) { Id = Guid.NewGuid(), PublicValue = 6, ValueWithPrivateGetter = 7 };
+            expectedStruct.SetValueWithPrivateSetter(8);
+            expectedStruct.SetPrivateValue(9);
+            var actualStruct = await grain.RoundTripStruct(expectedStruct);
+            Assert.AreEqual(expectedStruct.Id, actualStruct.Id);
+            Assert.AreEqual(expectedStruct.ReadonlyField, actualStruct.ReadonlyField);
+            Assert.AreEqual(expectedStruct.PublicValue, actualStruct.PublicValue);
+            Assert.AreEqual(expectedStruct.ValueWithPrivateSetter, actualStruct.ValueWithPrivateSetter);
+            Assert.AreEqual(expectedStruct.GetPrivateValue(), actualStruct.GetPrivateValue());
+            Assert.AreEqual(expectedStruct.GetValueWithPrivateGetter(), actualStruct.GetValueWithPrivateGetter());
+
+            // Test abstract class serialization.
+            var expectedAbstract = new OuterClass.SomeConcreteClass { Int = 89, String = Guid.NewGuid().ToString() };
+            expectedAbstract.Classes = new List<SomeAbstractClass>
+            {
+                expectedAbstract,
+                new AnotherConcreteClass
+                {
+                    AnotherString = "hi",
+                    Interfaces = new List<ISomeInterface> { expectedAbstract }
+                }
+            };
+            var actualAbstract = await grain.RoundTripClass(expectedAbstract);
+            Assert.AreEqual(expectedAbstract.Int, actualAbstract.Int);
+            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract).String);
+            Assert.AreEqual(expectedAbstract.Classes.Count, actualAbstract.Classes.Count);
+            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract.Classes[0]).String);
+            Assert.AreEqual(expectedAbstract.Classes[1].Interfaces[0].Int, actualAbstract.Classes[1].Interfaces[0].Int);
+
+            // Test abstract class serialization with state.
+            await grain.SetState(expectedAbstract);
+            actualAbstract = await grain.GetState();
+            Assert.AreEqual(expectedAbstract.Int, actualAbstract.Int);
+            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract).String);
+            Assert.AreEqual(expectedAbstract.Classes.Count, actualAbstract.Classes.Count);
+            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract.Classes[0]).String);
+            Assert.AreEqual(expectedAbstract.Classes[1].Interfaces[0].Int, actualAbstract.Classes[1].Interfaces[0].Int);
+
+            // Test interface serialization.
+            var expectedInterface = expectedAbstract;
+            var actualInterface = await grain.RoundTripInterface(expectedInterface);
+            Assert.AreEqual(expectedAbstract.Int, actualInterface.Int);
+            
+            // Test enum serialization.
+            const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
+            var actualEnum = await grain.RoundTripEnum(ExpectedEnum);
+            Assert.AreEqual(ExpectedEnum, actualEnum);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain")]

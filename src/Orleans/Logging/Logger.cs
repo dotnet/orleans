@@ -22,6 +22,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Orleans.Runtime
@@ -32,23 +34,14 @@ namespace Orleans.Runtime
     [Serializable]
     public abstract class Logger
     {
-        /// <summary> Severity levels for log messages. </summary>
-        public enum Severity
-        {
-            Off = TraceLevel.Off,
-            Error = TraceLevel.Error,
-            Warning = TraceLevel.Warning,
-            Info = TraceLevel.Info,
-            Verbose = TraceLevel.Verbose,
-            Verbose2 = TraceLevel.Verbose + 1,
-            Verbose3 = TraceLevel.Verbose + 2
-        }
-
         /// <summary> Current SeverityLevel set for this logger. </summary>
         public abstract Severity SeverityLevel
         {
             get;
         }
+
+        public static ConcurrentBag<ITelemetryConsumer> TelemetryConsumers { get; set; }
+
 
         /// <summary> Whether the current SeverityLevel would output <c>Warning</c> messages for this logger. </summary>
         [DebuggerHidden]
@@ -112,6 +105,32 @@ namespace Orleans.Runtime
         public abstract void Verbose2(int logCode, string format, params object[] args);
         /// <summary> Output the specified message at <c>Verbose3</c> log level with the specified log id value. </summary>
         public abstract void Verbose3(int logCode, string format, params object[] args);
-#endregion
+        #endregion
+
+        #region APM Methods
+
+        public abstract void TrackDependency(string name, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success);
+        //public abstract void TrackDependency(DependencyTelemetry telemetry);
+        //public abstract void TrackEvent(EventTelemetry telemetry);
+        public abstract void TrackEvent(string name, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null);
+        //public abstract void TrackMetric(MetricTelemetry telemetry);
+        public abstract void TrackMetric(string name, double value, IDictionary<string, string> properties = null);
+        public abstract void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null);
+        public abstract void IncrementMetric(string name);
+        public abstract void IncrementMetric(string name, double value);
+        public abstract void DecrementMetric(string name);
+        public abstract void DecrementMetric(string name, double value);
+        //public abstract void TrackRequest(RequestTelemetry request);
+        public abstract void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success);
+        
+        //public abstract void TrackException(ExceptionTelemetry telemetry);
+        public abstract void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null);
+        public abstract void TrackTrace(string message);
+        public abstract void TrackTrace(string message, Severity severityLevel);
+        public abstract void TrackTrace(string message, Severity severityLevel, IDictionary<string, string> properties);
+        public abstract void TrackTrace(string message, IDictionary<string, string> properties);
+        //public abstract void TrackTrace(TraceTelemetry telemetry);
+
+        #endregion
     }
 }

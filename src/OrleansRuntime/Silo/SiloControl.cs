@@ -51,7 +51,7 @@ namespace Orleans.Runtime
 
         public Task SetSystemLogLevel(int traceLevel)
         {
-            var newTraceLevel = (Logger.Severity)traceLevel;
+            var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetSystemLogLevel={0}", newTraceLevel);
             TraceLogger.SetRuntimeLogLevel(newTraceLevel);
             silo.LocalConfig.DefaultTraceLevel = newTraceLevel;
@@ -60,7 +60,7 @@ namespace Orleans.Runtime
 
         public Task SetAppLogLevel(int traceLevel)
         {
-            var newTraceLevel = (Logger.Severity)traceLevel;
+            var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetAppLogLevel={0}", newTraceLevel);
             TraceLogger.SetAppLogLevel(newTraceLevel);
             return TaskDone.Done;
@@ -68,7 +68,7 @@ namespace Orleans.Runtime
 
         public Task SetLogLevel(string logName, int traceLevel)
         {
-            var newTraceLevel = (Logger.Severity)traceLevel;
+            var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetLogLevel[{0}]={1}", logName, newTraceLevel);
             TraceLogger log = TraceLogger.FindLogger(logName);
             

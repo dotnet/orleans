@@ -113,29 +113,26 @@ namespace Orleans.Runtime.GrainDirectory
             cache.Clear();
         }
 
-        public bool LookUp(GrainId key, out TValue result)
+        public bool LookUp(GrainId key, out TValue result, out int version)
         {
+            result = default(TValue);
+            version = default(int);
             NumAccesses++;      // for stats
 
             // Here we do not check whether the found entry is expired. 
             // It will be done by the thread managing the cache.
             // This is to avoid situation where the entry was just expired, but the manager still have not run and have not refereshed it.
             GrainDirectoryCacheEntry tmp;
-            if (cache.TryGetValue(key, out tmp))
-            {
-                NumHits++;      // for stats
-                tmp.NumAccesses++;
-                result = tmp.Value;
-                return true;
-            }
-            else
-            {
-                result = default(TValue);
-                return false;
-            }
+            if (!cache.TryGetValue(key, out tmp)) return false;
+
+            NumHits++;      // for stats
+            tmp.NumAccesses++;
+            result = tmp.Value;
+            version = tmp.ETag;
+            return true;
         }
 
-        public List<Tuple<GrainId, TValue, int>> KeyValues
+        public IReadOnlyList<Tuple<GrainId, TValue, int>> KeyValues
         {
             get
             {

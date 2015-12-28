@@ -406,8 +406,9 @@ namespace Orleans
         SiloShutdownEventCreated        = SiloBase + 42,
         SiloShutdownEventOpened         = SiloBase + 43,
         SiloShutdownEventReceived       = SiloBase + 44,
-        SiloLoadeDI                     = SiloBase + 45,
+        SiloLoadedDI                    = SiloBase + 45,
         SiloFailedToLoadDI              = SiloBase + 46,
+        SiloFileNotFoundLoadingDI       = SiloBase + 47,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
@@ -902,6 +903,7 @@ namespace Orleans
         SerMgr_IgnoreAssembly                   = SerializationManagerBase + 8,
         SerMgr_TypeRegistrationFailureIgnore    = SerializationManagerBase + 9,
         SerMgr_ArtifactReport                   = SerializationManagerBase + 10,
+        SerMgr_UnavailableSerializer            = SerializationManagerBase + 11,
 
         WatchdogBase                            = Runtime + 2600,
         Watchdog_ParticipantThrownException     = WatchdogBase + 1,

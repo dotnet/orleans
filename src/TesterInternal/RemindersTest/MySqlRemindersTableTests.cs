@@ -64,7 +64,7 @@ namespace UnitTests.RemindersTest
         public static void ClassInitialize(TestContext testContext)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("MySqlRemindersTableTests", Logger.Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride("MySqlRemindersTableTests", Severity.Verbose3);
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);

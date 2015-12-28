@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Configuration
         /// a specific TraceLevelOverride element.
         /// The default level is Info if this attribute does not appear.
         /// </summary>
-        Logger.Severity DefaultTraceLevel { get; set; }
+        Severity DefaultTraceLevel { get; set; }
         /// <summary>
         /// The TraceFileName attribute specifies the name of a file that trace output should be written to.
         /// </summary>
@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Configuration
         /// TraceLevelOverrides are applied in length order; that is, the override with the longest matching
         /// LogPrefix takes precedence and specifies the tracing level for all matching loggers.
         /// </summary>
-        IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; }
+        IList<Tuple<string, Severity>> TraceLevelOverrides { get; }
         /// <summary>
         /// The TraceToConsole attribute specifies whether trace output should be written to the console.
         /// The default is not to write trace data to the console.

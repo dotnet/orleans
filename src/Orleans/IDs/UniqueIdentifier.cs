@@ -22,6 +22,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
+using Newtonsoft.Json;
 
 namespace Orleans.Runtime
 {
@@ -29,6 +30,7 @@ namespace Orleans.Runtime
     internal abstract class UniqueIdentifier : IEquatable<UniqueIdentifier>, IComparable<UniqueIdentifier>
     {
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
+        [JsonProperty]
         protected readonly internal UniqueKey Key;
 
         protected UniqueIdentifier()

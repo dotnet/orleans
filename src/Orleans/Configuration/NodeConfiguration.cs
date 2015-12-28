@@ -159,10 +159,10 @@ namespace Orleans.Runtime.Configuration
         private string traceFilePattern;
         /// <summary>
         /// </summary>
-        public Logger.Severity DefaultTraceLevel { get; set; }
+        public Severity DefaultTraceLevel { get; set; }
         /// <summary>
         /// </summary>
-        public IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; private set; }
+        public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
         /// <summary>
         /// </summary>
         public bool WriteMessagingTraces { get; set; }
@@ -280,8 +280,8 @@ namespace Orleans.Runtime.Configuration
             LoadSheddingEnabled = false;
             LoadSheddingLimit = 95;
 
-            DefaultTraceLevel = Logger.Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
+            DefaultTraceLevel = Severity.Info;
+            TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
             WriteMessagingTraces = false;
@@ -327,7 +327,7 @@ namespace Orleans.Runtime.Configuration
             LoadSheddingLimit = other.LoadSheddingLimit;
 
             DefaultTraceLevel = other.DefaultTraceLevel;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>(other.TraceLevelOverrides);
+            TraceLevelOverrides = new List<Tuple<string, Severity>>(other.TraceLevelOverrides);
             TraceToConsole = other.TraceToConsole;
             TraceFilePattern = other.TraceFilePattern;
             TraceFileName = other.TraceFileName;
@@ -511,6 +511,9 @@ namespace Orleans.Runtime.Configuration
                         {
                             StartupTypeName = child.GetAttribute("Type");
                         }
+                        break;
+                    case "Telemetry":
+                        ConfigUtilities.ParseTelemetry(child);
                         break;
                 }
             }
