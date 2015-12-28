@@ -635,14 +635,13 @@ namespace Orleans.Runtime
             {
                 state = Activator.CreateInstance(stateObjectType);
             }
-
-            grain.Identity = data.Identity;
-            data.SetGrainInstance(grain);
-
-            var statefulGrain = grain as IStatefulGrain;
-            if (statefulGrain != null)
+            
+            lock (data)
             {
-                lock (data)
+                grain.Identity = data.Identity;
+                data.SetGrainInstance(grain);
+                var statefulGrain = grain as IStatefulGrain;
+                if (statefulGrain != null)
                 {
                     if (state != null)
                     {

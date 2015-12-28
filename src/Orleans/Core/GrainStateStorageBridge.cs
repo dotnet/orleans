@@ -132,8 +132,8 @@ namespace Orleans.Core
                 // Clear (most likely Delete) state from external storage
                 await store.ClearStateAsync(grainTypeName, grainRef, grain.GrainState);
 
-                // Null out the in-memory copy of the state
-                grain.GrainState.State = null;
+                // Reset the in-memory copy of the state
+                grain.GrainState.State = Activator.CreateInstance(grain.GrainState.State.GetType());
 
                 // Update counters
                 StorageStatisticsGroup.OnStorageDelete(store, grainTypeName, grainRef, sw.Elapsed);

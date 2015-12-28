@@ -89,7 +89,6 @@ namespace UnitTests.Grains
         public async Task DoDelete()
         {
             await ClearStateAsync();
-            State = new PersistenceTestGrainState();
         }
     }
 

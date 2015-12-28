@@ -37,22 +37,24 @@ namespace Orleans.Storage
         {
             if (logger.IsVerbose) logger.Verbose("ReadStateAsync for {0} grain: {1}", stateStore, grainStoreKey);
             GrainStateStore storage = GetStoreForGrain(stateStore);
-            var stateTuple = storage.GetGrainState(grainStoreKey);
-            return Task.FromResult(stateTuple);
+            var grainState = storage.GetGrainState(grainStoreKey);;
+            return Task.FromResult(grainState);
         }
         
         public Task<string> WriteStateAsync(string stateStore, string grainStoreKey, IGrainState grainState)
         {
             if (logger.IsVerbose) logger.Verbose("WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, grainState.ETag);
             GrainStateStore storage = GetStoreForGrain(stateStore);
+            storage.UpdateGrainState(grainStoreKey, grainState);
             if (logger.IsVerbose) logger.Verbose("Done WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, grainState.ETag);
-            return Task.FromResult(storage.UpdateGrainState(grainStoreKey, grainState));
+            return Task.FromResult(grainState.ETag);
         }
 
         public Task DeleteStateAsync(string grainType, string grainId, string etag)
         {
             GrainStateStore storage = GetStoreForGrain(grainType);
-            return Task.FromResult(storage.DeleteGrainState(grainId, etag));
+            storage.DeleteGrainState(grainId, etag);
+            return TaskDone.Done;
         }
 
         private GrainStateStore GetStoreForGrain(string grainType)
@@ -83,40 +85,37 @@ namespace Orleans.Storage
                 return entry;
             }
 
-            public string UpdateGrainState(string grainId, IGrainState grainState)
+            public void UpdateGrainState(string grainId, IGrainState grainState)
             {
                 IGrainState entry;
-                grainStateStorage.TryGetValue(grainId, out entry);
-                if (entry == null)
+                string currentETag = null;
+                if (grainStateStorage.TryGetValue(grainId, out entry))
                 {
-                    grainStateStorage[grainId] = grainState;
-                    return grainState.ETag;
+                    currentETag = entry.ETag;
                 }
 
-                ValidateEtag(grainState.ETag, entry.ETag, grainId, "Update");
-
+                ValidateEtag(currentETag, grainState.ETag, grainId, "Update");
                 grainState.ETag = NewEtag();
                 grainStateStorage[grainId] = grainState;
-                return grainState.ETag;
             }
 
-            public string DeleteGrainState(string grainId, string eTag)
+            public void DeleteGrainState(string grainId, string receivedEtag)
             {
                 IGrainState entry;
+                string currentETag = null;
                 grainStateStorage.TryGetValue(grainId, out entry);
-                if (entry == null)
+                if (grainStateStorage.TryGetValue(grainId, out entry))
                 {
-                    return eTag;
+                    currentETag = entry.ETag;
                 }
 
-                ValidateEtag(eTag, entry.ETag, grainId, "Delete");
+                ValidateEtag(currentETag, receivedEtag, grainId, "Delete");
                 grainStateStorage.Remove(grainId);
-                return NewEtag();
             }
 
             private static string NewEtag()
             {
-                return DateTime.UtcNow.ToString(CultureInfo.InvariantCulture);
+                return Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
             }
 
             private void ValidateEtag(string currentETag, string receivedEtag, string grainStoreKey, string operation)

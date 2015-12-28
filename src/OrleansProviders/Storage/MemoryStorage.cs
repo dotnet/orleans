@@ -109,7 +109,7 @@ namespace Orleans.Storage
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
             var state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
-            if (state != null)
+            if (state != null && state.State != null)
             {
                 grainState.ETag = state.ETag;
                 grainState.State = state.State;
