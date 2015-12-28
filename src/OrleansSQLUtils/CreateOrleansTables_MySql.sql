@@ -55,9 +55,8 @@ CREATE TABLE OrleansQuery
 	(
 		DeploymentId NVARCHAR(150) NOT NULL,
 		Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-		Version BIGINT NOT NULL,
-		-- ETag should also always be unique, but there will ever be only one row.
-		ETag BIGINT NOT NULL DEFAULT 0,
+		Version BIGINT NOT NULL DEFAULT 0,
+
     
 		CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY (DeploymentId)
 	);
@@ -185,19 +184,13 @@ CREATE TABLE OrleansQuery
 		' 
 		INSERT INTO OrleansMembershipVersionTable
 		(
-			DeploymentId,
-			Version
+			DeploymentId
 		)
-		SELECT	
-			@deploymentId,
-			@version
-		WHERE NOT EXISTS
-		(			
-			SELECT 1
-			FROM OrleansMembershipVersionTable
-			WHERE DeploymentId = @deploymentId AND @deploymentId IS NOT NULL
-			FOR UPDATE
-		);
+		Values
+		(
+			@deploymentId
+		)
+		ON DUPLICATE KEY UPDATE DeploymentId = DeploymentId;
                                         
 		SELECT ROW_COUNT();
 	');
@@ -295,11 +288,10 @@ BEGIN
 			-- to be rolled back.
 			UPDATE OrleansMembershipVersionTable
 			SET
-				Version		= _version,
-			 	Etag 		= _versionEtag + 1
+			 	Version		= _versionEtag + 1
 			WHERE
 				(DeploymentId	= _deploymentId AND _deploymentId IS NOT NULL)
-				AND (ETag		= _versionEtag AND _versionEtag IS NOT NULL);
+				AND (Version		= _versionEtag AND _versionEtag IS NOT NULL);
 		END IF;
 		-- Here the rowcount should always be either zero (no update)
 		-- or one (exactly one entry updated).
@@ -383,11 +375,10 @@ BEGIN
 			-- to be rolled back.
 			UPDATE OrleansMembershipVersionTable
 			SET
-				Version		= _version,
-				ETag		= _versionEtag + 1
+			Version = _versionEtag + 1
 			WHERE
 				DeploymentId	= _deploymentId AND _deploymentId IS NOT NULL
-				AND ETag		= _versionEtag AND _versionEtag IS NOT NULL;
+				AND Version 		= _versionEtag AND _versionEtag IS NOT NULL;
 
 		END IF;
         SET _ROWCOUNT = ROW_COUNT();
@@ -698,7 +689,7 @@ VALUES
 		m.IAmAliveTime,
 		CONVERT(m.ETag, BINARY) AS ETag,
 		v.Version,
-		CONVERT(v.ETag, BINARY) AS VersionETag
+		CONVERT(v.Version, BINARY) AS VersionETag
 	FROM
 		OrleansMembershipVersionTable v
 		-- This ensures the version table will returned even if there is no matching membership row.
@@ -733,7 +724,7 @@ VALUES
 		m.IAmAliveTime,
 		CONVERT(m.ETag, BINARY) AS ETag,
 		v.Version,
-		CONVERT(v.ETag, BINARY) AS VersionETag
+		CONVERT(v.Version, BINARY) AS VersionETag
 	FROM
 		OrleansMembershipVersionTable v
 		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
