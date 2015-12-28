@@ -126,7 +126,7 @@ namespace Orleans.SqlUtils.StorageProvider
             _readGroups.Clear();
         }
 
-        public async Task<IDictionary<string, object>> ReadStateAsync(GrainIdentity grainIdentity)
+        public async Task<object> ReadStateAsync(GrainIdentity grainIdentity)
         {
             // for this specific type of grain choose the batch
             // Lazy is used to avoid side effects since valueFactory() may be called multiple times on different threads
@@ -144,7 +144,7 @@ namespace Orleans.SqlUtils.StorageProvider
                 return group;
             })).Value;
 
-            var tcs = new TaskCompletionSource<IDictionary<string, object>>();
+            var tcs = new TaskCompletionSource<object>();
             // use SendAsync instead of Post to allow for buffering posted messages
             // Post would retrun false when the Block cannot accept a message
             if (await readGroup.BatchBlock.SendAsync(new ReadEntry(grainIdentity, tcs)))
@@ -161,7 +161,7 @@ namespace Orleans.SqlUtils.StorageProvider
             return await tcs.Task;
         }
 
-        public async Task UpsertStateAsync(GrainIdentity grainIdentity, IDictionary<string, object> state)
+        public async Task UpsertStateAsync(GrainIdentity grainIdentity, object state)
         {
             // for this specific type of grain choose the batch
             // Lazy is used to avoid side effects since valueFactory() may be called multiple times on different threads
@@ -284,7 +284,7 @@ namespace Orleans.SqlUtils.StorageProvider
 
             // this will accumulate read states
             // introduction of this local variable gives us consistency in obtaining results from SQL and handlig transient errors
-            var states = new List<Tuple<string, IDictionary<string, object>>>();
+            var states = new List<Tuple<string, object>>();
 
             try
             {
@@ -308,18 +308,18 @@ namespace Orleans.SqlUtils.StorageProvider
                         // Execute a simple command 
                         SqlCommand cmd = con.CreateCommand();
                         mapEntry.PrepareReadSqlCommand(cmd, data);
-                        states = new List<Tuple<string, IDictionary<string, object>>>();
+                        states = new List<Tuple<string, object>>();
 
                         using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
                                 string grainKey = reader[SqlColumns.GrainKey].ToString();
-                                IDictionary<string, object> state = mapEntry.CreateState(reader);
+                                object state = mapEntry.CreateState(reader);
 
                                 // here we accumulate states instead of completing a given task per a state to ensure that 
                                 // if subsequent reader.ReadAsync throws an exception, we stay consistent
-                                states.Add(new Tuple<string, IDictionary<string, object>>(grainKey, state));
+                                states.Add(new Tuple<string, object>(grainKey, state));
                             }
                         }
 

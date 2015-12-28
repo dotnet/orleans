@@ -55,7 +55,7 @@ namespace Orleans.SqlUtils.StorageProvider
             _shardBatchers.Clear();
         }
 
-        public async Task<IDictionary<string, object>> ReadStateAsync(GrainIdentity grainIdentity)
+        public async Task<object> ReadStateAsync(GrainIdentity grainIdentity)
         {
             Guard.NotNull(grainIdentity, "grainIdentity");
 
@@ -68,7 +68,7 @@ namespace Orleans.SqlUtils.StorageProvider
             return state;
         }
 
-        public async Task UpsertStateAsync(GrainIdentity grainIdentity, IDictionary<string, object> state)
+        public async Task UpsertStateAsync(GrainIdentity grainIdentity, object state)
         {
             Guard.NotNull(grainIdentity, "grainIdentity");
             Guard.NotNull(state, "state");

@@ -89,6 +89,8 @@
     <Compile Include="CodeGeneration\OrleansCodeGenerationTargetAttribute.cs" />
     <Compile Include="CodeGeneration\KnownTypeAttribute.cs" />
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
+    <Compile Include="CodeGeneration\IGrainState.cs" />
+    <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="Providers\DefaultServiceProvider.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />

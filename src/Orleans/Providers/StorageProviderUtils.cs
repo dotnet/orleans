@@ -26,30 +26,14 @@ namespace Orleans.Storage
                 keyTuple => string.Format("Key:{0}={1}", keyTuple.Item1, keyTuple.Item2 ?? "null"));
         }
 
-        public static string PrintData(IDictionary<string, object> data)
+        public static string PrintData(object data)
         {
-            if (data == null || data.Count == 0)
+            if (data == null)
             {
                 return "[ ]";
             }
-            return Utils.EnumerableToString(data.Keys,
-                key =>
-                {
-                    string val;
-                    object obj = data[key];
-#if DEBUG
-                    // Show types
-                    if (obj == null) 
-                        val = "null";
-                    else if (obj is string) 
-                        val = "\"" + obj + "\"";
-                    else 
-                        val = obj.ToString() + " (" + obj.GetType() + ")";
-#else
-                    val = obj != null ? obj.ToString() : "null";
-#endif
-                    return string.Format("{0} => {1}", key, val);
-                });
+
+            return data.ToString();
         }
 
         public static string PrintResults(IList<IDictionary<string, object>> results)
@@ -68,7 +52,7 @@ namespace Orleans.Storage
 
         public static string PrintOneWrite(
             IEnumerable<Tuple<string, string>> keys,
-            IDictionary<string, object> data,
+            object data,
             string eTag)
         {
             var sb = new StringBuilder();

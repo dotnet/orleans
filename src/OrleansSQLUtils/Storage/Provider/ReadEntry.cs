@@ -13,9 +13,9 @@ namespace Orleans.SqlUtils.StorageProvider
         /// </summary>
         public GrainIdentity GrainIdentity { get; private set; }
 
-        internal TaskCompletionSource<IDictionary<string, object>> CompletionSource { get; private set; }
+        internal TaskCompletionSource<object> CompletionSource { get; private set; }
 
-        internal ReadEntry(GrainIdentity grainIdentity, TaskCompletionSource<IDictionary<string, object>> tcs)
+        internal ReadEntry(GrainIdentity grainIdentity, TaskCompletionSource<object> tcs)
         {
             GrainIdentity = grainIdentity;
             CompletionSource = tcs;

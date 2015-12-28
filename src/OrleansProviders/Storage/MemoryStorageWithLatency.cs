@@ -61,17 +61,17 @@ namespace Orleans.Storage
             await MakeFixedLatencyCall(() => base.Close());
         }
 
-        public override async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public override async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ReadStateAsync(grainType, grainReference, grainState));
         }
 
-        public override async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public override async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            await MakeFixedLatencyCall(() => base.WriteStateAsync(grainType, grainReference, grainState));
+           await MakeFixedLatencyCall(() => base.WriteStateAsync(grainType, grainReference, grainState));
         }
 
-        public override async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public override async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ClearStateAsync(grainType, grainReference, grainState));
         }
@@ -106,7 +106,7 @@ namespace Orleans.Storage
             if (error != null)
             {
                 // Wrap in AggregateException so that the original error stack trace is preserved.
-                throw new AggregateException(error); 
+                throw new AggregateException(error);
             }
         }
     }
