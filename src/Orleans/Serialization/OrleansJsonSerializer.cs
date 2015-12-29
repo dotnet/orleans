@@ -1,27 +1,23 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal class OrleansJsonSerializer : IExternalSerializer
+    public class OrleansJsonSerializer : IExternalSerializer
     {
-        public static JsonSerializerSettings settings;
+        public static JsonSerializerSettings SerializerSettings { get; set; }
+
         private TraceLogger logger;
 
         static OrleansJsonSerializer()
         {
-            settings = new JsonSerializerSettings
+            SerializerSettings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.All,
-                PreserveReferencesHandling = PreserveReferencesHandling.Objects,
+                PreserveReferencesHandling = PreserveReferencesHandling.All,
                 DateFormatHandling = DateFormatHandling.IsoDateFormat,
                 DefaultValueHandling = DefaultValueHandling.Ignore,
                 MissingMemberHandling = MissingMemberHandling.Ignore,
@@ -29,13 +25,13 @@ namespace Orleans.Serialization
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor
             };
 
-            settings.Converters.Add(new IPAddressConverter());
-            settings.Converters.Add(new IPEndPointConverter());
-            settings.Converters.Add(new GrainIdConverter());
-            settings.Converters.Add(new SiloAddressConverter());
-            settings.Converters.Add(new UniqueKeyConverter());
+            SerializerSettings.Converters.Add(new IPAddressConverter());
+            SerializerSettings.Converters.Add(new IPEndPointConverter());
+            SerializerSettings.Converters.Add(new GrainIdConverter());
+            SerializerSettings.Converters.Add(new SiloAddressConverter());
+            SerializerSettings.Converters.Add(new UniqueKeyConverter());
         }
-        
+
         /// <summary>
         /// Initializes the serializer
         /// </summary>
@@ -87,7 +83,7 @@ namespace Orleans.Serialization
             }
 
             var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, settings);
+            return JsonConvert.DeserializeObject(str, expectedType, SerializerSettings);
         }
 
         /// <summary>
@@ -109,14 +105,14 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var str = JsonConvert.SerializeObject(item, expectedType, settings);
+            var str = JsonConvert.SerializeObject(item, expectedType, SerializerSettings);
             writer.Write(str);
         }
     }
 
     #region JsonConverters
 
-    class IPAddressConverter : JsonConverter
+    public class IPAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -136,79 +132,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class GrainIdConverter : JsonConverter
-    {
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(GrainId));
-        }
-
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            GrainId id = (GrainId)value;
-            writer.WriteStartObject();
-            writer.WritePropertyName("GrainId");
-            writer.WriteValue(id.ToParsableString());
-            writer.WriteEndObject();
-        }
-
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            JObject jo = JObject.Load(reader);
-            GrainId grainId = GrainId.FromParsableString(jo["GrainId"].ToObject<string>());
-            return grainId;
-        }
-    }
-
-    class SiloAddressConverter : JsonConverter
-    {
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(SiloAddress));
-        }
-
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            SiloAddress addr = (SiloAddress)value;
-            writer.WriteStartObject();
-            writer.WritePropertyName("SiloAddress");
-            writer.WriteValue(addr.ToParsableString());
-            writer.WriteEndObject();
-        }
-
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            JObject jo = JObject.Load(reader);
-            SiloAddress addr = SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
-            return addr;
-        }
-    }
-
-    class UniqueKeyConverter : JsonConverter
-    {
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(UniqueKey));
-        }
-
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            UniqueKey key = (UniqueKey)value;
-            writer.WriteStartObject();
-            writer.WritePropertyName("UniqueKey");
-            writer.WriteValue(key.ToHexString());
-            writer.WriteEndObject();
-        }
-
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            JObject jo = JObject.Load(reader);
-            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>());
-            return addr;
-        }
-    }
- 
-    class IPEndPointConverter : JsonConverter
+    public class IPEndPointConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -235,5 +159,76 @@ namespace Orleans.Serialization
         }
     }
 
+    internal class GrainIdConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType)
+        {
+            return (objectType == typeof(GrainId));
+        }
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            GrainId id = (GrainId)value;
+            writer.WriteStartObject();
+            writer.WritePropertyName("GrainId");
+            writer.WriteValue(id.ToParsableString());
+            writer.WriteEndObject();
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JObject jo = JObject.Load(reader);
+            GrainId grainId = GrainId.FromParsableString(jo["GrainId"].ToObject<string>());
+            return grainId;
+        }
+    }
+
+    internal class SiloAddressConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType)
+        {
+            return (objectType == typeof(SiloAddress));
+        }
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            SiloAddress addr = (SiloAddress)value;
+            writer.WriteStartObject();
+            writer.WritePropertyName("SiloAddress");
+            writer.WriteValue(addr.ToParsableString());
+            writer.WriteEndObject();
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JObject jo = JObject.Load(reader);
+            SiloAddress addr = SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+            return addr;
+        }
+    }
+
+    internal class UniqueKeyConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType)
+        {
+            return (objectType == typeof(UniqueKey));
+        }
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            UniqueKey key = (UniqueKey)value;
+            writer.WriteStartObject();
+            writer.WritePropertyName("UniqueKey");
+            writer.WriteValue(key.ToHexString());
+            writer.WriteEndObject();
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JObject jo = JObject.Load(reader);
+            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>());
+            return addr;
+        }
+    }
     #endregion
 }

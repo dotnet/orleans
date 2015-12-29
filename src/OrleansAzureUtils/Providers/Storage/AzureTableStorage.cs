@@ -103,8 +103,7 @@ namespace Orleans.Storage
             
             if (useJsonFormat)
             {
-                jsonSettings = new Newtonsoft.Json.JsonSerializerSettings();
-                jsonSettings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All;
+                jsonSettings = OrleansJsonSerializer.SerializerSettings;
             }
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
