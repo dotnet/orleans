@@ -55,9 +55,8 @@ CREATE TABLE OrleansQuery
 	(
 		DeploymentId NVARCHAR(150) NOT NULL,
 		Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-		Version BIGINT NOT NULL,
-		-- ETag should also always be unique, but there will ever be only one row.
-		ETag BIGINT NOT NULL DEFAULT 0,
+		Version BIGINT NOT NULL DEFAULT 0,
+
     
 		CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY (DeploymentId)
 	);
@@ -185,19 +184,13 @@ CREATE TABLE OrleansQuery
 		' 
 		INSERT INTO OrleansMembershipVersionTable
 		(
-			DeploymentId,
-			Version
+			DeploymentId
 		)
-		SELECT	
-			@deploymentId,
-			@version
-		WHERE NOT EXISTS
-		(			
-			SELECT 1
-			FROM OrleansMembershipVersionTable
-			WHERE DeploymentId = @deploymentId AND @deploymentId IS NOT NULL
-			FOR UPDATE
-		);
+		Values
+		(
+			@deploymentId
+		)
+		ON DUPLICATE KEY UPDATE DeploymentId = DeploymentId;
                                         
 		SELECT ROW_COUNT();
 	');
@@ -295,11 +288,10 @@ BEGIN
 			-- to be rolled back.
 			UPDATE OrleansMembershipVersionTable
 			SET
-				Version		= _version,
-			 	Etag 		= _versionEtag + 1
+			 	Version		= _versionEtag + 1
 			WHERE
 				(DeploymentId	= _deploymentId AND _deploymentId IS NOT NULL)
-				AND (ETag		= _versionEtag AND _versionEtag IS NOT NULL);
+				AND (Version		= _versionEtag AND _versionEtag IS NOT NULL);
 		END IF;
 		-- Here the rowcount should always be either zero (no update)
 		-- or one (exactly one entry updated).
@@ -383,11 +375,10 @@ BEGIN
 			-- to be rolled back.
 			UPDATE OrleansMembershipVersionTable
 			SET
-				Version		= _version,
-				ETag		= _versionEtag + 1
+			Version = _versionEtag + 1
 			WHERE
 				DeploymentId	= _deploymentId AND _deploymentId IS NOT NULL
-				AND ETag		= _versionEtag AND _versionEtag IS NOT NULL;
+				AND Version 		= _versionEtag AND _versionEtag IS NOT NULL;
 
 		END IF;
         SET _ROWCOUNT = ROW_COUNT();
@@ -405,31 +396,7 @@ DELIMITER ;
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-	'UpsertReminderRowKey', 'call UpsertReminderRowKey(@serviceId, @grainId, @reminderName, @startTime, @period, 
-    @grainIdConsistentHash);'
-);
-
-DELIMITER $$
-CREATE PROCEDURE UpsertReminderRowKey(
-	in 	_serviceId NVARCHAR(150),
-	in 	_grainId NVARCHAR(150),
-	in 	_reminderName NVARCHAR(150),
-	in 	_startTime DATETIME,
-	in 	_period INT,
-	in 	_grainIdConsistentHash INT
-)
-BEGIN
-		DECLARE _newEtag BIGINT;
-		START TRANSACTION;
-        SET _newEtag = (SELECT ETag + 1 FROM OrleansRemindersTable WHERE
-						ServiceId = _serviceId AND _serviceId IS NOT NULL
-						AND GrainId = _grainId AND _grainId IS NOT NULL
-						AND ReminderName = _reminderName AND _reminderName IS NOT NULL 
-						FOR UPDATE);
-                        
-		IF _newEtag IS NULL
-		THEN
-			SET _newEtag = 0;
+	'UpsertReminderRowKey', '
 			INSERT INTO OrleansRemindersTable
 			(
 				ServiceId,
@@ -441,77 +408,26 @@ BEGIN
 			)
 			VALUES
 			(
-				_serviceId,
-				_grainId,
-				_reminderName,
-				_startTime,
-				_period,
-				_grainIdConsistentHash
-			);
-		ELSE
-			UPDATE OrleansRemindersTable
-			SET				
-				StartTime             = _startTime,
-				Period                = _period,
-				GrainIdConsistentHash = _grainIdConsistentHash,
-				ETag                  = _newEtag
-			WHERE
-				ServiceId = _serviceId AND _serviceId IS NOT NULL
-				AND GrainId = _grainId AND _grainId IS NOT NULL
-				AND ReminderName = _reminderName AND _reminderName IS NOT NULL;
-		END IF;
-		COMMIT;
-		SELECT CONVERT(_newEtag, BINARY) AS ETag;
-END$$
-
-DELIMITER ;
+				@serviceId,
+				@grainId,
+				@reminderName,
+				@startTime,
+				@period,
+				@grainIdConsistentHash
+			)
+		ON DUPLICATE KEY UPDATE 
+				StartTime             = @startTime,
+				Period                = @period,
+				GrainIdConsistentHash = @grainIdConsistentHash,
+				ETag                  = last_insert_id(ETag+1);
+	
+		SELECT CONVERT(last_insert_id(), BINARY) AS ETag;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-	'UpsertReportClientMetricsKey','call UpsertReportClientMetricsKey(@deploymentId, @clientId, @timestamp, 
-    @address, @hostName, @cpuUsage, @memoryUsage, @sendQueueLength, @receiveQueueLength, @sentMessagesCount,
-    @receivedMessagesCount, @connectedGatewaysCount);'
-);
-
-DELIMITER $$
-
-CREATE PROCEDURE UpsertReportClientMetricsKey(
-	in	_deploymentId NVARCHAR(150),
-	in	_clientId NVARCHAR(150),
-	in	_timestamp DATETIME,
-	in	_address VARCHAR(45),
-	in	_hostName NVARCHAR(150),
-	in	_cpuUsage FLOAT,
-	in	_memoryUsage BIGINT,
-	in	_sendQueueLength INT,
-	in	_receiveQueueLength INT,
-	in	_sentMessagesCount BIGINT,
-	in	_receivedMessagesCount BIGINT,
-	in	_connectedGatewaysCount BIGINT
-)
-BEGIN
-		START TRANSACTION;     
-		IF EXISTS(SELECT 1 FROM OrleansClientMetricsTable WHERE
-			DeploymentId = _deploymentId AND _deploymentId IS NOT NULL
-			AND ClientId = _clientId AND _clientId IS NOT NULL
-			FOR UPDATE) 
-		THEN
-			UPDATE OrleansClientMetricsTable
-			SET			
-				Address = _address,
-				HostName = _hostName,
-				CPU = _cpuUsage,
-				Memory = _memoryUsage,
-				SendQueue = _sendQueueLength,
-				ReceiveQueue = _receiveQueueLength,
-				SentMessages = _sentMessagesCount,
-				ReceivedMessages = _receivedMessagesCount,
-				ConnectedGatewayCount = _connectedGatewaysCount
-			WHERE
-				(DeploymentId = _deploymentId AND _deploymentId IS NOT NULL)
-				AND (ClientId = _clientId AND _clientId IS NOT NULL);
-		ELSE
+	'UpsertReportClientMetricsKey','
 			INSERT INTO OrleansClientMetricsTable
 			(
 				DeploymentId,
@@ -528,87 +444,34 @@ BEGIN
 			)
 			VALUES
 			(
-				_deploymentId,
-				_clientId,
-				_address,
-				_hostName,
-				_cpuUsage,
-				_memoryUsage,
-				_sendQueueLength,
-				_receiveQueueLength,
-				_sentMessagesCount,
-				_receivedMessagesCount,
-				_connectedGatewaysCount
-			);
-		END IF;
-		COMMIT;
-END$$    
-
-DELIMITER ;
+				@deploymentId,
+				@clientId,
+				@address,
+				@hostName,
+				@cpuUsage,
+				@memoryUsage,
+				@sendQueueLength,
+				@receiveQueueLength,
+				@sentMessagesCount,
+				@receivedMessagesCount,
+				@connectedGatewaysCount
+			)
+		ON DUPLICATE KEY UPDATE 
+				Address 		= @address,
+				HostName 		= @hostName,
+				CPU 			= @cpuUsage,
+				Memory 			= @memoryUsage,
+				SendQueue 		= @sendQueueLength,
+				ReceiveQueue 		= @receiveQueueLength,
+				SentMessages 		= @sentMessagesCount,
+				ReceivedMessages 	= @receivedMessagesCount,
+				ConnectedGatewayCount 	= @connectedGatewaysCount;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
-	'UpsertSiloMetricsKey','call UpsertSiloMetricsKey(@deploymentId, @siloId, @address, @port, @generation, 
-    @hostName, @gatewayAddress, @gatewayPort, @cpuUsage, @memoryUsage, @activationsCount, @recentlyUsedActivationsCount,
-	@sendQueueLength, @receiveQueueLength, @requestQueueLength, @sentMessagesCount, @receivedMessagesCount,
-	@isOverloaded, @clientCount);'
-);
-
-DELIMITER $$
-
-CREATE PROCEDURE UpsertSiloMetricsKey(
-	in	_deploymentId NVARCHAR(150),
-	in	_siloId NVARCHAR(150),
-    in	_timestamp DATETIME,
-    in	_address VARCHAR(45),
-    in	_port INT,
-    in	_generation INT,
-    in	_hostName NVARCHAR(150),
-    in	_gatewayAddress VARCHAR(45),
-    in	_gatewayPort INT,
-    in	_cpuUsage FLOAT,
-    in	_memoryUsage BIGINT,
-    in	_activationsCount INT,
-    in	_recentlyUsedActivationsCount INT,
-    in	_sendQueueLength INT,
-    in	_receiveQueueLength INT,
-    in	_requestQueueLength BIGINT,
-    in	_sentMessagesCount BIGINT,
-	in	_receivedMessagesCount BIGINT,
-    in	_isOverloaded BIT,
-    in	_clientCount BIGINT
-)
-BEGIN
-		START TRANSACTION;
-		IF EXISTS(SELECT 1 FROM  OrleansSiloMetricsTable WHERE
-			DeploymentId = _deploymentId AND _deploymentId IS NOT NULL
-			AND SiloId = _siloId AND _siloId IS NOT NULL
-			FOR UPDATE)
-		THEN
-			UPDATE OrleansSiloMetricsTable
-			SET
-				Address = _address,
-				Port = _port,
-				Generation = _generation,
-				HostName = _hostName,
-				GatewayAddress = _gatewayAddress,
-				GatewayPort = _gatewayPort,
-				CPU = _cpuUsage,
-				Memory = _memoryUsage,
-				Activations = _activationsCount,
-				RecentlyUsedActivations = _recentlyUsedActivationsCount,
-				SendQueue = _sendQueueLength,
-				ReceiveQueue = _receiveQueueLength,
-				RequestQueue = _requestQueueLength,
-				SentMessages = _sentMessagesCount,
-				ReceivedMessages = _receivedMessagesCount,
-				LoadShedding = _isOverloaded,
-				ClientCount = _clientCount
-			WHERE
-				(DeploymentId = _deploymentId AND _deploymentId IS NOT NULL)
-				AND (SiloId = _siloId AND _siloId IS NOT NULL);
-		ELSE
+	'UpsertSiloMetricsKey','
 			INSERT INTO OrleansSiloMetricsTable
 			(
 				DeploymentId,
@@ -633,31 +496,45 @@ BEGIN
 			)
 			VALUES
 			(
-				_deploymentId,
-				_siloId,
-				_address,
-				_port,
-				_generation,
-				_hostName,
-				_gatewayAddress,
-				_gatewayPort,
-				_cpuUsage,
-				_memoryUsage,
-				_activationsCount,
-				_recentlyUsedActivationsCount,
-				_sendQueueLength,
-				_receiveQueueLength,
-				_requestQueueLength,
-				_sentMessagesCount,
-				_receivedMessagesCount,
-				_isOverloaded,
-				_clientCount
-			);
-		END IF;
-		COMMIT;
-END$$    
-
-DELIMITER ;
+				@deploymentId,
+				@siloId,
+				@address,
+				@port,
+				@generation,
+				@hostName,
+				@gatewayAddress,
+				@gatewayPort,
+				@cpuUsage,
+				@memoryUsage,
+				@activationsCount,
+				@recentlyUsedActivationsCount,
+				@sendQueueLength,
+				@receiveQueueLength,
+				@requestQueueLength,
+				@sentMessagesCount,
+				@receivedMessagesCount,
+				@isOverloaded,
+				@clientCount
+			)
+		ON DUPLICATE KEY UPDATE 
+				Address 		= @address,
+				Port 			= @port,
+				Generation 		= @generation,
+				HostName 		= @hostName,
+				GatewayAddress	 	= @gatewayAddress,
+				GatewayPort		= @gatewayPort,
+				CPU 			= @cpuUsage,
+				Memory 			= @memoryUsage,
+				Activations 		= @activationsCount,
+				RecentlyUsedActivations	= @recentlyUsedActivationsCount,
+				SendQueue 		= @sendQueueLength,
+				ReceiveQueue 		= @receiveQueueLength,
+				RequestQueue 		= @requestQueueLength,
+				SentMessages 		= @sentMessagesCount,
+				ReceivedMessages 	= @receivedMessagesCount,
+				LoadShedding 		= @isOverloaded,
+				ClientCount 		= @clientCount;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -698,7 +575,7 @@ VALUES
 		m.IAmAliveTime,
 		CONVERT(m.ETag, BINARY) AS ETag,
 		v.Version,
-		CONVERT(v.ETag, BINARY) AS VersionETag
+		CONVERT(v.Version, BINARY) AS VersionETag
 	FROM
 		OrleansMembershipVersionTable v
 		-- This ensures the version table will returned even if there is no matching membership row.
@@ -733,7 +610,7 @@ VALUES
 		m.IAmAliveTime,
 		CONVERT(m.ETag, BINARY) AS ETag,
 		v.Version,
-		CONVERT(v.ETag, BINARY) AS VersionETag
+		CONVERT(v.Version, BINARY) AS VersionETag
 	FROM
 		OrleansMembershipVersionTable v
 		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId

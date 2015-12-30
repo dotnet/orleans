@@ -100,6 +100,8 @@
     <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="ManagementGrainTests.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
@@ -113,6 +115,10 @@
     <Compile Include="LocalErrorGrain.cs" />
     <Compile Include="ManagementAgentTests.cs" />
     <Compile Include="MockStatsCollectors.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs" />
     <Compile Include="StorageTests\LocalStoreTests.cs" />
     <Compile Include="StorageTests\MockStorageProvider.cs" />
     <Compile Include="MultifacetGrainTest.cs" />
