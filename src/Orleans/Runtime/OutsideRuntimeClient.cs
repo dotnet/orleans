@@ -148,6 +148,8 @@ namespace Orleans
                 {
                     UnobservedExceptionsHandlerClass.SetUnobservedExceptionHandler(UnhandledException);
                 }
+                AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
+
                 // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
                 SerializationManager.GetDeserializer(typeof(String));
 
@@ -168,7 +170,8 @@ namespace Orleans
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
                     BARS, config.DNSHostName, localAddress, clientId));
-                string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}'", BARS, RuntimeVersion.Current);
+                string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}", 
+                    BARS, RuntimeVersion.Current, PrintAppDomainDetails());
                 startMsg = string.Format("{0} Config= "  + Environment.NewLine + " {1}", startMsg, config);
                 logger.Info(ErrorCode.ClientStarting, startMsg);
 
@@ -754,6 +757,11 @@ namespace Orleans
             catch (Exception) { }
             try
             {
+                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
+            }
+            catch (Exception) { }
+            try
+            {
                 if (clientProviderRuntime != null)
                 {
                     clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
@@ -836,6 +844,25 @@ namespace Orleans
         }
 
         #endregion
+
+        private void CurrentDomain_DomainUnload(object sender, EventArgs e)
+        {
+            try
+            {
+                logger.Warn(ErrorCode.ProxyClient_AppDomain_Unload, 
+                    String.Format("Current AppDomain={0} is unloading.", PrintAppDomainDetails()));
+                TraceLogger.Flush();
+            }
+            catch(Exception)
+            {
+                // just ignore, make sure not to throw from here.
+            }
+        }
+        private string PrintAppDomainDetails()
+        {
+            return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
+        }
+
 
         private class LocalObjectData
         {
