@@ -13,8 +13,10 @@ namespace Orleans.Serialization
 {
     internal class OrleansJsonSerializer : IExternalSerializer
     {
-        public static JsonSerializerSettings settings;
+        private static JsonSerializerSettings settings;
         private TraceLogger logger;
+
+        internal static JsonSerializerSettings SerializerSettings { get { return settings; } }
 
         static OrleansJsonSerializer()
         {
