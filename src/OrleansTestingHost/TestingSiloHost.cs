@@ -246,6 +246,26 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Restart all additional silos, not including the default Primary and Secondary silos.
+        /// </summary>
+        public void RestartAllAdditionalSilos()
+        {
+            if (additionalSilos.Count == 0) return;
+
+            var restartedAdditionalSilos = new List<SiloHandle>();
+            foreach (SiloHandle instance in additionalSilos.ToArray())
+            {
+                if (instance.Silo != null)
+                {
+                    var restartedSilo = RestartSilo(instance);
+                    restartedAdditionalSilos.Add(restartedSilo);
+                }
+            }
+            additionalSilos.Clear();
+            additionalSilos.AddRange(restartedAdditionalSilos);
+        }
+
+        /// <summary>
         /// Stop the default Primary and Secondary silos.
         /// </summary>
         public static void StopDefaultSilos()
@@ -292,7 +312,7 @@ namespace Orleans.TestingHost
             Primary = StartOrleansSilo(Silo.SiloType.Primary, primarySiloOptions, InstanceCounter++);
             Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, InstanceCounter++);
             WaitForLivenessToStabilizeAsync().Wait();
-            GrainClient.Initialize();
+            GrainClient.Initialize(this.ClientConfig);
         }
 
         /// <summary>

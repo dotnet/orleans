@@ -131,6 +131,8 @@
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="ExternalTypesTests.cs" />
     <Compile Include="GrainFactoryTests.cs" />
+    <Compile Include="KeyExtensionTests.cs" />
+    <Compile Include="ProviderTests.cs" />
     <Compile Include="ReminderTest.cs" />
     <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />

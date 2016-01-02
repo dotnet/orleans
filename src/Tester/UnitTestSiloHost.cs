@@ -1,7 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Text;
+using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 
 namespace UnitTests.Tester
@@ -80,7 +85,7 @@ namespace UnitTests.Tester
             return sb.ToString();
         }
 
-        protected static int GetRandomGrainId()
+        public static int GetRandomGrainId()
         {
             return random.Next();
         }
@@ -126,6 +131,32 @@ namespace UnitTests.Tester
             }
             Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
             return duration;
+        }
+
+        protected void TestSilosStarted(int expected)
+        {
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+
+            Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
+            foreach (var pair in statuses)
+            {
+                Console.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                Assert.AreEqual(
+                    SiloStatus.Active,
+                    pair.Value,
+                    "Failed to confirm start of {0} silos ({1} confirmed).",
+                    pair.Value,
+                    SiloStatus.Active);
+            }
+            Assert.AreEqual(expected, statuses.Count);
+        }
+
+        public static void ConfigureClientThreadPoolSettingsForStorageTests(int NumDotNetPoolThreads = 200)
+        {
+            ThreadPool.SetMinThreads(NumDotNetPoolThreads, NumDotNetPoolThreads);
+            ServicePointManager.Expect100Continue = false;
+            ServicePointManager.DefaultConnectionLimit = NumDotNetPoolThreads; // 1000;
+            ServicePointManager.UseNagleAlgorithm = false;
         }
     }
 }
