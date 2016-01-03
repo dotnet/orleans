@@ -64,6 +64,10 @@
     <Compile Include="TestingUtils.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrleansManager\OrleansManager.csproj">
+      <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
+      <Name>OrleansManager</Name>
+    </ProjectReference>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>

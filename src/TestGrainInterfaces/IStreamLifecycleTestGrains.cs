@@ -13,6 +13,7 @@ namespace UnitTests.GrainInterfaces
 
         Task Ping();
         Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName);
+        Task TestBecomeConsumerSlim(Guid streamId, string streamNamespace, string providerName);
         Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, StreamSubscriptionHandle<int> consumerHandle);
         Task ClearGrain();
     }

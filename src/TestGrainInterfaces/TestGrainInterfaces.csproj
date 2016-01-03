@@ -77,11 +77,13 @@
     <Compile Include="IPolymorphicTestGrain.cs" />
     <Compile Include="IPromiseForwardGrain.cs" />
     <Compile Include="IProxyGrain.cs" />
+    <Compile Include="IReentrancyGrain.cs" />
     <Compile Include="IReentrantStressTestGrain.cs" />
     <Compile Include="IReminderTestGrain.cs" />
     <Compile Include="IReminderTestGrain2.cs" />
     <Compile Include="IRequestContextTestGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
+    <Compile Include="ISerializationGeneratorTests.cs" />
     <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="CodegenTestInterfaces.cs" />

@@ -50,6 +50,7 @@
     <Compile Include="ClientAddressableTestRendezvousGrain.cs" />
     <Compile Include="CollectionTestGrain.cs" />
     <Compile Include="EchoTaskGrain.cs" />
+    <Compile Include="EnumResultGrain.cs" />
     <Compile Include="ErrorGrain.cs" />
     <Compile Include="ExtensionTestGrain.cs" />
     <Compile Include="InterlockedFlag.cs" />
@@ -62,12 +63,15 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="ReentrantGrain.cs" />
     <Compile Include="ReminderTestGrain2.cs" />
     <Compile Include="StreamingGrain.cs" />
+    <Compile Include="StreamLifecycleTestGrains.cs" />
     <Compile Include="StressTestGrain.cs" />
     <Compile Include="TestExtension.cs" />
     <Compile Include="TestGrain.cs" />
     <Compile Include="TimerGrain.cs" />
+    <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansManager\OrleansManager.csproj">

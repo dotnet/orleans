@@ -50,6 +50,7 @@
     <Compile Include="IMultifacetFactoryTestGrain.cs" />
     <Compile Include="IMultifacetTestGrain.cs" />
     <Compile Include="IStressTestGrain.cs" />
+    <Compile Include="IValueTypeTestGrain.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">

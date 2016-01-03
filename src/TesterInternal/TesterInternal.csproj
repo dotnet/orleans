@@ -130,6 +130,16 @@
     <Compile Include="LocalErrorGrain.cs" />
     <Compile Include="ManagementAgentTests.cs" />
     <Compile Include="MockStatsCollectors.cs" />
+    <Compile Include="ReentrancyTests.cs" />
+    <Compile Include="SchedulerTests\QueuedTaskSchedulerTests_Set1.cs" />
+    <Compile Include="SchedulerTests\QueuedTaskSchedulerTests_Set2.cs" />
+    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs" />
+    <Compile Include="SchedulerTests\STSchedulerLongTurnTest.cs" />
+    <Compile Include="SerializerTests\CustomSerializerTests.cs" />
+    <Compile Include="SerializerTests\MessageSerializerTests.cs" />
+    <Compile Include="SerializerTests\RoundTripSerializerTests.cs" />
+    <Compile Include="SerializerTests\SerializationTests.cs" />
+    <Compile Include="SerializerTests\SerializerGenerationTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs" />
@@ -142,8 +152,8 @@
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
     <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
-    <Compile Include="OrleansTaskSchedulerAdvancedTests.cs" />
-    <Compile Include="OrleansTaskSchedulerBasicTests.cs" />
+    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs" />
+    <Compile Include="SchedulerTests\OrleansTaskSchedulerBasicTests.cs" />
     <Compile Include="PolymorphicInterfaceTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
@@ -174,6 +184,9 @@
     <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
     <Compile Include="StorageTests\AzureQueueDataManagerTests.cs" />
     <Compile Include="MembershipTests\ZookeeperMembershipTableTests.cs" />
+    <Compile Include="StreamingTests\StreamLimitTests.cs" />
+    <Compile Include="StreamingTests\StreamPubSubReliabilityTests.cs" />
+    <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />
@@ -283,8 +296,14 @@
     <Content Include="ClientConfig_NewAzure.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="ClientConfig_StreamProviders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config_ActivationCollectorTests.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_AzureTableStorage.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_Azure_Default.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -308,6 +327,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_OldAzure.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_StorageErrors.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_StorageProvider_Azure1.xml">
@@ -345,9 +367,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="MockStats_ServerConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_AzureTableStorage.xml">

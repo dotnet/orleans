@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.Providers;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
@@ -167,6 +168,30 @@ namespace UnitTests.Grains
             await WriteStateAsync();
         }
 
+        public virtual async Task TestBecomeConsumerSlim(Guid streamIdGuid, string streamNamespace, string providerName)
+        {
+            InitStream(streamIdGuid, streamNamespace, providerName);
+            var observer = new MyStreamObserver<int>(logger);
+
+            //var subsHandle = await State.Stream.SubscribeAsync(observer);
+
+            IStreamConsumerExtension myExtensionReference;
+#if USE_CAST
+            myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
+#else
+            var tup = await SiloProviderRuntime.Instance.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+                        () => new StreamConsumerExtension(SiloProviderRuntime.Instance));
+            StreamConsumerExtension myExtension = tup.Item1;
+            myExtensionReference = tup.Item2;
+#endif
+            string extKey = providerName + "_" + State.Stream.Namespace;
+            IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
+            GuidId subscriptionId = GuidId.GetNewGuidId();
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).StreamId, myExtensionReference, null);
+
+            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null);
+        }
+
         public async Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, StreamSubscriptionHandle<int> subsHandle)
         {
             if (logger.IsVerbose) logger.Verbose("RemoveConsumer StreamId={0} StreamProvider={1}", streamId, providerName);
@@ -198,8 +223,8 @@ namespace UnitTests.Grains
     {
         private static Logger _logger;
 
-        private const Int32 FilterDataOdd = 1;
-        private const Int32 FilterDataEven = 2;
+        private const int FilterDataOdd = 1;
+        private const int FilterDataEven = 2;
 
         public override Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName)
         {
@@ -256,7 +281,7 @@ namespace UnitTests.Grains
             {
                 throw new Exception("Should have got the correct filter data passed in, but got: " + filterData);
             }
-            Int32 val = (int) item;
+            int val = (int) item;
             bool result = val % 2 == 0;
             if (_logger != null) _logger.Info("FilterIsEven(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
             return result;
@@ -267,7 +292,7 @@ namespace UnitTests.Grains
             {
                 throw new Exception("Should have got the correct filter data passed in, but got: " + filterData);
             }
-            Int32 val = (int) item;
+            int val = (int) item;
             bool result = val % 2 == 1;
             if (_logger != null) _logger.Info("FilterIsOdd(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
             return result;
@@ -381,7 +406,7 @@ namespace UnitTests.Grains
             await WriteStateAsync();
 
             if (logger.IsVerbose) logger.Verbose("Calling DeactivateOnIdle");
-            base.DeactivateOnIdle();
+            DeactivateOnIdle();
         }
     }
 

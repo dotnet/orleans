@@ -114,7 +114,7 @@
     <Reference Include="System.Data.Services.Client" />
     <Reference Include="System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
+      <HintPath>..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
     </Reference>
     <Reference Include="System.Spatial">
       <HintPath>$(SolutionDir)packages\System.Spatial.5.6.4\lib\net40\System.Spatial.dll</HintPath>
@@ -130,17 +130,19 @@
     <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="ExternalTypesTests.cs" />
-    <Compile Include="GrainFactoryTests.cs" />
     <Compile Include="KeyExtensionTests.cs" />
     <Compile Include="ProviderTests.cs" />
     <Compile Include="ReminderTest.cs" />
     <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="DeactivationTests.cs" />
+    <Compile Include="DeploymentTests\DeployTest.cs" />
     <Compile Include="DuplicateActivationsTests.cs" />
     <Compile Include="GenericGrainsInAzureStorageTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainActivateDeactivateTests.cs" />
+    <Compile Include="GrainFactoryTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
+    <Compile Include="ManagementGrainTests.cs" />
     <Compile Include="MembershipTests\LivenessTests.cs" />
     <Compile Include="MemoryStorageProviderTests.cs" />
     <Compile Include="ObserverTests.cs" />
@@ -230,6 +232,33 @@
     </Content>
     <Content Include="ClientConfigurationForStreamTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\Deployment.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\Deploy-AbsolutePaths.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\Clean-EmptyRelativePaths.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\OrleansConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\Clean-RelativePaths.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\OrleansConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestRelativePaths\Deploy-RelativePaths.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="OrleansConfigurationForStreamingDeactivationUnitTests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -343,6 +372,7 @@
     <None Include="SerializationTests\ProtobufSerializationTests\addressbook.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\GenerateProtos.cmd" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
