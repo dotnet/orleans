@@ -175,7 +175,6 @@
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\StreamFilteringTests.cs" />
     <Compile Include="StreamingTests\ControllableStreamGeneratorProviderTests.cs" />
-    <Compile Include="StreamingTests\StreamTestsConstants.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />

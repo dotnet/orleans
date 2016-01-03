@@ -69,7 +69,7 @@ namespace UnitTests.StreamingTests
         public void TestInitialize()
         {
             Console.WriteLine("TestInitialize - {0}", TestContext.TestName);
-            StreamNamespace = UnitTestStreamNamespace.StreamLifecycleTestsNamespace;
+            StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
             mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
         }
 

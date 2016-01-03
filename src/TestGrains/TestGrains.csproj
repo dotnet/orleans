@@ -55,6 +55,7 @@
     <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ConcurrentGrain.cs" />
+    <Compile Include="ConsumerEventCountingGrain.cs" />
     <Compile Include="DeadlockGrain.cs" />
     <Compile Include="DerivedServiceType.cs" />
     <Compile Include="EnumResultGrain.cs" />
@@ -78,6 +79,7 @@
     <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
     <Compile Include="MyObserverSubscriptionManager.cs" />
     <Compile Include="PolymorphicTestGrain.cs" />
+    <Compile Include="ProducerEventCountingGrain.cs" />
     <Compile Include="PromiseForwardGrain.cs" />
     <Compile Include="ProxyGrain.cs" />
     <Compile Include="ReentrantGrain.cs" />

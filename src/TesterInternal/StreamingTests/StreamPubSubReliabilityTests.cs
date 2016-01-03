@@ -59,7 +59,7 @@ namespace UnitTests.StreamingTests
             logger.Info("TestInitialize - {0}", TestContext.TestName);
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-            StreamNamespace = UnitTestStreamNamespace.StreamLifecycleTestsNamespace;
+            StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
 
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
         }

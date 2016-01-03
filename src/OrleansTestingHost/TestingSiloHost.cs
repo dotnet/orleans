@@ -296,21 +296,27 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Restart the default Primary and Secondary silos.
         /// </summary>
-        public void RestartDefaultSilos()
+        public void RestartDefaultSilos(bool pickNewDeploymentId=false)
         {
-            TestingSiloOptions primarySiloOptions = Primary.Options;
-            TestingSiloOptions secondarySiloOptions = Secondary.Options;
+            TestingSiloOptions primarySiloOptions = Primary != null ? Primary.Options : null;
+            TestingSiloOptions secondarySiloOptions = Secondary != null ? Secondary.Options : null;
             // Restart as the same deployment
             string deploymentId = DeploymentId;
 
             StopDefaultSilos();
 
-            DeploymentId = deploymentId;
-            primarySiloOptions.PickNewDeploymentId = false;
-            secondarySiloOptions.PickNewDeploymentId = false;
-
-            Primary = StartOrleansSilo(Silo.SiloType.Primary, primarySiloOptions, InstanceCounter++);
-            Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, InstanceCounter++);
+            DeploymentId = pickNewDeploymentId ? null : deploymentId;
+            if (primarySiloOptions != null)
+            {
+                primarySiloOptions.PickNewDeploymentId = pickNewDeploymentId;
+                Primary = StartOrleansSilo(Silo.SiloType.Primary, primarySiloOptions, InstanceCounter++);
+            }
+            if (secondarySiloOptions != null)
+            {
+                secondarySiloOptions.PickNewDeploymentId = pickNewDeploymentId;
+                Secondary = StartOrleansSilo(Silo.SiloType.Secondary, secondarySiloOptions, InstanceCounter++);
+            }
+            
             WaitForLivenessToStabilizeAsync().Wait();
             GrainClient.Initialize(this.ClientConfig);
         }
@@ -361,8 +367,22 @@ namespace Orleans.TestingHost
                 var options = instance.Options;
                 var type = instance.Silo.Type;
                 StopOrleansSilo(instance, true);
-                instance = StartOrleansSilo(type, options, InstanceCounter++);
-                return instance;
+                var newInstance = StartOrleansSilo(type, options, InstanceCounter++);
+
+                if (type == Silo.SiloType.Primary)
+                {
+                    Primary = newInstance;
+                }
+                else if (type == Silo.SiloType.Secondary)
+                {
+                    Secondary = newInstance;
+                }
+                else
+                {
+                    additionalSilos.Add(newInstance);
+                }
+
+                return newInstance;
             }
             return null;
         }

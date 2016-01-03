@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
@@ -157,6 +158,20 @@ namespace UnitTests.Tester
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = NumDotNetPoolThreads; // 1000;
             ServicePointManager.UseNagleAlgorithm = false;
+        }
+
+        public static async Task<int> GetActivationCount(string fullTypeName)
+        {
+            int result = 0;
+
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
+            foreach (var stat in stats)
+            {
+                if (stat.GrainType == fullTypeName)
+                    result += stat.ActivationCount;
+            }
+            return result;
         }
     }
 }
