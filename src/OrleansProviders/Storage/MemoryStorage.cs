@@ -100,7 +100,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ReadStateAsync"/>
-        public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
 
@@ -108,43 +108,34 @@ namespace Orleans.Storage
             
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
-            Tuple<IDictionary<string, object>, string> result = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
-            if (result != null && result.Item1 != null)
+            var state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
+            if (state != null && state.State != null)
             {
-                grainState.SetAll(result.Item1);
-                grainState.Etag = result.Item2;
+                grainState.ETag = state.ETag;
+                grainState.State = state.State;
             }
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#WriteStateAsync"/>
-        public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
-            var data = grainState.AsDictionary();
-            string prevEtag = grainState.Etag;
-
-            if (Log.IsVerbose2) Log.Verbose2("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, data, prevEtag));
-
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
+            if (Log.IsVerbose2) Log.Verbose2("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            string newEtag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, data, prevEtag);
-
-            grainState.Etag = newEtag;
+            grainState.ETag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, grainState);
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ClearStateAsync"/>
-        public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             var keys = MakeKeys(grainType, grainReference);
-            string prevEtag = grainState.Etag; // TOD: Should this be 'null' for always Delete?
-
-            if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), prevEtag);
-
+            if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, prevEtag);
+            await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
         }
 
         #endregion

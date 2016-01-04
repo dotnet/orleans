@@ -10,7 +10,8 @@ namespace UnitTests.GrainInterfaces
         public int Foo { get; set; }
     }
 
-    public class MyState<T> : GrainState
+    [Serializable]
+    public class MyState<T>
          where T : IGrainObserver
     {
         public MyObserverSubscriptionManager<T> Subscription { get; set; }

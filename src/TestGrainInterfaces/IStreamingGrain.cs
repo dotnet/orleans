@@ -43,17 +43,20 @@ namespace UnitTests.GrainInterfaces
 
     //------- STATE interfaces ----//
 
-    public class Streaming_ProducerGrain_State : GrainState
+    [Serializable]
+    public class Streaming_ProducerGrain_State
     {
         public List<IProducerObserver> Producers { get; set; }
     }
 
-    public class Streaming_ConsumerGrain_State : GrainState
+    [Serializable]
+    public class Streaming_ConsumerGrain_State
     {
         public List<IConsumerObserver> Consumers { get; set; }
     }
 
-    public class Streaming_ProducerConsumerGrain_State : GrainState
+    [Serializable]
+    public class Streaming_ProducerConsumerGrain_State
     {
         public List<IProducerObserver> Producers { get; set; }
         public List<IConsumerObserver> Consumers { get; set; }

@@ -114,7 +114,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ReadStateAsync"/>
-        public Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             int num = FindStorageShard(grainType, grainReference);
             IStorageProvider provider = storageProviders[num];
@@ -123,7 +123,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#WriteStateAsync"/>
-        public Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             int num = FindStorageShard(grainType, grainReference);
             IStorageProvider provider = storageProviders[num];
@@ -132,7 +132,7 @@ namespace Orleans.Storage
 
         /// <summary> Deleet / Clear state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider#ClearStateAsync"/>
-        public Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             int num = FindStorageShard(grainType, grainReference);
             IStorageProvider provider = storageProviders[num];

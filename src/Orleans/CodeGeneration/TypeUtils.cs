@@ -419,17 +419,7 @@ namespace Orleans.Runtime
             }
             return generalType.GetTypeInfo().IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));        
         }
- 
-        public static bool IsGrainStateType(Type type)
-        {
-            var generalType = typeof(GrainState);
-            if (type.Assembly.ReflectionOnly)
-            {
-                generalType = ToReflectionOnlyType(generalType);
-            }
-            return generalType.GetTypeInfo().IsAssignableFrom(type) && TypeHasAttribute(type, typeof(GrainStateAttribute));
-        }
-            
+        
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);

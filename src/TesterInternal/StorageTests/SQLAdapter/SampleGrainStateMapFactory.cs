@@ -36,20 +36,20 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                         var devices = reader["Devices"];
                         if (devices is DBNull)
                             devices = string.Empty;
-                        return new Dictionary<string, object>()
+                        return new
                         {
-                            {"CustomerId", reader["CustomerId"]},
-                            {"FirstName", reader["FirstName"]},
-                            {"LastName", reader["LastName"]},
-                            {"NickName", reader["NickName"]},
-                            {"BirthDate", reader["BirthDate"]},
-                            {"Gender", reader["Gender"]},
-                            {"Country", reader["Country"]},
-                            {"AvatarUrl", reader["AvatarUrl"]},
-                            {"KudoPoints", reader["KudoPoints"]},
-                            {"Status", reader["Status"]},
-                            {"LastLogin", reader["LastLogin"]},
-                            {"Devices", JsonConvert.DeserializeObject((string)devices, jsonSettings)},
+                            CustomerId = reader["CustomerId"],
+                            FirstName = reader["FirstName"],
+                            LastName = reader["LastName"],
+                            NickName = reader["NickName"],
+                            BirthDate = reader["BirthDate"],
+                            Gender = reader["Gender"],
+                            Country = reader["Country"],
+                            AvatarUrl = reader["AvatarUrl"],
+                            KudoPoints = reader["KudoPoints"],
+                            Status = reader["Status"],
+                            LastLogin = reader["LastLogin"],
+                            Devices = JsonConvert.DeserializeObject((string)devices, jsonSettings)
                         };
                     },
                     entries =>
@@ -70,13 +70,7 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                         data.Columns.Add("Devices", typeof(string));
                         foreach (var entry in entries)
                         {
-                            data.Rows.Add(
-                                entry.GrainIdentity.GrainKey,
-                                entry.State["CustomerId"], entry.State["FirstName"], entry.State["LastName"], entry.State["NickName"],
-                                entry.State["BirthDate"], entry.State["Gender"], entry.State["Country"],
-                                entry.State["AvatarUrl"], entry.State["KudoPoints"], entry.State["Status"], entry.State["LastLogin"],
-                                JsonConvert.SerializeObject(entry.State["Devices"], jsonSettings)
-                                );
+                            data.Rows.Add(entry.GrainIdentity.GrainKey, JsonConvert.SerializeObject(entry.State, jsonSettings));
                         }
                         return data;
                     },

@@ -5,7 +5,8 @@ using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
 
 namespace Orleans.SqlUtils.StorageProvider.GrainClasses
 {
-    public class CustomerState : GrainState
+    [Serializable]
+    public class CustomerState
     {
         public int CustomerId { get; set; }
         public string FirstName { get; set; }

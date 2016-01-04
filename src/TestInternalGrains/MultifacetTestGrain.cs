@@ -1,11 +1,13 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class MultifacetTestGrainState : GrainState
+    [Serializable]
+    public class MultifacetTestGrainState
     {
         public int Value { get; set; }
     }

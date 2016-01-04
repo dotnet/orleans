@@ -5,7 +5,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class SimpleGrainState : GrainState
+    [Serializable]
+    public class SimpleGrainState
     {
         public int A { get; set; }
         public int EventDelay { get; set; }

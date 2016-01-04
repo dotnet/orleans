@@ -10,7 +10,8 @@ using Orleans.CodeGeneration;
 
 namespace UnitTests.Grains
 {
-    public class SimpleGenericGrainState<T> : GrainState
+    [Serializable]
+    public class SimpleGenericGrainState<T>
     {
         public T A { get; set; }
         public T B { get; set; }
@@ -81,7 +82,8 @@ namespace UnitTests.Grains
         }
     }
 
-    public class SimpleGenericGrainUState<U> : GrainState
+    [Serializable]
+    public class SimpleGenericGrainUState<U>
     {
         public U A { get; set; }
         public U B { get; set; }
@@ -120,7 +122,8 @@ namespace UnitTests.Grains
         }
     }
 
-    public class SimpleGenericGrain2State<T, U> : GrainState
+    [Serializable]
+    public class SimpleGenericGrain2State<T, U>
     {
         public T A { get; set; }
         public U B { get; set; }
@@ -175,7 +178,9 @@ namespace UnitTests.Grains
             return Task.FromResult(retValue);
         }
     }
-    public class IGrainWithListFieldsState : GrainState
+
+    [Serializable]
+    public class IGrainWithListFieldsState
     {
         public IList<string> Items { get; set; }
     }
@@ -202,7 +207,8 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericGrainWithListFieldsState<T> : GrainState
+    [Serializable]
+    public class GenericGrainWithListFieldsState<T>
     {
         public IList<T> Items { get; set; }
     }
@@ -230,24 +236,28 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericReaderWriterState<T> : GrainState
+    [Serializable]
+    public class GenericReaderWriterState<T>
     {
         public T Value { get; set; }
     }
-    
 
-    public class GenericReader2State<TOne, TTwo> : GrainState
-    {
-        public TOne Value1 { get; set; }
-        public TTwo Value2 { get; set; }
-    }
-    public class GenericReaderWriterGrain2State<TOne, TTwo> : GrainState
+    [Serializable]
+    public class GenericReader2State<TOne, TTwo>
     {
         public TOne Value1 { get; set; }
         public TTwo Value2 { get; set; }
     }
 
-    public class GenericReader3State<TOne, TTwo, TThree> : GrainState
+    [Serializable]
+    public class GenericReaderWriterGrain2State<TOne, TTwo>
+    {
+        public TOne Value1 { get; set; }
+        public TTwo Value2 { get; set; }
+    }
+
+    [Serializable]
+    public class GenericReader3State<TOne, TTwo, TThree>
     {
         public TOne Value1 { get; set; }
         public TTwo Value2 { get; set; }
