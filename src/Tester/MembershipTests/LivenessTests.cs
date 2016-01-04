@@ -255,6 +255,13 @@ namespace UnitTests.MembershipTests
             DoClassInitialize();
         }
 
+		[TestMethod, TestCategory("Functional"), TestCategory("Liveness")]
+        public void Silo_Config_MembershipGrain()
+        {
+            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, Globals.LivenessType, "LivenessType");
+            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, Globals.ReminderServiceType, "ReminderServiceType");
+        }
+
         //[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("Gabi")]
         public async Task Liveness_Grain_1()
         {
@@ -322,8 +329,15 @@ namespace UnitTests.MembershipTests
 
             DoClassInitialize();
         }
+		
+		[TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
+        public void Silo_Config_AzureTable()
+        {
+            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, Globals.LivenessType, "LivenessType");
+            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, Globals.ReminderServiceType, "ReminderServiceType");
+        }
 
-        //[TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_1()
         {
             await Do_Liveness_OracleTest_1();
@@ -335,13 +349,13 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_2(0);
         }
 
-        //[TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_3_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        //[TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
@@ -470,6 +484,13 @@ namespace UnitTests.MembershipTests
             DoClassInitialize();
         }
 
+		[TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("SqlServer")]
+        public void Silo_Config_SqlServer()
+        {
+            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.SqlServer, Globals.LivenessType, "LivenessType");
+            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, Globals.ReminderServiceType, "ReminderServiceType");
+        }
+		
         //[TestMethod, TestCategory("Membership"), TestCategory("SqlServer")]
         public async Task Liveness_Sql_1()
         {

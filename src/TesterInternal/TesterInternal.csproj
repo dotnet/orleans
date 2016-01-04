@@ -96,9 +96,16 @@
     <Compile Include="ConfigTests.cs" />
     <Compile Include="CounterControlProgTests.cs" />
     <Compile Include="CounterTests.cs" />
+    <Compile Include="DeadlockDetectionTests.cs" />
+    <Compile Include="EchoTaskGrainTests.cs" />
     <Compile Include="ErrorGrainTest.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
+    <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
+    <Compile Include="General\LoadSheddingTest.cs" />
+    <Compile Include="General\LoggerTest.cs" />
+    <Compile Include="General\LruTest.cs" />
+    <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
     <Compile Include="ManagementGrainTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
@@ -119,6 +126,7 @@
     <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs" />
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs" />
+    <Compile Include="StorageTests\HierarchicalKeyStoreTests.cs" />
     <Compile Include="StorageTests\LocalStoreTests.cs" />
     <Compile Include="StorageTests\MockStorageProvider.cs" />
     <Compile Include="MultifacetGrainTest.cs" />
@@ -161,6 +169,7 @@
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />
+    <Compile Include="TestUtils.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
@@ -301,6 +310,13 @@
     <Content Include="Config_TestSiloConfig.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Data\TestDb.mdf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Data\TestDb_log.ldf">
+      <DependentUpon>TestDb.mdf</DependentUpon>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="DevTestClientConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -316,7 +332,11 @@
     <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Config_AzureTableStorage.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup Condition=" '$(OS)' == 'Windows_NT' ">
     <!-- PostBuild.cmd script is platform specific, so for now we only want to run it on Windows -->
