@@ -23,7 +23,6 @@ namespace UnitTests
     public class LoggerTest:UnitTestSiloHost
     {
         private double timingFactor;
-        private SafeRandom random = TestConstants.random;
 
         /// <summary>
         ///Gets or sets the test context which provides

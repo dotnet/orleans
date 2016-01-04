@@ -49,7 +49,6 @@
     <Compile Include="ClientAddressableTestGrain.cs" />
     <Compile Include="ClientAddressableTestRendezvousGrain.cs" />
     <Compile Include="CollectionTestGrain.cs" />
-    <Compile Include="DeadlockGrain.cs" />
     <Compile Include="EchoTaskGrain.cs" />
     <Compile Include="ErrorGrain.cs" />
     <Compile Include="InterlockedFlag.cs" />

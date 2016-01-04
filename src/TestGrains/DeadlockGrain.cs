@@ -35,7 +35,7 @@ namespace UnitTests.Grains
 
     public class DeadlockNonReentrantGrain : Grain, IDeadlockNonReentrantGrain
     {
-        private string Id { get { return String.Format("DeadlockNonReentrantGrain {0}", base.Identity.ToString()); } }
+        private string Id { get { return String.Format("DeadlockNonReentrantGrain {0}", base.IdentityString); } }
 
         public Task CallNext_1(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
@@ -53,7 +53,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class DeadlockReentrantGrain : Grain, IDeadlockReentrantGrain
     {
-        private string Id { get { return String.Format("DeadlockReentrantGrain {0}", base.Identity.ToString()); } }
+        private string Id { get { return String.Format("DeadlockReentrantGrain {0}", base.IdentityString); } }
 
         public Task CallNext_1(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
