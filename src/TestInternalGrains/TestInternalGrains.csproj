@@ -53,7 +53,6 @@
     <Compile Include="ErrorGrain.cs" />
     <Compile Include="ExtensionTestGrain.cs" />
     <Compile Include="InterlockedFlag.cs" />
-    <Compile Include="KeyExtensionTestGrain.cs" />
     <Compile Include="MultifacetFactoryTestGrain.cs" />
     <Compile Include="MultifacetTestGrain.cs" />
     <Compile Include="PersistenceTestGrains.cs" />

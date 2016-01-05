@@ -18,7 +18,6 @@ namespace UnitTests.General
         [ClassCleanup]
         public static void ClassCleanup()
         {
-           StopAllSilos();
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
