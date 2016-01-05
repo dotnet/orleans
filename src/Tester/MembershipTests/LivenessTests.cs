@@ -478,13 +478,7 @@ namespace UnitTests.MembershipTests
             DoClassCleanup();
         }
 
-        [ClassInitialize]
-        public static void MyClassInitialize(TestContext testContext)
-        {
-            DoClassInitialize();
-        }
-
-		[TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("SqlServer")]
         public void Silo_Config_SqlServer()
         {
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.SqlServer, Globals.LivenessType, "LivenessType");
