@@ -1,6 +1,6 @@
 param($installPath, $toolsPath, $package, $project)
 
-$bondSerializerTypeName = 'Orleans.Serialization.BondSerializer, BondSerializer'
+$bondSerializerTypeName = 'Orleans.Serialization.BondSerializer, OrleansBondUtils'
 
 function AddOrGetElement(
     [OutputType([System.Xml.XmlElement])]
@@ -9,7 +9,7 @@ function AddOrGetElement(
     [Parameter(Mandatory=$true)]
     [string]$name,
     [Parameter(Mandatory=$true)]
-    [System.Xml.XmlNamespaceManager]$namespaceManager    
+    [System.Xml.XmlNamespaceManager]$namespaceManager
     )
 {
     $node = $xml.ChildNodes | where { $_.Name -eq $name }
@@ -51,7 +51,7 @@ function RegisterSerializer(
 
     $bondTypeProvider = $providersnode.Provider | where { $_.type -eq $type }
 
-    if ($bondTypeProvider -eq $null) 
+    if ($bondTypeProvider -eq $null)
     {
         $provider = AddOrGetElement -xml $providersNode -name "Provider" -namespaceManager $namespaceManager
         $typeAttribute = $fileXml.CreateAttribute("type");

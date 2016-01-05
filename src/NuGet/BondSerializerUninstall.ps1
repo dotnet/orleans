@@ -1,6 +1,6 @@
 param($installPath, $toolsPath, $package, $project)
 
-$bondSerializerTypeName = 'Orleans.Serialization.BondSerializer, BondSerializer'
+$bondSerializerTypeName = 'Orleans.Serialization.BondSerializer, OrleansBondUtils'
 
 function UnregisterSerializer(
     [Parameter(Mandatory=$true)]
