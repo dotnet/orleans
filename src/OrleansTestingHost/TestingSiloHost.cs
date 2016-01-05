@@ -166,7 +166,7 @@ namespace Orleans.TestingHost
         public IEnumerable<SiloHandle> GetActiveSilos()
         {
             WriteLog("GetActiveSilos: Primary={0} Secondary={1} + {2} Additional={3}",
-                Primary, Secondary, additionalSilos.Count, additionalSilos);
+                Primary, Secondary, additionalSilos.Count, Orleans.Runtime.Utils.EnumerableToString(additionalSilos));
 
             if (null != Primary && Primary.Silo != null) yield return Primary;
             if (null != Secondary && Secondary.Silo != null) yield return Secondary;

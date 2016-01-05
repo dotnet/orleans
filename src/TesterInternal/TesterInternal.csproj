@@ -102,7 +102,6 @@
     <Compile Include="AsyncPipelineTests.cs" />
     <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
     <Compile Include="Async_TimingTests.cs" />
-    <Compile Include="BootstrapProviderTests.cs" />
     <Compile Include="ClientAddressableTests.cs" />
     <Compile Include="ClientInitTests.cs" />
     <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
@@ -118,6 +117,7 @@
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="General\RingTests_Standalone.cs" />
     <Compile Include="General\ConsistentRingProviderTests_Silo.cs" />
+    <Compile Include="General\BootstrapProviderTests.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="General\ElasticPlacementTest.cs" />
     <Compile Include="General\GrainPlacementTests.cs" />
@@ -125,6 +125,7 @@
     <Compile Include="General\LoggerTest.cs" />
     <Compile Include="General\LruTest.cs" />
     <Compile Include="General\RequestContextTest.cs" />
+    <Compile Include="General\TestingBootstrapProviders.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
     <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
     <Compile Include="OrleansRuntime\Streams\CachedMessageBlockTests.cs" />
