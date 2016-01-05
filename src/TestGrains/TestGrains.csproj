@@ -55,6 +55,7 @@
     <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ConcurrentGrain.cs" />
+    <Compile Include="DeadlockGrain.cs" />
     <Compile Include="DerivedServiceType.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="ExternalTypeGrain.cs" />

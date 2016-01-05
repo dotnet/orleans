@@ -60,7 +60,7 @@ namespace UnitTests.Tester
             }
         }
 
-        protected static string DumpTestContext(TestContext context)
+        public static string DumpTestContext(TestContext context)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendFormat(@"TestName={0}", context.TestName).AppendLine();
