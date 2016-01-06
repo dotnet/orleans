@@ -96,6 +96,10 @@ Console.WriteLine(await friend.SayHello("Good morning, my friend!"));
 Community
 =========
 
+* [Ask Questions on Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
+
+* [Chat on Gitter](https://gitter.im/dotnet/orleans)
+
 * Follow the [@ProjectOrleans](https://twitter.com/ProjectOrleans) Twitter account for Orleans project news announcements.
 
 * [OrleansContrib - Repository of community add-ons to Orleans](https://github.com/OrleansContrib/) Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
