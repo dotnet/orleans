@@ -85,9 +85,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyLoaderTests.cs" />
+    <Compile Include="AsynchAgentRestartTest.cs" />
     <Compile Include="AsyncPipelineTests.cs" />
     <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
     <Compile Include="Async_TimingTests.cs" />
+    <Compile Include="BootstrapProviderTests.cs" />
     <Compile Include="ClientAddressableTests.cs" />
     <Compile Include="ClientInitTests.cs" />
     <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
@@ -101,10 +103,16 @@
     <Compile Include="ErrorGrainTest.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="GatewaySelectionTest.cs" />
+    <Compile Include="General\RingTests_Standalone.cs" />
+    <Compile Include="General\ConsistentRingProviderTests_Silo.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
+    <Compile Include="General\ElasticPlacementTest.cs" />
+    <Compile Include="General\GrainPlacementTests.cs" />
     <Compile Include="General\LoadSheddingTest.cs" />
     <Compile Include="General\LoggerTest.cs" />
     <Compile Include="General\LruTest.cs" />
+    <Compile Include="General\RequestContextTest.cs" />
+    <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
     <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
     <Compile Include="ManagementGrainTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
@@ -170,6 +178,13 @@
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />
+    <Compile Include="TimeoutTests.cs" />
+    <Compile Include="TimerOrleansTest.cs" />
+    <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
+    <Compile Include="TimerTests\ReminderTests_AzureTable.cs" />
+    <Compile Include="TimerTests\ReminderTests_TableGrain.cs" />
+    <Compile Include="TimerTests\ReminderTests_SqlServer.cs" />
+    <Compile Include="TimerTests\ReminderTests_Base.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
@@ -272,6 +287,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_Azure_Default.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_BootstrapProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_DevStorage.xml">

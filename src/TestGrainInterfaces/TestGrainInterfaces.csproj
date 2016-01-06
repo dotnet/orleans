@@ -54,6 +54,7 @@
     <Compile Include="IEchoTaskGrain.cs" />
     <Compile Include="IErrorGrain.cs" />
     <Compile Include="IExceptionGrain.cs" />
+    <Compile Include="IExtensionTestGrain.cs" />
     <Compile Include="IExternalTypeGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
     <Compile Include="IGeneratorTestDerivedDerivedGrain.cs" />
@@ -65,17 +66,21 @@
     <Compile Include="IGeneratedEventReporterGrain.cs" />
     <Compile Include="IGenericInterfaces.cs" />
     <Compile Include="IInitialStateGrain.cs" />
+    <Compile Include="IKeyExtensionTestGrain.cs" />
     <Compile Include="IMultifacetReader.cs" />
     <Compile Include="IMultifacetWriter.cs" />
     <Compile Include="IMultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="IMultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyIGrains.cs" />
     <Compile Include="IPersistenceTestGrains.cs" />
+    <Compile Include="IPlacementTestGrain.cs" />
     <Compile Include="IPolymorphicTestGrain.cs" />
     <Compile Include="IPromiseForwardGrain.cs" />
     <Compile Include="IProxyGrain.cs" />
     <Compile Include="IReentrantStressTestGrain.cs" />
     <Compile Include="IReminderTestGrain.cs" />
+    <Compile Include="IReminderTestGrain2.cs" />
+    <Compile Include="IRequestContextTestGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
     <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
@@ -89,8 +94,10 @@
     <Compile Include="ILivenessTestGrain.cs" />
     <Compile Include="IStreamingGrain.cs" />
     <Compile Include="IStreamLifecycleTestGrains.cs" />
+    <Compile Include="ITestExtension.cs" />
     <Compile Include="ITestGrain.cs" />
     <Compile Include="IStreaming_ProducerGrain.cs" />
+    <Compile Include="ITimerGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

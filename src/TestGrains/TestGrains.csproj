@@ -71,6 +71,7 @@
     <Compile Include="GenericGrains.cs" />
     <Compile Include="GetGrainGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
+    <Compile Include="KeyExtensionTestGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
     <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="PromiseForwardGrain.cs" />
     <Compile Include="ProxyGrain.cs" />
     <Compile Include="ReminderTestGrain.cs" />
+    <Compile Include="RequestContextTestGrain.cs" />
     <Compile Include="SerializationGenerationGrain.cs" />
     <Compile Include="ServiceType.cs" />
     <Compile Include="SimpleGenericGrain.cs" />

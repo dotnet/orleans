@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using UnitTests.Tester;
 
 namespace UnitTests.General
@@ -11,9 +12,7 @@ namespace UnitTests.General
     /// </summary>
     [TestClass]
     public class SimpleGrainTests : UnitTestSiloHost
-    {
-        private const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
-        
+    {        
         public SimpleGrainTests()
             : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
         {
@@ -21,7 +20,7 @@ namespace UnitTests.General
 
         public ISimpleGrain GetSimpleGrain()
         {
-            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
+            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
         }
 
         [ClassCleanup]
