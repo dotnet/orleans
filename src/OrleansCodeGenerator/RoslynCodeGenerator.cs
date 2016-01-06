@@ -445,8 +445,6 @@ namespace Orleans.CodeGenerator
 
         private static void RecordType(Type type, Module module, Assembly targetAssembly, ISet<Type> includedTypes)
         {
-            if (type.IsNested) return;
-
             if (SerializerGenerationManager.RecordTypeToGenerate(type, module, targetAssembly))
                 includedTypes.Add(type);
         }
