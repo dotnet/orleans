@@ -173,6 +173,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalGrainInterfaces
 		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansServiceBus", "OrleansServiceBus\OrleansServiceBus.csproj", "{8BFF0092-15D2-4425-80C0-29E381702F2B}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.AI", "OrleansTelemetryConsumers.AI\OrleansTelemetryConsumers.AI.csproj", "{99A8E011-3A30-423A-9F67-D1349FD8B1CD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.NewRelic", "OrleansTelemetryConsumers.NewRelic\OrleansTelemetryConsumers.NewRelic.csproj", "{CCE2639F-5D20-429F-947F-B904CF745E92}"
@@ -273,6 +275,10 @@ Global
 		{2AE67055-F38A-45F0-AEA7-5754F4814EA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2AE67055-F38A-45F0-AEA7-5754F4814EA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2AE67055-F38A-45F0-AEA7-5754F4814EA5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8BFF0092-15D2-4425-80C0-29E381702F2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8BFF0092-15D2-4425-80C0-29E381702F2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8BFF0092-15D2-4425-80C0-29E381702F2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8BFF0092-15D2-4425-80C0-29E381702F2B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{99A8E011-3A30-423A-9F67-D1349FD8B1CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{99A8E011-3A30-423A-9F67-D1349FD8B1CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99A8E011-3A30-423A-9F67-D1349FD8B1CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
