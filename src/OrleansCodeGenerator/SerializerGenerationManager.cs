@@ -84,7 +84,7 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            if (typeInfo.IsNestedPublic || typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
+            if (typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
             {
                 Log.Warn(
                     ErrorCode.CodeGenIgnoringTypes,

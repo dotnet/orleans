@@ -30,6 +30,7 @@ using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using System.Collections.Generic;
+using System.Globalization;
 using Orleans.TestingHost;
 using System.Runtime.Serialization;
 

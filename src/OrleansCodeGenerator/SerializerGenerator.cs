@@ -48,6 +48,13 @@ namespace Orleans.CodeGenerator
     /// </summary>
     public static class SerializerGenerator
     {
+        private static readonly TypeFormattingOptions GeneratedTypeNameOptions = new TypeFormattingOptions(
+            ClassSuffix,
+            includeGenericParameters: false,
+            includeTypeParameters: false,
+            nestedClassSeparator: '_',
+            includeGlobal: false);
+
         /// <summary>
         /// The suffix appended to the name of generated classes.
         /// </summary>
@@ -84,9 +91,7 @@ namespace Orleans.CodeGenerator
                         SF.AttributeArgument(SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))))
             };
 
-            var className = CodeGeneratorCommon.ClassPrefix
-                            + TypeUtils.GetSimpleTypeName(type, _ => !_.IsGenericParameter).Replace('.', '_')
-                            + ClassSuffix;
+            var className = CodeGeneratorCommon.ClassPrefix + type.GetParseableName(GeneratedTypeNameOptions);
             var fields = GetFields(type);
 
             // Mark each field type for generation
