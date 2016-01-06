@@ -34,7 +34,7 @@ namespace Orleans.Runtime
         public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
         {
             var typeInfo = t.GetTypeInfo();
-            if (typeInfo.IsNestedPublic || typeInfo.IsNestedPrivate)
+            if (typeInfo.IsNested)
             {
                 if (typeInfo.DeclaringType.IsGenericType)
                     return GetTemplatedName(GetUntemplatedTypeName(typeInfo.DeclaringType.Name), typeInfo.DeclaringType, typeInfo.GetGenericArguments(), _ => true, language) + "." + GetUntemplatedTypeName(typeInfo.Name);

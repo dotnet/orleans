@@ -52,7 +52,8 @@ namespace Orleans.CodeGenerator
             var typeInfo = t.GetTypeInfo();
 
             if (typeInfo.IsGenericParameter || ProcessedTypes.Contains(t) || TypesToProcess.Contains(t)
-                || typeof(Exception).GetTypeInfo().IsAssignableFrom(t)) return false;
+                || typeof(Exception).GetTypeInfo().IsAssignableFrom(t)
+                || typeof(Delegate).GetTypeInfo().IsAssignableFrom(t)) return false;
 
             if (typeInfo.IsArray)
             {
@@ -60,7 +61,7 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            if (typeInfo.IsNestedPublic || typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
+            if (typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
             {
                 Log.Warn(
                     ErrorCode.CodeGenIgnoringTypes,
