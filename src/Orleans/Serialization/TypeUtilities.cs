@@ -242,9 +242,7 @@ namespace Orleans.Serialization
                 return IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly);
             }
 
-            var result = typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
-            
-            return result;
+            return typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
         }
 
         /// <summary>
