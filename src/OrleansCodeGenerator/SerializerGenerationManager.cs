@@ -52,7 +52,8 @@ namespace Orleans.CodeGenerator
             var typeInfo = t.GetTypeInfo();
 
             if (typeInfo.IsGenericParameter || ProcessedTypes.Contains(t) || TypesToProcess.Contains(t)
-                || typeof(Exception).GetTypeInfo().IsAssignableFrom(t)) return false;
+                || typeof(Exception).GetTypeInfo().IsAssignableFrom(t)
+                || typeof(Delegate).GetTypeInfo().IsAssignableFrom(t)) return false;
 
             if (typeInfo.IsArray)
             {
