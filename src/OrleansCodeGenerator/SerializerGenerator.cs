@@ -590,7 +590,7 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => field.GetCustomAttribute<NonSerializedAttribute>() == null)
+                    .Where(field => !field.IsNotSerialized)
                     .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
@@ -647,26 +647,25 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-
             /// <summary>
-            /// Gets a value indicating whether or not this field represents a property with an accessible getter. 
+            /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete getter. 
             /// </summary>
             public bool IsGettableProperty
             {
                 get
                 {
-                    return this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null;
+                    return this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null && !this.IsObsolete;
                 }
             }
 
             /// <summary>
-            /// Gets a value indicating whether or not this field represents a property with an accessible setter. 
+            /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete setter. 
             /// </summary>
             public bool IsSettableProperty
             {
                 get
                 {
-                    return this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null;
+                    return this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null && !this.IsObsolete;
                 }
             }
 
@@ -706,6 +705,25 @@ namespace Orleans.CodeGenerator
             }
 
             /// <summary>
+            /// Gets a value indicating whether or not this field is obsolete.
+            /// </summary>
+            private bool IsObsolete
+            {
+                get
+                {
+                    var obsoleteAttr = this.FieldInfo.GetCustomAttribute<ObsoleteAttribute>();
+
+                    // Get the attribute from the property, if present.
+                    if (this.property != null && obsoleteAttr == null)
+                    {
+                        obsoleteAttr = this.property.GetCustomAttribute<ObsoleteAttribute>();
+                    }
+                    
+                    return obsoleteAttr != null;
+                }
+            }
+
+            /// <summary>
             /// Returns syntax for retrieving the value of this field.
             /// </summary>
             /// <param name="instance">The instance of the containing type.</param>
@@ -713,16 +731,17 @@ namespace Orleans.CodeGenerator
             /// <returns>Syntax for retrieving the value of this field.</returns>
             public ExpressionSyntax GetGetter(ExpressionSyntax instance, bool forceAvoidCopy = false)
             {
+                // If the field is not obsolete and is the backing field for an auto-property, try to use the property
+                // directly.
+                if (this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null && !this.IsObsolete)
+                {
+                    return instance.Member(this.PropertyInfo.Name);
+                }
+                
                 var typeSyntax = this.FieldInfo.FieldType.GetTypeSyntax();
                 var getFieldExpression =
                     SF.InvocationExpression(SF.IdentifierName(this.GetterFieldName))
                         .AddArgumentListArguments(SF.Argument(instance));
-
-                // If the field is the backing field for an auto-property, try to use the property directly.
-                if (this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null)
-                {
-                    return instance.Member(this.PropertyInfo.Name);
-                }
 
                 if (forceAvoidCopy || this.FieldInfo.FieldType.IsOrleansShallowCopyable())
                 {
@@ -745,8 +764,9 @@ namespace Orleans.CodeGenerator
             /// <returns>Syntax for setting the value of this field.</returns>
             public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value)
             {
-                // If the field is the backing field for an auto-property, try to use the property directly.
-                if (this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null)
+                // If the field is not obsolete and is the backing field for an auto-property, try to use the property
+                // directly.
+                if (this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null && !this.IsObsolete)
                 {
                     return SF.AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
