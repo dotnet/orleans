@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{8BFF0092-15D2-4425-80C0-29E381702F2B}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>OrleansServiceBusUtils</RootNamespace>
+    <AssemblyName>OrleansServiceBusUtils</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.ServiceBus">
+      <HintPath>..\packages\WindowsAzure.ServiceBus.3.0.8\lib\net45-full\Microsoft.ServiceBus.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.WindowsAzure.Configuration">
+      <HintPath>..\packages\Microsoft.WindowsAzure.ConfigurationManager.3.1.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventDataExtensions.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubAdapterFactory.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubAdapterReceiver.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubBatchContainer.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubQueueMapper.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubSequenceToken.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubSettings.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubStreamProvider.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubStreamProviderConfig.cs" />
+    <Compile Include="Providers\Streams\EventHub\IEventHubSettings.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj">
+      <Project>{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}</Project>
+      <Name>OrleansProviders</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Orleans\Orleans.csproj">
+      <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

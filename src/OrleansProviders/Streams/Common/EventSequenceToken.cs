@@ -18,7 +18,7 @@ namespace Orleans.Providers.Streams.Common
             EventIndex = 0;
         }
 
-        internal EventSequenceToken(long seqNumber, int eventInd)
+        public EventSequenceToken(long seqNumber, int eventInd)
         {
             SequenceNumber = seqNumber;
             EventIndex = eventInd;

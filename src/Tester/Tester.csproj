@@ -168,6 +168,7 @@
     <Compile Include="StreamingTests\ControllableStreamProviderTests.cs" />
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
     <Compile Include="MembershipTests\SilosStopTests.cs" />
+    <Compile Include="StreamingTests\EHSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\StreamFilteringTests.cs" />
@@ -295,6 +296,10 @@
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
       <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansServiceBus\OrleansServiceBus.csproj">
+      <Project>{8BFF0092-15D2-4425-80C0-29E381702F2B}</Project>
+      <Name>OrleansServiceBus</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansSQLUtils\OrleansSqlUtils.csproj">
       <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
