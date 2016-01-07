@@ -76,7 +76,7 @@ namespace Orleans.Runtime
             {ReminderServiceId,"ReminderService"},
             {TypeManagerId,"TypeManagerId"},
             {ProviderManagerSystemTargetId, "ProviderManagerSystemTarget"},
-            {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarge"},
+            {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarget"},
         };
 
         private static readonly Dictionary<int, string> nonSingletonSystemTargetNames = new Dictionary<int, string>
