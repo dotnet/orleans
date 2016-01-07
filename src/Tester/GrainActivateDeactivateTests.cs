@@ -42,7 +42,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task WatcherGrain_GetGrain()
         {
             IActivateDeactivateWatcherGrain grain = GrainClient.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(1);

@@ -476,7 +476,7 @@ namespace UnitTests.General
             return pkGuidString;
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers"), TestCategory("GrainReference")]
         public void GrainReference_Test1()
         {
             Guid guid = Guid.NewGuid();

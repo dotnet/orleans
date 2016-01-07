@@ -174,7 +174,7 @@ namespace UnitTests
             Logger.Info(1, "DONE.");
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
         public void ArgumentTypes_ListOfGrainReferences()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -219,7 +219,7 @@ namespace UnitTests
             Assert.AreEqual(30, result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("General"), TestCategory("SimpleGrain")]
+        [TestMethod, TestCategory("Functional"), TestCategory("SimpleGrain")]
         public void SimpleGrain_GuidDistribution()
         {
             int n = 0x1111;

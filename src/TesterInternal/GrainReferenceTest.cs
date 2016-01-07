@@ -74,14 +74,14 @@ namespace UnitTests.General
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Json"), TestCategory("GrainReference")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, true, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Json"), TestCategory("GrainReference")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
             int id = random.Next();

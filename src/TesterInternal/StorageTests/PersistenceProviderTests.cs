@@ -213,7 +213,7 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(readTime >= expectedLatency, "Read: Expected minimum latency = {0} Actual = {1}", expectedLatency, readTime);
         }
 
-        [TestMethod, TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Json")]
+        [TestMethod, TestCategory("Persistence"), TestCategory("Performance"), TestCategory("JSON")]
         public void Json_Perf_Newtonsoft_vs_Net()
         {
             int numIterations = 10000;
