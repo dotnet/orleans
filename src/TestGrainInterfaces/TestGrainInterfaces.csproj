@@ -77,11 +77,13 @@
     <Compile Include="IPolymorphicTestGrain.cs" />
     <Compile Include="IPromiseForwardGrain.cs" />
     <Compile Include="IProxyGrain.cs" />
+    <Compile Include="IReentrancyGrain.cs" />
     <Compile Include="IReentrantStressTestGrain.cs" />
     <Compile Include="IReminderTestGrain.cs" />
     <Compile Include="IReminderTestGrain2.cs" />
     <Compile Include="IRequestContextTestGrain.cs" />
     <Compile Include="ISampleStreamingGrain.cs" />
+    <Compile Include="ISerializationGeneratorTests.cs" />
     <Compile Include="ISimpleDIGrain.cs" />
     <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="CodegenTestInterfaces.cs" />
@@ -98,6 +100,7 @@
     <Compile Include="ITestGrain.cs" />
     <Compile Include="IStreaming_ProducerGrain.cs" />
     <Compile Include="ITimerGrain.cs" />
+    <Compile Include="IValueTypeTestGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
