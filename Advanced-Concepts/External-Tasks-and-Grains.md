@@ -60,7 +60,7 @@ Below is a sample code that demonstrates the usage of `TaskScheduler.Current`, `
 
 There is sometimes an even more advanced scenario of a piece of grain code that needs to “break out” of the Orleans task scheduling model and run on a thread pool (or some other, non-Orleans context) but still needs an ability to make a grain call to another grain. If you will just try to make a grain call not from within Orleans context, you will get an exception telling you that you are "trying to send a message on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext)". 
 
-Below is a code that demonstrates how a grain call can be made from a piece of code that runs inside on a grain but not in the grain context.
+Below is a code that demonstrates how a grain call can be made from a piece of code that runs inside a grain but not in the grain context.
 
 ``` csharp
    public Task MyGrainMethod()
