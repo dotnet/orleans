@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -34,6 +35,69 @@ namespace UnitTests.Serialization
             JObject input = JObject.Parse(json);
             JObject output = SerializationManager.RoundTripSerializationForTesting(input);
             Assert.AreEqual(input.ToString(), output.ToString());
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        [ExpectedException(typeof(AssertFailedException))]
+        public void SerializationTests_Json_Guid_WithoutConverter()
+        {
+            var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
+            Do_Json_Guid_Test(settings);
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        public void SerializationTests_Json_Guid_WithConverter()
+        {
+            var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
+            settings.Converters.Add(new GuidJsonTestConverter());
+            Do_Json_Guid_Test(settings);
+        }
+
+        private void Do_Json_Guid_Test(JsonSerializerSettings settings)
+        {
+            var dict = new Dictionary<string, object>
+                {
+                    {"key", Guid.NewGuid()},
+                };
+
+            string dictSerialized = JsonConvert.SerializeObject(dict, settings);
+            var dictDeserialized = JsonConvert.DeserializeObject<Dictionary<string, object>>(dictSerialized, settings);
+            var originalGuid = dict["key"];
+            var deserGuid = dictDeserialized["key"];
+
+            Assert.AreEqual(typeof(Guid), originalGuid.GetType());
+            Assert.AreEqual(typeof(Guid), deserGuid.GetType());
+            Assert.AreEqual(originalGuid, deserGuid);
+        }
+
+        private class GuidJsonTestConverter : JsonConverter
+        { 
+            public override bool CanRead { get { return true; } }
+            public override bool CanWrite { get { return true; } }
+
+            public override bool CanConvert(Type objectType)
+            {
+                return objectType.IsAssignableFrom(typeof(Guid)) || objectType.IsAssignableFrom(typeof(Guid?));
+            }
+
+            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+            {
+                if (value == null)
+                {
+                    writer.WriteValue(default(string));
+                }
+                else if (value is Guid)
+                {
+                    var guid = (Guid)value;
+                    writer.WriteValue(guid.ToString("N"));
+                }
+            }
+
+            public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+            {
+                var str = reader.Value as string;
+                return str != null ? Guid.Parse(str) : default(Guid);
+            }
         }
 
         [RegisterSerializerAttribute]
