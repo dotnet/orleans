@@ -557,47 +557,6 @@ namespace UnitTests
         }
 
         /// <summary>
-        /// Runs the indicated PowerShell script and returns the results.  Prefix script names with .\\ but do
-        /// not prefix PowerShell commands.
-        /// </summary>
-        /// <param name="powershellCommand">
-        ///     The name of the PowerShell script to run, assumed to be in the current folder. Prefix script
-        ///     names with .// to differentiate between a script and a command.</param>
-        /// <param name="scriptParameters">Any parameters to be passed to the script.</param>
-        /// <returns>A collection of PSObjects that contain the results of running the script.</returns>
-        /// <remarks>
-        ///     This overload was an attempt to run the scripts without the administrator privilege.  It works,
-        ///     but the scripts themselves must run elevated to carry out their operations, and therefore this
-        ///     solution doesn't help for this scenario.
-        /// </remarks>
-        private Collection<PSObject> RunPowerShellCommand2(string powershellCommand, params string[] scriptParameters)
-        {
-            Collection<PSObject> results;
-            using (Runspace runspace = RunspaceFactory.CreateRunspace())
-            {
-                runspace.Open();
-
-                using (Pipeline pipeline = runspace.CreatePipeline())
-                {
-                    //Invoke-Command -ScriptBlock {cd C:\Projects\Orleans\Binaries\Deployment\Orleans; Invoke-Expression -Command ".\CleanOrleansSilos.ps1"}
-                    StringBuilder powerShellCommand = new StringBuilder(string.Format("Invoke-Command -ScriptBlock {{cd \"{0}\"; Invoke-Expression -Command (\"{1}", Environment.CurrentDirectory, powershellCommand));
-                    // Tack on any parameters.
-                    foreach (string scriptParameter in scriptParameters)
-                    {
-                        powerShellCommand.AppendFormat(" {0}", scriptParameter);
-                    }
-                    powerShellCommand.AppendFormat("\")}} ");
-                    pipeline.Commands.AddScript(powerShellCommand.ToString());
-
-                    results = pipeline.Invoke();
-                }
-
-                runspace.Close();
-            }
-            return results;
-        }
-
-        /// <summary>
         /// Stops all processes of the given name.
         /// </summary>
         /// <param name="processName">The name of the process to stop.</param>

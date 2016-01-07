@@ -114,7 +114,6 @@
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
     <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
-    <Compile Include="ManagementGrainTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
@@ -300,9 +299,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_ActivationCollectorTests.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_Azure_Default.xml">
