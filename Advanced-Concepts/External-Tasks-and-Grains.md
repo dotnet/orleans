@@ -12,9 +12,9 @@ In some cases grain code might need to “break out” of the Orleans task sched
 
 1) `await`, `Task.Factory.StartNew`, `Task.ContinuewWith`, `Task.WhenAny`, `Task.WhenAll`, `Task.Delay` all respect the current Task Scheduler. That means that using them in the default way, without passing a different TaskScheduler, will cause them to execute in the grain context.
 
-2) Both `Task.Run` and the `endMethod` delegate of `Task.Factory.FromAsync` do NOT respect the current task Scheduler. They both use the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler. Therefore, they will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx). Any continuation of `await` code chained to them will run back under the “current” scheduler at the point the task was created, which is the grain context. 
+2) Both `Task.Run` and the `endMethod` delegate of `Task.Factory.FromAsync` do NOT respect the current task Scheduler. They both use the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler. Therefore, the code inside `Task.Run` and the `endMethod` will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx). However, any code after the `await Task.Run` or `await Task.Factory.FromAsync` will run back under the scheduler at the point the task was created, which is the grain scheduler. 
 
-3) `configureAwait(false)` is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the `TaskScheduler.Default` scheduler, which is the .NET thread pool and will thus break the single-threaded execution of Orleans grain. You should in general **never ever use `configureAwait(false)` in the grain code.**
+3) `configureAwait(false)` is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the `TaskScheduler.Default` scheduler, which is the .NET thread pool and will thus break the single-threaded execution of Orleans grain. You should in general **never ever use `configureAwait(false)` directly in the grain code.**
 
 4) Methods with signature `async void` should not be used with grains, they are intended for graphical user interface event handlers.
 
@@ -90,14 +90,21 @@ Below is a code that demonstrates how a grain call can be made from a piece of c
         Assert.AreEqual(orleansTS, TaskScheduler.Current); 
    }
 ```
+### Dealing with libraries
+
+Some external libraries that your code is using might be using `ConfigureAwait(false)` internally. In fact, it is a good and correct practice in .NET to use `ConfigureAwait(false)` [when implementing general purpose libraries](https://msdn.microsoft.com/en-us/magazine/jj991977.aspx). This is not a problem in Orleans. As long as the code in the grain that invokes the library method is awaiting the library call with a regular `await`, the grain code is correct. The result will be exactly as desired - the library code will run on the ThreadPool scheduler, while the grain code will run on Orleans scheduler.
+
+Another question that we are often asked whether there is a need to execute library calls with `Task.Run` - that is, whether there is a need to explicitly offload the library code to ThreadPool (for grain code to do `Task.Run(()=> myLibrary.FooAsync())`). The answer is negative. There is no need to offload any code to ThreadPool, except for the case that the library code is making a blocking synchronous calls. Usually, any well written and correct .NET async library (methods that return `Task` and are named with `Async` suffix) do not making blocking calls and thus there is really no need to offload anything to ThreadPool, unless you suspect the async library is buggy or if you are deliberately using a synchronous blocking library.
+
 
 ## Summary
 
 What are you trying to do?   | How to do it 
 ------------- | -------------
 Run background work on .NET thread-pool threads. No grain code or grain calls allowed.  |  `Task.Run`
-Run worker task from grain code with Orleans turn-based concurrency guarantees. | `Task.Factory.StartNew`  
 Grain interface call | Method return types = `Task` or `Task<T>` 
+Run worker task from grain code with Orleans turn-based concurrency guarantees. | `Task.Factory.StartNew`  
 Timeouts for executing work items  | `Task.Delay` + `Task.WhenAny` 
 Use with `async`/`await` | The normal .NET Task-Async programming model. Supported & recommended  
- `configureAwait(false)` | Do not use. Will escape Orleans's scheduler
+`ConfigureAwait(false)` | Do not use inside grain code. Allowed only inside libraries.
+Calling async library  |  `await` the library call
