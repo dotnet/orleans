@@ -4,7 +4,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ValueTypeTestGrainState : GrainState
+    public class ValueTypeTestGrainState
     {
         public ValueTypeTestData StateData { get; set; }
     }

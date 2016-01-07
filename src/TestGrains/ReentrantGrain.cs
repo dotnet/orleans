@@ -472,14 +472,4 @@ namespace UnitTests.Grains
             return Task.FromResult(++count);
         }
     }
-
-    public class ReentrantTestSupportGrain : Grain, IReentrantTestSupportGrain
-    {
-        public Task<bool> IsReentrant(string fullTypeName)
-        {
-            GrainTypeData data;
-            GrainTypeManager.Instance.TryGetData(fullTypeName, out data);
-            return Task.FromResult(data.IsReentrant);
-        }
-    }
 }
