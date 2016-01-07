@@ -96,7 +96,7 @@ Console.WriteLine(await friend.SayHello("Good morning, my friend!"));
 Community
 =========
 
-* [Ask Questions on Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
+* Ask questions by [opening an issue on GitHub](https://github.com/dotnet/orleans/issues) or on [Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
 
 * [Chat on Gitter](https://gitter.im/dotnet/orleans)
 
