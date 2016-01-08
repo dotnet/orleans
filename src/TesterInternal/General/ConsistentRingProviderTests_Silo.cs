@@ -40,7 +40,7 @@ namespace UnitTests.General
         public void TestInitialize()
         {
             Console.WriteLine("ConsistentRingProviderTests - TestInitialize");
-            string config = Primary.Silo.TestHookup.PrintSiloConfig();
+            string config = Primary.Silo.TestHook.PrintSiloConfig();
             Console.WriteLine("Running with Silo Config = " + config);
         }
 
@@ -219,12 +219,12 @@ namespace UnitTests.General
             {
                 double next = random.NextDouble();
                 uint randomKey = (uint)((double)RangeFactory.RING_SIZE * next);
-                SiloAddress s = Primary.Silo.TestHookup.ConsistentRingProvider.GetPrimaryTargetSilo(randomKey);
+                SiloAddress s = Primary.Silo.TestHook.ConsistentRingProvider.GetPrimaryTargetSilo(randomKey);
                 if (responsibleSilo.Equals(s))
                     return randomKey;
             }
             throw new Exception(String.Format("Could not pick a key that silo {0} will be responsible for. Primary.Ring = \n{1}",
-                responsibleSilo, Primary.Silo.TestHookup.ConsistentRingProvider));
+                responsibleSilo, Primary.Silo.TestHook.ConsistentRingProvider));
         }
 
         private void VerificationScenario(uint testKey)
@@ -257,7 +257,7 @@ namespace UnitTests.General
 
         private void VerifyKey(uint key, List<SiloAddress> silos)
         {
-            SiloAddress truth = Primary.Silo.TestHookup.ConsistentRingProvider.GetPrimaryTargetSilo(key); //expected;
+            SiloAddress truth = Primary.Silo.TestHook.ConsistentRingProvider.GetPrimaryTargetSilo(key); //expected;
             //if (truth == null) // if the truth isn't passed, we compute it here
             //{
             //    truth = silos.Find(siloAddr => (key <= siloAddr.GetConsistentHashCode()));
@@ -270,7 +270,7 @@ namespace UnitTests.General
             // lookup for 'key' should return 'truth' on all silos
             foreach (var siloHandle in GetActiveSilos()) // do this for each silo
             {
-                SiloAddress s = siloHandle.Silo.TestHookup.ConsistentRingProvider.GetPrimaryTargetSilo((uint)key);
+                SiloAddress s = siloHandle.Silo.TestHook.ConsistentRingProvider.GetPrimaryTargetSilo((uint)key);
                 Assert.AreEqual(truth, s, string.Format("Lookup wrong for key: {0} on silo: {1}", key, siloHandle.Silo.SiloAddress));
             }
         }

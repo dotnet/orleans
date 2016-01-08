@@ -394,10 +394,10 @@ namespace Orleans.TestingHost
         private static void ImportGeneratedAssemblies(SiloHandle siloHandle)
         {
             var silo = siloHandle.Silo;
-            if (silo != null && silo.TestHookup != null)
+            if (silo != null && silo.TestHook != null)
             {
-                var generatedAssemblies = new Silo.TestHookups.GeneratedAssemblies();
-                silo.TestHookup.UpdateGeneratedAssemblies(generatedAssemblies);
+                var generatedAssemblies = new Silo.TestHooks.GeneratedAssemblies();
+                silo.TestHook.UpdateGeneratedAssemblies(generatedAssemblies);
                 foreach (var assembly in generatedAssemblies.Assemblies)
                 {
                     // If we have never seen generated code for this assembly before, or generated code might be
@@ -686,16 +686,16 @@ namespace Orleans.TestingHost
             appDomain = AppDomain.CreateDomain(siloName, null, setup);
 
             // Load each of the additional assemblies.
-            Silo.TestHookups.CodeGeneratorOptimizer optimizer = null;
+            Silo.TestHooks.CodeGeneratorOptimizer optimizer = null;
             foreach (var assembly in additionalAssemblies)
             {
                 if (optimizer == null)
                 {
                     optimizer =
-                        (Silo.TestHookups.CodeGeneratorOptimizer)
+                        (Silo.TestHooks.CodeGeneratorOptimizer)
                         appDomain.CreateInstanceFromAndUnwrap(
                             "OrleansRuntime.dll",
-                            typeof(Silo.TestHookups.CodeGeneratorOptimizer).FullName,
+                            typeof(Silo.TestHooks.CodeGeneratorOptimizer).FullName,
                             false,
                             BindingFlags.Default,
                             null,

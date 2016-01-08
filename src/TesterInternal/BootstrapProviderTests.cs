@@ -82,7 +82,7 @@ namespace UnitTests.General
             List<SiloHandle> silos = GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.Silo.TestHookup.GetBootstrapProvider(providerName);
+                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.Silo.TestHook.GetBootstrapProvider(providerName);
                 Assert.IsNotNull(provider, "No storage provider found: Name={0} Silo={1}", providerName, siloHandle.Silo.SiloAddress);
                 providerInUse = provider;
             }

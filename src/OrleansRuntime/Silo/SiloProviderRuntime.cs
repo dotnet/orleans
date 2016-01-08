@@ -121,7 +121,6 @@ namespace Orleans.Runtime.Providers
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension
         {
-            // Hookup Extension.
             TExtension extension;
             if (!TryGetExtensionHandler(out extension))
             {
