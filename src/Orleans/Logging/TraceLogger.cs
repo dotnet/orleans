@@ -268,7 +268,7 @@ namespace Orleans.Runtime
                     catch (Exception exc)
                     {
                         Trace.Listeners.Add(new DefaultTraceListener());
-                        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", exc);
+                        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", config.TraceFileName, exc);
                     }
                 }
 
