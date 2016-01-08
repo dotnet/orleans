@@ -60,11 +60,11 @@ namespace UnitTests.Stats
             Assert.AreEqual("MockStats", config.StatisticsProviderName, "Client.StatisticsProviderName");
 
             Silo silo = Primary.Silo;
-            Assert.IsTrue(silo.TestHookup.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
+            Assert.IsTrue(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
             Assert.AreEqual("MockStats", silo.LocalConfig.StatisticsProviderName, "Silo.StatisticsProviderName");
 
             // Check we got some stats & metrics callbacks on both client and server.
-            var siloStatsCollector = Primary.Silo.TestHookup.StatisticsProvider as MockStatsSiloCollector;
+            var siloStatsCollector = Primary.Silo.TestHook.StatisticsProvider as MockStatsSiloCollector;
             var clientStatsCollector = MockStatsCollectorClient.StatsPublisherInstance;
             var clientMetricsCollector = MockStatsCollectorClient.MetricsPublisherInstance;
 
@@ -195,7 +195,7 @@ namespace UnitTests.Stats
             Assert.AreEqual("SQL", config.StatisticsProviderName, "Client.StatisticsProviderName");
 
             Silo silo = Primary.Silo;
-            Assert.IsTrue(silo.TestHookup.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
+            Assert.IsTrue(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
             Assert.AreEqual("SQL", silo.LocalConfig.StatisticsProviderName, "Silo.StatisticsProviderName");
         }
     }

@@ -398,7 +398,7 @@ namespace UnitTests.StorageTests
             foreach (var silo in silos)
             {
                 string provider = typeof(AzureTableStorage).FullName;
-                List<string> providers = silo.Silo.TestHookup.GetStorageProviderNames().ToList();
+                List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
                 Assert.IsTrue(providers.Contains(provider), "No storage provider found: {0}", provider);
             }
         }

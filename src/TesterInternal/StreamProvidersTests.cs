@@ -80,7 +80,7 @@ namespace UnitTests.Streaming
             SiloHandle siloHandle = GetActiveSilos().First();
             Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
             Assert.AreEqual(thisRunServiceId, serviceId, "ServiceId in Silo config");
-            serviceId = siloHandle.Silo.TestHookup.ServiceId;
+            serviceId = siloHandle.Silo.TestHook.ServiceId;
             Assert.AreEqual(thisRunServiceId, serviceId, "ServiceId active in silo");
 
             // ServiceId is not currently available in client config
@@ -113,7 +113,7 @@ namespace UnitTests.Streaming
             SiloHandle siloHandle = GetActiveSilos().First();
             Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
             Assert.AreEqual(initialServiceId, serviceId, "ServiceId in Silo config");
-            serviceId = siloHandle.Silo.TestHookup.ServiceId;
+            serviceId = siloHandle.Silo.TestHook.ServiceId;
             Assert.AreEqual(initialServiceId, serviceId, "ServiceId active in silo");
 
             // ServiceId is not currently available in client config

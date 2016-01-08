@@ -86,11 +86,11 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                List<string> providers = silo.Silo.TestHookup.GetStorageProviderNames().ToList();
+                List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
                 Assert.IsNotNull(providers, "Null provider manager");
                 Assert.IsTrue(providers.Count > 0, "Some providers loaded");
                 const string providerName = "test1";
-                IStorageProvider store = silo.Silo.TestHookup.GetStorageProvider(providerName);
+                IStorageProvider store = silo.Silo.TestHook.GetStorageProvider(providerName);
                 Assert.IsNotNull(store, "No storage provider found: {0}", providerName);
             }
         }
@@ -102,7 +102,7 @@ namespace UnitTests.StorageTests
             foreach (var silo in silos)
             {
                 const string providerName = "LowerCase";
-                IStorageProvider store = silo.Silo.TestHookup.GetStorageProvider(providerName);
+                IStorageProvider store = silo.Silo.TestHook.GetStorageProvider(providerName);
                 Assert.IsNotNull(store, "No storage provider found: {0}", providerName);
             }
         }
@@ -114,7 +114,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
-            IStorageProvider store = silo.Silo.TestHookup.GetStorageProvider(providerName);
+            IStorageProvider store = silo.Silo.TestHook.GetStorageProvider(providerName);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
@@ -1215,7 +1215,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHookup.GetStorageProvider(providerName);
+                MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
                 provider.SetValue<TState>(grainType, (GrainReference)grain, "Field1", newValue);
             }
         }
@@ -1225,7 +1225,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.Silo.TestHookup.GetStorageProvider(providerName);
+                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
                 provider.SetErrorInjection(errorInjectionPoint);
             }
         }
@@ -1279,7 +1279,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHookup.GetStorageProvider(providerName);
+                MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
                 Assert.IsNotNull(provider, "No storage provider found: Name={0} Silo={1}", providerName, siloHandle.Silo.SiloAddress);
                 if (provider.ReadCount > 0)
                 {

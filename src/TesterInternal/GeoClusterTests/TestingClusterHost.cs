@@ -231,13 +231,13 @@ namespace Tests.GeoClusterTests
         {
             foreach (var silo in Clusters[from].Silos)
                 foreach (var dest in Clusters[to].Silos)
-                    silo.Silo.TestHookup.BlockSiloCommunication(dest.Endpoint, 100);
+                    silo.Silo.TestHook.BlockSiloCommunication(dest.Endpoint, 100);
         }
 
         public void UnblockAllClusterCommunication(string from)
         {
             foreach (var silo in Clusters[from].Silos)
-                    silo.Silo.TestHookup.UnblockSiloCommunication();
+                    silo.Silo.TestHook.UnblockSiloCommunication();
         }
 
   
