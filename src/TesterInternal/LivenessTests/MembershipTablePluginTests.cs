@@ -53,7 +53,7 @@ namespace UnitTests.LivenessTests
         // Test methods 
 
 #if DEBUG
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
+        [TestMethod, TestCategory("Liveness"), TestCategory("Azure")]
         public async Task MT_UpdateRow_Azure()
         {
             var membershipType = GlobalConfiguration.LivenessProviderType.AzureTable;
@@ -64,7 +64,7 @@ namespace UnitTests.LivenessTests
 #endif
 
 #if USE_SQL_SERVER || DEBUG
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("Liveness"), TestCategory("SqlServer")]
         public async Task MT_UpdateRow_SqlServer()
         {
             var membershipType = GlobalConfiguration.LivenessProviderType.SqlServer;
