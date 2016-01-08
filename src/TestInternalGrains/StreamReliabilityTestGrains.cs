@@ -13,7 +13,7 @@ using UnitTests.StreamingTests;
 
 namespace UnitTests.Grains
 {
-    public class StreamReliabilityTestGrainState : GrainState
+    public class StreamReliabilityTestGrainState
     {
         // For producer and consumer 
         // -- only need to store because of how we run our unit tests against multiple providers
@@ -31,14 +31,17 @@ namespace UnitTests.Grains
         // For consumer only.
 #if USE_GENERICS
         public HashSet<StreamSubscriptionHandle<T>> ConsumerSubscriptionHandles { get; set; }
+
+        public StreamReliabilityTestGrainState()
+        {
+            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<T>>();
+        }
 #else
         public HashSet<StreamSubscriptionHandle<int>> ConsumerSubscriptionHandles { get; set; }
 
-        public override void SetAll(IDictionary<string, object> values)
+        public StreamReliabilityTestGrainState()
         {
-            base.SetAll(values);
-            if(ConsumerSubscriptionHandles == null)
-                ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
+            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
         }
 #endif
     }
