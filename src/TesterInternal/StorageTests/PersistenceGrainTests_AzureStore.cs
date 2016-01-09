@@ -27,7 +27,7 @@ namespace UnitTests.StorageTests
     /// </summary>
     [TestClass]
     [DeploymentItem("Config_AzureTableStorage.xml")]
-    public class PersistenceGrainTests_AzureStore : UnitTestSiloHost
+    public class PersistenceGrainTests_AzureStore : UnitTestSiloHostPerFixture
     {
         private readonly double timingFactor;
 
@@ -51,16 +51,12 @@ namespace UnitTests.StorageTests
             }
         };
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public static TestingSiloHost CreateSiloHost()
         {
-            //ResetDefaultRuntimes();
-            StopAllSilos();
+            return new TestingSiloHost(testSiloOptions);
         }
 
         public PersistenceGrainTests_AzureStore()
-            : base(testSiloOptions)
         {
             timingFactor = CalibrateTimings();
         }
@@ -295,8 +291,8 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_AzureStore_SiloRestart()
         {
-            var initialDeploymentId = DeploymentId;
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, Globals.ServiceId);
+            var initialDeploymentId = this.HostedCluster.DeploymentId;
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -308,12 +304,12 @@ namespace UnitTests.StorageTests
             await grain.DoWrite(1);
 
             Console.WriteLine("About to reset Silos");
-            RestartDefaultSilos(true);
+            this.HostedCluster.RestartDefaultSilos(true);
             Console.WriteLine("Silos restarted");
 
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, Globals.ServiceId);
-            Assert.AreEqual(initialServiceId, Globals.ServiceId, "ServiceId same after restart.");
-            Assert.AreNotEqual(initialDeploymentId, DeploymentId, "DeploymentId different after restart.");
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
+            Assert.AreEqual(initialServiceId, this.HostedCluster.Globals.ServiceId, "ServiceId same after restart.");
+            Assert.AreNotEqual(initialDeploymentId, this.HostedCluster.DeploymentId, "DeploymentId different after restart.");
 
             val = await grain.GetValue();
             Assert.AreEqual(1, val, "Value after Write-1");
@@ -435,7 +431,7 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void Persistence_Silo_StorageProvider_Azure()
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
                 string provider = typeof(AzureTableStorage).FullName;

@@ -20,7 +20,7 @@ namespace UnitTests
     [TestClass]
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class LoggerTest:UnitTestSiloHost
+    public class LoggerTest : UnitTestSiloHostEnsureDefaultStarted
     {
         private double timingFactor;
 

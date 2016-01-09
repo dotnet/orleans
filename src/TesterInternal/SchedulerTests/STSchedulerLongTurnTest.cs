@@ -12,20 +12,8 @@ using UnitTests.Tester;
 namespace UnitTests.SchedulerTests
 {
     [TestClass]
-    public class STSchedulerLongTurnTest : UnitTestSiloHost
+    public class STSchedulerLongTurnTest : UnitTestSiloHostEnsureDefaultStarted3
     {
-        public STSchedulerLongTurnTest()
-            : base(true)
-        {
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-           // ResetDefaultRuntimes();
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_LongTurnTest()
         {

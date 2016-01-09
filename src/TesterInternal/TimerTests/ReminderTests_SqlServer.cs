@@ -27,16 +27,14 @@ namespace UnitTests.TimerTests
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
         };
 
-        public ReminderTests_SqlServer()
-            : base(siloOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
+            return new TestingSiloHost(siloOptions);
         }
 
         [ClassInitialize]
         public static void ClassInitialize(TestContext context)
         {
-            DoClassInitialize();
-
             Console.WriteLine("TestContext.DeploymentDirectory={0}", context.DeploymentDirectory);
             Console.WriteLine("TestContext=");
             Console.WriteLine(DumpTestContext(context));
@@ -44,16 +42,10 @@ namespace UnitTests.TimerTests
             siloOptions.DataConnectionString = TestUtils.GetSqlConnectionString(context);
         }
 
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            DoClassCleanup();
-        }
-
         [TestInitialize]
         public void TestInitialize()
         {
-            Console.WriteLine("{0} TestInitialize {1}", GetType().Name, TestContext.TestName);
+            this.DoTestInitialize();
 
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
@@ -64,7 +56,7 @@ namespace UnitTests.TimerTests
         [TestCleanup]
         public void TestCleanup()
         {
-            DoCleanup();
+            DoTestCleanup();
         }
 
         // Basic tests

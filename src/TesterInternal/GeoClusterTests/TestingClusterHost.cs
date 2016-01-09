@@ -1,7 +1,6 @@
 ﻿using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.TestingHost;
@@ -10,7 +9,6 @@ using System.Globalization;
 using UnitTests.Tester;
 using Orleans.Runtime.Configuration;
 using System.Net;
-using System.Net.Sockets;
 using Orleans;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -23,6 +21,7 @@ namespace Tests.GeoClusterTests
     public class TestingClusterHost   
     {
         protected readonly Dictionary<string, ClusterInfo> Clusters;
+        private TestingSiloHost siloHost;
 
         public TestingClusterHost() : base()
         {
@@ -37,13 +36,10 @@ namespace Tests.GeoClusterTests
             public int SequenceNumber; // we number created clusters in order of creation
         }
 
-    
-
         public static void WriteLog(string format, params object[] args)
         {
             Console.WriteLine(format, args);
         }
-
 
         #region Default Cluster and Client Configuration
 
@@ -65,15 +61,18 @@ namespace Tests.GeoClusterTests
 
         #region Cluster Creation
 
-
         public void NewCluster(string clusterid, int numSilos, Action<ClusterConfiguration> customizer = null)
         {
-            
             lock (Clusters)
             {
                 WriteLog("Starting Cluster {0}...", clusterid);
 
                 var mycount = Clusters.Count;
+                if (mycount == 0)
+                {
+                    TestingSiloHost.StopAllSilosIfRunning();
+                    this.siloHost = TestingSiloHost.CreateUninitialized();
+                }
 
                 var silohandles = new SiloHandle[numSilos];
 
@@ -84,11 +83,11 @@ namespace Tests.GeoClusterTests
                     BasePort = GetPortBase(mycount),
                     ProxyBasePort = GetProxyBase(mycount)
                 };
-                silohandles[0] = TestingSiloHost.StartOrleansSilo(null, Silo.SiloType.Primary, options, 0);
+                silohandles[0] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Primary, options, 0);
 
                 Parallel.For(1, numSilos, i =>
                 {
-                    silohandles[i] = TestingSiloHost.StartOrleansSilo(null, Silo.SiloType.Secondary, options, i);
+                    silohandles[i] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Secondary, options, i);
                 });
 
                 Clusters[clusterid] = new ClusterInfo
@@ -111,10 +110,8 @@ namespace Tests.GeoClusterTests
                 AdjustConfig = customizer
             };
 
-            var silo = TestingSiloHost.StartOrleansSilo(null, Silo.SiloType.Secondary, options, clusterinfo.Silos.Count);
+            var silo = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Secondary, options, clusterinfo.Silos.Count);
         }
-
-      
 
         public void StopAllClientsAndClusters()
         {
@@ -131,8 +128,8 @@ namespace Tests.GeoClusterTests
                 Parallel.ForEach(Clusters.Keys, key =>
                 {
                     var info = Clusters[key];
-                    Parallel.For(1, info.Silos.Count, i => TestingSiloHost.StopSilo(info.Silos[i]));
-                    TestingSiloHost.StopSilo(info.Silos[0]);
+                    Parallel.For(1, info.Silos.Count, i => siloHost.StopSilo(info.Silos[i]));
+                    siloHost.StopSilo(info.Silos[0]);
                 });
                 Clusters.Clear();
             }

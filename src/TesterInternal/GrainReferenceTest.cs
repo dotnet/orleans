@@ -12,19 +12,8 @@ namespace UnitTests.General
     /// Summary description for GrainReferenceTest
     /// </summary>
     [TestClass]
-    public class GrainReferenceTest : UnitTestSiloHost
+    public class GrainReferenceTest : UnitTestSiloHostEnsureDefaultStarted2
     {
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            //ResetDefaultRuntimes();
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReferenceComparison_DifferentReference()
         {

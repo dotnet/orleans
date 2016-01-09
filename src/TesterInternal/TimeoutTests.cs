@@ -14,30 +14,25 @@ namespace UnitTests
     /// Summary description for ErrorHandlingGrainTest
     /// </summary>
     [TestClass]
-    public class TimeoutTests : UnitTestSiloHost
+    public class TimeoutTests : UnitTestSiloHostEnsureDefaultStarted2
     {
         private TimeSpan originalTimeout;
 
-        public TimeoutTests()
+        [TestInitialize]
+        public void Initialize()
         {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            originalTimeout = RuntimeClient.Current.GetResponseTimeout();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            //RuntimeClient.Current.SetResponseTimeout(originalTimeout);
+            RuntimeClient.Current.SetResponseTimeout(originalTimeout);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Timeout")]
         public void Timeout_LongMethod()
         {
-            originalTimeout = RuntimeClient.Current.GetResponseTimeout();
             bool finished = false;
             var grainName = typeof (ErrorGrain).FullName;
             IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);

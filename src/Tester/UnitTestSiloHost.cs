@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,24 +29,13 @@ namespace UnitTests.Tester
     [DeploymentItem("OrleansProviders.dll")]
     [DeploymentItem("TestInternalGrainInterfaces.dll")]
     [DeploymentItem("TestInternalGrains.dll")]
-    public class UnitTestSiloHost : TestingSiloHost
+    public abstract class UnitTestSiloHost
     {
-        public UnitTestSiloHost() // : base()
-        {
-        }
+        protected static readonly Random random = new Random();
 
-        public UnitTestSiloHost(bool startFreshOrleans)
-            : base(startFreshOrleans)
+        public Logger logger
         {
-        }
-
-        public UnitTestSiloHost(TestingSiloOptions siloOptions)
-            : base(siloOptions)
-        {
-        }
-        public UnitTestSiloHost(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
-            : base(siloOptions, clientOptions)
-        {
+            get { return GrainClient.Logger; }
         }
 
         public static void CheckForAzureStorage()
@@ -66,6 +58,8 @@ namespace UnitTests.Tester
             }
         }
 
+        protected static IGrainFactory GrainFactory { get { return GrainClient.GrainFactory; } }
+
         public static string DumpTestContext(TestContext context)
         {
             StringBuilder sb = new StringBuilder();
@@ -86,7 +80,7 @@ namespace UnitTests.Tester
             return sb.ToString();
         }
 
-        public static int GetRandomGrainId()
+        public static long GetRandomGrainId()
         {
             return random.Next();
         }
@@ -172,6 +166,182 @@ namespace UnitTests.Tester
                     result += stat.ActivationCount;
             }
             return result;
+        }
+    }
+
+    [TestClass]
+    public abstract class UnitTestSiloHostEnsureDefaultStarted : UnitTestSiloHost
+    {
+        private static TestingSiloHost defaultHostedCluster;
+        protected TestingSiloHost HostedCluster { get; private set; }
+
+        [TestInitialize]
+        public void EnsureDefaultOrleansHostInitialized()
+        {
+
+            var runningCluster = TestingSiloHost.Instance;
+            if (runningCluster != null && runningCluster == defaultHostedCluster)
+            {
+                runningCluster.StopAdditionalSilos();
+                this.HostedCluster = runningCluster;
+                return;
+            }
+
+            TestingSiloHost.StopAllSilosIfRunning();
+            this.HostedCluster = new TestingSiloHost(true);
+            defaultHostedCluster = this.HostedCluster;
+        }
+
+        [TestCleanup]
+        public void CleanupOrleansBackToDefault()
+        {
+            if (this.HostedCluster != null && TestingSiloHost.Instance == this.HostedCluster)
+            {
+                this.HostedCluster.StopAdditionalSilos();
+            }
+        }
+    }
+
+    // marker class for test that were originally using the TestingSiloHost default constructor
+    [TestClass]
+    public abstract class UnitTestSiloHostEnsureDefaultStarted2 : UnitTestSiloHostEnsureDefaultStarted
+    {
+    }
+
+    // marker class for test that were originally using the TestingSiloHost(true) constructor
+    [TestClass]
+    public abstract class UnitTestSiloHostEnsureDefaultStarted3 : UnitTestSiloHostEnsureDefaultStarted
+    {
+    }
+
+    // marker class for test that were originally using the TestingSiloHost(StartSecondary=false) constructor
+    [TestClass]
+    public abstract class UnitTestSiloHostEnsureDefaultStartedSecondaryOff : UnitTestSiloHostEnsureDefaultStarted
+    {
+    }
+
+    internal static class IsolatedUnitTestSiloHost
+    {
+        public static Func<TestingSiloHost> FindTestingSiloHostFactory(object fixture)
+        {
+            var factory = fixture.GetType()
+                .GetTypeInfo()
+                .GetMethod("CreateSiloHost", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+
+            if (factory != null)
+            {
+                if (!factory.IsStatic)
+                {
+                    throw new InvalidOperationException("CreateSiloHost must be static");
+                }
+
+                if (factory.ReturnParameter == null || factory.ReturnParameter.ParameterType != typeof(TestingSiloHost))
+                {
+                    throw new InvalidOperationException("CreateSiloHost must have a return type of TestingSiloHost");
+                }
+
+                if (factory.GetParameters().Length != 0)
+                {
+                    throw new InvalidOperationException("CreateSiloHost must not have any input parameters in its signature");
+                }
+
+                return () =>
+                {
+                    try
+                    {
+                        return (TestingSiloHost)factory.Invoke(fixture, null);
+                    }
+                    catch (TargetInvocationException ex)
+                    {
+                        ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                        return null;
+                    }
+                };
+            }
+
+            Console.WriteLine("Static method named CreateSiloHost was not found in the test fixture type {0}. Using a default silo host.", fixture.GetType().Name);
+            var potentialFactory = fixture.GetType()
+                .GetTypeInfo()
+                .GetMethods()
+                .FirstOrDefault(m => m.ReturnParameter != null && m.ReturnParameter.ParameterType == typeof(TestingSiloHost));
+
+            if (potentialFactory != null)
+            {
+                Console.WriteLine("If you meant to use '{0}' as the factory method, please rename it to 'CreateSiloHost' and follow the method signature guidelines", potentialFactory.Name);
+            }
+
+            return () => new TestingSiloHost(true);
+        }
+    }
+
+    [TestClass]
+    public abstract class UnitTestSiloHostPerFixture : UnitTestSiloHost
+    {
+        private static TestingSiloHost previousHostedCluster;
+        private static string previousFixtureType;
+        protected TestingSiloHost HostedCluster { get; private set; }
+
+        [TestInitialize]
+        public void EnsureOrleansHostInitialized()
+        {
+            var fixtureType = this.GetType().AssemblyQualifiedName;
+            var runningCluster = TestingSiloHost.Instance;
+            if (runningCluster != null
+                && previousFixtureType != null 
+                && previousFixtureType == fixtureType 
+                && runningCluster == previousHostedCluster)
+            {
+                runningCluster.StopAdditionalSilos();
+                this.HostedCluster = runningCluster;
+                return;
+            }
+
+            previousHostedCluster = null;
+            previousFixtureType = null;
+
+            TestingSiloHost.StopAllSilosIfRunning();
+            var siloHostFactory = IsolatedUnitTestSiloHost.FindTestingSiloHostFactory(this);
+            this.HostedCluster = siloHostFactory.Invoke();
+            previousHostedCluster = this.HostedCluster;
+            previousFixtureType = fixtureType;
+        }
+
+        [TestCleanup]
+        public void CleanupOrleansBackToDefault()
+        {
+            if (this.HostedCluster != null && TestingSiloHost.Instance == this.HostedCluster)
+            {
+                this.HostedCluster.StopAdditionalSilos();
+            }
+        }
+
+        // Avoid using ClassCleanup, as the order of execution is not guaranteed, and my run after another test fixture ran.
+        //[ClassCleanup]
+        //public static void StopOrleansAfterFixture()
+        //{
+        //    previousHostedCluster = null;
+        //    previousFixtureType = null;
+        //    TestingSiloHost.StopAllSilosIfRunning();
+        //}
+    }
+
+    [TestClass]
+    public abstract class UnitTestSiloHostPerTest : UnitTestSiloHost
+    {
+        protected TestingSiloHost HostedCluster { get; private set; }
+
+        [TestInitialize]
+        public void InitializeOrleansHost()
+        {
+            TestingSiloHost.StopAllSilosIfRunning();
+            var siloHostFactory = IsolatedUnitTestSiloHost.FindTestingSiloHostFactory(this);
+            this.HostedCluster = siloHostFactory.Invoke();
+        }
+
+        [TestCleanup]
+        public void StopOrleansAfterTest()
+        {
+            TestingSiloHost.StopAllSilosIfRunning();
         }
     }
 }

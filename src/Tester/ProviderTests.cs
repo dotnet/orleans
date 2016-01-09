@@ -8,19 +8,8 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class ProviderTests : UnitTestSiloHost
+    public class ProviderTests : UnitTestSiloHostEnsureDefaultStarted3
     {
-        public ProviderTests()
-            : base(true)
-        {
-        }
-
-        [ClassCleanup()]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {

@@ -10,19 +10,13 @@ namespace UnitTests.General
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
 
     [TestClass]
-    public class MultifacetGrainTest : UnitTestSiloHost
+    public class MultifacetGrainTest : UnitTestSiloHostEnsureDefaultStarted2
     {
         IMultifacetWriter writer;
         IMultifacetReader reader;
         //int eventCounter;
         const int EXPECTED_NUMBER_OF_EVENTS = 4;
         private TimeSpan timeout = TimeSpan.FromSeconds(5);
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
         public void RWReferences()

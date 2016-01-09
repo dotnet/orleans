@@ -10,14 +10,8 @@ using UnitTests.Tester;
 namespace UnitTests.CodeGeneration
 {
     [TestClass]
-    public class CodeGeneratorTests_RequiringSilo : UnitTestSiloHost
+    public class CodeGeneratorTests_RequiringSilo : UnitTestSiloHostEnsureDefaultStarted2
     {
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         // These test cases create GrainReferences, to we need to be connected to silo for that to work.
 
         [TestMethod, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey")]
