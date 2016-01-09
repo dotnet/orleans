@@ -65,9 +65,30 @@ namespace Orleans.Streams
                 pubSub, myGrainReference, token);
 
             GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.StreamId, myGrainReference);
-            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
 
-            return myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
+            // Optimistic Concurrency: 
+            // In general, we should first register the subsription with the pubsub (pubSub.RegisterConsumer)
+            // and only if it succeeds store it locally (myExtension.SetObserver). 
+            // Basicaly, those 2 operations should be done as one atomic transaction - either both or none and isolated from concurrent reads.
+            // BUT: there is a distributed race here: the first msg may arrive before the call is awaited 
+            // (since the pubsub notifies the producer that may immideately produce)
+            // and will thus not find the subriptionHandle in the extension, basically violating "isolation". 
+            // Therefore, we employ Optimistic Concurrency Control here to guarantee isolation: 
+            // we optimisticaly store subscriptionId in the handle first before calling pubSub.RegisterConsumer
+            // and undo it in the case of failure. 
+            // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
+            // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
+            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
+            try
+            {
+                await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
+                return subriptionHandle;
+            } catch(Exception)
+            {
+                // Undo the previous call myExtension.SetObserver.
+                myExtension.RemoveObserver(subscriptionId);
+                throw;
+            }            
         }
 
         public async Task<StreamSubscriptionHandle<T>> ResumeAsync(
