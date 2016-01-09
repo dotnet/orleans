@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 
@@ -8,29 +8,25 @@ namespace Orleans.SqlUtils
     /// this class caches the references to all loaded factories
     internal static class DbConnectionFactory
     {
-        private static readonly Dictionary<string, CachedFactory> factoryCache =
-            new Dictionary<string, CachedFactory>();
+        private static readonly ConcurrentDictionary<string, CachedFactory> factoryCache =
+            new ConcurrentDictionary<string, CachedFactory>();
 
-        static DbConnectionFactory()
+        private static CachedFactory GetFactory(string invariantName)
         {
             // Seeks for database provider factory classes from GAC or as indicated by
             // the configuration file, see at <see href="https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx">Obtaining a DbProviderFactory</see>.       
-            
-            foreach (DataRow factoryData in DbProviderFactories.GetFactoryClasses().Rows)
-            {
-                var invariantName = factoryData["InvariantName"].ToString();
-                var factoryName = factoryData["Name"].ToString();
-                var description = factoryData["Description"].ToString();
-                var assemblyQualifiedNameKey = factoryData["AssemblyQualifiedName"].ToString();
-                var factory = DbProviderFactories.GetFactory(invariantName);
-                var cachedFactory = new CachedFactory(factory, factoryName, description, assemblyQualifiedNameKey);
-                factoryCache.Add(invariantName, cachedFactory);
-            }
+
+            DataRow factoryData = DbProviderFactories.GetFactoryClasses().Rows.Find(invariantName);
+            var factoryName = factoryData["Name"].ToString();
+            var description = factoryData["Description"].ToString();
+            var assemblyQualifiedNameKey = factoryData["AssemblyQualifiedName"].ToString();
+            var factory = DbProviderFactories.GetFactory(invariantName);
+            return new CachedFactory(factory, factoryName, description, assemblyQualifiedNameKey);
         }
 
         public static DbConnection CreateConnection(string invariantName, string connectionString)
         {
-            var factory = factoryCache[invariantName].Factory;
+            var factory = factoryCache.GetOrAdd(invariantName, GetFactory).Factory;
             var connection = factory.CreateConnection();
             connection.ConnectionString = connectionString;
             return connection;
