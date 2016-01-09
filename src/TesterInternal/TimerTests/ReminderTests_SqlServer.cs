@@ -69,13 +69,13 @@ namespace UnitTests.TimerTests
 
         // Basic tests
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("ReminderService"), TestCategory("SqlServer")]
         public async Task Rem_Sql_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("ReminderService"), TestCategory("SqlServer")]
         public async Task Rem_Sql_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -83,7 +83,7 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("ReminderService"), TestCategory("SqlServer")]
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();

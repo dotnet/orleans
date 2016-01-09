@@ -78,7 +78,7 @@ namespace UnitTests.MessageCenterTests
         }
 
 #if USE_SQL_SERVER || DEBUG
-        [TestMethod, TestCategory("Functional"), TestCategory("Gateway"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("Gateway"), TestCategory("SqlServer")]
         public async Task GatewaySelection_SqlServer()
         {
             string testName = TestContext.TestName;

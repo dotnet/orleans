@@ -178,7 +178,7 @@ namespace UnitTests.Stats
             StopAllSilos();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
+        [TestMethod, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
         public void ClientInit_SqlServer_WithStats()
         {
             Assert.IsTrue(GrainClient.IsInitialized);
