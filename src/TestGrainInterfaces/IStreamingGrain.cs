@@ -88,12 +88,5 @@ namespace UnitTests.GrainInterfaces
         Task<int> ItemsConsumed { get; }
         Task<int> ConsumerCount { get; }
         string ProviderName { get; }
-    }
-    
-    public class UnitTestStreamNamespace
-    {
-        public const string DefaultStreamNamespace = "DefaultStreamNamespace";
-        public const string StreamReliabilityNamespace = "StreamReliabilityNamespace";
-        public const string StreamLifecycleTestsNamespace = "UnitTest.Streaming.LifecycleTests";
-    }
+    }    
 }

@@ -37,12 +37,18 @@ namespace UnitTests.StorageTests
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
 
+        private static readonly Guid initialServiceId = Guid.NewGuid();
+
         private static readonly TestingSiloOptions testSiloOptions = new TestingSiloOptions
         {
             SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
             StartFreshOrleans = true,
             StartPrimary = true,
             StartSecondary = false,
+            AdjustConfig = config =>
+            {
+                config.Globals.ServiceId = initialServiceId;
+            }
         };
 
         // Use ClassCleanup to run code after all tests in a class have run
@@ -284,6 +290,41 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expected3, val3, "Value after Write#2 - 3");
             val3 = await grain3.DoRead();
             Assert.AreEqual(expected3, val3, "Value after Re-Read - 3");
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        public async Task Grain_AzureStore_SiloRestart()
+        {
+            var initialDeploymentId = DeploymentId;
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, Globals.ServiceId);
+
+            Guid id = Guid.NewGuid();
+            IAzureStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
+
+            int val = await grain.GetValue();
+
+            Assert.AreEqual(0, val, "Initial value");
+
+            await grain.DoWrite(1);
+
+            Console.WriteLine("About to reset Silos");
+            RestartDefaultSilos(true);
+            Console.WriteLine("Silos restarted");
+
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, Globals.ServiceId);
+            Assert.AreEqual(initialServiceId, Globals.ServiceId, "ServiceId same after restart.");
+            Assert.AreNotEqual(initialDeploymentId, DeploymentId, "DeploymentId different after restart.");
+
+            val = await grain.GetValue();
+            Assert.AreEqual(1, val, "Value after Write-1");
+
+            await grain.DoWrite(2);
+            val = await grain.GetValue();
+            Assert.AreEqual(2, val, "Value after Write-2");
+
+            val = await grain.DoRead();
+
+            Assert.AreEqual(2, val, "Value after Re-Read");
         }
 
         [TestMethod, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]

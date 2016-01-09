@@ -84,6 +84,7 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="AssemblyLoaderTests.cs" />
     <Compile Include="AsynchAgentRestartTest.cs" />
     <Compile Include="AsyncPipelineTests.cs" />
@@ -183,8 +184,16 @@
     <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
     <Compile Include="StorageTests\AzureQueueDataManagerTests.cs" />
     <Compile Include="MembershipTests\ZookeeperMembershipTableTests.cs" />
+    <Compile Include="StreamingTests\AzureQueueAdapterTests.cs" />
+    <Compile Include="StreamingTests\HaloStreamSubscribeTests.cs" />
+    <Compile Include="StreamingTests\MultipleStreamsTestRunner.cs" />
+    <Compile Include="StreamingTests\SingleStreamTestRunner.cs" />
+    <Compile Include="StreamingTests\SMSStreamingTests.cs" />
+    <Compile Include="StreamingTests\StreamLifecycleTests.cs" />
     <Compile Include="StreamingTests\StreamLimitTests.cs" />
     <Compile Include="StreamingTests\StreamPubSubReliabilityTests.cs" />
+    <Compile Include="StreamingTests\StreamReliabilityTests.cs" />
+    <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestConstants.cs" />
@@ -295,10 +304,16 @@
     <Content Include="ClientConfig_NewAzure.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="ClientConfig_AzureStreamProviders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="ClientConfig_StreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_ActivationCollectorTests.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_Azure_Default.xml">
@@ -340,6 +355,9 @@
     <Content Include="Config_StorageProvider_SomeConfig.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Config_AzureStreamProviders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config_StreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -363,9 +381,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="MockStats_ServerConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

@@ -50,6 +50,7 @@
     <Compile Include="IClientAddressableTestConsumer.cs" />
     <Compile Include="ICollectionTestGrain.cs" />
     <Compile Include="IConcurrentGrain.cs" />
+    <Compile Include="IConsumerEventCountingGrain.cs" />
     <Compile Include="IDeadlockGrain.cs" />
     <Compile Include="IEchoTaskGrain.cs" />
     <Compile Include="IErrorGrain.cs" />
@@ -75,6 +76,7 @@
     <Compile Include="IPersistenceTestGrains.cs" />
     <Compile Include="IPlacementTestGrain.cs" />
     <Compile Include="IPolymorphicTestGrain.cs" />
+    <Compile Include="IProducerEventCountingGrain.cs" />
     <Compile Include="IPromiseForwardGrain.cs" />
     <Compile Include="IProxyGrain.cs" />
     <Compile Include="IReentrancyGrain.cs" />
@@ -96,6 +98,8 @@
     <Compile Include="ILivenessTestGrain.cs" />
     <Compile Include="IStreamingGrain.cs" />
     <Compile Include="IStreamLifecycleTestGrains.cs" />
+    <Compile Include="IStreamLifecycleTestInternalGrains.cs" />
+    <Compile Include="IStreamReliabilityTestGrains.cs" />
     <Compile Include="ITestExtension.cs" />
     <Compile Include="ITestGrain.cs" />
     <Compile Include="IStreaming_ProducerGrain.cs" />
