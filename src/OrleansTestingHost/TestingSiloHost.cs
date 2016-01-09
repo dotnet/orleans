@@ -384,7 +384,7 @@ namespace Orleans.TestingHost
 
             config.AdjustForTestEnvironment();
         }
-       
+
         #region Private methods
 
         /// <summary>
@@ -393,21 +393,30 @@ namespace Orleans.TestingHost
         /// <param name="siloHandle">The silo.</param>
         private static void ImportGeneratedAssemblies(SiloHandle siloHandle)
         {
-            var silo = siloHandle.Silo;
-            if (silo != null && silo.TestHook != null)
+            try
             {
-                var generatedAssemblies = new Silo.TestHooks.GeneratedAssemblies();
-                silo.TestHook.UpdateGeneratedAssemblies(generatedAssemblies);
-                foreach (var assembly in generatedAssemblies.Assemblies)
+                var silo = siloHandle.Silo;
+                if (silo != null && silo.TestHook != null)
                 {
-                    // If we have never seen generated code for this assembly before, or generated code might be
-                    // newer, store it for later silo creation.
-                    byte[] existing;
-                    if (!additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
+                    var generatedAssemblies = new Silo.TestHooks.GeneratedAssemblies();
+                    silo.TestHook.UpdateGeneratedAssemblies(generatedAssemblies);
+                    
+                    foreach (var assembly in generatedAssemblies.Assemblies)
                     {
-                        additionalAssemblies[assembly.Key] = assembly.Value;
+                        // If we have never seen generated code for this assembly before, or generated code might be
+                        // newer, store it for later silo creation.
+                        byte[] existing;
+                        if (!additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
+                        {
+                            additionalAssemblies[assembly.Key] = assembly.Value;
+                        }
                     }
                 }
+            }
+            catch (Exception exc)
+            {
+                Console.WriteLine("UpdateGeneratedAssemblies threw an exception. Ignoring it. Exception: {0}", exc);
+                return;
             }
         }
 
