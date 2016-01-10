@@ -8,11 +8,8 @@ title: Running the Application
 
 To allow applications to communicate with grains from outside Orleans, the framework includes a client library. 
 This client library might be used by a desktop or mobile application, or by a front end server that renders interactive web pages or exposes a web services API. 
-The client library provides a subset of the Orleans programming model for writing asynchronous clients that communicate with Orleans grains. This requires a few simple steps:
-
-1. Connect to an Orleans gateway  
-2. Send messages to grains and receive responses 
-3. Receive asynchronous notifications from grains via observers 
+The client library provides an API for writing asynchronous clients that communicate with Orleans grains.
+Once the client library is connected to an Orleans gateway, a client can send messages to grains, receive responses and receive asynchronous notifications from grains via observers.
 
 ## Connecting to a Gateway
 
