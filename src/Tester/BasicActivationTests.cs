@@ -14,7 +14,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class BasicActivationTests : UnitTestSiloHostEnsureDefaultStarted3
+    public class BasicActivationTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ActivateAndUpdate()

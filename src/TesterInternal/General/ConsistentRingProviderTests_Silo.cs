@@ -14,7 +14,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class ConsistentRingProviderTests_Silo : UnitTestSiloHostPerTest
+    public class ConsistentRingProviderTests_Silo : HostedTestClusterPerTest
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {

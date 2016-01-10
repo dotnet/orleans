@@ -12,7 +12,7 @@ using Orleans.Runtime;
 namespace UnitTests.General
 {
     [TestClass]
-    public class StatelessWorkerTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class StatelessWorkerTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly int ExpectedMaxLocalActivations = 1; // System.Environment.ProcessorCount;
 

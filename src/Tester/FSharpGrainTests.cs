@@ -12,7 +12,7 @@ namespace UnitTests.General
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
     [TestClass]
-    public class FSharpGrainTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class FSharpGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private async Task PingTest<T>(T input)
         {

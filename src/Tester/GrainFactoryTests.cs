@@ -9,7 +9,7 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class GrainFactoryTests : UnitTestSiloHostEnsureDefaultStarted3
+    public class GrainFactoryTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
         [ExpectedException(typeof(OrleansException))]

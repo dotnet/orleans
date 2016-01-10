@@ -6,7 +6,7 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class SerializationTests : UnitTestSiloHostEnsureDefaultStarted2
+    public class SerializationTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
         public void Serialization_LargeTestData()

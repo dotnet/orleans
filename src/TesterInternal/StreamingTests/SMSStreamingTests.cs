@@ -14,7 +14,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SMSStreamingTests : UnitTestSiloHostPerFixture
+    public class SMSStreamingTests : HostedTestClusterPerFixture
     {
         internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_StreamProviders.xml");
         internal static readonly FileInfo ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml");

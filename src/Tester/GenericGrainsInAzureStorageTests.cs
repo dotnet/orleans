@@ -10,7 +10,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class GenericGrainsInAzureStorageTests : UnitTestSiloHostPerFixture
+    public class GenericGrainsInAzureStorageTests : HostedTestClusterPerFixture
     {
         public static TestingSiloHost CreateSiloHost()
         {

@@ -8,7 +8,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class KeyExtensionTests : UnitTestSiloHostEnsureDefaultStarted2
+    public class KeyExtensionTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldDifferentiateGrainsUsingTheSameBasePrimaryKey()

@@ -12,7 +12,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class DeadlockDetectionTests : UnitTestSiloHostPerFixture
+    public class DeadlockDetectionTests : HostedTestClusterPerFixture
     {
         private const int numIterations = 30;
 

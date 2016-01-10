@@ -17,7 +17,7 @@ namespace UnitTests.General
 {
     [DeploymentItem("Config_BootstrapProviders.xml")]
     [TestClass]
-    public class BootstrapProvidersTests : UnitTestSiloHostPerFixture
+    public class BootstrapProvidersTests : HostedTestClusterPerFixture
     {
         private static readonly TestingSiloOptions testOptions = new TestingSiloOptions
         {

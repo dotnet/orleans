@@ -11,7 +11,7 @@ namespace UnitTests.General
     /// Tests that exceptions are correctly propagated.
     /// </summary>
     [TestClass]
-    public class ExceptionPropagationTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class ExceptionPropagationTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task TaskCancelationPropagation()

@@ -389,7 +389,7 @@ namespace UnitTests.General
     }
 
     [TestClass]
-    public class RequestContextTests_Silo : UnitTestSiloHostPerFixture
+    public class RequestContextTests_Silo : HostedTestClusterPerFixture
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {

@@ -14,7 +14,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SampleStreamingTests : UnitTestSiloHostPerFixture
+    public class SampleStreamingTests : HostedTestClusterPerFixture
     {
         private const string StreamNamespace = "SampleStreamNamespace"; 
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);

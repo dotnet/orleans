@@ -27,7 +27,7 @@ namespace UnitTests.Streaming.Reliability
     [DeploymentItem("Config_AzureStreamProviders.xml")]
     [DeploymentItem("ClientConfig_AzureStreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamReliabilityTests : UnitTestSiloHostPerFixture
+    public class StreamReliabilityTests : HostedTestClusterPerFixture
     {
         public TestContext TestContext { get; set; }
         public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";

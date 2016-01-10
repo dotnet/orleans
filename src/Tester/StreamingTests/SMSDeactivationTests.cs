@@ -12,7 +12,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SMSDeactivationTests : UnitTestSiloHostPerFixture
+    public class SMSDeactivationTests : HostedTestClusterPerFixture
     {
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";

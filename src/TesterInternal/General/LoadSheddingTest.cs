@@ -10,7 +10,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class LoadSheddingTest : UnitTestSiloHostPerTest
+    public class LoadSheddingTest : HostedTestClusterPerTest
     {
         public static TestingSiloHost CreateSiloHost()
         {

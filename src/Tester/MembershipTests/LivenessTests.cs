@@ -15,7 +15,7 @@ using UnitTests.General;
 
 namespace UnitTests.MembershipTests
 {
-    public class LivenessTestsBase : UnitTestSiloHostPerFixture
+    public class LivenessTestsBase : HostedTestClusterPerFixture
     {
         private const int numAdditionalSilos = 1;
         private const int numGrains = 20;

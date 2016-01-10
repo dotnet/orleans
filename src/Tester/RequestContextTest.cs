@@ -8,7 +8,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class RequestContextTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class RequestContextTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("RequestContext"), TestCategory("Functional")]
         public async Task RequestContextCallerToCalleeFlow()

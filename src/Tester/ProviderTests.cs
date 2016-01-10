@@ -8,12 +8,12 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class ProviderTests : UnitTestSiloHostEnsureDefaultStarted3
+    public class ProviderTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {
-            IExtensionTestGrain grain = GrainClient.GrainFactory.GetGrain<IExtensionTestGrain>(1);
+            IExtensionTestGrain grain = GrainClient.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
             ITestExtension extension = grain.AsReference<ITestExtension>();
             bool exceptionThrown = true;
 

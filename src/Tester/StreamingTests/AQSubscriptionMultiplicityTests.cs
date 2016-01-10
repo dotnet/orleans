@@ -14,7 +14,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class AQSubscriptionMultiplicityTests : UnitTestSiloHostPerTest
+    public class AQSubscriptionMultiplicityTests : HostedTestClusterPerTest
     {
         private const string AQStreamProviderName = "AzureQueueProvider";                 // must match what is in OrleansConfigurationForStreamingUnitTests.xml
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";

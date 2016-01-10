@@ -21,7 +21,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class ControllableStreamGeneratorProviderTests : UnitTestSiloHostPerFixture
+    public class ControllableStreamGeneratorProviderTests : HostedTestClusterPerFixture
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 

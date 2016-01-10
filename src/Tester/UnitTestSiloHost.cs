@@ -170,7 +170,7 @@ namespace UnitTests.Tester
     }
 
     [TestClass]
-    public abstract class UnitTestSiloHostEnsureDefaultStarted : UnitTestSiloHost
+    public abstract class HostedTestClusterEnsureDefaultStarted : UnitTestSiloHost
     {
         private static TestingSiloHost defaultHostedCluster;
         protected TestingSiloHost HostedCluster { get; private set; }
@@ -200,24 +200,6 @@ namespace UnitTests.Tester
                 this.HostedCluster.StopAdditionalSilos();
             }
         }
-    }
-
-    // marker class for test that were originally using the TestingSiloHost default constructor
-    [TestClass]
-    public abstract class UnitTestSiloHostEnsureDefaultStarted2 : UnitTestSiloHostEnsureDefaultStarted
-    {
-    }
-
-    // marker class for test that were originally using the TestingSiloHost(true) constructor
-    [TestClass]
-    public abstract class UnitTestSiloHostEnsureDefaultStarted3 : UnitTestSiloHostEnsureDefaultStarted
-    {
-    }
-
-    // marker class for test that were originally using the TestingSiloHost(StartSecondary=false) constructor
-    [TestClass]
-    public abstract class UnitTestSiloHostEnsureDefaultStartedSecondaryOff : UnitTestSiloHostEnsureDefaultStarted
-    {
     }
 
     internal static class IsolatedUnitTestSiloHost
@@ -275,7 +257,7 @@ namespace UnitTests.Tester
     }
 
     [TestClass]
-    public abstract class UnitTestSiloHostPerFixture : UnitTestSiloHost
+    public abstract class HostedTestClusterPerFixture : UnitTestSiloHost
     {
         private static TestingSiloHost previousHostedCluster;
         private static string previousFixtureType;
@@ -326,7 +308,7 @@ namespace UnitTests.Tester
     }
 
     [TestClass]
-    public abstract class UnitTestSiloHostPerTest : UnitTestSiloHost
+    public abstract class HostedTestClusterPerTest : UnitTestSiloHost
     {
         protected TestingSiloHost HostedCluster { get; private set; }
 

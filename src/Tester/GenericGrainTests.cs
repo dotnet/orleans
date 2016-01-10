@@ -15,7 +15,7 @@ namespace UnitTests.General
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
     [TestClass]
-    public class GenericGrainTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class GenericGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private static int grainId = 0;
 

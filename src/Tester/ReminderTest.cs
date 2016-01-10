@@ -6,7 +6,7 @@ using UnitTests.Tester;
 namespace Tester
 {
     [TestClass]
-    public class ReminderTest : UnitTestSiloHostEnsureDefaultStarted
+    public class ReminderTest : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Reminders")]
         public async Task SimpleGrainGetGrain()

@@ -10,7 +10,7 @@ namespace UnitTests.General
     /// Summary description for SimpleGrain
     /// </summary>
     [TestClass]
-    public class SimpleGrainTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class SimpleGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         public ISimpleGrain GetSimpleGrain()
         {

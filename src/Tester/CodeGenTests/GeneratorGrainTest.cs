@@ -16,7 +16,7 @@ namespace Tester.CodeGenTests
     /// Summary description for GrainClientTest
     /// </summary>
     [TestClass]
-    public class GeneratorGrainTest : UnitTestSiloHostPerFixture
+    public class GeneratorGrainTest : HostedTestClusterPerFixture
     {
         [ClassInitialize]
         public static void Initialize(TestContext context)

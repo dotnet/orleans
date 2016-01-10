@@ -15,7 +15,7 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class ReentrancyTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class ReentrancyTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void ReentrantGrain()

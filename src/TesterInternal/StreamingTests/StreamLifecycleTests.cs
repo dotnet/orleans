@@ -16,7 +16,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamLifecycleTests : UnitTestSiloHostPerTest
+    public class StreamLifecycleTests : HostedTestClusterPerTest
     {
         protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
         {

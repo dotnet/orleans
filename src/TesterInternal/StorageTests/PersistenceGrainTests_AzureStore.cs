@@ -27,7 +27,7 @@ namespace UnitTests.StorageTests
     /// </summary>
     [TestClass]
     [DeploymentItem("Config_AzureTableStorage.xml")]
-    public class PersistenceGrainTests_AzureStore : UnitTestSiloHostPerFixture
+    public class PersistenceGrainTests_AzureStore : HostedTestClusterPerFixture
     {
         private readonly double timingFactor;
 

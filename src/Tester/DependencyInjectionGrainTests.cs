@@ -13,7 +13,7 @@ namespace UnitTests.General
     [DeploymentItem("OrleansStartupConfigurationForTesting.xml")]
     [DeploymentItem("OrleansDependencyInjection.dll")]
     [TestClass]
-    public class DependencyInjectionGrainTests : UnitTestSiloHostPerFixture
+    public class DependencyInjectionGrainTests : HostedTestClusterPerFixture
     {
         public static TestingSiloHost CreateSiloHost()
         {

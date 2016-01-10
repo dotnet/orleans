@@ -14,7 +14,7 @@ namespace UnitTests.HaloTests.Streaming
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class HaloStreamSubscribeTests : UnitTestSiloHostPerFixture
+    public class HaloStreamSubscribeTests : HostedTestClusterPerFixture
     {
         private const string SmsStreamProviderName = "SMSProvider";
         private const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;

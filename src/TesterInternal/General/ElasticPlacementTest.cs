@@ -15,7 +15,7 @@ using UnitTests.Tester;
 namespace UnitTests.Elasticity
 {
     [TestClass]
-    public class ElasticPlacementTests : UnitTestSiloHostPerTest
+    public class ElasticPlacementTests : HostedTestClusterPerTest
     {
         private readonly List<IActivationCountBasedPlacementTestGrain> grains = new List<IActivationCountBasedPlacementTestGrain>();
         private const int leavy = 300;

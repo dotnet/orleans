@@ -15,7 +15,7 @@ namespace UnitTests
     /// Summary description for ErrorHandlingGrainTest
     /// </summary>
     [TestClass]
-    public class ErrorGrainTest : UnitTestSiloHostEnsureDefaultStarted2
+    public class ErrorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
         private readonly TraceLogger Logger = TraceLogger.GetLogger("AssemblyLoaderTests", TraceLogger.LoggerType.Application);

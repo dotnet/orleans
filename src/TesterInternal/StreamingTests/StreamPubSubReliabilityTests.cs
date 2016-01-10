@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("Config_StorageErrors.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamPubSubReliabilityTests : UnitTestSiloHostPerFixture
+    public class StreamPubSubReliabilityTests : HostedTestClusterPerFixture
     {
         public TestContext TestContext { get; set; }
         protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions

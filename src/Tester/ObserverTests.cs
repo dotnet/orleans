@@ -14,7 +14,7 @@ namespace UnitTests.General
     /// Summary description for ObserverTests
     /// </summary>
     [TestClass]
-    public class ObserverTests : UnitTestSiloHostEnsureDefaultStarted2
+    public class ObserverTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
         private int callbackCounter;

@@ -10,7 +10,7 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class ClientInitTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class ClientInitTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_IsInitialized()

@@ -14,7 +14,7 @@ using UnitTests.Tester;
 namespace UnitTests.Management
 {
     [TestClass]
-    public class ManagementGrainTests : UnitTestSiloHostEnsureDefaultStarted2
+    public class ManagementGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private IManagementGrain mgmtGrain;
 

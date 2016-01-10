@@ -7,7 +7,7 @@ using UnitTests.Tester;
 namespace Tester
 {
     [TestClass]
-    public class GrainInterfaceHierarchyTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class GrainInterfaceHierarchyTests : HostedTestClusterEnsureDefaultStarted
     {
         private T GetHierarchyGrain<T>() where T : IDoSomething, IGrainWithIntegerKey
         {

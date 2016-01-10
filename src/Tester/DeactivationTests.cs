@@ -7,7 +7,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class DeactivationTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class DeactivationTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DeactivateReactivateTiming()

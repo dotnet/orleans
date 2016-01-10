@@ -12,7 +12,7 @@ namespace UnitTests.General
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
     [TestClass]
-    public class ExternalTypesTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class ExternalTypesTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public async Task ExternalTypesTest_GrainWithAbstractExternalTypeParam()

@@ -7,7 +7,7 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class PolymorphicInterfaceTest : UnitTestSiloHostEnsureDefaultStarted2
+    public class PolymorphicInterfaceTest : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic_SimpleTest()

@@ -16,7 +16,7 @@ namespace UnitTests.Stats
     [TestClass]
     [DeploymentItem("MockStats_ClientConfiguration.xml")]
     [DeploymentItem("MockStats_ServerConfiguration.xml")]
-    public class StatsInitTests : UnitTestSiloHostPerFixture
+    public class StatsInitTests : HostedTestClusterPerFixture
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
@@ -129,7 +129,7 @@ namespace UnitTests.Stats
     [DeploymentItem("DevTestClientConfiguration.xml")]
     [DeploymentItem("DevTestServerConfiguration.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class SqlClientInitTests : UnitTestSiloHostPerFixture
+    public class SqlClientInitTests : HostedTestClusterPerFixture
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {

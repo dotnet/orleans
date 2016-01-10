@@ -19,7 +19,7 @@ using UnitTests.Tester;
 
 namespace UnitTests.TimerTests
 {
-    public class ReminderTests_Base : UnitTestSiloHostPerFixture
+    public class ReminderTests_Base : HostedTestClusterPerFixture
     {
         internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(100); // the experiment shouldnt be that long that the sums of leeways exceeds a period
         internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(5);

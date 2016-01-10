@@ -17,7 +17,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class ControllableStreamProviderTests : UnitTestSiloHostPerFixture
+    public class ControllableStreamProviderTests : HostedTestClusterPerFixture
     {
         private const string StreamProviderName = "ControllableTestStreamProvider";
         private readonly string StreamProviderTypeName = typeof(ControllableTestStreamProvider).FullName;

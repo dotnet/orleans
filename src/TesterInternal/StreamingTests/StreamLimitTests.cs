@@ -21,7 +21,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamLimitTests : UnitTestSiloHostPerFixture
+    public class StreamLimitTests : HostedTestClusterPerFixture
     {
         public TestContext TestContext { get; set; }
 

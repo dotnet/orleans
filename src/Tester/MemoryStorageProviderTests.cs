@@ -8,7 +8,7 @@ using UnitTests.Tester;
 namespace UnitTests.StorageTests
 {
     [TestClass]
-    public class MemoryStorageProviderTests : UnitTestSiloHostEnsureDefaultStarted2
+    public class MemoryStorageProviderTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Storage")]
         public async Task MemoryStorageProvider_RestoreStateTest()

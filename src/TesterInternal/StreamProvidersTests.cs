@@ -14,7 +14,7 @@ namespace UnitTests.Streaming
     [DeploymentItem("Config_DevStorage.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class StreamProvidersTests_ProviderConfigNotLoaded : UnitTestSiloHostPerFixture
+    public class StreamProvidersTests_ProviderConfigNotLoaded : HostedTestClusterPerFixture
     {
         private static readonly FileInfo SiloConfig = new FileInfo("Config_DevStorage.xml");
 
@@ -110,7 +110,7 @@ namespace UnitTests.Streaming
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class StreamProvidersTests_ProviderConfigLoaded : UnitTestSiloHostPerFixture
+    public class StreamProvidersTests_ProviderConfigLoaded : HostedTestClusterPerFixture
     {
         public static TestingSiloHost CreateSiloHost()
         {

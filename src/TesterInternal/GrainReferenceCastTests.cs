@@ -12,7 +12,7 @@ using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
 namespace UnitTests
 {
     [TestClass]
-    public class GrainReferenceCastTests : UnitTestSiloHostEnsureDefaultStarted
+    public class GrainReferenceCastTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefCastFromMyType()

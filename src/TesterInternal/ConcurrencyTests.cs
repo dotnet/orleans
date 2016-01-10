@@ -13,7 +13,7 @@ namespace UnitTests.ConcurrencyTests
     /// Summary description for PersistenceTest
     /// </summary>
     [TestClass]
-    public class ConcurrencyTests : UnitTestSiloHostPerFixture
+    public class ConcurrencyTests : HostedTestClusterPerFixture
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
 

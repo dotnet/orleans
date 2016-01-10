@@ -16,7 +16,7 @@ using UnitTests.Tester;
 namespace Tester.StreamingTests
 {
     [ExcludeFromCodeCoverage]
-    public abstract class StreamFilteringTestsBase : UnitTestSiloHostPerFixture
+    public abstract class StreamFilteringTestsBase : HostedTestClusterPerFixture
     {
         protected Guid StreamId;
         protected string StreamNamespace;

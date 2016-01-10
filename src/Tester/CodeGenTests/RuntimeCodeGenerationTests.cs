@@ -12,7 +12,7 @@ namespace Tester.CodeGenTests
     /// </summary>
     [DeploymentItem("OrleansCodeGenerator.dll")]
     [TestClass]
-    public class RuntimeCodeGenerationTests : UnitTestSiloHostEnsureDefaultStarted2
+    public class RuntimeCodeGenerationTests : HostedTestClusterPerFixture
     {
         [TestInitialize]
         public void InitializeForTesting()

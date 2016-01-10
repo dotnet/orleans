@@ -10,7 +10,7 @@ namespace UnitTests.General
     /// Summary description for SimpleGrain
     /// </summary>
     [TestClass]
-    public class StateClassTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class StateClassTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly Random rand = new Random();
 

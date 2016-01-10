@@ -14,7 +14,7 @@ using UnitTests.Tester;
 namespace UnitTests.TimerTests
 {
     [TestClass]
-    public class TimerOrleansTest : UnitTestSiloHostEnsureDefaultStarted
+    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Basic()

@@ -10,7 +10,7 @@ using UnitTests.Tester;
 namespace UnitTests.CatalogTests
 {
     [TestClass]
-    public class DuplicateActivationsTests : UnitTestSiloHostPerFixture
+    public class DuplicateActivationsTests : HostedTestClusterPerFixture
     {
         public static TestingSiloHost CreateSiloHost()
         {

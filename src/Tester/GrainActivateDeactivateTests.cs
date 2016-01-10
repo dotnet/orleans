@@ -9,7 +9,7 @@ using UnitTests.Tester;
 namespace UnitTests.ActivationsLifeCycleTests
 {
     [TestClass]
-    public class GrainActivateDeactivateTests : UnitTestSiloHostEnsureDefaultStartedSecondaryOff
+    public class GrainActivateDeactivateTests : HostedTestClusterEnsureDefaultStarted
     {
         private IActivateDeactivateWatcherGrain watcher;
 

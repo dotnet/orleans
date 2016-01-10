@@ -7,7 +7,7 @@ using UnitTests.Tester;
 namespace UnitTests.SerializerTests
 {
     [TestClass]
-    public class RoundTripSerializerTests : UnitTestSiloHostEnsureDefaultStarted
+    public class RoundTripSerializerTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
         public void Serialize_TestMethodResultEnum()

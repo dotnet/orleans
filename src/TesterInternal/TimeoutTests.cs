@@ -10,11 +10,9 @@ using UnitTests.Tester;
 
 namespace UnitTests
 {
-    /// <summary>
-    /// Summary description for ErrorHandlingGrainTest
-    /// </summary>
     [TestClass]
-    public class TimeoutTests : UnitTestSiloHostEnsureDefaultStarted2
+    // if we paralellize tests, this should run in isolation
+    public class TimeoutTests : HostedTestClusterEnsureDefaultStarted
     {
         private TimeSpan originalTimeout;
 

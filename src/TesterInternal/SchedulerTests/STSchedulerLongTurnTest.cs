@@ -12,7 +12,7 @@ using UnitTests.Tester;
 namespace UnitTests.SchedulerTests
 {
     [TestClass]
-    public class STSchedulerLongTurnTest : UnitTestSiloHostEnsureDefaultStarted3
+    public class STSchedulerLongTurnTest : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_LongTurnTest()
@@ -23,7 +23,7 @@ namespace UnitTests.SchedulerTests
             var grainFullName = typeof(ErrorGrain).FullName;
             for (int i = 0; i < 100; i++)
             {
-                grains.Add(GrainClient.GrainFactory.GetGrain<IErrorGrain>(i, grainFullName));
+                grains.Add(GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
             }
 
             // Send a bunch of do-nothing requests just to get the grains activated

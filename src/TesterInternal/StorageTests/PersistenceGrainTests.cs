@@ -27,7 +27,7 @@ namespace UnitTests.StorageTests
     /// </summary>
     [TestClass]
     [DeploymentItem("Config_DevStorage.xml")]
-    public class PersistenceGrainTests_Local : UnitTestSiloHostPerFixture
+    public class PersistenceGrainTests_Local : HostedTestClusterPerFixture
     {
         const string ErrorInjectorStorageProvider = "ErrorInjector";
 

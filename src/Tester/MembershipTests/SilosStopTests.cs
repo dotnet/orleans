@@ -9,7 +9,7 @@ using UnitTests.Tester;
 namespace UnitTests.MembershipTests
 {
     [TestClass]
-    public class SilosStopTests : UnitTestSiloHostPerTest
+    public class SilosStopTests : HostedTestClusterPerTest
     {
         public static TestingSiloHost CreateSiloHost()
         {

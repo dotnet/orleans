@@ -15,7 +15,7 @@ namespace UnitTests
 {
     [TestClass]
 
-    public class GrainPlacementTests : UnitTestSiloHostPerFixture
+    public class GrainPlacementTests : HostedTestClusterPerFixture
     {
         public static TestingSiloHost CreateSiloHost()
         {

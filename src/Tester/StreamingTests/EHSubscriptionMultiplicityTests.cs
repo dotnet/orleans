@@ -18,7 +18,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class EHSubscriptionMultiplicityTests : UnitTestSiloHostPerFixture
+    public class EHSubscriptionMultiplicityTests : HostedTestClusterPerFixture
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHSubscriptionMultiplicityTestsNamespace";
