@@ -302,12 +302,26 @@ namespace Orleans
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
-        internal string Namespace { get; private set; }
+        public string Namespace { get; private set; }
+
+        public string Provider { get; private set; }
 
         // We have not yet come to an agreement whether the provider should be specified as well.
         public ImplicitStreamSubscriptionAttribute(string streamNamespace)
         {
             Namespace = streamNamespace;
+        }
+
+
+        /// <summary>
+        /// Constructor which allows you to specify both namespace and provider names
+        /// </summary>
+        /// <param name="streamNamespace"></param>
+        /// <param name="streamProvider"></param>
+        public ImplicitStreamSubscriptionAttribute(string streamNamespace, string streamProvider)
+        {
+            Namespace = streamNamespace;
+            Provider = streamProvider;
         }
     }
 }
