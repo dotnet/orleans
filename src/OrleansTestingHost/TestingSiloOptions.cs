@@ -1,13 +1,12 @@
 using System;
 using System.IO;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
 {
     public class TestingSiloOptions
     {
-        private static Random random = new Random();
-
         public const string DEFAULT_SILO_CONFIG_FILE = "OrleansConfigurationForTesting.xml";
 
         public bool StartFreshOrleans { get; set; }
@@ -38,7 +37,7 @@ namespace Orleans.TestingHost
             StartClient = true;
             PickNewDeploymentId = true;
             // BasePort = -1; // use default from configuration file
-            BasePort = random.Next(2000, 9999);
+            BasePort = ThreadSafeRandom.Next(2000, 9999);
             ProxyBasePort = -1; 
             MachineName = ".";
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;

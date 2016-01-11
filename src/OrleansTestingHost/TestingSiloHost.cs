@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
+using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
 {
@@ -44,8 +45,6 @@ namespace Orleans.TestingHost
         public GlobalConfiguration Globals { get; private set; }
 
         private TimeSpan livenessStabilizationTime;
-
-        protected static readonly Random random = new Random();
 
         public string DeploymentId = null;
         public string DeploymentIdPrefix = null;
@@ -836,7 +835,7 @@ namespace Orleans.TestingHost
                 return DeploymentId;
             }
             string prefix = DeploymentIdPrefix ?? "testdepid-";
-            int randomSuffix = random.Next(1000);
+            int randomSuffix = ThreadSafeRandom.Next(1000);
             DateTime now = DateTime.UtcNow;
             string DateTimeFormat = "yyyy-MM-dd-hh-mm-ss-fff";
             string depId = String.Format("{0}{1}-{2}",
