@@ -4,6 +4,16 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+# [v1.1.1](https://github.com/dotnet/orleans/releases/tag/v1.1.1) January 11th 2016
+
+### Release notes
+
+A patch release for two bug fixes
+
+* [Missing argument to trace format in TraceLogger.Initialize](https://github.com/dotnet/orleans/pull/1134)
+* [Make ConsoleText resilient to ObjectDisposedExceptions](https://github.com/dotnet/orleans/pull/1195)
+
+
 # [v1.1.0](https://github.com/dotnet/orleans/releases/tag/v1.1.0) December 14nd 2015
 
 ### Release notes
