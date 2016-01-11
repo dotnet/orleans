@@ -11,8 +11,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using UnitTests.Tester;
-using UnitTests.TestHelper;
+using Tester;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -83,7 +82,7 @@ namespace UnitTests.MessageCenterTests
         {
             string testName = TestContext.TestName;
 
-            Console.WriteLine(UnitTestSiloHost.DumpTestContext(TestContext));
+            Console.WriteLine(TestUtils.DumpTestContext(TestContext));
 
             Guid serviceId = Guid.NewGuid();
 
@@ -91,7 +90,7 @@ namespace UnitTests.MessageCenterTests
             {
                 ServiceId = serviceId,
                 DeploymentId = testName,
-                DataConnectionString = TestUtils.GetSqlConnectionString(TestContext)
+                DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(TestContext)
             };
 
             var membership = new SqlMembershipTable();

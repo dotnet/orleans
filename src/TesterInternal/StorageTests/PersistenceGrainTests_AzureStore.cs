@@ -13,6 +13,7 @@ using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -58,7 +59,7 @@ namespace UnitTests.StorageTests
 
         public PersistenceGrainTests_AzureStore()
         {
-            timingFactor = CalibrateTimings();
+            timingFactor = TestUtils.CalibrateTimings();
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
@@ -465,16 +466,16 @@ namespace UnitTests.StorageTests
 
             TimeSpan baseline, elapsed;
 
-            elapsed = baseline = TimeRun(n, TimeSpan.Zero, testName + " (No state)",
+            elapsed = baseline = TestUtils.TimeRun(n, TimeSpan.Zero, testName + " (No state)",
                 () => RunIterations(testName, n, i => actionNoState(noStateGrains[i])));
 
-            elapsed = TimeRun(n, baseline, testName + " (Local Memory Store)",
+            elapsed = TestUtils.TimeRun(n, baseline, testName + " (Local Memory Store)",
                 () => RunIterations(testName, n, i => actionMemory(memoryGrains[i])));
 
-            elapsed = TimeRun(n, baseline, testName + " (Dev Store Grain Store)",
+            elapsed = TestUtils.TimeRun(n, baseline, testName + " (Dev Store Grain Store)",
                 () => RunIterations(testName, n, i => actionMemoryStore(memoryStoreGrains[i])));
 
-            elapsed = TimeRun(n, baseline, testName + " (Azure Table Store)",
+            elapsed = TestUtils.TimeRun(n, baseline, testName + " (Azure Table Store)",
                 () => RunIterations(testName, n, i => actionAzureTable(azureStoreGrains[i])));
 
             if (elapsed > target.Multiply(timingFactor))

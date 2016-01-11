@@ -11,6 +11,7 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Orleans.SqlUtils;
+using Tester;
 using UnitTests.General;
 
 namespace UnitTests.MembershipTests
@@ -289,7 +290,7 @@ namespace UnitTests.MembershipTests
         [ClassInitialize]
         public static void MyClassInitialize(TestContext testContext)
         {
-            CheckForAzureStorage();
+            TestUtils.CheckForAzureStorage();
         }
 		
 		[TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
@@ -416,7 +417,7 @@ namespace UnitTests.MembershipTests
         {
             Console.WriteLine("TestContext.DeploymentDirectory={0}", context.DeploymentDirectory);
             Console.WriteLine("TestContext=");
-            Console.WriteLine(DumpTestContext(context));
+            Console.WriteLine(TestUtils.DumpTestContext(context));
 
             Console.WriteLine("Initializing relational databases...");
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, testDatabaseName).Result;

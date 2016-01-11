@@ -11,6 +11,7 @@ using Orleans.Runtime.Configuration;
 using System.Net;
 using Orleans;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Tester;
 
 namespace Tests.GeoClusterTests
 {
@@ -27,7 +28,7 @@ namespace Tests.GeoClusterTests
         {
             Clusters = new Dictionary<string, ClusterInfo>();
 
-            UnitTestSiloHost.CheckForAzureStorage();
+            TestUtils.CheckForAzureStorage();
         }
 
         protected struct ClusterInfo

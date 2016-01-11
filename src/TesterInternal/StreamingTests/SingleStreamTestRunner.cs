@@ -5,6 +5,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.Grains;
 using UnitTests.Tester;
 
@@ -320,7 +321,7 @@ namespace UnitTests.StreamingTests
 
             Func<bool, Task<bool>> waitUntilFunc =
                 async lastTry =>
-                    0 < await UnitTestSiloHost.GetActivationCount(consumerTypeName) && await CheckCounters(producer, consumer, false);
+                    0 < await TestUtils.GetActivationCount(consumerTypeName) && await CheckCounters(producer, consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
             await CheckCounters(producer, consumer);
@@ -341,7 +342,7 @@ namespace UnitTests.StreamingTests
 
             Func<bool, Task<bool>> waitUntilFunc =
                 async lastTry =>
-                    0 < await UnitTestSiloHost.GetActivationCount(consumerTypeName) && await CheckCounters(producer, consumer, false);
+                    0 < await TestUtils.GetActivationCount(consumerTypeName) && await CheckCounters(producer, consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
             await CheckCounters(producer, consumer);
@@ -363,7 +364,7 @@ namespace UnitTests.StreamingTests
 
             Func<bool, Task<bool>> waitUntilFunc =
                 async lastTry =>
-                    0 < await UnitTestSiloHost.GetActivationCount(consumerTypeName) && await CheckCounters(producer, consumer, false);
+                    0 < await TestUtils.GetActivationCount(consumerTypeName) && await CheckCounters(producer, consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
             await CheckCounters(producer, consumer);

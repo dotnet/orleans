@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -151,11 +152,11 @@ namespace UnitTests.TimerTests
             persistant = persist;
             if (persistant)
             {
-                persistantGrain = GrainClient.GrainFactory.GetGrain<ITimerPersistantGrain>(UnitTestSiloHost.GetRandomGrainId());
+                persistantGrain = GrainClient.GrainFactory.GetGrain<ITimerPersistantGrain>(TestUtils.GetRandomGrainId());
             }
             else
             {
-                grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(UnitTestSiloHost.GetRandomGrainId());
+                grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(TestUtils.GetRandomGrainId());
             }
         }
 

@@ -9,6 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 
 using Orleans.Runtime;
+using Tester;
 using UnitTests.Tester;
 
 namespace UnitTests
@@ -41,7 +42,7 @@ namespace UnitTests
                 new Tuple<string, Severity>("Grain.Two", Severity.Verbose3)
             };
             TraceLogger.SetTraceLevelOverrides(overrides.ToList());
-            timingFactor = UnitTestSiloHost.CalibrateTimings();
+            timingFactor = TestUtils.CalibrateTimings();
         }
 
         [TestCleanup]

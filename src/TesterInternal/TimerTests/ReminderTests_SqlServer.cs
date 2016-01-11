@@ -6,8 +6,10 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
+using TestUtils = Tester.TestUtils;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -37,9 +39,9 @@ namespace UnitTests.TimerTests
         {
             Console.WriteLine("TestContext.DeploymentDirectory={0}", context.DeploymentDirectory);
             Console.WriteLine("TestContext=");
-            Console.WriteLine(DumpTestContext(context));
+            Console.WriteLine(TestUtils.DumpTestContext(context));
 
-            siloOptions.DataConnectionString = TestUtils.GetSqlConnectionString(context);
+            siloOptions.DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(context);
         }
 
         [TestInitialize]
