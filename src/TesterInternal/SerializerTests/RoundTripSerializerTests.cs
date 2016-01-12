@@ -7,11 +7,8 @@ using UnitTests.Tester;
 namespace UnitTests.SerializerTests
 {
     [TestClass]
-    public class RoundTripSerializerTests : UnitTestSiloHost
+    public class RoundTripSerializerTests : HostedTestClusterEnsureDefaultStarted
     {
-        public RoundTripSerializerTests() : base(false)
-        {}
-
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
         public void Serialize_TestMethodResultEnum()
         {

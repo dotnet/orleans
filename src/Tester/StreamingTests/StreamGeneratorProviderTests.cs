@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class StreamGeneratorProviderTests : UnitTestSiloHost
+    public class StreamGeneratorProviderTests : HostedTestClusterPerFixture
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
@@ -38,39 +38,32 @@ namespace UnitTests.StreamingTests
             GeneratorConfigType = GeneratorConfig.GetType()
         };
 
-        public StreamGeneratorProviderTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                AdjustConfig = config => {
-                    var settings = new Dictionary<string, string>();
-                    // get initial settings from configs
-                    AdapterConfig.WriteProperties(settings);
-                    GeneratorConfig.WriteProperties(settings);
-
-                    // add queue balancer setting
-                    settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
-
-                    // add pub/sub settting
-                    settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-                    // register stream provider
-                    config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-                    // make sure all node configs exist, for dynamic cluster queue balancer
-                    config.GetConfigurationForNode("Primary");
-                    config.GetConfigurationForNode("Secondary_1");
-                }
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                    AdjustConfig = config => {
+                        var settings = new Dictionary<string, string>();
+                        // get initial settings from configs
+                        AdapterConfig.WriteProperties(settings);
+                        GeneratorConfig.WriteProperties(settings);
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+                        // add queue balancer setting
+                        settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+
+                        // add pub/sub settting
+                        settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+
+                        // register stream provider
+                        config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+
+                        // make sure all node configs exist, for dynamic cluster queue balancer
+                        config.GetConfigurationForNode("Primary");
+                        config.GetConfigurationForNode("Secondary_1");
+                    }
+                });
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]

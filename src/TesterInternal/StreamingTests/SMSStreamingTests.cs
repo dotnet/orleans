@@ -14,7 +14,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SMSStreamingTests : UnitTestSiloHost
+    public class SMSStreamingTests : HostedTestClusterPerFixture
     {
         internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_StreamProviders.xml");
         internal static readonly FileInfo ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml");
@@ -35,30 +35,23 @@ namespace UnitTests.StreamingTests
                         StartSecondary = false, 
                     };
 
-        private readonly SingleStreamTestRunner runner;
-        private readonly bool fireAndForgetDeliveryProperty;
+        private SingleStreamTestRunner runner;
+        private bool fireAndForgetDeliveryProperty;
 
-        public SMSStreamingTests()
-            : base(smsSiloOption, smsClientOptions)
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(
+                smsSiloOption,
+                //smsSiloOption_OnlyPrimary,
+                smsClientOptions);
+        }
+
+        [TestInitialize]
+        public void Initialize()
         {
             runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME);
+            // runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, 0, false);
             fireAndForgetDeliveryProperty = ExtractFireAndForgetDeliveryProperty();
-        }
-
-        public SMSStreamingTests(int dummy)
-            : base(smsSiloOption_OnlyPrimary, smsClientOptions)
-        {
-            runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, 0, false);
-            fireAndForgetDeliveryProperty = ExtractFireAndForgetDeliveryProperty();
-
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            //ResetDefaultRuntimes();
-            StopAllSilos();
         }
 
         #region Simple Message Stream Tests

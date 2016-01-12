@@ -21,7 +21,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamLimitTests : UnitTestSiloHost
+    public class StreamLimitTests : HostedTestClusterPerFixture
     {
         public TestContext TestContext { get; set; }
 
@@ -51,18 +51,10 @@ namespace UnitTests.StreamingTests
 
         private string StreamNamespace;
 
-        public StreamLimitTests()
-            : base(siloOptions, clientOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
             //MaxConsumersPerStream = 509; // ~= 64 * 1024 / 128
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            //ResetAllAdditionalRuntimes();
-            //ResetDefaultRuntimes();
-            StopAllSilos();
+            return new TestingSiloHost(siloOptions, clientOptions);
         }
 
         [TestInitialize]

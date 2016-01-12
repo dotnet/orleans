@@ -124,6 +124,8 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="OrleansTestingBase.cs" />
+    <Compile Include="TestAssemblyCleanup.cs" />
     <Compile Include="BasicActivationTests.cs" />
     <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
     <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
@@ -191,7 +193,8 @@
     <Compile Include="TestStreamProviders\Generator\Generators\SimpleGeneratorConfig.cs" />
     <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\ExternalSerializerTest.cs" />
-    <Compile Include="UnitTestSiloHost.cs" />
+    <Compile Include="HostedTestClusterBase.cs" />
+    <Compile Include="TestUtils.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\Build\Version.txt">

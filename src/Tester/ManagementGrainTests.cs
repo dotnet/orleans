@@ -14,7 +14,7 @@ using UnitTests.Tester;
 namespace UnitTests.Management
 {
     [TestClass]
-    public class ManagementGrainTests : UnitTestSiloHost
+    public class ManagementGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private IManagementGrain mgmtGrain;
 
@@ -22,12 +22,6 @@ namespace UnitTests.Management
         public void TestInitialize()
         {
             mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
@@ -38,14 +32,6 @@ namespace UnitTests.Management
             Assert.AreEqual(2, siloStatuses.Count, "Number of silo statuses");
         }
 
-        private SimpleGrainStatistic[] GetSimpleGrainStatistics(string when)
-        {
-            SimpleGrainStatistic[] stats = mgmtGrain.GetSimpleGrainStatistics(null).Result;
-            StringBuilder sb = new StringBuilder();
-            foreach (var s in stats) sb.Append(s).AppendLine();
-            Console.WriteLine("Grain statistics returned by Orleans Management Grain - " + when + " : " + sb);
-            return stats;
-        }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()
@@ -59,67 +45,44 @@ namespace UnitTests.Management
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
-        public void GetGrainStatistics_ActivationCounts_OrleansManagedGrains()
+        public void GetSimpleGrainStatistics_ActivationCounts()
         {
-            SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Before Create");
-            Assert.IsTrue(stats.Length > 0, "Got some grain statistics: " + stats.Length);
-
-            string grainType = typeof(SimpleGrain).FullName;
-            Assert.AreEqual(0, stats.Count(s => s.GrainType == grainType), "No activation counter yet for grain: " + grainType);
-            ISimpleGrain grain1 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            int x = grain1.GetA().Result; // Call grain method
-            stats = GetSimpleGrainStatistics("After Invoke");
-            Assert.AreEqual(1, stats.Count(s => s.GrainType == grainType), "Activation counter now exists for grain: " + grainType);
-            SimpleGrainStatistic grainStats = stats.First(s => s.GrainType == grainType);
-            Assert.AreEqual(1, grainStats.ActivationCount, "Activation count for grain after activation: " + grainType);
+            RunGetStatisticsTest<ISimpleGrain, SimpleGrain>(g => g.GetA().Wait());
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
-        public void GetGrainStatistics_ActivationCounts_SelfManagedGrains()
+        public void GetTestGrainStatistics_ActivationCounts()
         {
-            SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Before Create");
-            Assert.IsTrue(stats.Length > 0, "Got some grain statistics: " + stats.Length);
-
-            string grainType = typeof(TestGrain).FullName;
-            Assert.AreEqual(0, stats.Count(s => s.GrainType == grainType), "No activation counter yet for grain: " + grainType);
-            ITestGrain grain1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(1);
-            long x = grain1.GetKey().Result; // Call grain method
-            stats = GetSimpleGrainStatistics("After Invoke");
-            Assert.AreEqual(1, stats.Count(s => s.GrainType == grainType), "Activation counter now exists for grain: " + grainType);
-            SimpleGrainStatistic grainStats = stats.First(s => s.GrainType == grainType);
-            Assert.AreEqual(1, grainStats.ActivationCount, "Activation count for grain after activation: " + grainType);
+            RunGetStatisticsTest<ITestGrain, TestGrain>(g => g.GetKey().Wait());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
-        public void GetSimpleGrainStatistics_ActivationCounts_OrleansManagedGrains()
+        private void RunGetStatisticsTest<TGrainInterface, TGrain>(Action<TGrainInterface> callGrainMethodAction)
+            where TGrainInterface : IGrainWithIntegerKey
+            where TGrain : TGrainInterface
         {
             SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Before Create");
             Assert.IsTrue(stats.Length > 0, "Got some grain statistics: " + stats.Length);
 
-            string grainType = typeof(SimpleGrain).FullName;
-            Assert.AreEqual(0, stats.Count(s => s.GrainType == grainType), "No activation counter yet for grain: " + grainType);
-            ISimpleGrain grain1 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            grain1.GetA().Wait(); // Call grain method
+            string grainType = typeof(TGrain).FullName;
+            int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
+            int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
+            var grain1 = GrainClient.GrainFactory.GetGrain<TGrainInterface>(random.Next());
+            callGrainMethodAction(grain1); // Call grain method
             stats = GetSimpleGrainStatistics("After Invoke");
-            Assert.AreEqual(1, stats.Count(s => s.GrainType == grainType), "Activation counter now exists for grain: " + grainType);
-            SimpleGrainStatistic grainStats = stats.First(s => s.GrainType == grainType);
-            Assert.AreEqual(1, grainStats.ActivationCount, "Activation count for grain after activation: " + grainType);
+            Assert.IsTrue(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
+            int expectedActivationsCount = initialActivationsCount + 1;
+            int actualActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
+            Assert.AreEqual(expectedActivationsCount, actualActivationsCount, "Activation count for grain after activation: " + grainType);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
-        public void GetSimpleGrainStatistics_ActivationCounts_SelfManagedGrains()
+        private SimpleGrainStatistic[] GetSimpleGrainStatistics(string when)
         {
-            SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Before Create");
-            Assert.IsTrue(stats.Length > 0, "Got some grain statistics: " + stats.Length);
-
-            string grainType = typeof(TestGrain).FullName;
-            Assert.AreEqual(0, stats.Count(s => s.GrainType == grainType), "No activation counter yet for grain: " + grainType);
-            ITestGrain grain1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(2);
-            grain1.GetKey().Wait(); // Call grain method
-            stats = GetSimpleGrainStatistics("After Invoke");
-            Assert.AreEqual(1, stats.Count(s => s.GrainType == grainType), "Activation counter now exists for grain: " + grainType);
-            SimpleGrainStatistic grainStats = stats.First(s => s.GrainType == grainType);
-            Assert.AreEqual(1, grainStats.ActivationCount, "Activation count for grain after activation: " + grainType);
+            SimpleGrainStatistic[] stats = mgmtGrain.GetSimpleGrainStatistics(null).Result;
+            StringBuilder sb = new StringBuilder();
+            foreach (var s in stats) sb.AppendLine().Append(s);
+            sb.AppendLine();
+            Console.WriteLine("Grain statistics returned by Orleans Management Grain - " + when + " : " + sb);
+            return stats;
         }
     }
 }

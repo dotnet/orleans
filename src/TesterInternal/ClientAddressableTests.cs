@@ -10,7 +10,7 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class ClientAddressableTests : UnitTestSiloHost
+    public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
         private object anchor;
 

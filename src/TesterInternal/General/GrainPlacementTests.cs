@@ -15,34 +15,34 @@ namespace UnitTests
 {
     [TestClass]
 
-    public class GrainPlacementTests : UnitTestSiloHost
+    public class GrainPlacementTests : HostedTestClusterPerFixture
     {
-        public GrainPlacementTests()
-            : base(new TestingSiloOptions
-                    {
-                        StartFreshOrleans = true,
-                        SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-                    }, new TestingClientOptions
-                    {
-                        ProxiedGateway = true,
-                        Gateways = new List<IPEndPoint>(new IPEndPoint[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
-                        PreferedGatewayIndex = -1,
-                        ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
-                    })
+        public static TestingSiloHost CreateSiloHost()
         {
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
+                }, new TestingClientOptions
+                {
+                    ProxiedGateway = true,
+                    Gateways = new List<IPEndPoint>(new IPEndPoint[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
+                    PreferedGatewayIndex = -1,
+                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
+                });
         }
 
-        [TestCleanup()]
+        [TestCleanup]
         public void TestCleanup()
         {
-            RestartAllAdditionalSilos();
-            RestartDefaultSilos();
+            this.HostedCluster.RestartDefaultSilos();
         }
 
         [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()
         {
-            await WaitForLivenessToStabilizeAsync();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test DefaultPlacementShouldBeRandom ******************************");
             TestSilosStarted(2);
 
@@ -55,7 +55,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
         public async Task RandomlyPlacedGrainShouldPlaceActivationsRandomly()
         {
-            await WaitForLivenessToStabilizeAsync();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test RandomlyPlacedGrainShouldPlaceActivationsRandomly ******************************");
             TestSilosStarted(2);
 
@@ -78,7 +78,7 @@ namespace UnitTests
         //[TestMethod, TestCategory("Placement"), TestCategory("Functional")]
         //public void PreferLocalPlacedGrainShouldPlaceActivationsLocally_OneHop()
         //{
-        //    WaitForLivenessToStabilize();
+        //    HostedCluster.WaitForLivenessToStabilize();
         //    logger.Info("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
         //    TestSilosStarted(2);
 
@@ -101,7 +101,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
         public async Task PreferLocalPlacedGrainShouldPlaceActivationsLocally_TwoHops()
         {
-            await WaitForLivenessToStabilizeAsync();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
             TestSilosStarted(2);
 
@@ -155,7 +155,7 @@ namespace UnitTests
         //[TestMethod, TestCategory("Placement"), TestCategory("Functional")]
         public async Task LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations()
         {
-            await WaitForLivenessToStabilizeAsync();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations ******************************");
             TestSilosStarted(2);
 
@@ -171,7 +171,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
         public async Task LocallyPlacedGrainShouldCreateActivationsOnLocalSilo()
         {
-            await WaitForLivenessToStabilizeAsync();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test LocallyPlacedGrainShouldCreateActivationsOnLocalSilo ******************************");
             TestSilosStarted(2);
 

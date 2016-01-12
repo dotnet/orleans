@@ -29,40 +29,27 @@ namespace UnitTests.TimerTests
             SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
         };
 
-        public ReminderTests_AzureTable()
-            : base(siloOptions)
-        { }
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext context)
+        public static TestingSiloHost CreateSiloHost()
         {
-            DoClassInitialize();
-        }
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            DoClassCleanup();
+            return new TestingSiloHost(siloOptions);
         }
 
         [TestInitialize]
         public void TestInitialize()
         {
-            Console.WriteLine("{0} TestInitialize {1}", GetType().Name, TestContext.TestName);
-
+            base.DoTestInitialize();
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             //var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(-1);
             //controlProxy.EraseReminderTable().WaitWithThrow(VSOTestConstants.InitTimeout);
 
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, Primary.Silo.GlobalConfig.LivenessType, "LivenesType");
+            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, this.HostedCluster.Primary.Silo.GlobalConfig.LivenessType, "LivenesType");
         }
 
         [TestCleanup]
         public void TestCleanup()
         {
-            Console.WriteLine("{0} TestCleanup {1} - Outcome = {2}", GetType().Name, TestContext.TestName, TestContext.CurrentTestOutcome);
-            RestartAllAdditionalSilos();
-            RestartDefaultSilos();
+            base.DoTestCleanup();
         }
 
         // Basic tests
@@ -175,8 +162,8 @@ namespace UnitTests.TimerTests
             // start two extra silos ... although it will take it a while before they stabilize
             log.Info("Starting 2 extra silos");
 
-            StartAdditionalSilos(2);
-            await WaitForLivenessToStabilizeAsync();
+            this.HostedCluster.StartAdditionalSilos(2);
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
@@ -224,7 +211,7 @@ namespace UnitTests.TimerTests
             Thread.Sleep(period.Multiply(failAfter));
             // stop the secondary silo
             log.Info("Stopping secondary silo");
-            StopSilo(Secondary);
+            this.HostedCluster.StopSilo(this.HostedCluster.Secondary);
 
             await test; // Block until test completes.
         }
@@ -235,7 +222,7 @@ namespace UnitTests.TimerTests
         public async Task Rem_Azure_2F_MultiGrain()
         {
             log.Info(TestContext.TestName);
-            List<SiloHandle> silos = StartAdditionalSilos(2);
+            List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(2);
 
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -259,9 +246,9 @@ namespace UnitTests.TimerTests
             // stop a couple of silos
             log.Info("Stopping 2 silos");
             int i = random.Next(silos.Count);
-            StopSilo(silos[i]);
+            this.HostedCluster.StopSilo(silos[i]);
             silos.RemoveAt(i);
-            StopSilo(silos[random.Next(silos.Count)]);
+            this.HostedCluster.StopSilo(silos[random.Next(silos.Count)]);
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
         }
@@ -272,8 +259,8 @@ namespace UnitTests.TimerTests
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
             log.Info(TestContext.TestName);
-            List<SiloHandle> silos = StartAdditionalSilos(1);
-            await WaitForLivenessToStabilizeAsync();
+            List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -300,12 +287,12 @@ namespace UnitTests.TimerTests
             Task<bool> t1 = Task.Factory.StartNew(() =>
             {
 
-                StopSilo(siloToKill);
+                this.HostedCluster.StopSilo(siloToKill);
                 return true;
             });
             Task<bool> t2 = Task.Factory.StartNew(() =>
             {
-                StartAdditionalSilos(1);
+                this.HostedCluster.StartAdditionalSilos(1);
                 return true;
             });
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
@@ -361,8 +348,8 @@ namespace UnitTests.TimerTests
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
             log.Info(TestContext.TestName);
-            List<SiloHandle> silos = StartAdditionalSilos(1);
-            await WaitForLivenessToStabilizeAsync();
+            List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -386,12 +373,12 @@ namespace UnitTests.TimerTests
             log.Info("Stopping a silo and joining a silo");
             Task<bool> t1 = Task.Run(() =>
             {
-                StopSilo(siloToKill);
+                this.HostedCluster.StopSilo(siloToKill);
                 return true;
             });
             Task<bool> t2 = Task.Run(() =>
             {
-                StartAdditionalSilos(1);
+                this.HostedCluster.StartAdditionalSilos(1);
                 return true;
             });
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);

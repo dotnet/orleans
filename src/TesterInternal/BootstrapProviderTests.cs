@@ -17,7 +17,7 @@ namespace UnitTests.General
 {
     [DeploymentItem("Config_BootstrapProviders.xml")]
     [TestClass]
-    public class BootstrapProvidersTests : UnitTestSiloHost
+    public class BootstrapProvidersTests : HostedTestClusterPerFixture
     {
         private static readonly TestingSiloOptions testOptions = new TestingSiloOptions
         {
@@ -27,15 +27,9 @@ namespace UnitTests.General
             StartSecondary = true,
         };
 
-        public BootstrapProvidersTests()
-            : base(testOptions)
-        { }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        public static TestingSiloHost CreateSiloHost()
         {
-            StopAllSilos();
+            return new TestingSiloHost(testOptions);
         }
 
         [TestMethod, TestCategory("Providers"), TestCategory("Silo")]
@@ -79,7 +73,7 @@ namespace UnitTests.General
         private MockBootstrapProvider FindBootstrapProvider(string providerName)
         {
             MockBootstrapProvider providerInUse = null;
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
                 MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.Silo.TestHook.GetBootstrapProvider(providerName);

@@ -2,8 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.TestingHost;
-
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using UnitTests.FSharpTypes;
@@ -14,20 +12,9 @@ namespace UnitTests.General
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
     [TestClass]
-    public class FSharpGrainTests : UnitTestSiloHost
+    public class FSharpGrainTests : HostedTestClusterEnsureDefaultStarted
     {
-        public FSharpGrainTests()
-            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
-        async Task PingTest<T>(T input)
+        private async Task PingTest<T>(T input)
         {
             var id = Guid.NewGuid();
             var grain = GrainFactory.GetGrain<IGeneric1Argument<T>>(id, "UnitTests.Grains.Generic1ArgumentGrain");

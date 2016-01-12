@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
@@ -10,40 +9,15 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 
-namespace UnitTests.Tester
+namespace Tester
 {
-    /// <summary>
-    /// Keep this class as a bridge to the OrleansTestingSilo package, 
-    /// because it gives a convenient place to declare all the additional
-    /// deployment items required by tests 
-    /// - such as the TestGrain assemblies, the client and server config files.
-    /// </summary>
-    [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [DeploymentItem("TestGrainInterfaces.dll")]
-    [DeploymentItem("TestGrains.dll")]
-    [DeploymentItem("OrleansCodeGenerator.dll")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [DeploymentItem("TestInternalGrainInterfaces.dll")]
-    [DeploymentItem("TestInternalGrains.dll")]
-    public class UnitTestSiloHost : TestingSiloHost
+    public class TestUtils
     {
-        public UnitTestSiloHost() // : base()
-        {
-        }
+        protected static readonly Random random = new Random();
 
-        public UnitTestSiloHost(bool startFreshOrleans)
-            : base(startFreshOrleans)
+        public static long GetRandomGrainId()
         {
-        }
-
-        public UnitTestSiloHost(TestingSiloOptions siloOptions)
-            : base(siloOptions)
-        {
-        }
-        public UnitTestSiloHost(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
-            : base(siloOptions, clientOptions)
-        {
+            return random.Next();
         }
 
         public static void CheckForAzureStorage()
@@ -84,11 +58,6 @@ namespace UnitTests.Tester
             }
             sb.AppendFormat(@" ]").AppendLine();
             return sb.ToString();
-        }
-
-        public static int GetRandomGrainId()
-        {
-            return random.Next();
         }
 
         public static double CalibrateTimings()
@@ -132,24 +101,6 @@ namespace UnitTests.Tester
             }
             Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
             return duration;
-        }
-
-        protected void TestSilosStarted(int expected)
-        {
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
-
-            Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
-            foreach (var pair in statuses)
-            {
-                Console.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
-                Assert.AreEqual(
-                    SiloStatus.Active,
-                    pair.Value,
-                    "Failed to confirm start of {0} silos ({1} confirmed).",
-                    pair.Value,
-                    SiloStatus.Active);
-            }
-            Assert.AreEqual(expected, statuses.Count);
         }
 
         public static void ConfigureClientThreadPoolSettingsForStorageTests(int NumDotNetPoolThreads = 200)

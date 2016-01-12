@@ -8,19 +8,8 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class GrainReferenceCacheTests : UnitTestSiloHost
+    public class GrainReferenceCacheTests : HostedTestClusterEnsureDefaultStarted
     {
-        public GrainReferenceCacheTests()
-            : base(false)
-        {
-        }
-
-        [ClassCleanup()]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain()
         {

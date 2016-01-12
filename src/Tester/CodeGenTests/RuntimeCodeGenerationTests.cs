@@ -1,32 +1,23 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans.Serialization;
+using UnitTests.Tester;
+
 namespace Tester.CodeGenTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Threading.Tasks;
-
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
-    
-    using Orleans.Serialization;
-
-    using UnitTests.Tester;
-
     /// <summary>
     /// Tests runtime code generation.
     /// </summary>
     [DeploymentItem("OrleansCodeGenerator.dll")]
     [TestClass]
-    public class RuntimeCodeGenerationTests : UnitTestSiloHost
+    public class RuntimeCodeGenerationTests : HostedTestClusterPerFixture
     {
         [TestInitialize]
         public void InitializeForTesting()
         {
             SerializationManager.InitializeForTesting();
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]

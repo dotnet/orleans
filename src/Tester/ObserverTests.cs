@@ -14,7 +14,7 @@ namespace UnitTests.General
     /// Summary description for ObserverTests
     /// </summary>
     [TestClass]
-    public class ObserverTests : UnitTestSiloHost
+    public class ObserverTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
         private int callbackCounter;
@@ -24,13 +24,6 @@ namespace UnitTests.General
         // being garbage collected permaturely (the runtime stores them as weak references).
         private SimpleGrainObserver observer1;
         private SimpleGrainObserver observer2;
-
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
 
         [TestInitialize]
         public void TestInitialize()

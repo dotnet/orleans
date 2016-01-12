@@ -17,36 +17,30 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class ControllableStreamProviderTests : UnitTestSiloHost
+    public class ControllableStreamProviderTests : HostedTestClusterPerFixture
     {
         private const string StreamProviderName = "ControllableTestStreamProvider";
         private readonly string StreamProviderTypeName = typeof(ControllableTestStreamProvider).FullName;
 
-        public ControllableStreamProviderTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                AdjustConfig = config =>
-                        {
-                            var settings = new Dictionary<string, string>
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                    AdjustConfig = config =>
+                    {
+                        var settings = new Dictionary<string, string>
                             {
                                 {PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE,StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString()},
                                 {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
                             };
-                                    config.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
-            config.GetConfigurationForNode("Primary");
-                                    config.GetConfigurationForNode("Secondary_1");
-                        }
-            })
-        {
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+                        config.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
+                        config.GetConfigurationForNode("Primary");
+                        config.GetConfigurationForNode("Secondary_1");
+                    }
+                });
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]

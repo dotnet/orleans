@@ -12,19 +12,8 @@ namespace UnitTests.General
     /// Summary description for GrainReferenceTest
     /// </summary>
     [TestClass]
-    public class GrainReferenceTest : UnitTestSiloHost
+    public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            //ResetDefaultRuntimes();
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReferenceComparison_DifferentReference()
         {
@@ -54,8 +43,8 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReference_Pass_this()
         {
-            IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(1);
-            IChainedGrain g2 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(2);
+            IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            IChainedGrain g2 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
             
             g1.PassThis(g2).Wait();
         }

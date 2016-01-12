@@ -13,6 +13,7 @@ using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -27,7 +28,7 @@ namespace UnitTests.StorageTests
     /// </summary>
     [TestClass]
     [DeploymentItem("Config_AzureTableStorage.xml")]
-    public class PersistenceGrainTests_AzureStore : UnitTestSiloHost
+    public class PersistenceGrainTests_AzureStore : HostedTestClusterPerFixture
     {
         private readonly double timingFactor;
 
@@ -51,18 +52,14 @@ namespace UnitTests.StorageTests
             }
         };
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public static TestingSiloHost CreateSiloHost()
         {
-            //ResetDefaultRuntimes();
-            StopAllSilos();
+            return new TestingSiloHost(testSiloOptions);
         }
 
         public PersistenceGrainTests_AzureStore()
-            : base(testSiloOptions)
         {
-            timingFactor = CalibrateTimings();
+            timingFactor = TestUtils.CalibrateTimings();
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
@@ -295,8 +292,8 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_AzureStore_SiloRestart()
         {
-            var initialDeploymentId = DeploymentId;
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, Globals.ServiceId);
+            var initialDeploymentId = this.HostedCluster.DeploymentId;
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -308,12 +305,12 @@ namespace UnitTests.StorageTests
             await grain.DoWrite(1);
 
             Console.WriteLine("About to reset Silos");
-            RestartDefaultSilos(true);
+            this.HostedCluster.RestartDefaultSilos(true);
             Console.WriteLine("Silos restarted");
 
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, Globals.ServiceId);
-            Assert.AreEqual(initialServiceId, Globals.ServiceId, "ServiceId same after restart.");
-            Assert.AreNotEqual(initialDeploymentId, DeploymentId, "DeploymentId different after restart.");
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
+            Assert.AreEqual(initialServiceId, this.HostedCluster.Globals.ServiceId, "ServiceId same after restart.");
+            Assert.AreNotEqual(initialDeploymentId, this.HostedCluster.DeploymentId, "DeploymentId different after restart.");
 
             val = await grain.GetValue();
             Assert.AreEqual(1, val, "Value after Write-1");
@@ -435,7 +432,7 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void Persistence_Silo_StorageProvider_Azure()
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
                 string provider = typeof(AzureTableStorage).FullName;
@@ -469,16 +466,16 @@ namespace UnitTests.StorageTests
 
             TimeSpan baseline, elapsed;
 
-            elapsed = baseline = TimeRun(n, TimeSpan.Zero, testName + " (No state)",
+            elapsed = baseline = TestUtils.TimeRun(n, TimeSpan.Zero, testName + " (No state)",
                 () => RunIterations(testName, n, i => actionNoState(noStateGrains[i])));
 
-            elapsed = TimeRun(n, baseline, testName + " (Local Memory Store)",
+            elapsed = TestUtils.TimeRun(n, baseline, testName + " (Local Memory Store)",
                 () => RunIterations(testName, n, i => actionMemory(memoryGrains[i])));
 
-            elapsed = TimeRun(n, baseline, testName + " (Dev Store Grain Store)",
+            elapsed = TestUtils.TimeRun(n, baseline, testName + " (Dev Store Grain Store)",
                 () => RunIterations(testName, n, i => actionMemoryStore(memoryStoreGrains[i])));
 
-            elapsed = TimeRun(n, baseline, testName + " (Azure Table Store)",
+            elapsed = TestUtils.TimeRun(n, baseline, testName + " (Azure Table Store)",
                 () => RunIterations(testName, n, i => actionAzureTable(azureStoreGrains[i])));
 
             if (elapsed > target.Multiply(timingFactor))

@@ -14,7 +14,7 @@ namespace UnitTests.Streaming
     [DeploymentItem("Config_DevStorage.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class StreamProvidersTests_ProviderConfigNotLoaded : UnitTestSiloHost
+    public class StreamProvidersTests_ProviderConfigNotLoaded : HostedTestClusterPerFixture
     {
         private static readonly FileInfo SiloConfig = new FileInfo("Config_DevStorage.xml");
 
@@ -31,24 +31,9 @@ namespace UnitTests.Streaming
             }
         };
 
-        public StreamProvidersTests_ProviderConfigNotLoaded()
-            : base(siloOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
-            // loading the default config, without stream providers.
-        }
-
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void MyClassInitialize(TestContext testContext)
-        {
-            //ResetDefaultRuntimes();
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(siloOptions);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Providers")]
@@ -75,9 +60,9 @@ namespace UnitTests.Streaming
         [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]
         public void ServiceId_ProviderRuntime()
         {
-            Guid thisRunServiceId = Globals.ServiceId;
+            Guid thisRunServiceId = this.HostedCluster.Globals.ServiceId;
 
-            SiloHandle siloHandle = GetActiveSilos().First();
+            SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
             Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
             Assert.AreEqual(thisRunServiceId, serviceId, "ServiceId in Silo config");
             serviceId = siloHandle.Silo.TestHook.ServiceId;
@@ -91,26 +76,26 @@ namespace UnitTests.Streaming
         [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId")]
         public void ServiceId_SiloRestart()
         {
-            Guid configServiceId = Globals.ServiceId;
+            Guid configServiceId = this.HostedCluster.Globals.ServiceId;
 
-            var initialDeploymentId = DeploymentId;
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, initialServiceId);
+            var initialDeploymentId = this.HostedCluster.DeploymentId;
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, initialServiceId);
 
             Assert.AreEqual(initialServiceId, configServiceId, "ServiceId in test config");
 
             Console.WriteLine("About to reset Silos .....");
             Console.WriteLine("Stopping Silos ...");
-            StopDefaultSilos();
+            this.HostedCluster.StopDefaultSilos();
             Console.WriteLine("Starting Silos ...");
-            RedeployTestingSiloHost(siloOptions);
+            this.HostedCluster.RedeployTestingSiloHost(siloOptions);
             Console.WriteLine("..... Silos restarted");
 
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", DeploymentId, Globals.ServiceId);
+            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
-            Assert.AreEqual(initialServiceId, Globals.ServiceId, "ServiceId same after restart.");
-            Assert.AreNotEqual(initialDeploymentId, DeploymentId, "DeploymentId different after restart.");
+            Assert.AreEqual(initialServiceId, this.HostedCluster.Globals.ServiceId, "ServiceId same after restart.");
+            Assert.AreNotEqual(initialDeploymentId, this.HostedCluster.DeploymentId, "DeploymentId different after restart.");
 
-            SiloHandle siloHandle = GetActiveSilos().First();
+            SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
             Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
             Assert.AreEqual(initialServiceId, serviceId, "ServiceId in Silo config");
             serviceId = siloHandle.Silo.TestHook.ServiceId;
@@ -125,27 +110,15 @@ namespace UnitTests.Streaming
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class StreamProvidersTests_ProviderConfigLoaded : UnitTestSiloHost
+    public class StreamProvidersTests_ProviderConfigLoaded : HostedTestClusterPerFixture
     {
-        public StreamProvidersTests_ProviderConfigLoaded()
-            : base(new TestingSiloOptions {
-                SiloConfigFile = new FileInfo("Config_StreamProviders.xml")
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void MyClassInitialize(TestContext testContext)
-        {
-            //ResetDefaultRuntimes();
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml")
+                });
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Providers")]

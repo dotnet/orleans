@@ -3,33 +3,25 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Serialization;
+using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
+using System;
+using System.Collections.Generic;
 
 namespace Tester.CodeGenTests
 {
-    using System;
-    using System.Collections.Generic;
-
-    using UnitTests.GrainInterfaces;
-
     /// <summary>
     /// Summary description for GrainClientTest
     /// </summary>
     [TestClass]
-    public class GeneratorGrainTest : UnitTestSiloHost
+    public class GeneratorGrainTest : HostedTestClusterPerFixture
     {
-        [TestInitialize]
-        public void InitializeForTesting()
+        [ClassInitialize]
+        public static void Initialize(TestContext context)
         {
             SerializationManager.InitializeForTesting();
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]

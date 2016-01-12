@@ -12,72 +12,49 @@ namespace UnitTests.Streaming
     [DeploymentItem("ClientConfig_AzureStreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class AQStreamingTests : UnitTestSiloHost
+    public class AQStreamingTests : HostedTestClusterPerFixture
     {
         internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml");
         internal static readonly FileInfo ClientConfigFile = new FileInfo("ClientConfig_AzureStreamProviders.xml");
 
         private static readonly TestingSiloOptions aqSiloOptions = new TestingSiloOptions
             {
-                StartFreshOrleans = true,
                 SiloConfigFile = SiloConfigFile,
             };
         private static readonly TestingClientOptions aqClientOptions = new TestingClientOptions
             {
                 ClientConfigFile = ClientConfigFile
             };
-        private static readonly TestingSiloOptions aqSiloOption_OnlyPrimary = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = SiloConfigFile,
-                StartSecondary = false,
-            };
+        //private static readonly TestingSiloOptions aqSiloOption_OnlyPrimary = new TestingSiloOptions
+        //    {
+        //        SiloConfigFile = SiloConfigFile,
+        //        StartSecondary = false,
+        //    };
+        //private static readonly TestingSiloOptions aqSiloOption_NoClient = new TestingSiloOptions
+        //    {
+        //        SiloConfigFile = SiloConfigFile,
+        //        StartClient = false
+        //    };
 
-        private static readonly TestingSiloOptions aqSiloOption_NoClient = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = SiloConfigFile,
-                StartClient = false
-            };
+        private SingleStreamTestRunner runner;
 
-        private readonly SingleStreamTestRunner runner;
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(aqSiloOptions, aqClientOptions);
+            //return new TestingSiloHost(aqSiloOption_OnlyPrimary, aqClientOptions);
+            //return new TestingSiloHost(aqSiloOption_NoClient);
+        }
 
-        public AQStreamingTests()
-            : base(aqSiloOptions, aqClientOptions)
+        [TestInitialize]
+        public void Initialize()
         {
             runner = new SingleStreamTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
         }
-
-        public AQStreamingTests(int dummy)
-            : base(aqSiloOption_OnlyPrimary, aqClientOptions)
-        {
-            runner = new SingleStreamTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
-        }
-
-        public AQStreamingTests(string dummy)
-            : base(aqSiloOption_NoClient)
-        {
-            runner = new SingleStreamTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            //ResetAllAdditionalRuntimes();
-            //ResetDefaultRuntimes();
-            StopAllSilos();
-        }
-
-        //[TestInitialize]
-        //public void TestInitialize()
-        //{
-        //    //DeleteAllQueues();
-        //}
 
         [TestCleanup]
         public void TestCleanup()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
         }
 
         ////------------------------ One to One ----------------------//
@@ -191,7 +168,7 @@ namespace UnitTests.Streaming
         {
             var multiRunner = new MultipleStreamsTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                StartAdditionalSilo);
+                this.HostedCluster.StartAdditionalSilo);
         }
 
         //[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
@@ -199,8 +176,8 @@ namespace UnitTests.Streaming
         {
             var multiRunner = new MultipleStreamsTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 18, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                StartAdditionalSilo,
-                StopSilo);
+                this.HostedCluster.StartAdditionalSilo,
+                this.HostedCluster.StopSilo);
         }
 
         [TestMethod, TestCategory("Streaming")]

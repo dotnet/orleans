@@ -12,6 +12,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Samples.StorageProviders;
+using Tester;
 using UnitTests.Tester;
 
 namespace UnitTests.StorageTests
@@ -222,7 +223,7 @@ namespace UnitTests.StorageTests
             var dotnetJsonSerializer = new System.Web.Script.Serialization.JavaScriptSerializer();
             string jsonData = null;
             int[] idx = { 0 };
-            TimeSpan baseline = UnitTestSiloHost.TimeRun(numIterations, TimeSpan.Zero, ".Net JavaScriptSerializer",
+            TimeSpan baseline = TestUtils.TimeRun(numIterations, TimeSpan.Zero, ".Net JavaScriptSerializer",
             () =>
             {
                 dataValues.Clear();
@@ -232,7 +233,7 @@ namespace UnitTests.StorageTests
                 jsonData = dotnetJsonSerializer.Serialize(dataValues);
             });
             idx[0] = 0;
-            TimeSpan elapsed = UnitTestSiloHost.TimeRun(numIterations, baseline, "Newtonsoft Json JavaScriptSerializer",
+            TimeSpan elapsed = TestUtils.TimeRun(numIterations, baseline, "Newtonsoft Json JavaScriptSerializer",
             () =>
             {
                 dataValues.Clear();

@@ -16,7 +16,7 @@ namespace UnitTests.Stats
     [TestClass]
     [DeploymentItem("MockStats_ClientConfiguration.xml")]
     [DeploymentItem("MockStats_ServerConfiguration.xml")]
-    public class StatsInitTests : UnitTestSiloHost
+    public class StatsInitTests : HostedTestClusterPerFixture
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
@@ -32,39 +32,27 @@ namespace UnitTests.Stats
             ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
         };
 
-        public StatsInitTests()
-            : base(siloOptions, clientOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            StopAdditionalSilos();
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(siloOptions, clientOptions);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
         public void Stats_Init_Mock()
         {
-            ClientConfiguration config = this.ClientConfig;
+            ClientConfiguration config = this.HostedCluster.ClientConfig;
 
             OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
             Assert.IsNotNull(ogc.ClientStatistics, "Client Statistics Manager is setup");
 
             Assert.AreEqual("MockStats", config.StatisticsProviderName, "Client.StatisticsProviderName");
 
-            Silo silo = Primary.Silo;
+            Silo silo = this.HostedCluster.Primary.Silo;
             Assert.IsTrue(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
             Assert.AreEqual("MockStats", silo.LocalConfig.StatisticsProviderName, "Silo.StatisticsProviderName");
 
             // Check we got some stats & metrics callbacks on both client and server.
-            var siloStatsCollector = Primary.Silo.TestHook.StatisticsProvider as MockStatsSiloCollector;
+            var siloStatsCollector = this.HostedCluster.Primary.Silo.TestHook.StatisticsProvider as MockStatsSiloCollector;
             var clientStatsCollector = MockStatsCollectorClient.StatsPublisherInstance;
             var clientMetricsCollector = MockStatsCollectorClient.MetricsPublisherInstance;
 
@@ -141,7 +129,7 @@ namespace UnitTests.Stats
     [DeploymentItem("DevTestClientConfiguration.xml")]
     [DeploymentItem("DevTestServerConfiguration.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class SqlClientInitTests : UnitTestSiloHost
+    public class SqlClientInitTests : HostedTestClusterPerFixture
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
@@ -157,25 +145,17 @@ namespace UnitTests.Stats
             ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
         };
 
-        public SqlClientInitTests()
-            : base(siloOptions, clientOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
+            return new TestingSiloHost(siloOptions, clientOptions);
         }
 
         [TestCleanup]
         public void TestCleanup()
         {
             //Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-           // ResetAllAdditionalRuntimes();
-		   StopAdditionalSilos();
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            //ResetAllAdditionalRuntimes();
-            //ResetDefaultRuntimes();
-            StopAllSilos();
+            // ResetAllAdditionalRuntimes();
+            TestingSiloHost.Instance.StopAdditionalSilos();
         }
 
         [TestMethod, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
@@ -183,7 +163,7 @@ namespace UnitTests.Stats
         {
             Assert.IsTrue(GrainClient.IsInitialized);
 
-            ClientConfiguration config = ClientConfig;
+            ClientConfiguration config = this.HostedCluster.ClientConfig;
 
             Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider, "GatewayProviderType");
 
@@ -194,7 +174,7 @@ namespace UnitTests.Stats
 
             Assert.AreEqual("SQL", config.StatisticsProviderName, "Client.StatisticsProviderName");
 
-            Silo silo = Primary.Silo;
+            Silo silo = this.HostedCluster.Primary.Silo;
             Assert.IsTrue(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
             Assert.AreEqual("SQL", silo.LocalConfig.StatisticsProviderName, "Silo.StatisticsProviderName");
         }

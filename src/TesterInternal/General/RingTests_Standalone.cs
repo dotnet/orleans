@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
@@ -10,11 +9,6 @@ namespace UnitTests.General
     [TestClass]
     public class RingTests_Standalone
     {
-        public RingTests_Standalone()
-        {
-            Console.WriteLine("RingTests_Standalone - Class Constructor");
-        }
-
         private const int count = 5;
 
         [TestMethod, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]

@@ -16,7 +16,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamLifecycleTests : UnitTestSiloHost
+    public class StreamLifecycleTests : HostedTestClusterPerTest
     {
         protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
         {
@@ -39,16 +39,9 @@ namespace UnitTests.StreamingTests
 
         public TestContext TestContext { get; set; }
 
-        public StreamLifecycleTests()
-            : base(SiloRunOptions, ClientRunOptions)
-        { }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public static TestingSiloHost CreateSiloHost()
         {
-            //ResetAllAdditionalRuntimes();
-            //ResetDefaultRuntimes();
-            StopAllSilos();
+            return new TestingSiloHost(SiloRunOptions, ClientRunOptions);
         }
 
         [TestInitialize]

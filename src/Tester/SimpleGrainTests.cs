@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
@@ -11,22 +10,11 @@ namespace UnitTests.General
     /// Summary description for SimpleGrain
     /// </summary>
     [TestClass]
-    public class SimpleGrainTests : UnitTestSiloHost
-    {        
-        public SimpleGrainTests()
-            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
-        {
-        }
-
+    public class SimpleGrainTests : HostedTestClusterEnsureDefaultStarted
+    {
         public ISimpleGrain GetSimpleGrain()
         {
             return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]

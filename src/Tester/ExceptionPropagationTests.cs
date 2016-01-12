@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -12,19 +11,8 @@ namespace UnitTests.General
     /// Tests that exceptions are correctly propagated.
     /// </summary>
     [TestClass]
-    public class ExceptionPropagationTests : UnitTestSiloHost
+    public class ExceptionPropagationTests : HostedTestClusterEnsureDefaultStarted
     {
-        public ExceptionPropagationTests()
-            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]
         public async Task TaskCancelationPropagation()
         {

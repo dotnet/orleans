@@ -8,23 +8,12 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class ProviderTests : UnitTestSiloHost
+    public class ProviderTests : HostedTestClusterEnsureDefaultStarted
     {
-        public ProviderTests()
-            : base(true)
-        {
-        }
-
-        [ClassCleanup()]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {
-            IExtensionTestGrain grain = GrainClient.GrainFactory.GetGrain<IExtensionTestGrain>(1);
+            IExtensionTestGrain grain = GrainClient.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
             ITestExtension extension = grain.AsReference<ITestExtension>();
             bool exceptionThrown = true;
 

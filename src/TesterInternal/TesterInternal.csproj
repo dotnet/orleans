@@ -196,6 +196,7 @@
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
+    <Compile Include="TestAssemblyCleanup.cs" />
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />

@@ -5,34 +5,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.TestingHost;
 using UnitTests.Tester;
 
 namespace UnitTests
 {
     [TestClass]
-    public class ClientInitTests : UnitTestSiloHost
+    public class ClientInitTests : HostedTestClusterEnsureDefaultStarted
     {
-        public ClientInitTests()
-            : base(new TestingSiloOptions
-            {
-                StartSecondary = false,
-            })
-        {
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            StopAdditionalSilos();
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_IsInitialized()
         {

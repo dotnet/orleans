@@ -14,7 +14,7 @@ namespace UnitTests.HaloTests.Streaming
     [DeploymentItem("Config_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class HaloStreamSubscribeTests : UnitTestSiloHost
+    public class HaloStreamSubscribeTests : HostedTestClusterPerFixture
     {
         private const string SmsStreamProviderName = "SMSProvider";
         private const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
@@ -23,38 +23,14 @@ namespace UnitTests.HaloTests.Streaming
         private Guid _streamId;
         private string _streamProvider;
 
-        public HaloStreamSubscribeTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        public HaloStreamSubscribeTests(int dummy)
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartSecondary = false,
-                SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-            })
-        {
-        }
-
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void MyClassInitialize(TestContext testContext)
-        {
-            //ResetDefaultRuntimes();
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-           // ResetDefaultRuntimes();
-            StopAllSilos();
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    // StartSecondary = false,
+                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
+                });
         }
 
         [TestCleanup]
@@ -62,7 +38,7 @@ namespace UnitTests.HaloTests.Streaming
         {
             if (_streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProvider, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProvider, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
             }
         }
 
