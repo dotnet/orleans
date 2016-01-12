@@ -18,7 +18,7 @@ In order to run this sample, you need a Bing Maps API key. The key is used by th
 Running the sample locally:
 
 1. Open the `GPSTracker.sln` file in Visual Studio 2013, and build the solution.
-2. Start the local Orleans Silo by running the `StartLocalSilo.cmd` in the Orleans SDK directory.
+2. Start the local Orleans Silo by running the `Host` project of the solution.
 3. In Visual Studio, right click on the `GPSTracker.Web` project, and click `Set as StartUp Project`.
 4. Press F5 to start `GPSTracker.Web` web application.
 5. Your browser should open on a map of San Francisco.
