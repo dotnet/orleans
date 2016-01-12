@@ -7,7 +7,7 @@ title: Typical Configurations
 Below are examples of typical configurations that can be used for development and production deployments.
 
 ## Local Development 
-For local development, where there is only one silo running locally on the programmer’s machine, the configuration is already included in the SDK. The local silo that can be started with the StartLocalSilo.cmd script in the top Orleans SDK folder is configured as follows.
+For local development, where there is only one silo running locally on the programmer’s machine, the configuration is already included in the *Orleans Dev/Test Host* project template of [Microsoft Orleans Tools for Visual Studio](https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4). The local silo that can be started by running a project created with the *Orleans Dev/Test Host* template is configured as follows in DevTestServerConfiguration.xml.
 
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
@@ -21,7 +21,7 @@ For local development, where there is only one silo running locally on the progr
 </OrleansConfiguration>
 ```
 
-To connect to the local silo, the client needs to be configured to localhost and can only connect from the same machine.
+To connect to the local silo, the client needs to be configured to localhost and can only connect from the same machine. The Orleans client that can be started by running a project created with the *Orleans Dev/Test Host* template is configured as follows in DevTestClientConfiguration.xml
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
