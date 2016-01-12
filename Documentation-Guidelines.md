@@ -82,7 +82,6 @@ Examples:
 * *OrleansRuntimeInterfaces.dll*
 * *C:\Binaries*
 * *../src/Grain.cs*
-* *[ORLEANS-SDK]\StartLocalSilo.cmd*
 
 
 ##Tables
