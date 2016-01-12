@@ -90,6 +90,7 @@
     <Compile Include="CodeGeneration\KnownTypeAttribute.cs" />
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\IGrainState.cs" />
+    <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="Providers\DefaultServiceProvider.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
