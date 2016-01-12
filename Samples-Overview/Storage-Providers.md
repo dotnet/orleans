@@ -40,10 +40,10 @@ Set the 'Test.Client' project as the startup project and hit F5. Right before it
     Press Enter to terminate...
 
 
-Stop the program and open a command line windows, move to the folder containing the Orleans SDK, then to the LocalSilo folder. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:
+Stop the program and open a command line windows, move to the `bin\Debug` folder of the Test.Client project. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:
 
     >>dir
-         Directory: C:\Microsoft Codename Orleans SDK v0.9\SDK\LocalSilo\Samples.FileStorage
+         Directory: c:\Orleans\Samples\StorageProviders\Test.Client\bin\Debug\Samples.FileStorage
 
     Mode                LastWriteTime     Length Name
     ----                -------------     ------ ----
