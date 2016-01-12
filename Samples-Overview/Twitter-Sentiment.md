@@ -72,23 +72,15 @@ The following must be installed prior to running the sample:
 ### Running the Sample
 * Open the `OrleansTwitterDemo.sln` file in Visual Studio 2013, and build the solution. 
 * Enter the details from Twitter into the TwitterClient\app.js file. 
-* Edit the [Orleans SDK]\LocalSilo\OrleansConfiguration.xml file to include a storage provider called `store1`, using the account name and key of your Windows Azure Storage account:
 
-         <?xml version="1.0" encoding="utf-8"?>
-             <OrleansConfiguration xmlns="urn:orleans">
-               <Globals>
-                 <StorageProviders>
-                    <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"           
-                          DataConnectionString="DefaultEndpointsProtocol=https;AccountName=ACCCOUNT_NAME;AccountKey=ACCOUNT_KEY" />
-                 </StorageProviders>
-
-* Start the local Orleans Silo by running the `StartLocalSilo.cmd` in the Orleans SDK directory. 
-* In Visual Studio, right click on the solution file, go to properties, select 'Multiple startup projects' and set the action for `TwitterWebApplication` and `TwitterClient` as `Start`. 
-* Press F5 to start the programs. 
+* Start Azure Storage Emulator or replace "UseDevelopmentStorage=true" in `DevTestServerConfiguration.xml` in the `Host` project with your Azure Storage account
+* Start the local Orleans Silo by running the `Host` project. 
+* Start the `TwitterClient` project. 
 * The Twitter Client should start, showing you every tweet it is consuming. 
+* Start the `TwitterWebApplication` project.
 * Your browser should open on http://localhost:5190/ showing you a few preset hashtags you can monitor. 
 * Try adding a couple of hashtags to track using the browser UI. 
-* Got get a cup of coffee, take out the trash, just do something else for a while, because it may take a little while before the tags you care about are seen in the feed.
+* Got get a cup of coffee or do something else for a while, because it may take some time before the tags you care about are seen in the feed.
 
 
 
