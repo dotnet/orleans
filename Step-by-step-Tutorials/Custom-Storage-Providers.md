@@ -85,7 +85,7 @@ The first thing we have to figure out is what data we need to provider through c
 The name is a required property, but we will also need the path to the root directory for our file store. 
 That is, in fact, the only piece of information we need, so we'll add a `RootDirectory` string property and edit the configuration file as in the previous section. 
 In doing so, it's critical to pay attention to the namespace and class name of the provider. 
-Add this to the `<StorageProviders>` element in the configuration file:
+Add this to the `<StorageProviders>` element in the `DevTestServerConfiguration.xml` configuration file of your silo host project where you will be testing the provider:
 
 
      <Provider Type="StorageProviders.FileStorageProvider"
@@ -123,7 +123,7 @@ public Task Init(string name,
 
 Run the program again. 
 This time, you will still crash, but in `ReadStateAsync()`. 
-After running the code, you should find a _Storage_ directory under the _$(OrleansSDK)\LocalSilo_ directory. 
+After running the code, you should find a _Storage_ directory under the `bin\Debug` directory of the silo host project. 
 Make sure you have set the project up to build on F5, or you may not see the edits take effect.
 
 ## Reading State
@@ -194,7 +194,7 @@ public async Task WriteStateAsync(string grainType, Orleans.GrainReference grain
 
 There's really just one thing left to do, and that is to test the thing. 
 Run the application and let it get to the end, where the greetings are shown, and then terminate it. 
-Under the _LocalSilo\Storage_ directory, you should find a file called _0.Grain1State_, and it should contain something very recognizable:
+Under the _bin\Debug\Storage_ directory of your silo host project, you should find a file called _0.Grain1State_, and it should contain something very recognizable:
 
 ![](../Images/Storage Provider 1.PNG)
 
