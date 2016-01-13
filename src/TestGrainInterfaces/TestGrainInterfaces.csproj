@@ -72,6 +72,7 @@
     <Compile Include="ILivenessTestGrain.cs" />
     <Compile Include="IStreamLifecycleTestGrains.cs" />
     <Compile Include="ITestGrain.cs" />
+    <Compile Include="IValueTypeTestGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
