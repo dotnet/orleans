@@ -22,8 +22,7 @@
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
 
-      <dependency id="WindowsAzure.Storage" version="4.2.0.0" />
-      <dependency id="Microsoft.WindowsAzure.ConfigurationManager" version="2.0.0.0" />
+      <dependency id="WindowsAzure.Storage" version="5.0.2" />
     </dependencies>
   </metadata>
   <files>
