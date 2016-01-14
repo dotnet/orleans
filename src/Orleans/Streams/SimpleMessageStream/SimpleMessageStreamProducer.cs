@@ -28,12 +28,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         internal bool IsRewindable { get; private set; }
 
-        internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool isRewindable)
+        internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
+            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, IStreamPubSub pubSub, bool isRewindable)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
-            pubSub = providerRuntime.PubSub(SimpleMessageStreamProvider.DEFAULT_STREAM_PUBSUB_TYPE);
+            this.pubSub = pubSub;
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
             IsRewindable = isRewindable;
