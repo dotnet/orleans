@@ -69,15 +69,31 @@ namespace UnitTests.GrainInterfaces
             }
         }
 
-        public void SetBit(int n)
+        public void SetBit(int n, bool value = true)
         {
-            boolArray[n] = true;
+            boolArray[n] = value;
         }
-
+        public bool GetBit(int n)
+        {
+            return boolArray[n];
+        }
         public void SetEnemy(int n, CampaignEnemyTestType enemy)
         {
             classArray[n].Enemy = enemy;
         }
+        public CampaignEnemyTestType GetEnemy(int n)
+        {
+            return classArray[n].Enemy;
+        }
+        public void SetNumber(string name, int value)
+        {
+            stringIntDict[name] = value;
+        }
+        public int GetNumber(string name)
+        {
+            return stringIntDict[name];
+        }
+
 
         // This class is not actually used anywhere. It is here to test that the serializer generator properly handles
         // nested generic classes. If it doesn't, then the generated serializer for this class will fail to compile.

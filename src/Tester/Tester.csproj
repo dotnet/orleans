@@ -125,6 +125,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="OrleansTestingBase.cs" />
+    <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="TestAssemblyCleanup.cs" />
     <Compile Include="BasicActivationTests.cs" />
     <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />

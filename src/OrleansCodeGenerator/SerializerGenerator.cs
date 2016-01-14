@@ -717,28 +717,34 @@ namespace Orleans.CodeGenerator
             /// <returns>Syntax for retrieving the value of this field.</returns>
             public ExpressionSyntax GetGetter(ExpressionSyntax instance, bool forceAvoidCopy = false)
             {
-                var typeSyntax = this.FieldInfo.FieldType.GetTypeSyntax();
-                var getFieldExpression =
-                    SF.InvocationExpression(SF.IdentifierName(this.GetterFieldName))
-                        .AddArgumentListArguments(SF.Argument(instance));
+                Type type;
+                ExpressionSyntax getExpression;
 
                 // If the field is the backing field for an auto-property, try to use the property directly.
                 if (this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null)
                 {
-                    return instance.Member(this.PropertyInfo.Name);
+                    type = this.PropertyInfo.PropertyType;
+                    getExpression = instance.Member(this.PropertyInfo.Name);
+                }
+                // otherwise, construct a field access expression
+                else
+                {
+                    type = this.FieldInfo.FieldType;
+                    getExpression = SF.InvocationExpression(SF.IdentifierName(this.GetterFieldName))
+                        .AddArgumentListArguments(SF.Argument(instance));
                 }
 
-                if (forceAvoidCopy || this.FieldInfo.FieldType.IsOrleansShallowCopyable())
+                if (forceAvoidCopy || type.IsOrleansShallowCopyable())
                 {
                     // Shallow-copy the field.
-                    return getFieldExpression;
+                    return getExpression;
                 }
 
                 // Deep-copy the field.
                 Expression<Action> deepCopyInner = () => SerializationManager.DeepCopyInner(default(object));
                 return SF.CastExpression(
-                    typeSyntax,
-                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(getFieldExpression)));
+                    type.GetTypeSyntax(),
+                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(getExpression)));
             }
 
             /// <summary>
