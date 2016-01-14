@@ -27,7 +27,7 @@ namespace UnitTests.Streaming.Reliability
     [DeploymentItem("Config_AzureStreamProviders.xml")]
     [DeploymentItem("ClientConfig_AzureStreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamReliabilityTests : HostedTestClusterPerFixture
+    public class StreamReliabilityTests : HostedTestClusterPerTest
     {
         public TestContext TestContext { get; set; }
         public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
@@ -43,6 +43,7 @@ namespace UnitTests.Streaming.Reliability
         {
             SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml"),
             LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
+            DataConnectionString = StorageTestConstants.DataConnectionString,
         };
 
         private static readonly TestingClientOptions clientRunOptions = new TestingClientOptions
