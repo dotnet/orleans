@@ -594,7 +594,7 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => field.GetCustomAttribute<NonSerializedAttribute>() == null)
+                    .Where(field => !field.IsNotSerialized)
                     .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
@@ -651,26 +651,25 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-
             /// <summary>
-            /// Gets a value indicating whether or not this field represents a property with an accessible getter. 
+            /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete getter. 
             /// </summary>
             public bool IsGettableProperty
             {
                 get
                 {
-                    return this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null;
+                    return this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null && !this.IsObsolete;
                 }
             }
 
             /// <summary>
-            /// Gets a value indicating whether or not this field represents a property with an accessible setter. 
+            /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete setter. 
             /// </summary>
             public bool IsSettableProperty
             {
                 get
                 {
-                    return this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null;
+                    return this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null && !this.IsObsolete;
                 }
             }
 
@@ -710,41 +709,48 @@ namespace Orleans.CodeGenerator
             }
 
             /// <summary>
-            /// Returns syntax for retrieving the value of this field.
+            /// Gets a value indicating whether or not this field is obsolete.
+            /// </summary>
+            private bool IsObsolete
+            {
+                get
+                {
+                    var obsoleteAttr = this.FieldInfo.GetCustomAttribute<ObsoleteAttribute>();
+
+                    // Get the attribute from the property, if present.
+                    if (this.property != null && obsoleteAttr == null)
+                    {
+                        obsoleteAttr = this.property.GetCustomAttribute<ObsoleteAttribute>();
+                    }
+                    
+                    return obsoleteAttr != null;
+                }
+            }
+
+            /// <summary>
+            /// Returns syntax for retrieving the value of this field, deep copying it if neccessary.
             /// </summary>
             /// <param name="instance">The instance of the containing type.</param>
             /// <param name="forceAvoidCopy">Whether or not to ensure that no copy of the field is made.</param>
             /// <returns>Syntax for retrieving the value of this field.</returns>
             public ExpressionSyntax GetGetter(ExpressionSyntax instance, bool forceAvoidCopy = false)
             {
-                Type type;
-                ExpressionSyntax getExpression;
+                // Retrieve the value of the field.
+                var getValueExpression = this.GetValueExpression(instance);
 
-                // If the field is the backing field for an auto-property, try to use the property directly.
-                if (this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null)
+                // Avoid deep-copying the field if possible.
+                if (forceAvoidCopy || this.FieldInfo.FieldType.IsOrleansShallowCopyable())
                 {
-                    type = this.PropertyInfo.PropertyType;
-                    getExpression = instance.Member(this.PropertyInfo.Name);
-                }
-                // otherwise, construct a field access expression
-                else
-                {
-                    type = this.FieldInfo.FieldType;
-                    getExpression = SF.InvocationExpression(SF.IdentifierName(this.GetterFieldName))
-                        .AddArgumentListArguments(SF.Argument(instance));
+                    // Return the value without deep-copying it.
+                    return getValueExpression;
                 }
 
-                if (forceAvoidCopy || type.IsOrleansShallowCopyable())
-                {
-                    // Shallow-copy the field.
-                    return getExpression;
-                }
-
-                // Deep-copy the field.
+                // Deep-copy the value.
                 Expression<Action> deepCopyInner = () => SerializationManager.DeepCopyInner(default(object));
+                var typeSyntax = this.FieldInfo.FieldType.GetTypeSyntax();
                 return SF.CastExpression(
-                    type.GetTypeSyntax(),
-                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(getExpression)));
+                    typeSyntax,
+                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(getValueExpression)));
             }
 
             /// <summary>
@@ -755,8 +761,8 @@ namespace Orleans.CodeGenerator
             /// <returns>Syntax for setting the value of this field.</returns>
             public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value)
             {
-                // If the field is the backing field for an auto-property, try to use the property directly.
-                if (this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null)
+                // If the field is the backing field for an accessible auto-property use the property directly.
+                if (this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null && !this.IsObsolete)
                 {
                     return SF.AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
@@ -776,6 +782,30 @@ namespace Orleans.CodeGenerator
             }
 
             /// <summary>
+            /// Returns syntax for retrieving the value of this field.
+            /// </summary>
+            /// <param name="instance">The instance of the containing type.</param>
+            /// <returns>Syntax for retrieving the value of this field.</returns>
+            private ExpressionSyntax GetValueExpression(ExpressionSyntax instance)
+            {
+                // If the field is the backing field for an accessible auto-property use the property directly.
+                ExpressionSyntax result;
+                if (this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null && !this.IsObsolete)
+                {
+                    result = instance.Member(this.PropertyInfo.Name);
+                }
+                else
+                {
+                    // Retrieve the field using the generated getter.
+                    result =
+                        SF.InvocationExpression(SF.IdentifierName(this.GetterFieldName))
+                            .AddArgumentListArguments(SF.Argument(instance));
+                }
+
+                return result;
+            }
+
+            /// <summary>
             /// A comparer for <see cref="FieldInfoMember"/> which compares by name.
             /// </summary>
             public class Comparer : IComparer<FieldInfoMember>
@@ -784,11 +814,6 @@ namespace Orleans.CodeGenerator
                 /// The singleton instance.
                 /// </summary>
                 private static readonly Comparer Singleton = new Comparer();
-
-                public int Compare(FieldInfoMember x, FieldInfoMember y)
-                {
-                    return string.Compare(x.FieldInfo.Name, y.FieldInfo.Name, StringComparison.Ordinal);
-                }
 
                 /// <summary>
                 /// Gets the singleton instance of this class.
@@ -799,6 +824,11 @@ namespace Orleans.CodeGenerator
                     {
                         return Singleton;
                     }
+                }
+
+                public int Compare(FieldInfoMember x, FieldInfoMember y)
+                {
+                    return string.Compare(x.FieldInfo.Name, y.FieldInfo.Name, StringComparison.Ordinal);
                 }
             }
         }

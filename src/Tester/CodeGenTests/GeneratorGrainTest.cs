@@ -42,36 +42,55 @@ namespace Tester.CodeGenTests
             Assert.AreEqual(expectedStruct.GetValueWithPrivateGetter(), actualStruct.GetValueWithPrivateGetter());
 
             // Test abstract class serialization.
-            var expectedAbstract = new OuterClass.SomeConcreteClass { Int = 89, String = Guid.NewGuid().ToString() };
-            expectedAbstract.Classes = new List<SomeAbstractClass>
+            var input = new OuterClass.SomeConcreteClass { Int = 89, String = Guid.NewGuid().ToString() };
+            input.Classes = new List<SomeAbstractClass>
             {
-                expectedAbstract,
+                input,
                 new AnotherConcreteClass
                 {
                     AnotherString = "hi",
-                    Interfaces = new List<ISomeInterface> { expectedAbstract }
+                    Interfaces = new List<ISomeInterface> { input }
                 }
             };
-            var actualAbstract = await grain.RoundTripClass(expectedAbstract);
-            Assert.AreEqual(expectedAbstract.Int, actualAbstract.Int);
-            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract).String);
-            Assert.AreEqual(expectedAbstract.Classes.Count, actualAbstract.Classes.Count);
-            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract.Classes[0]).String);
-            Assert.AreEqual(expectedAbstract.Classes[1].Interfaces[0].Int, actualAbstract.Classes[1].Interfaces[0].Int);
+
+            // Set fields which should not be serialized.
+#pragma warning disable 618
+            input.ObsoleteInt = 38;
+#pragma warning restore 618
+
+            input.NonSerializedInt = 39;
+
+            var output = await grain.RoundTripClass(input);
+
+            Assert.AreEqual(input.Int, output.Int);
+            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output).String);
+            Assert.AreEqual(input.Classes.Count, output.Classes.Count);
+            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
+            Assert.AreEqual(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
+
+#pragma warning disable 618
+            Assert.AreEqual(input.ObsoleteInt, output.ObsoleteInt);
+#pragma warning restore 618
+            
+            Assert.AreEqual(0, output.NonSerializedInt);
 
             // Test abstract class serialization with state.
-            await grain.SetState(expectedAbstract);
-            actualAbstract = await grain.GetState();
-            Assert.AreEqual(expectedAbstract.Int, actualAbstract.Int);
-            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract).String);
-            Assert.AreEqual(expectedAbstract.Classes.Count, actualAbstract.Classes.Count);
-            Assert.AreEqual(expectedAbstract.String, ((OuterClass.SomeConcreteClass)actualAbstract.Classes[0]).String);
-            Assert.AreEqual(expectedAbstract.Classes[1].Interfaces[0].Int, actualAbstract.Classes[1].Interfaces[0].Int);
+            await grain.SetState(input);
+            output = await grain.GetState();
+            Assert.AreEqual(input.Int, output.Int);
+            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output).String);
+            Assert.AreEqual(input.Classes.Count, output.Classes.Count);
+            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
+            Assert.AreEqual(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
+#pragma warning disable 618
+            Assert.AreEqual(input.ObsoleteInt, output.ObsoleteInt);
+#pragma warning restore 618
+            Assert.AreEqual(0, output.NonSerializedInt);
 
             // Test interface serialization.
-            var expectedInterface = expectedAbstract;
+            var expectedInterface = input;
             var actualInterface = await grain.RoundTripInterface(expectedInterface);
-            Assert.AreEqual(expectedAbstract.Int, actualInterface.Int);
+            Assert.AreEqual(input.Int, actualInterface.Int);
             
             // Test enum serialization.
             const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
