@@ -32,7 +32,7 @@ The client configuration should look like this:
 </ClientConfiguration>
 ```
 
-Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file [CreateOrleansTables_*](https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/SQLServer/CreateOrleansTables_SqlServer.sql)(where asterisk denotes database vendor) in the Binaries\OrleansServer folder which establishes the necessary database objects. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.
+Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file [CreateOrleansTables_*](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_SqlServer.sql)(where asterisk denotes database vendor) in the Binaries\OrleansServer folder which establishes the necessary database objects. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.
 
 ### SQL Metrics and Statistics tables
 
