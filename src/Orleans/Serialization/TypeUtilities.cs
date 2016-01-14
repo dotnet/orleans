@@ -215,11 +215,11 @@ namespace Orleans.Serialization
                         return true;
                     }
                 }
-                
-                return IsTypeIsInaccessibleForSerialization(
-                    typeInfo.GetGenericTypeDefinition(),
-                    fromModule,
-                    fromAssembly);
+
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetGenericTypeDefinition(), fromModule, fromAssembly))
+                {
+                    return true;
+                }
             }
 
             if ((typeInfo.IsNotPublic || !typeInfo.IsVisible) && !AreInternalsVisibleTo(typeInfo.Assembly, fromAssembly))
@@ -237,9 +237,22 @@ namespace Orleans.Serialization
                 }
             }
 
+            // For arrays, check the element type.
             if (typeInfo.IsArray)
             {
-                return IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly);
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly))
+                {
+                    return true;
+                }
+            }
+
+            // For nested types, check that the declaring type is accessible.
+            if (typeInfo.IsNested)
+            {
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.DeclaringType, fromModule, fromAssembly))
+                {
+                    return true;
+                }
             }
 
             return typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
