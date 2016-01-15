@@ -26,7 +26,10 @@ namespace UnitTests.TimerTests
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
             DataConnectionString = StorageTestConstants.DataConnectionString,
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+            AdjustConfig = config =>
+            {
+                config.Globals.ServiceId = Guid.NewGuid();
+            },
         };
 
         public static TestingSiloHost CreateSiloHost()
@@ -42,8 +45,6 @@ namespace UnitTests.TimerTests
             // so we must proxy the call through a grain.
             //var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(-1);
             //controlProxy.EraseReminderTable().WaitWithThrow(VSOTestConstants.InitTimeout);
-
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, this.HostedCluster.Primary.Silo.GlobalConfig.LivenessType, "LivenesType");
         }
 
         [TestCleanup]
