@@ -12,7 +12,7 @@ namespace UnitTests.Streaming
     [DeploymentItem("ClientConfig_AzureStreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class AQStreamingTests : HostedTestClusterPerFixture
+    public class AQStreamingTests : HostedTestClusterPerTest
     {
         internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml");
         internal static readonly FileInfo ClientConfigFile = new FileInfo("ClientConfig_AzureStreamProviders.xml");

@@ -10,6 +10,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -73,6 +74,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportToMessage()
         {
+            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
@@ -128,6 +130,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportImport()
         {
+            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
