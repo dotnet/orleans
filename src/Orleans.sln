@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -45,12 +45,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrains", "TestGrains\TestGrains.csproj", "{EACE28AE-F301-472A-B633-02B55434871B}"
 	ProjectSection(ProjectDependencies) = postProject
 		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
-	EndProjectSection
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "Tester\Tester.csproj", "{591EF75B-D3B0-403D-830C-39D032A73404}"
-	ProjectSection(ProjectDependencies) = postProject
-		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
-		{B9196CB5-D356-4228-B73F-143F2EB80C64} = {B9196CB5-D356-4228-B73F-143F2EB80C64}
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{856B8FB9-194E-4F5C-9D9D-A35EB82387FC}"
@@ -183,6 +177,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTelemetryConsumers.N
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansGoogleUtils", "OrleansGoogleUtils\OrleansGoogleUtils.csproj", "{B9196CB5-D356-4228-B73F-143F2EB80C64}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{01F3CC7E-F996-411E-AFD6-72673A826549}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "..\test\Tester\Tester.csproj", "{A9C8FFEC-4947-4F04-BA73-1F17B329A55D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestExtensions", "..\test\TestExtensions\TestExtensions.csproj", "{8FD242B4-EDA9-42CD-BA39-E410B98ADD26}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -221,10 +221,6 @@ Global
 		{EACE28AE-F301-472A-B633-02B55434871B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EACE28AE-F301-472A-B633-02B55434871B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EACE28AE-F301-472A-B633-02B55434871B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{591EF75B-D3B0-403D-830C-39D032A73404}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{591EF75B-D3B0-403D-830C-39D032A73404}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{591EF75B-D3B0-403D-830C-39D032A73404}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{591EF75B-D3B0-403D-830C-39D032A73404}.Release|Any CPU.Build.0 = Release|Any CPU
 		{792818EF-B3F8-4CE2-9886-4808713B15C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{792818EF-B3F8-4CE2-9886-4808713B15C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{792818EF-B3F8-4CE2-9886-4808713B15C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -297,11 +293,21 @@ Global
 		{B9196CB5-D356-4228-B73F-143F2EB80C64}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B9196CB5-D356-4228-B73F-143F2EB80C64}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B9196CB5-D356-4228-B73F-143F2EB80C64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9C8FFEC-4947-4F04-BA73-1F17B329A55D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9C8FFEC-4947-4F04-BA73-1F17B329A55D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9C8FFEC-4947-4F04-BA73-1F17B329A55D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9C8FFEC-4947-4F04-BA73-1F17B329A55D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8FD242B4-EDA9-42CD-BA39-E410B98ADD26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8FD242B4-EDA9-42CD-BA39-E410B98ADD26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8FD242B4-EDA9-42CD-BA39-E410B98ADD26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8FD242B4-EDA9-42CD-BA39-E410B98ADD26}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{0BB483EF-6401-424C-9C4F-5750B300C7FD} = {DD5D35C0-A5FE-41CC-A10D-CAAA37996479}
+		{A9C8FFEC-4947-4F04-BA73-1F17B329A55D} = {01F3CC7E-F996-411E-AFD6-72673A826549}
+		{8FD242B4-EDA9-42CD-BA39-E410B98ADD26} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 	EndGlobalSection
 EndGlobal
