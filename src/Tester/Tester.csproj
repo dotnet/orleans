@@ -189,6 +189,7 @@
     <Compile Include="TestStreamProviders\Generator\Generators\SimpleGenerator.cs" />
     <Compile Include="TestStreamProviders\Generator\GeneratorAdapterConfig.cs" />
     <Compile Include="TestStreamProviders\Generator\GeneratorAdapterFactory.cs" />
+    <Compile Include="TestStreamProviders\Generator\GeneratorPooledCache.cs" />
     <Compile Include="TestStreamProviders\Generator\GeneratorStreamProvider.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
     <Compile Include="TestStreamProviders\Generator\Generators\SimpleGeneratorConfig.cs" />

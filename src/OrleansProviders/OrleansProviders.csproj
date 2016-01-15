@@ -42,9 +42,17 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Streams\Common\SimpleQueueCache.cs" />
-    <Compile Include="Streams\Common\SimpleQueueCacheCursor.cs" />
-    <Compile Include="Streams\Common\SimpleQueueAdapterCache.cs" />
+    <Compile Include="Streams\Common\PooledCache\CachedMessageBlock.cs" />
+    <Compile Include="Streams\Common\PooledCache\FixedSizeObjectPool.cs" />
+    <Compile Include="Streams\Common\PooledCache\FixedSizeBuffer.cs" />
+    <Compile Include="Streams\Common\PooledCache\ICacheDataAdapter.cs" />
+    <Compile Include="Streams\Common\PooledCache\IObjectPool.cs" />
+    <Compile Include="Streams\Common\PooledCache\PooledQueueCache.cs" />
+    <Compile Include="Streams\Common\PooledCache\CachedMessagePool.cs" />
+    <Compile Include="Streams\Common\PooledCache\ObjectPool.cs" />
+    <Compile Include="Streams\Common\SimpleCache\SimpleQueueCache.cs" />
+    <Compile Include="Streams\Common\SimpleCache\SimpleQueueCacheCursor.cs" />
+    <Compile Include="Streams\Common\SimpleCache\SimpleQueueAdapterCache.cs" />
     <Compile Include="Streams\Common\EventSequenceToken.cs" />
     <Compile Include="ProviderErrorCode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

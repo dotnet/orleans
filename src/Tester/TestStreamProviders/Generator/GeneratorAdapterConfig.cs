@@ -16,8 +16,6 @@ namespace Tester.TestStreamProviders.Generator
 
         public string StreamProviderName { get; private set; }
 
-        public int CacheSize { get { return 1024; } }
-
         private const string TotalQueueCountName = "TotalQueueCount";
         private const int TotalQueueCountDefault = 4;
         public int TotalQueueCount { get; set; }

@@ -115,6 +115,11 @@
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
     <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\CachedMessageBlockTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\FixedSizeBufferTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\FixedSizeObjectPoolTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\ObjectPoolTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\PooledQueueCacheTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
