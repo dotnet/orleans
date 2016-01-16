@@ -29,7 +29,7 @@ namespace TestGrains
             if (!reports.TryGetValue(key, out counts))
             {
                 counts = new Dictionary<Guid, int>();
-                reports.Add(key, counts);
+                reports[key] = counts;
             }
             logger.Info("ReportResult. StreamProvider: {0}, StreamNamespace: {1}, StreamGuid: {2}, Count: {3}", streamProvider, streamNamespace, streamGuid, count);
             counts[streamGuid] = count;

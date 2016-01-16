@@ -65,6 +65,9 @@
     <Compile Include="EventSourcing\PersonState.cs" />
     <Compile Include="GeneratedEventCollectorGrain.cs" />
     <Compile Include="GeneratedEvent.cs" />
+    <Compile Include="GeneratedStreamTestConstants.cs" />
+    <Compile Include="ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.cs" />
+    <Compile Include="ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.cs" />
     <Compile Include="GeneratedEventReporterGrain.cs" />
     <Compile Include="GeneratorTestDerivedDerivedGrain.cs" />
     <Compile Include="GeneratorTestDerivedGrain1.cs" />
@@ -109,6 +112,7 @@
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="LivenessTestGrain.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
+    <Compile Include="StreamCheckpoint.cs" />
     <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>

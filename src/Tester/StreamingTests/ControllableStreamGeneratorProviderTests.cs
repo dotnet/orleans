@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,6 +13,7 @@ using Tester.TestStreamProviders.Generator;
 using Tester.TestStreamProviders.Generator.Generators;
 using TestGrainInterfaces;
 using TestGrains;
+using UnitTests.Grains;
 using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
@@ -23,7 +25,7 @@ namespace UnitTests.StreamingTests
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-        private const string StreamProviderName = GeneratedEventCollectorGrain.StreamProviderName;
+        private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
         private const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
@@ -99,16 +101,16 @@ namespace UnitTests.StreamingTests
             }
             finally
             {
-                var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedEventCollectorGrain.ReporterId);
+                var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
                 reporter.Reset().Ignore();
             }
         }
 
         private async Task<bool> CheckCounters(SimpleGeneratorConfig generatorConfig, bool assertIsTrue)
         {
-            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedEventCollectorGrain.ReporterId);
+            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(GeneratedEventCollectorGrain.StreamProviderName, GeneratedEventCollectorGrain.StreamNamespace);
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, GeneratedEventCollectorGrain.StreamNamespace);
             if (assertIsTrue)
             {
                 // one stream per queue

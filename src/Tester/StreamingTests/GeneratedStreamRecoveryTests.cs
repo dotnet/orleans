@@ -1,15 +1,13 @@
-using System;
+﻿    
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Tester.StreamingTests;
 using Tester.TestStreamProviders.Generator;
-using Tester.TestStreamProviders.Generator.Generators;
-using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
 using UnitTests.Tester;
@@ -19,36 +17,30 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class StreamGeneratorProviderTests : HostedTestClusterPerFixture
+    public class GeneratedImplicitSubscriptionStreamRecoveryTests : HostedTestClusterPerFixture
     {
-        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-
+        private static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-        private const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
-
-        private readonly static SimpleGeneratorConfig GeneratorConfig = new SimpleGeneratorConfig
-        {
-            StreamNamespace = StreamNamespace,
-            EventsInStream = 100
-        };
 
         private readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
         {
             TotalQueueCount = 4,
-            GeneratorConfigType = GeneratorConfig.GetType()
         };
+
+        private ImplicitSubscritionRecoverableStreamTestRunner runner;
 
         public static TestingSiloHost CreateSiloHost()
         {
             return new TestingSiloHost(
                 new TestingSiloOptions
                 {
+                    StartFreshOrleans = true,
                     SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config => {
+                    AdjustConfig = config =>
+                    {
                         var settings = new Dictionary<string, string>();
                         // get initial settings from configs
                         AdapterConfig.WriteProperties(settings);
-                        GeneratorConfig.WriteProperties(settings);
 
                         // add queue balancer setting
                         settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
@@ -66,33 +58,25 @@ namespace UnitTests.StreamingTests
                 });
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task ValidateGeneratedStreamsTest()
+        [TestInitialize]
+        public void InitializeOrleans()
         {
-            logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
-            await TestingUtils.WaitUntilAsync(CheckCounters, Timeout);
+            runner = new ImplicitSubscritionRecoverableStreamTestRunner(GrainClient.GrainFactory, StreamProviderTypeName, StreamProviderName, AdapterConfig);
         }
 
-        private async Task<bool> CheckCounters(bool assertIsTrue)
-        {
-            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(StreamProviderName, StreamNamespace);
-            if (assertIsTrue)
-            {
-                // one stream per queue
-                Assert.AreEqual(AdapterConfig.TotalQueueCount, report.Count, "Stream count");
-                foreach (int eventsPerStream in report.Values)
-                {
-                    Assert.AreEqual(GeneratorConfig.EventsInStream, eventsPerStream, "Events per stream");
-                }
-            }
-            else if (AdapterConfig.TotalQueueCount != report.Count ||
-                     report.Values.Any(count => count != GeneratorConfig.EventsInStream))
-            {
-                return false;
-            }
-            return true;
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task Recoverable100EventStreamsWithTransientErrorsTest()
+        {
+            logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
+            await runner.Recoverable100EventStreamsWithTransientErrors(ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace);
+        }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
+        {
+            logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
+            await runner.Recoverable100EventStreamsWith1NonTransientError(ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace);
         }
     }
 }
