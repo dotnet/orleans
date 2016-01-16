@@ -8,6 +8,7 @@ title: Prerequisites
 Orleans is a set of .NET libraries. In order to use Orleans, you need [.NET Framework](http://www.microsoft.com/net) 4.5.1 or higher and a copy of [Visual Studio](https://www.visualstudio.com) 2013 or higher. Note that the Express versions of Visual Studio do not support extension packages.
 
 In production, Orleans requires persistent storage. The following technologies are supported:
+
 * [Azure](https://azure.microsoft.com/en-us/pricing) - Tested with [Azure SDK](http://azure.microsoft.com/en-us/downloads) 2.4 - 2.7
 * [SQL Server](https://www.microsoft.com/en-us/server-cloud/products/sql-server) 2000 or higher
 * [ZooKeeper](https://zookeeper.apache.org) 3.4.0 or higher
