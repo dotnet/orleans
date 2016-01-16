@@ -5,7 +5,7 @@ title: Samples Overview
 {% include JB/setup %}
 
 ### What do I need?
-To productively use the Orleans samples, please follow the [Prerequisites](/Prerequisites.md) section for the supported versions of the .NET framework, Visual Studio and Azure SDK.
+To productively use the Orleans samples, please follow the [Prerequisites](/orleans/Prerequisites) section for the supported versions of the .NET framework, Visual Studio and Azure SDK.
 An Azure subscription will help with some of the samples, but is not required. For the Azure-based samples, you will need to install the SDK.
 
 The samples themselves can be downloaded from [GitHub](https://github.com/dotnet/orleans/tree/master/Samples).
