@@ -5,9 +5,8 @@ title: Samples Overview
 {% include JB/setup %}
 
 ### What do I need?
-To productively use the Orleans samples, you need to have a copy of Visual Studio 2012 or 2013. Trial versions of Visual Studio are available at [MSDN](http://msdn.microsoft.com/en-us/dn369242#fbid=S8c2-uibvsG). Note that the Express versions of Visual Studio do not support extension packages.
-
-An Azure subscription will help with some of the samples, but is not required. Azure is available as a [free trial](http://www.windowsazure.com/en-us/pricing/free-trial/). For the Azure-based samples, you will need to install the [Azure SDK 2.4 or 2.5 for .NET](http://www.windowsazure.com/en-us/downloads). 
+To productively use the Orleans samples, please follow the [Prerequisites](/Prerequisites.md) section for the supported versions of the .NET framework, Visual Studio and Azure SDK.
+An Azure subscription will help with some of the samples, but is not required. For the Azure-based samples, you will need to install the SDK.
 
 The samples themselves can be downloaded from [GitHub](https://github.com/dotnet/orleans/tree/master/Samples).
 
