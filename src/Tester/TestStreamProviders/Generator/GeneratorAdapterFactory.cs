@@ -20,7 +20,7 @@ namespace Tester.TestStreamProviders.Generator
     /// This factory acts as the adapter and the adapter factory.  It creates receivers that use configurable generator
     ///   to generate event streams, rather than reading them from storage.
     /// </summary>
-    public class GeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IControllable
+    public class GeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache, IControllable
     {
         public const string GeneratorConfigTypeName = "StreamGeneratorConfigType";
         private IServiceProvider serviceProvider;
@@ -29,6 +29,7 @@ namespace Tester.TestStreamProviders.Generator
         private IStreamQueueMapper streamQueueMapper;
         private IStreamFailureHandler streamFailureHandler;
         private ConcurrentDictionary<QueueId, Receiver> receivers;
+        private IObjectPool<FixedSizeBuffer> bufferPool;
         private Logger logger;
 
         public bool IsRewindable { get { return true; } }
@@ -50,6 +51,8 @@ namespace Tester.TestStreamProviders.Generator
                 }
                 generatorConfig.PopulateFromProviderConfig(providerConfig);
             }
+            // 10 meg buffer pool.  10 1 meg blocks
+            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(10, pool => new FixedSizeBuffer(1<<20, pool));
         }
 
         public Task<IQueueAdapter> CreateAdapter()
@@ -59,7 +62,7 @@ namespace Tester.TestStreamProviders.Generator
 
         public IQueueAdapterCache GetQueueAdapterCache()
         {
-            return new SimpleQueueAdapterCache(adapterConfig.CacheSize, logger);
+            return this;
         }
 
         public IStreamQueueMapper GetStreamQueueMapper()
@@ -157,6 +160,11 @@ namespace Tester.TestStreamProviders.Generator
             }
             generator.Configure(serviceProvider, generatorConfig);
             receiver.QueueGenerator = generator;
+        }
+
+        public IQueueCache CreateQueueCache(QueueId queueId)
+        {
+            return new GeneratorPooledCache(bufferPool);
         }
     }
 }

@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders.Generator;

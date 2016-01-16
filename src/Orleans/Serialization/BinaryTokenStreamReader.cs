@@ -53,6 +53,15 @@ namespace Orleans.Serialization
             Trace("Starting new stream reader");
         }
 
+        /// <summary>
+        /// Create a new BinaryTokenStreamReader to read from the specified input buffer.
+        /// </summary>
+        /// <param name="buff">ArraySegment to use for the data.</param>
+        public BinaryTokenStreamReader(ArraySegment<byte> buff)
+            : this(new[] { buff })
+        {
+        }
+
         /// <summary> Current read position in the stream. </summary>
         public int CurrentPosition { get { return currentOffset + totalProcessedBytes - currentSegment.Offset; } }
 
