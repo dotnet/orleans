@@ -6,7 +6,7 @@ title: Introduction
 
 Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 cloud services, as well as by a number of other companies.
 
-#### Background
+### Background
 
 Cloud applications and services are inherently parallel and distributed. They are also interactive and dynamic; often requiring near real time direct interactions between cloud entities. Such applications are very difficult to build today. The development process demands expert level programmers and typically requires expensive iterations of the design and the architecture, as the workload grows.
 
@@ -16,7 +16,7 @@ The data scale-out mechanism of SOA is partitioning. As data size and load grow 
 
 The stateless N-tier model delegates the partitioning problem to the storage layer. It often requires caching in the stateless layer to get acceptable performance, adding complexity and introducing cache consistency issues.
 
-#### Actors
+### Actors
 
 The actor model supports fine-grain individual objects—actors—that are isolated from each other and light-weight enough to allow modeling of an individual entity as an actor. They communicate via asynchronous message passing, which enables direct communications between actors.
 
@@ -24,7 +24,7 @@ Significantly, an actor executes with single-threaded semantics. Coupled with en
 
 For the last decade, Erlang has been the most popular implementation of the traditional actor model. Facing the above-mentioned challenges of SOA, the industry started rediscovering the actor model, which stimulated renewed interest in Erlang and creation of new Erlang-like solutions: Scala actors, Akka, DCell.
 
-#### Project "Orleans"
+### Project "Orleans"
 
 The project we have codenamed "Orleans" is an implementation of an improved actor model that borrows heavily from Erlang and distributed objects systems, adds static typing, message indirection and actor virtualization, exposing them in an integrated programming model. Whereas Erlang is a pure functional language with its own custom VM, the "Orleans" programming model directly leverages .NET and its object-oriented capabilities.
 
@@ -34,7 +34,7 @@ Project "Orleans" has been used in production within Microsoft since fall 2012, 
 
 The main benefits of "Orleans" are: **1) developer productivity**, even for non-expert programmers; and **2) transparent scalability by default** with no special effort from the programmer. It is a set of .NET libraries and tools that make development of complex distributed applications much easier and make the resulting applications scalable by design. We expand on each of these benefits below.
 
-#### Developer Productivity
+### Developer Productivity
 
 The "Orleans" programming model raises productivity of both expert and non-expert programmers by providing the following key abstractions, guarantees and system services.
 
@@ -45,7 +45,7 @@ The "Orleans" programming model raises productivity of both expert and non-exper
 * **Transparent integration with persistent store**. "Orleans" allows for declarative mapping of actors’ in-memory state to persistent store. It synchronizes updates, transparently guaranteeing that callers receive results only after the persistent state has been successfully updated. Extending and/or customizing the set of existing persistent storage providers available is straight-forward.
 * **Automatic propagation of errors**. The runtime automatically propagates unhandled errors up the call chain with the semantics of asynchronous and distributed try/catch. As a result, errors do not get lost within an application. This allows the programmer to put error handling logic at the appropriate places, without the tedious work of manually propagating errors at each level.
 
-#### Transparent Scalability by Default
+### Transparent Scalability by Default
 
 The "Orleans" programming model is designed to guide the programmer down a path of likely success in scaling their application or service through several orders of magnitude. This is done by incorporating the proven best practices and patterns, and providing an efficient implementation of the lower level system functionality. Here are some key factors that enable scalability and performance.
 
