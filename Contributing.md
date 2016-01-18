@@ -4,7 +4,7 @@ title: Contributing to Orleans
 ---
 {% include JB/setup %}
 
-Some notes and guidelines for developers wanting to contribute to Project Orleans.
+Some notes and guidelines for developers wanting to contribute to Orleans.
 
 # Contributing To This Project
 
