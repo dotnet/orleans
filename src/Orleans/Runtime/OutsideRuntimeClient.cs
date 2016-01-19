@@ -915,7 +915,11 @@ namespace Orleans
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    var targetGrain = callback.Value.Message.TargetGrain;
+                    if (targetGrain == null || !targetGrain.IsSystemTarget)
+                    {
+                        callback.Value.OnTargetSiloFail();
+                    }
                 }
             }
         }
