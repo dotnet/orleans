@@ -1,31 +1,9 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 namespace Orleans.Serialization
 {
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Linq.Expressions;
     using System.Reflection;
 
     using Bond;
@@ -41,7 +19,7 @@ namespace Orleans.Serialization
     /// </summary>
     public class BondSerializer : IExternalSerializer
     {
-        private static readonly ConcurrentDictionary<RuntimeTypeHandle, Delegate> CopierDictionary = new ConcurrentDictionary<RuntimeTypeHandle, Delegate>();
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, ClonerInfo> ClonerInfoDictionary = new ConcurrentDictionary<RuntimeTypeHandle, ClonerInfo>();
         private static readonly ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer> SerializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer>();
         private static readonly ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer> DeserializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer>();
 
@@ -54,7 +32,7 @@ namespace Orleans.Serialization
         /// <returns>A value indicating whether the type can be serialized</returns>
         public bool IsSupportedType(Type itemType)
         {
-            if (CopierDictionary.ContainsKey(itemType.TypeHandle))
+            if (ClonerInfoDictionary.ContainsKey(itemType.TypeHandle))
             {
                 return true;
             }
@@ -85,14 +63,14 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            var copier = GetCopier(source.GetType().TypeHandle);
-            if (copier == null)
+            var clonerInfo = GetClonerInfo(source.GetType().TypeHandle);
+            if (clonerInfo == null)
             {
                 LogWarning(1, "no copier found for type {0}", source.GetType());
                 throw new ArgumentOutOfRangeException("original", "no copier provided for the selected type");
             }
 
-            return copier.DynamicInvoke(source);
+            return clonerInfo.Invoke(source);
         }
 
         /// <summary>
@@ -167,9 +145,14 @@ namespace Orleans.Serialization
             serializer.Serialize(item, bondWriter);
         }
 
-        private static Delegate GetCopier(RuntimeTypeHandle handle)
+        private static object DeepCopy<T>(T source, object cloner)
+        {       
+            return ((Cloner<T>)cloner).Clone<T>(source);
+        }
+
+        private static ClonerInfo GetClonerInfo(RuntimeTypeHandle handle)
         {
-            return Get(CopierDictionary, handle);
+            return Get(ClonerInfoDictionary, handle);
         }
 
         private static BondTypeSerializer GetSerializer(RuntimeTypeHandle handle)
@@ -214,15 +197,41 @@ namespace Orleans.Serialization
             var clonerType = typeof(Cloner<>);
             var realType = clonerType.MakeGenericType(type);
             var clonerInstance = Activator.CreateInstance(realType);
-            var cloneMethod = realType.GetMethod("Clone").MakeGenericMethod(type);
-            var copierDelegate = cloneMethod.CreateDelegate(
-                    typeof(Func<,>).MakeGenericType(new[] { type, type }),
-                    clonerInstance);
             var serializer = new BondTypeSerializer(type);
             var deserializer = new BondTypeDeserializer(type);
-            CopierDictionary.TryAdd(type.TypeHandle, copierDelegate);
+            var sourceParameter = Expression.Parameter(typeof(object));
+            var instanceParameter = Expression.Parameter(typeof(object));
+            var method = typeof(BondSerializer).GetMethod("DeepCopy", BindingFlags.NonPublic | BindingFlags.Static).MakeGenericMethod(type);
+            var lambda = Expression.Lambda(
+                   typeof(Func<object, object, object>),
+                   Expression.Call(
+                       method,
+                       Expression.Convert(sourceParameter, type),
+                       instanceParameter),
+                   sourceParameter,
+                   instanceParameter);
+            var copierDelegate = (Func<object, object, object>)lambda.Compile();
+            ClonerInfoDictionary.TryAdd(type.TypeHandle, new ClonerInfo(clonerInstance, copierDelegate));
             SerializerDictionary.TryAdd(type.TypeHandle, serializer);
             DeserializerDictionary.TryAdd(type.TypeHandle, deserializer);
+        }
+
+        private class ClonerInfo
+        {
+            private readonly object instance;
+
+            private readonly Func<object, object, object> func;
+
+            internal ClonerInfo(object clonerInstance, Func<object, object, object> func)
+            {
+                this.instance = clonerInstance;
+                this.func = func;
+            }
+
+            public object Invoke(object source)
+            {
+                return this.func(source, this.instance);
+            }
         }
     }
 }

@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -171,6 +148,8 @@ namespace Orleans
                 {
                     UnobservedExceptionsHandlerClass.SetUnobservedExceptionHandler(UnhandledException);
                 }
+                AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
+
                 // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
                 SerializationManager.GetDeserializer(typeof(String));
 
@@ -191,7 +170,8 @@ namespace Orleans
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
                     BARS, config.DNSHostName, localAddress, clientId));
-                string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}'", BARS, RuntimeVersion.Current);
+                string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}", 
+                    BARS, RuntimeVersion.Current, PrintAppDomainDetails());
                 startMsg = string.Format("{0} Config= "  + Environment.NewLine + " {1}", startMsg, config);
                 logger.Info(ErrorCode.ClientStarting, startMsg);
 
@@ -777,6 +757,11 @@ namespace Orleans
             catch (Exception) { }
             try
             {
+                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
+            }
+            catch (Exception) { }
+            try
+            {
                 if (clientProviderRuntime != null)
                 {
                     clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
@@ -859,6 +844,25 @@ namespace Orleans
         }
 
         #endregion
+
+        private void CurrentDomain_DomainUnload(object sender, EventArgs e)
+        {
+            try
+            {
+                logger.Warn(ErrorCode.ProxyClient_AppDomain_Unload, 
+                    String.Format("Current AppDomain={0} is unloading.", PrintAppDomainDetails()));
+                TraceLogger.Flush();
+            }
+            catch(Exception)
+            {
+                // just ignore, make sure not to throw from here.
+            }
+        }
+        private string PrintAppDomainDetails()
+        {
+            return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
+        }
+
 
         private class LocalObjectData
         {

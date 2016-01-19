@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
@@ -13,8 +8,10 @@ namespace Orleans.Serialization
 {
     internal class OrleansJsonSerializer : IExternalSerializer
     {
-        public static JsonSerializerSettings settings;
+        private static JsonSerializerSettings settings;
         private TraceLogger logger;
+
+        internal static JsonSerializerSettings SerializerSettings { get { return settings; } }
 
         static OrleansJsonSerializer()
         {
@@ -34,6 +31,7 @@ namespace Orleans.Serialization
             settings.Converters.Add(new GrainIdConverter());
             settings.Converters.Add(new SiloAddressConverter());
             settings.Converters.Add(new UniqueKeyConverter());
+            settings.Converters.Add(new GuidJsonConverter());
         }
         
         /// <summary>
@@ -232,6 +230,94 @@ namespace Orleans.Serialization
             IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
             int port = jo["Port"].Value<int>();
             return new IPEndPoint(address, port);
+        }
+    }
+
+    /// <summary>
+    ///     JSON converter for <see cref="Guid"/>.
+    /// </summary>
+    class GuidJsonConverter : JsonConverter
+    {
+        /// <summary>
+        ///     Gets a value indicating whether this <see cref="T:Newtonsoft.Json.JsonConverter"/> can read JSON.
+        /// </summary>
+        /// <value><see langword="true"/> if this <see cref="T:Newtonsoft.Json.JsonConverter"/> can read JSON; otherwise, <see langword="false"/>.
+        /// </value>
+        public override bool CanRead { get { return true; } }
+
+        /// <summary>
+        ///     Gets a value indicating whether this <see cref="T:Newtonsoft.Json.JsonConverter"/> can write JSON.
+        /// </summary>
+        /// <value><see langword="true"/> if this <see cref="T:Newtonsoft.Json.JsonConverter"/> can write JSON; otherwise, <see langword="false"/>.
+        /// </value>
+        public override bool CanWrite { get { return true; } }
+
+        /// <summary>
+        /// Determines whether this instance can convert the specified object type.
+        /// </summary>
+        /// <param name="objectType">
+        /// Kind of the object.
+        /// </param>
+        /// <returns>
+        /// <see langword="true"/> if this instance can convert the specified object type; otherwise,
+        /// .
+        /// </returns>
+        public override bool CanConvert(Type objectType)
+        {
+            return objectType.IsAssignableFrom(typeof(Guid)) || objectType.IsAssignableFrom(typeof(Guid?));
+        }
+
+        /// <summary>
+        /// Writes the JSON representation of the object.
+        /// </summary>
+        /// <param name="writer">
+        /// The <see cref="T:Newtonsoft.Json.JsonWriter"/> to write to.
+        /// </param>
+        /// <param name="value">
+        /// The value.
+        /// </param>
+        /// <param name="serializer">
+        /// The calling serializer.
+        /// </param>
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            if (value == null)
+            {
+                writer.WriteValue(default(string));
+            }
+            else if (value is Guid)
+            {
+                var guid = (Guid)value;
+                writer.WriteValue(guid.ToString("N"));
+            }
+        }
+
+        /// <summary>
+        /// Reads the JSON representation of the object.
+        /// </summary>
+        /// <param name="reader">
+        /// The <see cref="T:Newtonsoft.Json.JsonReader"/> to read from.
+        /// </param>
+        /// <param name="objectType">
+        /// Kind of the object.
+        /// </param>
+        /// <param name="existingValue">
+        /// The existing value of object being read.
+        /// </param>
+        /// <param name="serializer">
+        /// The calling serializer.
+        /// </param>
+        /// <returns>
+        /// The object value.
+        /// </returns>
+        public override object ReadJson(
+            JsonReader reader,
+            Type objectType,
+            object existingValue,
+            JsonSerializer serializer)
+        {
+            var str = reader.Value as string;
+            return str != null ? Guid.Parse(str) : default(Guid);
         }
     }
 

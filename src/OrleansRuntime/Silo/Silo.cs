@@ -1,28 +1,6 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -138,9 +116,9 @@ namespace Orleans.Runtime
         public WaitHandle SiloTerminatedEvent { get { return siloTerminatedEvent; } } // one event for all types of termination (shutdown, stop and fast kill).
 
         /// <summary>
-        /// Test hookup connection for white-box testing of silo.
+        /// Test hook connection for white-box testing of silo.
         /// </summary>
-        public TestHookups TestHookup;
+        public TestHooks TestHook;
         
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
@@ -331,7 +309,7 @@ namespace Orleans.Runtime
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => TraceLogger.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
-            TestHookup = new TestHookups(this);
+            TestHook = new TestHooks(this);
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
@@ -538,11 +516,6 @@ namespace Orleans.Runtime
                     }
                 }
 
-                // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
-                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
-
                 bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
                     () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations),
@@ -552,6 +525,12 @@ namespace Orleans.Runtime
                 allSiloProviders.AddRange(BootstrapProviders);
 
                 if (logger.IsVerbose) { logger.Verbose("App bootstrap calls done successfully."); }
+
+                // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
+                // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
+                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 
                 // Now that we're active, we can start the gateway
                 var mc = messageCenter as MessageCenter;
@@ -827,7 +806,7 @@ namespace Orleans.Runtime
                     SystemStatus.Current = SystemStatus.Stopping;
                 }
 
-                if (!TestHookup.ExecuteFastKillInProcessExit) return;
+                if (!TestHook.ExecuteFastKillInProcessExit) return;
 
                 logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
                 FastKill();
@@ -839,9 +818,9 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Test hookup functions for white box testing.
+        /// Test hook functions for white box testing.
         /// </summary>
-        public class TestHookups : MarshalByRefObject
+        public class TestHooks : MarshalByRefObject
         {
             private readonly Silo silo;
             internal bool ExecuteFastKillInProcessExit;
@@ -878,7 +857,7 @@ namespace Orleans.Runtime
 
             internal Action<GrainId> Debug_OnDecideToCollectActivation { get; set; }
 
-            internal TestHookups(Silo s)
+            internal TestHooks(Silo s)
             {
                 silo = s;
                 ExecuteFastKillInProcessExit = true;
@@ -919,6 +898,37 @@ namespace Orleans.Runtime
             internal void SuppressFastKillInHandleProcessExit()
             {
                 ExecuteFastKillInProcessExit = false;
+            }
+
+            // store silos for which we simulate faulty communication
+            // number indicates how many percent of requests are lost
+            internal ConcurrentDictionary<IPEndPoint, double> SimulatedMessageLoss; 
+
+            internal void BlockSiloCommunication(IPEndPoint destination, double lost_percentage)
+            {
+                if (SimulatedMessageLoss == null)
+                    SimulatedMessageLoss = new ConcurrentDictionary<IPEndPoint, double>();
+
+                SimulatedMessageLoss[destination] = lost_percentage;
+            }
+
+            internal void UnblockSiloCommunication()
+            {
+                SimulatedMessageLoss = null;
+            }
+
+            SafeRandom random = new SafeRandom();
+
+            internal bool ShouldDrop(Message msg)
+            {
+                if (SimulatedMessageLoss != null)
+                {
+                    double blockedpercentage = 0.0;
+                    Silo.CurrentSilo.TestHook.SimulatedMessageLoss.TryGetValue(msg.TargetSilo.Endpoint, out blockedpercentage);
+                    return (random.NextDouble() * 100 < blockedpercentage);
+                }
+                else
+                    return false;
             }
 
             // this is only for white box testing - use RuntimeClient.Current.SendRequest instead

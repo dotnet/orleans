@@ -4,7 +4,8 @@ using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
 
 namespace Orleans.SqlUtils.StorageProvider.GrainClasses
 {
-    public class DeviceState : GrainState
+    [Serializable]
+    public class DeviceState
     {
         public ICustomerGrain Owner { get; set; }
         public string SerialNumber { get; set; }

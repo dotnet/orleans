@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <DiagnosticsConfiguration xmlns="http://schemas.microsoft.com/ServiceHosting/2010/10/DiagnosticsConfiguration">
-  <PublicConfig xmlns="http://schemas.microsoft.com/ServiceHosting/2010/10/DiagnosticsConfiguration">
+  <PublicConfig>
     <WadCfg>
       <DiagnosticMonitorConfiguration overallQuotaInMB="4096">
         <DiagnosticInfrastructureLogs scheduledTransferLogLevelFilter="Error" />
@@ -29,10 +29,12 @@
         <Logs scheduledTransferPeriod="PT1M" scheduledTransferLogLevelFilter="Error" />
       </DiagnosticMonitorConfiguration>
     </WadCfg>
-    <StorageAccount>MyStorageAccount</StorageAccount>
+    <!--<StorageAccount>MyStorageAccount</StorageAccount>-->
+    <StorageAccount></StorageAccount>
   </PublicConfig>
-  <PrivateConfig xmlns="http://schemas.microsoft.com/ServiceHosting/2010/10/DiagnosticsConfiguration">
-    <StorageAccount name="MyStorageAccount" endpoint="https://core.windows.net/" />
+  <PrivateConfig>
+    <!--<StorageAccount name="MyStorageAccount" endpoint="https://core.windows.net/" />-->
+    <StorageAccount name="" key="" endpoint="" />
   </PrivateConfig>
   <IsEnabled>true</IsEnabled>
 </DiagnosticsConfiguration>

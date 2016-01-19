@@ -16,11 +16,11 @@ namespace Orleans.SqlUtils.StorageProvider
         /// <summary>
         /// Grain state to write
         /// </summary>
-        public IDictionary<string, object> State { get; private set; }
+        public object State { get; private set; }
 
         internal TaskCompletionSource<int> CompletionSource { get; private set; }
 
-        internal WriteEntry(GrainIdentity grainIdentity, IDictionary<string, object> state, TaskCompletionSource<int> tcs)
+        internal WriteEntry(GrainIdentity grainIdentity, object state, TaskCompletionSource<int> tcs)
         {
             GrainIdentity = grainIdentity;
             State = state;

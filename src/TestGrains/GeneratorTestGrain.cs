@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Orleans;
-using TestGrainInterfaces;
+using UnitTests.GrainInterfaces;
 
-namespace TestGrains
+namespace UnitTests.Grains
 {
     public class GeneratorTestGrain : Grain, IGeneratorTestGrain
     {

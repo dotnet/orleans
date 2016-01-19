@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -181,6 +158,9 @@ namespace Orleans.Runtime
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
         }
 
+        // constructor used by serializator
+        private TraceLogger() {}
+
         /// <summary>
         /// Constructs a TraceLogger with the given name and type.
         /// </summary>
@@ -268,7 +248,7 @@ namespace Orleans.Runtime
                     catch (Exception exc)
                     {
                         Trace.Listeners.Add(new DefaultTraceListener());
-                        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", exc);
+                        Trace.TraceError("Error opening trace file {0} -- Using DefaultTraceListener instead -- Exception={1}", config.TraceFileName, exc);
                     }
                 }
 
@@ -293,7 +273,11 @@ namespace Orleans.Runtime
             {
                 Close();
                 LogConsumers = new ConcurrentBag<ILogConsumer>();
-                if (loggerStoreInternCache != null) loggerStoreInternCache.StopAndClear();
+                TelemetryConsumers = new ConcurrentBag<ITelemetryConsumer>();
+
+                if (loggerStoreInternCache != null) 
+                    loggerStoreInternCache.StopAndClear();
+                
                 BulkMessageInterval = defaultBulkMessageInterval;
                 BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
                 IsInitialized = false;

@@ -76,11 +76,11 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
             InstrumentationContext.Reset();
             const int count = 10000;
             var grainStateMap = CreateGrainStateMap();
-            var grains = new List<Tuple<GrainIdentity, IDictionary<string, object>>>();
+            var grains = new List<Tuple<GrainIdentity, object>>();
             for (int i = 0; i < count; ++i)
             {
                 var state = CreateState(i);
-                grains.Add(new Tuple<GrainIdentity, IDictionary<string, object>>(RandomIdentity(), state));
+                grains.Add(new Tuple<GrainIdentity, object>(RandomIdentity(), state));
             }
 
             using (var dataManager = new SqlDataManager(logger, grainStateMap, ConnectionString, ShardCredentials, ShardMapDefault))
@@ -107,11 +107,11 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
             InstrumentationContext.Reset();
             const int count = 10000;
             var grainStateMap = CreateGrainStateMap();
-            var grains = new List<Tuple<GrainIdentity, IDictionary<string, object>>>();
+            var grains = new List<Tuple<GrainIdentity, object>>();
             for (int i = 0; i < count; ++i)
             {
                 var state = CreateState(i);
-                grains.Add(new Tuple<GrainIdentity, IDictionary<string, object>>(RandomIdentity(), state));
+                grains.Add(new Tuple<GrainIdentity, object>(RandomIdentity(), state));
             }
 
             using (var dataManager = new SqlDataManager(logger, grainStateMap, ConnectionString, ShardCredentials, ShardMapDefault))
@@ -177,10 +177,7 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                     var state2 = await dataManager.ReadStateAsync(grainIdentity);
                     stopwatch.Stop();
                     Console.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
-
-                    Assert.AreEqual(state.Count, state2.Count);
-                    foreach (var kv in state)
-                        Assert.AreEqual(state[kv.Key], state2[kv.Key]);
+                    Assert.AreEqual(state, state2);
                 }
             }).Wait();
         }
@@ -229,7 +226,7 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
             };
         }
 
-        private Dictionary<string, object> CreateState(int iter =-1)
+        private object CreateState(int iter =-1)
         {
             var dt = DateTime.Now;
             var now = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second);

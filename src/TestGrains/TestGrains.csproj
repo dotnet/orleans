@@ -10,10 +10,8 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>UnitTests.Grains</RootNamespace>
     <AssemblyName>TestGrains</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SignAssembly>false</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
   </PropertyGroup>
@@ -51,9 +49,18 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AsyncSimpleGrain.cs" />
+    <Compile Include="CatalogTestGrain.cs" />
+    <Compile Include="ChainedGrain.cs" />
     <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
+    <Compile Include="ConcurrentGrain.cs" />
+    <Compile Include="ConsumerEventCountingGrain.cs" />
+    <Compile Include="DeadlockGrain.cs" />
+    <Compile Include="DerivedServiceType.cs" />
+    <Compile Include="EnumResultGrain.cs" />
     <Compile Include="ExceptionGrain.cs" />
+    <Compile Include="ExternalTypeGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="EventSourcing\PersonState.cs" />
     <Compile Include="GeneratedEventCollectorGrain.cs" />
@@ -64,12 +71,22 @@
     <Compile Include="GeneratorTestDerivedGrain2.cs" />
     <Compile Include="GeneratorTestGrain.cs" />
     <Compile Include="GenericGrains.cs" />
+    <Compile Include="GetGrainGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
+    <Compile Include="KeyExtensionTestGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
     <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
     <Compile Include="MyObserverSubscriptionManager.cs" />
+    <Compile Include="PolymorphicTestGrain.cs" />
+    <Compile Include="ProducerEventCountingGrain.cs" />
+    <Compile Include="PromiseForwardGrain.cs" />
+    <Compile Include="ProxyGrain.cs" />
+    <Compile Include="ReentrantGrain.cs" />
+    <Compile Include="ReminderTestGrain.cs" />
+    <Compile Include="RequestContextTestGrain.cs" />
     <Compile Include="SerializationGenerationGrain.cs" />
+    <Compile Include="ServiceType.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
@@ -92,7 +109,7 @@
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="LivenessTestGrain.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
-    <Compile Include="StreamLifecycleTestGrains.cs" />
+    <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansEventSourcing\OrleansEventSourcing.csproj">

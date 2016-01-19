@@ -6,7 +6,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class Initialized_State : GrainState
+    [Serializable]
+    public class Initialized_State
     {
         public List<string> Names { get; set; }
         public Initialized_State()
@@ -14,11 +15,18 @@ namespace UnitTests.Grains
             Names = new List<string>();
         }
     }
+
     public class InitialStateGrain : Grain<Initialized_State>, IInitialStateGrain
     {
         public Task<List<string>> GetNames()
         {
             return Task.FromResult(State.Names);
+        }
+
+        public Task AddName(string name)
+        {
+            State.Names.Add(name);
+            return WriteStateAsync();
         }
     }
 }

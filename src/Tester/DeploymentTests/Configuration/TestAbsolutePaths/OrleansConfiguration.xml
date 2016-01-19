@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <!--Orleans Test Configuration for Absolute Paths-->
+  <Deployment>
+    <Silo Name="Primary" HostName="localhost" />
+  </Deployment>
+  <Globals>
+    <Persistence Type="None" Path=".\OrleansData" />
+    <SeedNode Address="localhost" Port="10010" Subnet="127"/>
+    <Tasks Disabled="false"/>
+  </Globals>
+  <Defaults>
+    <Networking Address="" Port="0" Subnet="127"/>
+    <Scheduler MaxActiveThreads="10" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" WriteMessagingTraces="false"/>
+  </Defaults>
+  <Override Node="Primary">
+    <Networking Port="10010" />
+  </Override>
+</OrleansConfiguration>

@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -33,7 +10,8 @@ using Orleans.CodeGeneration;
 
 namespace UnitTests.Grains
 {
-    public class SimpleGenericGrainState<T> : GrainState
+    [Serializable]
+    public class SimpleGenericGrainState<T>
     {
         public T A { get; set; }
         public T B { get; set; }
@@ -72,7 +50,40 @@ namespace UnitTests.Grains
         }
     }
 
-    public class SimpleGenericGrainUState<U> : GrainState
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class SimpleGenericGrainUsingAzureTableStorage<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrainUsingAzureTableStorage<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
+        }
+    }
+
+    [StorageProvider(ProviderName = "AzureStore")]
+    public class TinyNameGrain<T> : Grain<SimpleGenericGrainState<T>>, ITinyNameGrain<T>
+    {
+        public async Task<T> EchoAsync(T entity)
+        {
+            State.A = entity;
+            await WriteStateAsync();
+            return entity;
+        }
+
+        public async Task ClearState()
+        {
+            await ClearStateAsync();
+        }
+    }
+
+    [Serializable]
+    public class SimpleGenericGrainUState<U>
     {
         public U A { get; set; }
         public U B { get; set; }
@@ -111,7 +122,8 @@ namespace UnitTests.Grains
         }
     }
 
-    public class SimpleGenericGrain2State<T, U> : GrainState
+    [Serializable]
+    public class SimpleGenericGrain2State<T, U>
     {
         public T A { get; set; }
         public U B { get; set; }
@@ -166,7 +178,9 @@ namespace UnitTests.Grains
             return Task.FromResult(retValue);
         }
     }
-    public class IGrainWithListFieldsState : GrainState
+
+    [Serializable]
+    public class IGrainWithListFieldsState
     {
         public IList<string> Items { get; set; }
     }
@@ -193,7 +207,8 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericGrainWithListFieldsState<T> : GrainState
+    [Serializable]
+    public class GenericGrainWithListFieldsState<T>
     {
         public IList<T> Items { get; set; }
     }
@@ -221,24 +236,28 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericReaderWriterState<T> : GrainState
+    [Serializable]
+    public class GenericReaderWriterState<T>
     {
         public T Value { get; set; }
     }
-    
 
-    public class GenericReader2State<TOne, TTwo> : GrainState
-    {
-        public TOne Value1 { get; set; }
-        public TTwo Value2 { get; set; }
-    }
-    public class GenericReaderWriterGrain2State<TOne, TTwo> : GrainState
+    [Serializable]
+    public class GenericReader2State<TOne, TTwo>
     {
         public TOne Value1 { get; set; }
         public TTwo Value2 { get; set; }
     }
 
-    public class GenericReader3State<TOne, TTwo, TThree> : GrainState
+    [Serializable]
+    public class GenericReaderWriterGrain2State<TOne, TTwo>
+    {
+        public TOne Value1 { get; set; }
+        public TTwo Value2 { get; set; }
+    }
+
+    [Serializable]
+    public class GenericReader3State<TOne, TTwo, TThree>
     {
         public TOne Value1 { get; set; }
         public TTwo Value2 { get; set; }
@@ -321,7 +340,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericSelfManagedGrain<T, U> : Grain, IGenericSelfManagedGrain<T, U>
+    public class BasicGenericGrain<T, U> : Grain, IBasicGenericGrain<T, U>
     {
         private T _a;
         private U _b;
@@ -575,6 +594,33 @@ namespace UnitTests.Grains
         public Task<string> GetRuntimeInstanceId()
         {
             return Task.FromResult(RuntimeIdentity);
+        }
+    }
+
+    public class GenericGrainWithContraints<A, B, C>: Grain, IGenericGrainWithConstraints<A, B, C>
+        where A : ICollection<B>, new()
+        where B : struct
+        where C : class
+    {
+        private A collection;
+
+        public override Task OnActivateAsync()
+        {
+            collection = new A();
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetCount() { return Task.FromResult(collection.Count); }
+
+        public Task Add(B item)
+        {
+            collection.Add(item);
+            return TaskDone.Done;
+        }
+
+        public Task<C> RoundTrip(C value)
+        {
+            return Task.FromResult(value);
         }
     }
 }

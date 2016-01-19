@@ -5,7 +5,7 @@
 -->
 <ClientConfiguration xmlns="urn:orleans">
   <GatewayProvider ProviderType="Config"/>
-  <Gateway Address="localhost" Port="30000"/>
+  <Gateway Address="localhost" Port="40000"/>
   <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true"/>
   <Tracing DefaultTraceLevel="Warning" TraceToConsole="true" TraceToFile="{0}-{1}.log">
     <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />

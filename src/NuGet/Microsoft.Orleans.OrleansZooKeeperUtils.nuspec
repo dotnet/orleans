@@ -20,13 +20,12 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-      <dependency id="Newtonsoft.Json" version="5.0.8" />
-	  <dependency id="ZooKeeperNetEx" version="3.4.6.1006" />
+	  <dependency id="ZooKeeperNetEx" version="3.4.6.1009" />
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansZooKeeperUtils.dll" target="lib\net45" />
-    <file src="OrleansZooKeeperUtils.pdb" target="lib\net45" />
+    <file src="OrleansZooKeeperUtils.dll" target="lib\net451" />
+    <file src="OrleansZooKeeperUtils.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansZooKeeperUtils\**\*.cs" target="src" />
   </files>
 </package>

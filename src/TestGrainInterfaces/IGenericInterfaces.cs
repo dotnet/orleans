@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -41,6 +18,28 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetAxB(T a, T b);
         Task SetA(T a);
         Task SetB(T b);
+    }
+
+    /// <summary>
+    /// Long named grain type, which can cause issues in AzureTableStorage
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    public interface ISimpleGenericGrainUsingAzureTableStorage<T> : IGrainWithGuidKey
+    {
+        Task<T> EchoAsync(T entity);
+
+        Task ClearState();
+    }
+
+    /// <summary>
+    /// Short named grain type, which shouldn't cause issues in AzureTableStorage
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    public interface ITinyNameGrain<T> : IGrainWithGuidKey
+    {
+        Task<T> EchoAsync(T entity);
+
+        Task ClearState();
     }
 
     public interface ISimpleGenericGrainU<U> : IGrainWithIntegerKey
@@ -119,7 +118,7 @@ namespace UnitTests.GrainInterfaces
     {
     }
 
-    public interface IGenericSelfManagedGrain<T, U> : IGrainWithIntegerKey
+    public interface IBasicGenericGrain<T, U> : IGrainWithIntegerKey
     {
         Task<T> GetA();
         Task<string> GetAxB();
@@ -187,5 +186,15 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetRuntimeInstanceId();
         Task<T> LongRunningTask(T t, TimeSpan delay);
         Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
+    }
+
+    public interface IGenericGrainWithConstraints<A, B, C> : IGrainWithStringKey
+        where A : ICollection<B>, new() where B : struct where C : class
+    {
+        Task<int> GetCount();
+
+        Task Add(B item);
+
+        Task<C> RoundTrip(C value);
     }
 }

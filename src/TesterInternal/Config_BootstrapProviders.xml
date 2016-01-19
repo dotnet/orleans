@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <BootstrapProviders>
+      <Provider Type="UnitTests.General.MockBootstrapProvider" Name="bootstrap1" />
+      <Provider Type="UnitTests.General.GrainCallBootstrapper" Name="bootstrap2" />
+      <Provider Type="UnitTests.General.LocalGrainInitBootstrapper" Name="bootstrap3" />
+    </BootstrapProviders>
+    <SeedNode Address="localhost" Port="22222" />
+  </Globals>
+  <Defaults>
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false" WriteMessagingTraces="false">
+      <!--
+      <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
+      <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose2" />
+      <TraceLevelOverride LogPrefix="Runtime.Message" TraceLevel="Verbose" />
+      <TraceLevelOverride LogPrefix="Runtime.Catalog" TraceLevel="Verbose" />
+      -->
+    </Tracing>
+  </Defaults>
+  <Override Node="Primary">
+    <Networking Port="22222" />
+    <ProxyingGateway Address="localhost" Port="40000" />
+  </Override>
+  <Override Node="Secondary_1">
+    <Networking Port="22223" />
+    <ProxyingGateway Address="localhost" Port="40001" />
+  </Override>
+</OrleansConfiguration>

@@ -1,34 +1,14 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Net;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Runtime;
@@ -38,8 +18,6 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
-    using System.Diagnostics.CodeAnalysis;
-    using System.Reflection.Emit;
 
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
@@ -90,17 +68,19 @@ namespace Orleans.Serialization
 
         #region Privates
 
-        private static readonly HashSet<Type> registeredTypes;
-        private static readonly List<IExternalSerializer> externalSerializers;
-        private static readonly ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
-        private static readonly Dictionary<string, Type> types;
-        private static readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
-        private static readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
-        private static readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
-
+        private static HashSet<Type> registeredTypes;
+        private static List<IExternalSerializer> externalSerializers;
+        private static ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
+        private static Dictionary<string, Type> types;
+        private static Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
+        private static Dictionary<RuntimeTypeHandle, Serializer> serializers;
+        private static Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
+        private static ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private static IExternalSerializer fallbackSerializer;
-        private static readonly TraceLogger logger;
+        private static TraceLogger logger;
+        private static bool IsBuiltInSerializersRegistered;
+        private static readonly object registerBuiltInSerializerLockObj = new object();
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
 
         // Semi-constants: type handles for simple types
@@ -147,6 +127,7 @@ namespace Orleans.Serialization
 
         public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, bool useJsonFallbackSerializer = false)
         {
+            RegisterBuiltInSerializers();
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             AssemblyProcessor.Initialize();
             RegisterSerializationProviders(serializationProviders);
@@ -155,6 +136,7 @@ namespace Orleans.Serialization
 
         internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
         {
+            RegisterBuiltInSerializers();
             UseStandardSerializer = useStandardSerializer;
 
 #if DNXCORE50
@@ -204,10 +186,19 @@ namespace Orleans.Serialization
             RegisterSerializationProviders(serializationProviders);
         }
 
-        static SerializationManager()
+        internal static void RegisterBuiltInSerializers()
         {
-            AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
+            lock (registerBuiltInSerializerLockObj)
+            {
+                if (IsBuiltInSerializersRegistered)
+        {
+                    return;
+                }
 
+                IsBuiltInSerializersRegistered = true;
+            }
+
+            AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
             registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
             typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
@@ -215,6 +206,7 @@ namespace Orleans.Serialization
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
+            grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
             logger = TraceLogger.GetLogger("SerializationManager", TraceLogger.LoggerType.Runtime);
             UseStandardSerializer = false; // Default
 
@@ -748,13 +740,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            // TODO: Optimize grain creation, eg using expression trees or IL.
-            var nonGenericConstructor =
-                type.GetConstructor(
-                    BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
-                    null,
-                    new[] { typeof(GrainReference) },
-                    null);
+            var defaultCtorDelegate = CreateGrainRefConstructorDelegate(type, null);
 
             // Register GrainReference serialization methods.
             Register(
@@ -763,26 +749,51 @@ namespace Orleans.Serialization
                 GrainReference.SerializeGrainReference,
                 (expected, stream) =>
                 {
-                    ConstructorInfo constructor;
-                    if (expected.IsConstructedGenericType)
+                    Func<GrainReference, GrainReference> ctorDelegate;
+                    var deserialized = (GrainReference)GrainReference.DeserializeGrainReference(expected, stream);
+                    if (expected.IsConstructedGenericType == false)
                     {
-                        var referenceType = type.MakeGenericType(expected.GenericTypeArguments);
-                        constructor =
-                            referenceType.GetConstructor(
+                        return defaultCtorDelegate(deserialized);
+                    }
+
+                    if (!grainRefConstructorDictionary.TryGetValue(expected, out ctorDelegate))
+                    {
+                        ctorDelegate = CreateGrainRefConstructorDelegate(type, expected.GenericTypeArguments);
+                        grainRefConstructorDictionary.TryAdd(expected, ctorDelegate);
+                    }
+
+                    return ctorDelegate(deserialized);
+                });
+        }
+
+        private static Func<GrainReference, GrainReference> CreateGrainRefConstructorDelegate(Type type, Type[] genericArgs)
+                    {
+            if (type.IsGenericType)
+            {
+                if (type.IsConstructedGenericType == false && genericArgs == null)
+                {
+                    return null;
+                }
+
+                type = type.MakeGenericType(genericArgs);
+            }
+
+            var constructor =
+                type.GetConstructor(
                                 BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
                                 null,
                                 new[] { typeof(GrainReference) },
                                 null);
-                    }
-                    else
-                    {
-                        constructor = nonGenericConstructor;
+
+            var ctorParam = Expression.Parameter(typeof(GrainReference), "grainRef");
+            var lambda = Expression.Lambda(
+                typeof(Func<,>).MakeGenericType(typeof(GrainReference), type),
+                Expression.New(constructor, ctorParam),
+                true,
+                ctorParam);
+            return (Func<GrainReference, GrainReference>)lambda.Compile();
                     }
 
-                    var deserialized = (IAddressable)GrainReference.DeserializeGrainReference(expected, stream);
-                    return (IAddressable)constructor.Invoke(new object[] { deserialized });
-                });
-        }
 
         private static SerializerMethods RegisterConcreteSerializer(Type concreteType, Type genericSerializerType)
         {
@@ -791,6 +802,21 @@ namespace Orleans.Serialization
             MethodInfo deserializer;
 
             var concreteSerializerType = genericSerializerType.MakeGenericType(concreteType.GetGenericArguments());
+            var typeAlreadyRegistered = false;
+            
+            lock (registeredTypes)
+            {
+                typeAlreadyRegistered = registeredTypes.Contains(concreteSerializerType);
+            }
+            
+            if (typeAlreadyRegistered)
+            {
+                return new SerializerMethods(
+                    GetCopier(concreteSerializerType),
+                    GetSerializer(concreteSerializerType),
+                    GetDeserializer(concreteSerializerType));
+            }
+
             GetSerializationMethods(concreteSerializerType, out copier, out serializer, out deserializer);
             var concreteCopier = (DeepCopier)copier.CreateDelegate(typeof(DeepCopier));
             var concreteSerializer = (Serializer)serializer.CreateDelegate(typeof(Serializer));

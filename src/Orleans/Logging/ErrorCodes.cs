@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿// ReSharper disable InconsistentNaming
+// ReSharper disable InconsistentNaming
 namespace Orleans
 {
     /// <summary>
@@ -672,6 +649,7 @@ namespace Orleans
         ProxyClient_ClientInvokeCallback_Error      = ProxyClientBase + 28,
         ProxyClient_StartDone                       = ProxyClientBase + 29,
         ProxyClient_OGC_TargetNotFound_2            = ProxyClientBase + 30,
+        ProxyClient_AppDomain_Unload                = ProxyClientBase + 31,
 
         MessagingBase                           = Runtime + 1000,
         Messaging_IMA_DroppingConnection        = MessagingBase + 1,
@@ -707,6 +685,7 @@ namespace Orleans
         Messaging_Dispatcher_TryForward         = MessagingBase + 31,
         Messaging_Dispatcher_TryForwardFailed   = MessagingBase + 32,
         Messaging_Dispatcher_ForwardingRequests = MessagingBase + 33,
+        Messaging_SimulatedMessageLoss          = MessagingBase + 34,
 
         DirectoryBase                           = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,
@@ -1000,6 +979,7 @@ namespace Orleans
         AzureQueue_12 = AzureQueueBase + 12,
         AzureQueue_13 = AzureQueueBase + 13,
         AzureQueue_14 = AzureQueueBase + 14,
+        AzureQueue_15 = AzureQueueBase + 15,
 
         PersistentStreamPullingAgentBase = Runtime + 3300,
         PersistentStreamPullingAgent_01 = PersistentStreamPullingAgentBase + 1,
@@ -1028,6 +1008,7 @@ namespace Orleans
         PersistentStreamPullingAgent_24 = PersistentStreamPullingAgentBase + 24,
         PersistentStreamPullingAgent_25 = PersistentStreamPullingAgentBase + 25,
         PersistentStreamPullingAgent_26 = PersistentStreamPullingAgentBase + 26,
+        PersistentStreamPullingAgent_27 = PersistentStreamPullingAgentBase + 27,
 
         StreamProviderManagerBase = Runtime +3400,
         StreamProvider_FailedToDispose              = StreamProviderManagerBase + 1,

@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using UnitTests.General;
 using UnitTests.StorageTests;
 
@@ -48,7 +25,6 @@ namespace UnitTests.RemindersTest
         public TestContext TestContext { get; set; }
 
         private string deploymentId;
-        private SiloAddress siloAddress;
         private static string connectionString;
         private const string testDatabaseName = "OrleansTest";
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
@@ -56,7 +32,6 @@ namespace UnitTests.RemindersTest
         private readonly TraceLogger logger = TraceLogger.GetLogger("MySqlRemindersTableTests",
             TraceLogger.LoggerType.Application);
 
-        private Guid serviceId;
         private SqlReminderTable reminder;
 
         // Use ClassInitialize to run code before running the first test in the class
@@ -74,10 +49,8 @@ namespace UnitTests.RemindersTest
 
         private async Task Initialize()
         {
-            serviceId = Guid.NewGuid();
             deploymentId = "test-" + Guid.NewGuid();
             int generation = SiloAddress.AllocateNewGeneration();
-            siloAddress = SiloAddress.NewLocalAddress(generation);
 
             logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
 
@@ -124,10 +97,10 @@ namespace UnitTests.RemindersTest
 
 
         [TestMethod, TestCategory("Reminders"), TestCategory("MySql")]
-        public async Task RemindersTable_MySql_UpsertReminderTwice()
+        public async Task RemindersTable_MySql_UpsertReminderParallel()
         {
             await Initialize();
-            await ReminderTablePluginTests.ReminderTableUpsertTwice(reminder);
+            await ReminderTablePluginTests.ReminderTableUpsertParallel(reminder);
         }
     }
 }

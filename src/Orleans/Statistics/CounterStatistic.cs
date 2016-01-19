@@ -1,27 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -54,15 +32,22 @@ namespace Orleans.Runtime
 
     internal class CounterStatistic : ICounter<long>
     {
+        private class ReferenceLong
+        {
+            internal long Value;
+        }
+
+        private const int BUFFER_SIZE = 100;
+
         [ThreadStatic]
-        private static List<long> perOrleansThreadCounters;
+        private static List<ReferenceLong> allStatisticsFromSpecificThread;
         [ThreadStatic]
         private static bool isOrleansManagedThread;
 
         private static readonly Dictionary<string, CounterStatistic> registeredStatistics;
         private static readonly object lockable;
         private static int nextId;
-        private static readonly HashSet<List<long>> allThreadCounters;
+        private readonly ConcurrentStack<ReferenceLong> specificStatisticFromAllThreads;
         
         private readonly int id;
         private long last;
@@ -77,8 +62,7 @@ namespace Orleans.Runtime
 
         static CounterStatistic()
         {
-            registeredStatistics = new Dictionary<string, CounterStatistic>();
-            allThreadCounters = new HashSet<List<long>>();
+            registeredStatistics = new Dictionary<string, CounterStatistic>();           
             nextId = 0;
             lockable = new object();
         }
@@ -95,6 +79,7 @@ namespace Orleans.Runtime
             valueConverter = null;
             nonOrleansThreadsCounter = 0;
             this.isHidden = isHidden;
+            specificStatisticFromAllThreads = new ConcurrentStack<ReferenceLong>();
         }
 
         internal static void SetOrleansManagedThread()
@@ -104,8 +89,7 @@ namespace Orleans.Runtime
                 lock (lockable)
                 {
                     isOrleansManagedThread = true;
-                    perOrleansThreadCounters = new List<long>();
-                    allThreadCounters.Add(perOrleansThreadCounters);
+                    allStatisticsFromSpecificThread = new List<ReferenceLong>(new ReferenceLong[BUFFER_SIZE]);                    
                 }
             }
         }
@@ -179,11 +163,23 @@ namespace Orleans.Runtime
         {
             if (isOrleansManagedThread)
             {
-                while (perOrleansThreadCounters.Count <= id)
+                if (allStatisticsFromSpecificThread.Count <= id)
                 {
-                    perOrleansThreadCounters.Add(0);
+                    var bufferSize = Math.Max(id - allStatisticsFromSpecificThread.Count, BUFFER_SIZE);
+
+                    allStatisticsFromSpecificThread.AddRange(new ReferenceLong[bufferSize+1]);
                 }
-                perOrleansThreadCounters[id] = perOrleansThreadCounters[id] + n;
+
+                var orleansValue = allStatisticsFromSpecificThread[id];
+
+                if (orleansValue == null)
+                {
+                    orleansValue = new ReferenceLong();
+                    allStatisticsFromSpecificThread[id] = orleansValue;
+                    specificStatisticFromAllThreads.Push(orleansValue);
+                }
+
+                orleansValue.Value += n;
             }
             else
             {
@@ -203,21 +199,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns></returns>
         public long GetCurrentValue()
-        {
-            List<List<long>> lists;
-            lock (lockable)
-            {
-                lists = allThreadCounters.ToList();
-            }
-            // Where(list => list.Count > id) takes only list from threads that actualy have value for this counter. 
-            // The whole way we store counters is very ineffecient and better be re-written.
-            long val = Interlocked.Read(ref nonOrleansThreadsCounter);
-            foreach(var list in lists.Where(list => list.Count > id))
-            {
-                val += list[id];
-            }
-            return val;
-            // return lists.Where(list => list.Count > id).Aggregate<List<long>, long>(0, (current, list) => current + list[id]) + nonOrleansThreadsCounter;
+        {            
+            long val = specificStatisticFromAllThreads.Sum(a => a.Value);         
+            return val + Interlocked.Read(ref nonOrleansThreadsCounter);            
         }
 
 

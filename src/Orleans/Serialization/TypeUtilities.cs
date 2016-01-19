@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -225,9 +202,9 @@ namespace Orleans.Serialization
             }
         }
 
-        public static bool IsTypeIsInaccessibleForSerialization(Type t, Module fromModule, Assembly fromAssembly)
+        public static bool IsTypeIsInaccessibleForSerialization(Type type, Module fromModule, Assembly fromAssembly)
         {
-            var typeInfo = t.GetTypeInfo();
+            var typeInfo = type.GetTypeInfo();
 
             if (!typeInfo.IsVisible && typeInfo.IsConstructedGenericType)
             {
@@ -238,11 +215,11 @@ namespace Orleans.Serialization
                         return true;
                     }
                 }
-                
-                return IsTypeIsInaccessibleForSerialization(
-                    typeInfo.GetGenericTypeDefinition(),
-                    fromModule,
-                    fromAssembly);
+
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetGenericTypeDefinition(), fromModule, fromAssembly))
+                {
+                    return true;
+                }
             }
 
             if ((typeInfo.IsNotPublic || !typeInfo.IsVisible) && !AreInternalsVisibleTo(typeInfo.Assembly, fromAssembly))
@@ -260,14 +237,25 @@ namespace Orleans.Serialization
                 }
             }
 
+            // For arrays, check the element type.
             if (typeInfo.IsArray)
             {
-                return IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly);
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly))
+                {
+                    return true;
+                }
             }
 
-            var result = typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily;
-            
-            return result;
+            // For nested types, check that the declaring type is accessible.
+            if (typeInfo.IsNested)
+            {
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.DeclaringType, fromModule, fromAssembly))
+                {
+                    return true;
+                }
+            }
+
+            return typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
         }
 
         /// <summary>
@@ -289,12 +277,7 @@ namespace Orleans.Serialization
             // Check InternalsVisibleTo attributes on the from-assembly, pointing to the to-assembly.
             var serializationAssemblyName = toAssembly.GetName().FullName;
             var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
-            if (internalsVisibleTo.All(_ => _.AssemblyName != serializationAssemblyName))
-            {
-                return true;
-            }
-
-            return false;
+            return internalsVisibleTo.Any(_ => _.AssemblyName == serializationAssemblyName);
         }
     }
 }

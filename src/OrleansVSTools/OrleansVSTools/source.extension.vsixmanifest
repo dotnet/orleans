@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.0.10" Language="en-US" Publisher="Microsoft" />
+    <Identity Id="462db41f-31a4-48f0-834c-1bdcc0578511" Version="1.1.0" Language="en-US" Publisher="Microsoft" />
     <DisplayName>Microsoft Orleans Tools for Visual Studio</DisplayName>
     <Description xml:space="preserve">Microsoft Orleans Tools for Visual Studio 2012, 2013, 2015
 C#, VB, F#  Project templates and item templates
-</Description>
+    </Description>
     <MoreInfo>htts://github.com/dotnet/orleans/</MoreInfo>
     <License>License.txt</License>
     <Icon>Orleans-nuget.png</Icon>
@@ -19,22 +19,19 @@ C#, VB, F#  Project templates and item templates
     <InstallationTarget Version="[14.0,15.0)" Id="Microsoft.VisualStudio.Enterprise" />
     <InstallationTarget Version="[14.0,15.0)" Id="Microsoft.VisualStudio.Community" />
   </Installation>
+  <Reference Id="NuPackToolsVsix.Microsoft.67e54e40-0ae3-42c5-a949-fddf5739e7a5" MinVersion="1.7.30402.9028">
+    <Name>NuGet Package Manager</Name>
+    <MoreInfoUrl>http://docs.nuget.org/</MoreInfoUrl>
+  </Reference>
   <Dependencies>
-    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5,)" />
-    <Dependency Id="Microsoft.VisualStudio.MPF.11.0" DisplayName="Visual Studio MPF 11.0" d:Source="Installed" Version="11.0" />
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5.1,)" />
   </Dependencies>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementation" d:TargetPath="|VSProjectTemplateGrainImplementation;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterface" d:TargetPath="|VSProjectTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
     <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterface" d:TargetPath="|VSItemTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
     <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainImplementation" d:TargetPath="|VSItemTemplateGrainImplementation;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainImplementationVB" d:TargetPath="|VSItemTemplateGrainImplementationVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementationVB" d:TargetPath="|VSProjectTemplateGrainImplementationVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
     <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplatePersistedGrain" d:TargetPath="|VSItemTemplatePersistedGrain;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplatePersistedGrainVB" d:TargetPath="|VSItemTemplatePersistedGrainVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
     <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectSiloHost" d:TargetPath="|VSProjectSiloHost;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceVB" d:TargetPath="|VSItemTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-    <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementationFSharp" d:TargetPath="|VSProjectTemplateGrainImplementationFSharp;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
   </Assets>
 </PackageManifest>

@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <StatisticsProviders>
+      <Provider Type="UnitTests.Stats.MockStatsSiloCollector" Name="MockStats" />
+    </StatisticsProviders>
+    <Liveness LivenessType ="MembershipTableGrain"/>
+    <ReminderService ReminderServiceType ="ReminderTableGrain"/>
+  </Globals>
+  <Defaults>
+    <Networking Address="localhost" Port="22222" />
+    <ProxyingGateway Address="localhost" Port="40000" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log">
+      <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+      <TraceLevelOverride LogPrefix="SiloLogStatistics" TraceLevel="Warning" />
+    </Tracing>
+    <Statistics MetricsTableWriteInterval="1s" LogWriteInterval="1s" WriteLogStatisticsToTable="true" />
+  </Defaults>
+</OrleansConfiguration>
