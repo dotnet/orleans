@@ -4,7 +4,7 @@ title: Frequently Asked Questions
 ---
 {% include JB/setup %}
 
-These questions pertain to Project "Orleans," not the samples project on CodePlex.
+
 
 ## Does Microsoft support Orleans?
 
