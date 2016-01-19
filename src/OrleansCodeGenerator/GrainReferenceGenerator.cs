@@ -98,6 +98,7 @@ namespace Orleans.CodeGenerator
                     .AddBaseListTypes(
                         SF.SimpleBaseType(typeof(GrainReference).GetTypeSyntax()),
                         SF.SimpleBaseType(grainType.GetTypeSyntax()))
+                    .AddConstraintClauses(grainType.GetTypeConstraintSyntax())
                     .AddMembers(GenerateConstructors(className))
                     .AddMembers(
                         GenerateInterfaceIdProperty(grainType),

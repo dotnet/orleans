@@ -45,6 +45,7 @@ namespace UnitTests.GrainInterfaces
 
     public interface ISerializationGenerationGrain : IGrainWithIntegerKey
     {
+        Task<object> RoundTripObject(object input);
         Task<SomeStruct> RoundTripStruct(SomeStruct input);
         Task<SomeAbstractClass> RoundTripClass(SomeAbstractClass input);
         Task<ISomeInterface> RoundTripInterface(ISomeInterface input);
@@ -137,11 +138,33 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public abstract class SomeAbstractClass : ISomeInterface
     {
+        [NonSerialized]
+        private int nonSerializedIntField;
+
         public abstract int Int { get; set; }
 
         public List<ISomeInterface> Interfaces { get; set; }
 
         public List<SomeAbstractClass> Classes { get; set; }
+
+        [Obsolete("This field should not be serialized", true)]
+        public int ObsoleteIntWithError { get; set; }
+
+        [Obsolete("This field should be serialized")]
+        public int ObsoleteInt { get; set; }
+
+        public int NonSerializedInt
+        {
+            get
+            {
+                return this.nonSerializedIntField;
+            }
+
+            set
+            {
+                this.nonSerializedIntField = value;
+            }
+        }
 
         [Serializable]
         public enum SomeEnum
@@ -198,5 +221,12 @@ namespace UnitTests.GrainInterfaces
         {
             return base.GetHashCode();
         }
+    }
+
+    [Serializable]
+    public class ClassWithStructConstraint<T>
+        where T : struct
+    {
+        public T Value { get; set; }
     }
 }

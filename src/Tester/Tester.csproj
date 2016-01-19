@@ -96,7 +96,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>$(SolutionDir)packages\WindowsAzure.Storage.5.0.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\WindowsAzure.Storage.5.0.2\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
@@ -116,12 +116,14 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="BasicActivationTests.cs" />
     <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
     <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
     <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="ConfigurationTests\SerializationProviderTests.cs" />
+    <Compile Include="ReminderTest.cs" />
     <Compile Include="DeactivationTests.cs" />
     <Compile Include="JsonFallbackSerializationTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
