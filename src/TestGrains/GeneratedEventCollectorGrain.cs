@@ -4,15 +4,14 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
+using UnitTests.Grains;
 
 namespace TestGrains
 {
     [ImplicitStreamSubscription(StreamNamespace)]
     public class GeneratedEventCollectorGrain : Grain, IGeneratedEventCollectorGrain
     {
-        public static Guid ReporterId = new Guid("f83247af-c14d-422c-8141-74d7a79717dc");
         public const string StreamNamespace = "Generated";
-        public const string StreamProviderName = "GeneratedStreamProvider";
 
         private Logger logger;
         private IAsyncStream<GeneratedEvent> stream;
@@ -23,7 +22,7 @@ namespace TestGrains
             logger = base.GetLogger("GeneratedEvenCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
-            var streamProvider = GetStreamProvider(StreamProviderName);
+            var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);
 
             await stream.SubscribeAsync(
@@ -35,8 +34,8 @@ namespace TestGrains
                     {
                         return TaskDone.Done;
                     }
-                    var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(ReporterId);
-                    return reporter.ReportResult(this.GetPrimaryKey(), StreamProviderName, StreamNamespace, counter);
+                    var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+                    return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, counter);
                 });
         }
     }
