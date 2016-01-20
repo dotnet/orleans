@@ -4,14 +4,14 @@ title: Silos
 ---
 {% include JB/setup %}
 
-An Orleans silo is a runtime container managing grain hosting and execution. 
-Typically, one silo will be run per machine.
+An Orleans silo is a server that hosts and executes Orleans grains. It has one listening port for silo-to-silo messaging and another for client-to-silo messaging. Typically, one silo is run per machine.
 
-A number of silos can work together to form an Orleans cluster.
+A number of silos can work together to form an Orleans cluster. A cluster has a shared membership store that is kept up-to-date by member silos.
+Silos learn about each others' status by reading the shared store. At any time, a silo can join a cluster by registering in a the shared store. Therefore, the cluster can be scaled-out dynamically at runtime.
 
-More silos can be added to a cluster dynamically in order to scale-out that cluster.
+Orleans provides resilience and availability by removing unresponsive silos from the cluster.
 
-The Orleans runtime manages resilience in case a silo is removed from the cluster due to a machine crash or similar failure mode.
+For an in-depth detailed documentation of how Orleans manages a cluster, read about [Cluster Management](/orleans/Runtime-Implementation-Details/Cluster-Management).
 
 ## Next
 Next we look at what a client is and how it interacts in the Orleans architecture.
