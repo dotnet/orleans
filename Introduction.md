@@ -4,7 +4,8 @@ title: Introduction
 ---
 {% include JB/setup %}
 
-Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used in production within Microsoft since fall 2012, serving as the programming model for 343 Industries' Halo Reach and Halo 4 backend services. 
+Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo Reach, Halo 4 and Haslo 5 cloud services, as well as by a number of other companies.
+ 
 
 Following Orleans' release as an open source framework on January 2015, it has quickly gained popularity and recognition. Leveraging an active developer community and the dedication of the Orleans team, features are added and improved on a daily basis. Microsoft Research continues to invest in Orleans, making it the framework of choice for .NET distributed development.
 
@@ -20,7 +21,7 @@ The stateless N-tier model delegates the partitioning problem to the storage lay
 
 ### Actors
 
-The actor model supports fine-grain individual objects—actors—that are isolated from each other and light-weight enough to allow modeling of an individual entity as an actor. They communicate via message passing, which enables direct communications between actors.
+The actor model supports fine-grain individual objects—actors—that are isolated from each other and light-weight enough to allow modeling of an individual entity as an actor. They communicate via asynchronous message passing, which enables direct communications between actors.
 
 Significantly, an actor executes with single-threaded semantics. Coupled with encapsulation of the actor’s state and isolation from other actors, this simplifies writing highly concurrent systems by removing data races from the actor’s code level. Developers using actors do not have to worry about critical regions, mutexes, lock leveling, and other complex race-prevention concerns that have nothing to do with the actual application logic. Actors are dynamically created within the pool of available hardware resources. This makes balancing of load easier compared to hash-based partitioning of SOA.
 
