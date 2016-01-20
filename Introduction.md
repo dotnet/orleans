@@ -4,9 +4,11 @@ title: Introduction
 ---
 {% include JB/setup %}
 
-Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 cloud services, as well as by a number of other companies.
+Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used in production within Microsoft since fall 2012, serving as the programming model for 343 Industries' Halo Reach and Halo 4 backend services. 
 
-### Background
+Following Orleans' release as an open source framework on January 2015, it has quickly gained popularity and recognition. Leveraging an active developer community and the dedication of the Orleans team, features are added and improved on a daily basis. Microsoft Research continues to invest in Orleans, making it the framework of choice for .NET distributed development.
+
+### Background 
 
 Cloud applications and services are inherently parallel and distributed. They are also interactive and dynamic; often requiring near real time direct interactions between cloud entities. Such applications are very difficult to build today. The development process demands expert level programmers and typically requires expensive iterations of the design and the architecture, as the workload grows.
 
@@ -18,17 +20,21 @@ The stateless N-tier model delegates the partitioning problem to the storage lay
 
 ### Actors
 
-The actor model supports fine-grain individual objects—actors—that are isolated from each other and light-weight enough to allow modeling of an individual entity as an actor. They communicate via asynchronous message passing, which enables direct communications between actors.
+The actor model supports fine-grain individual objects—actors—that are isolated from each other and light-weight enough to allow modeling of an individual entity as an actor. They communicate via message passing, which enables direct communications between actors.
 
 Significantly, an actor executes with single-threaded semantics. Coupled with encapsulation of the actor’s state and isolation from other actors, this simplifies writing highly concurrent systems by removing data races from the actor’s code level. Developers using actors do not have to worry about critical regions, mutexes, lock leveling, and other complex race-prevention concerns that have nothing to do with the actual application logic. Actors are dynamically created within the pool of available hardware resources. This makes balancing of load easier compared to hash-based partitioning of SOA.
 
 For the last decade, Erlang has been the most popular implementation of the traditional actor model. Facing the above-mentioned challenges of SOA, the industry started rediscovering the actor model, which stimulated renewed interest in Erlang and creation of new Erlang-like solutions: Scala actors, Akka, DCell.
 
-### Orleans
+### Virtual Actors
 
-Orleans is an implementation of an improved actor model that borrows heavily from Erlang and distributed objects systems, adds static typing, message indirection and actor virtualization, exposing them in an integrated programming model. Whereas Erlang is a pure functional language with its own custom VM, the Orleans programming model directly leverages .NET and its object-oriented capabilities.
-It provides a framework that makes development of complex distributed applications much easier and make the resulting applications scalable by design.
+Orleans is an implementation of an improved actor model that borrows heavily from Erlang and distributed objects systems, adds static typing, message indirection and actor virtualization, exposing them in an integrated programming model. Whereas Erlang is a pure functional language with its own custom VM, the Orleans programming model directly leverages .NET and its object-oriented capabilities. It provides a framework that makes development of complex distributed applications much easier and make the resulting applications scalable by design.
 
-Orleans has been used in production within Microsoft since fall 2012, serving as the programming model for the Halo Reach and Halo 4 backend services.
+Unlike actors in other systems such as Erlang or Akka, [Orleans Grains](/orleans/Getting-Started-With-Orleans/Grains) are virtual actors. They communicate via asynchronous messaging, which differs greatly from synchronous method calls, but experience has shown that purely synchronous systems do not scale well; in this case we have traded familiarity for scalability. 
+
+The Orleans runtime manages the location and activation of grains similarly to the way that the virtual memory manager of an operating system manages memory pages: it activates a grain by creating an in-memory copy (an activation) on a server (an [Orleans Silo](/orleans/Getting-Started-With-Orleans/Silos)), and later it may deactivate that activation if it hasn't been used for some time. 
+
+If a message is sent to the grain and there is no activation on any server, then the runtime will pick a location and create a new activation there. Because grains are virtual, they never fail, even if the server that currently hosts all of their activations fails. 
+This eliminates the need to test to see if a grain exists, as well as the need to track failures and recreate grains as needed; the Orleans runtime does all this automatically.
 
 [Read the MSR Technical Report on Orleans](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf)
