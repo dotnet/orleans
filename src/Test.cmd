@@ -26,7 +26,7 @@ set TESTS=%OutDir%\Tester.dll %OutDir%\TesterInternal.dll
 @Echo Test assemblies = %TESTS%
 
 set TEST_ARGS= /Settings:%CMDHOME%\Local.testsettings
-set TEST_ARGS= %TEST_ARGS% /TestCaseFilter:%TEST_CATEGORIES%
+set TEST_ARGS= %TEST_ARGS% /TestCaseFilter:%TEST_CATEGORIES% /Logger:trx
 
 @echo on
 
