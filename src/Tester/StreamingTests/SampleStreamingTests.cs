@@ -14,7 +14,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SampleStreamingTests : UnitTestSiloHost
+    public class SampleStreamingTests : HostedTestClusterPerFixture
     {
         private const string StreamNamespace = "SampleStreamNamespace"; 
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
@@ -22,24 +22,17 @@ namespace UnitTests.StreamingTests
         private Guid streamId;
         private string streamProvider;
 
-        public SampleStreamingTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-            },
-            new TestingClientOptions()
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+                },
+                new TestingClientOptions()
+                {
+                    ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
+                });
         }
 
         [TestCleanup]
@@ -47,7 +40,7 @@ namespace UnitTests.StreamingTests
         {
             if (streamProvider != null && streamProvider.Equals(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
             }
         }
 

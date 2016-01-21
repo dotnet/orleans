@@ -16,11 +16,4 @@
     </Tracing>
     <Statistics MetricsTableWriteInterval="1s" LogWriteInterval="1s" WriteLogStatisticsToTable="true" />
   </Defaults>
-  <Override Node="Primary">
-    <Networking Port="22222" />
-    <ProxyingGateway Address="localhost" Port="40000"/>
-  </Override>
-  <Override Node="Secondary_1">
-    <Networking Port="22223" />
-  </Override>
 </OrleansConfiguration>

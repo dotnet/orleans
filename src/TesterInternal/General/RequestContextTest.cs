@@ -10,6 +10,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -28,6 +29,7 @@ namespace UnitTests.General
         [TestInitialize]
         public void TestInitialize()
         {
+            oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
@@ -41,20 +43,6 @@ namespace UnitTests.General
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
             headers.Clear();
-            GrainClient.ClientInvokeCallback = null;
-        }
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            oldPropagateActivityId = RequestContext.PropagateActivityId;
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            RequestContext.PropagateActivityId = oldPropagateActivityId;
-            RequestContext.Clear();
             GrainClient.ClientInvokeCallback = null;
         }
 
@@ -86,6 +74,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportToMessage()
         {
+            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
@@ -141,6 +130,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportImport()
         {
+            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
@@ -402,10 +392,8 @@ namespace UnitTests.General
     }
 
     [TestClass]
-    public class RequestContextTests_Silo : UnitTestSiloHost
+    public class RequestContextTests_Silo : HostedTestClusterPerFixture
     {
-        private static bool oldPropagateActivityId;
-
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
             StartFreshOrleans = true,
@@ -415,9 +403,9 @@ namespace UnitTests.General
             SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
         };
 
-        public RequestContextTests_Silo()
-            : base(siloOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
+            return new TestingSiloHost(siloOptions);
         }
 
         [TestInitialize]
@@ -435,19 +423,6 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            oldPropagateActivityId = RequestContext.PropagateActivityId;
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            RequestContext.PropagateActivityId = oldPropagateActivityId;
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_Simple()
         {
@@ -461,7 +436,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_AC_Test1()
         {
-            int id = GetRandomGrainId();
+            long id = GetRandomGrainId();
             const string key = "TraceId";
             string val = "TraceValue-" + id;
             string val2 = val + "-2";
@@ -488,7 +463,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_Task_Test1()
         {
-            int id = GetRandomGrainId();
+            long id = GetRandomGrainId();
             const string key = "TraceId";
             string val = "TraceValue-" + id;
             string val2 = val + "-2";

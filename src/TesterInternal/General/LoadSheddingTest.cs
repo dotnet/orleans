@@ -10,26 +10,20 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class LoadSheddingTest : UnitTestSiloHost
+    public class LoadSheddingTest : HostedTestClusterPerTest
     {
-        public LoadSheddingTest()
-            : base(new TestingSiloOptions { StartFreshOrleans = true })
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        [TestCleanup]
-        public void Cleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(true);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("LoadShedding")]
         public void LoadSheddingBasic()
         {
             ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            
-            Primary.Silo.Metrics.LatchIsOverload(true);
-            Assert.IsTrue(Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
+
+            this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(true);
+            Assert.IsTrue(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
 
             var promise = grain.SetA(5);
             bool failed = false;
@@ -63,8 +57,8 @@ namespace UnitTests.General
 
             Console.WriteLine("First set succeeded");
 
-            Primary.Silo.Metrics.LatchIsOverload(true);
-            Assert.IsTrue(Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
+            this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(true);
+            Assert.IsTrue(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
 
             promise = grain.SetA(2);
             try
@@ -83,8 +77,8 @@ namespace UnitTests.General
 
             Console.WriteLine("Second set was shed");
 
-            Primary.Silo.Metrics.LatchIsOverload(false);
-            Assert.IsFalse(Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch non-overload state");
+            this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(false);
+            Assert.IsFalse(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch non-overload state");
 
             promise = grain.SetA(4);
             try

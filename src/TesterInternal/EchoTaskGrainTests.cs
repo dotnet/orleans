@@ -4,13 +4,14 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
     [TestClass]
-    public class EchoTaskGrainTests : UnitTestSiloHost
+    public class EchoTaskGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(10);
 
@@ -19,12 +20,6 @@ namespace UnitTests.General
         private IEchoTaskGrain grain;
 
         public static readonly TimeSpan Epsilon = TimeSpan.FromSeconds(1);
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
-        }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Echo")]
         public void EchoGrain_GetGrain()
@@ -204,8 +199,9 @@ namespace UnitTests.General
             grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
-            SiloAddress silo1 = Primary.Silo.SiloAddress;
-            SiloAddress silo2 = Secondary.Silo.SiloAddress;
+            var siloHost = TestingSiloHost.Instance;
+            SiloAddress silo1 = siloHost.Primary.Silo.SiloAddress;
+            SiloAddress silo2 = siloHost.Secondary.Silo.SiloAddress;
 
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();

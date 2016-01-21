@@ -10,6 +10,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.Tester;
 
 // ReSharper disable InconsistentNaming
@@ -33,7 +34,7 @@ namespace UnitTests.TimerTests
 
             ServiceId = Guid.NewGuid();
 
-            UnitTestSiloHost.ConfigureClientThreadPoolSettingsForStorageTests(1000);
+            TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
         }
 
         #region Extra tests / experiments

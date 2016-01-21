@@ -16,28 +16,21 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class DelayedQueueRebalancingTests : UnitTestSiloHost
+    public class DelayedQueueRebalancingTests : HostedTestClusterPerTest
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(20); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(5);
 
-        public DelayedQueueRebalancingTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartSecondary = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreaming4SilosUnitTests.xml"),
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartSecondary = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreaming4SilosUnitTests.xml"),
+                });
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
@@ -55,7 +48,7 @@ namespace UnitTests.StreamingTests
         {
             await ValidateAgentsState(2, 2, "1");
 
-            StartAdditionalSilos(2);
+            this.HostedCluster.StartAdditionalSilos(2);
 
             await ValidateAgentsState(4, 2, "2");
 

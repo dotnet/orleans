@@ -8,7 +8,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -28,7 +27,7 @@ namespace UnitTests.StorageTests
     /// </summary>
     [TestClass]
     [DeploymentItem("Config_DevStorage.xml")]
-    public class PersistenceGrainTests_Local : UnitTestSiloHost
+    public class PersistenceGrainTests_Local : HostedTestClusterPerFixture
     {
         const string ErrorInjectorStorageProvider = "ErrorInjector";
 
@@ -40,31 +39,9 @@ namespace UnitTests.StorageTests
             StartSecondary = false,
         };
 
-        public PersistenceGrainTests_Local()
-            : base(testSiloOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
-            AppDomain.CurrentDomain.UnhandledException += ReportUnhandledException;
-            TaskScheduler.UnobservedTaskException += ReportUnobservedTaskException;
-        }
-
-        private static void ReportUnhandledException(object sender, UnhandledExceptionEventArgs e)
-        {
-            Console.WriteLine("Unhandled exception left behind: {0}", e.ExceptionObject);
-        }
-
-        private static void ReportUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs excArgs)
-        {
-            Console.WriteLine("Unhandled Task exception left behind: {0}", excArgs.Exception);
-            excArgs.SetObserved();
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            //ResetDefaultRuntimes();
-            StopAllSilos();
-            AppDomain.CurrentDomain.UnhandledException -= ReportUnhandledException;
-            TaskScheduler.UnobservedTaskException -= ReportUnobservedTaskException;
+            return new TestingSiloHost(testSiloOptions);
         }
 
         [TestInitialize]
@@ -72,6 +49,7 @@ namespace UnitTests.StorageTests
         {
             SerializationManager.InitializeForTesting();
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
+            ResetMockStorageProvidersHistory();
         }
 
         [TestCleanup]
@@ -83,7 +61,7 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
         public void Persistence_Silo_StorageProviders()
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
                 List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
@@ -98,7 +76,7 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
         public void Persistence_Silo_StorageProvider_Name_LowerCase()
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
                 const string providerName = "LowerCase";
@@ -111,7 +89,7 @@ namespace UnitTests.StorageTests
         [ExpectedException(typeof(KeyNotFoundException))]
         public void Persistence_Silo_StorageProvider_Name_Missing()
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
             IStorageProvider store = silo.Silo.TestHook.GetStorageProvider(providerName);
@@ -371,22 +349,23 @@ namespace UnitTests.StorageTests
 
             MockStorageProvider storageProvider = FindStorageProviderInUse(providerName);
 
-            Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
-            Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes");
+            int initialReadCount = storageProvider.ReadCount;
+            int initialWriteCount = storageProvider.WriteCount;
+            int initialDeleteCount = storageProvider.DeleteCount;
 
             await grain.DoDelete();
 
-            Assert.AreEqual(1, storageProvider.DeleteCount, "StorageProvider #Deletes");
+            Assert.AreEqual(initialDeleteCount + 1, storageProvider.DeleteCount, "StorageProvider #Deletes");
             Assert.AreEqual(null, storageProvider.LastState, "Store-AfterDelete-Empty");
 
             int val = await grain.GetValue(); // Returns current in-memory null data without re-read.
             Assert.AreEqual(0, val, "Value after Delete");
-            Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
+            Assert.AreEqual(initialReadCount, storageProvider.ReadCount, "StorageProvider #Reads");
 
             await grain.DoWrite(2);
 
-            Assert.AreEqual(1, storageProvider.ReadCount, "StorageProvider #Reads");
-            Assert.AreEqual(2, storageProvider.WriteCount, "StorageProvider #Writes");
+            Assert.AreEqual(initialReadCount, storageProvider.ReadCount, "StorageProvider #Reads");
+            Assert.AreEqual(initialWriteCount + 1, storageProvider.WriteCount, "StorageProvider #Writes");
 
             Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
@@ -1212,7 +1191,7 @@ namespace UnitTests.StorageTests
         // ---------- Utility functions ----------
         private void SetStoredValue<TState>(string providerName, string grainType, IGrain grain, string fieldName, int newValue)
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
                 MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
@@ -1222,7 +1201,7 @@ namespace UnitTests.StorageTests
 
         private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
                 ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
@@ -1276,7 +1255,7 @@ namespace UnitTests.StorageTests
         {
             MockStorageProvider providerInUse = null;
             SiloHandle siloInUse = null;
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
                 MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
@@ -1297,6 +1276,22 @@ namespace UnitTests.StorageTests
                 Assert.Fail("Cannot find active storage provider currently in use, Name={0}", providerName);
             }
             return providerInUse;
+        }
+
+        private void ResetMockStorageProvidersHistory()
+        {
+            var mockStorageProviders = new[] { "test1", "test2", "lowercase"};
+            foreach (var siloHandle in this.HostedCluster.GetActiveSilos().ToList())
+            {
+                foreach (var providerName in mockStorageProviders)
+                {
+                    MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                    if (provider != null)
+                    {
+                        provider.ResetHistory();
+                    }
+                }
+            }
         }
         #endregion
     }

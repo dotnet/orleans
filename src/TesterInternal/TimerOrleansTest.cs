@@ -7,28 +7,16 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
 namespace UnitTests.TimerTests
 {
     [TestClass]
-    public class TimerOrleansTest : UnitTestSiloHost
+    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
     {
-        public TimerOrleansTest() : base(false){ }
-
-        [TestCleanup]
-        public void Cleanup()
-        {
-            RestartAllAdditionalSilos();
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Basic()
         {
@@ -88,7 +76,7 @@ namespace UnitTests.TimerTests
             Console.WriteLine("value = " + last);
             Assert.IsTrue(last >= 10 && last <= 11, "last = " + last.ToString(CultureInfo.InvariantCulture));
 
-            StartAdditionalSilo();
+            this.HostedCluster.StartAdditionalSilo();
 
             //IManagementGrain mgmtGrain = Orleans.Silo.SystemManagement;
             //mgmtGrain.SuspendHost(Orleans.SiloAddress).Wait();
@@ -117,7 +105,7 @@ namespace UnitTests.TimerTests
             Exception error = null;
             try
             {
-                grain = GrainClient.GrainFactory.GetGrain<ITimerCallGrain>(0);
+                grain = GrainClient.GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
 
                 await grain.StartTimer(testName, delay);
 
@@ -143,6 +131,7 @@ namespace UnitTests.TimerTests
             {
                 // Ignore
                 Console.WriteLine("Ignoring exception from StopTimer : {0}", exc);
+                TestingSiloHost.StopAllSilosIfRunning();
             }
 
             if (error != null)
@@ -163,11 +152,11 @@ namespace UnitTests.TimerTests
             persistant = persist;
             if (persistant)
             {
-                persistantGrain = GrainClient.GrainFactory.GetGrain<ITimerPersistantGrain>(UnitTestSiloHost.GetRandomGrainId());
+                persistantGrain = GrainClient.GrainFactory.GetGrain<ITimerPersistantGrain>(TestUtils.GetRandomGrainId());
             }
             else
             {
-                grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(UnitTestSiloHost.GetRandomGrainId());
+                grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(TestUtils.GetRandomGrainId());
             }
         }
 

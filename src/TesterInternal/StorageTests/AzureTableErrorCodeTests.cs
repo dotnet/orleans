@@ -3,6 +3,7 @@ using Orleans.AzureUtils;
 using Orleans.TestingHost;
 using System;
 using System.Net;
+using Tester;
 using UnitTests.Tester;
 
 namespace UnitTests.StorageTests
@@ -13,7 +14,7 @@ namespace UnitTests.StorageTests
         [ClassInitialize]
         public static void ClassInitialize(TestContext testContext)
         {
-            UnitTestSiloHost.CheckForAzureStorage();
+            TestUtils.CheckForAzureStorage();
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]

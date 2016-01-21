@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
@@ -9,7 +8,7 @@ using UnitTests.Tester;
 namespace UnitTests.StorageTests
 {
     [TestClass]
-    public class MemoryStorageProviderTests : UnitTestSiloHost
+    public class MemoryStorageProviderTests : HostedTestClusterEnsureDefaultStarted
     {
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Storage")]
         public async Task MemoryStorageProvider_RestoreStateTest()

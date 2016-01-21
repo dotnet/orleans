@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,14 +7,13 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester.TestStreamProviders.Controllable;
 using Tester.TestStreamProviders.Generator;
 using Tester.TestStreamProviders.Generator.Generators;
 using TestGrainInterfaces;
 using TestGrains;
+using UnitTests.Grains;
 using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
@@ -21,11 +21,11 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class ControllableStreamGeneratorProviderTests : UnitTestSiloHost
+    public class ControllableStreamGeneratorProviderTests : HostedTestClusterPerFixture
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-        private const string StreamProviderName = GeneratedEventCollectorGrain.StreamProviderName;
+        private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
         private const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
@@ -34,39 +34,33 @@ namespace UnitTests.StreamingTests
             TotalQueueCount = 4,
         };
 
-        public ControllableStreamGeneratorProviderTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                AdjustConfig = config =>
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(
+                new TestingSiloOptions
                 {
-                    var settings = new Dictionary<string, string>();
-                    // get initial settings from configs
-                    AdapterConfig.WriteProperties(settings);
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                    AdjustConfig = config =>
+                    {
+                        var settings = new Dictionary<string, string>();
+                        // get initial settings from configs
+                        AdapterConfig.WriteProperties(settings);
 
-                    // add queue balancer setting
-                    settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+                        // add queue balancer setting
+                        settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
 
-                    // add pub/sub settting
-                    settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+                        // add pub/sub settting
+                        settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
 
-                    // register stream provider
-                    config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+                        // register stream provider
+                        config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
 
-                    // make sure all node configs exist, for dynamic cluster queue balancer
-                    config.GetConfigurationForNode("Primary");
-                    config.GetConfigurationForNode("Secondary_1");
-                }
-            })
-        {
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+                        // make sure all node configs exist, for dynamic cluster queue balancer
+                        config.GetConfigurationForNode("Primary");
+                        config.GetConfigurationForNode("Secondary_1");
+                    }
+                });
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
@@ -107,16 +101,16 @@ namespace UnitTests.StreamingTests
             }
             finally
             {
-                var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedEventCollectorGrain.ReporterId);
+                var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
                 reporter.Reset().Ignore();
             }
         }
 
         private async Task<bool> CheckCounters(SimpleGeneratorConfig generatorConfig, bool assertIsTrue)
         {
-            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedEventCollectorGrain.ReporterId);
+            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(GeneratedEventCollectorGrain.StreamProviderName, GeneratedEventCollectorGrain.StreamNamespace);
+            var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, GeneratedEventCollectorGrain.StreamNamespace);
             if (assertIsTrue)
             {
                 // one stream per queue

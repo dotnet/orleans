@@ -1078,7 +1078,7 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 logger.Error(ErrorCode.Catalog_ErrorCallingActivate,
-                    string.Format("Error calling grain's AsyncActivate method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
+                    string.Format("Error calling grain's OnActivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
 
                 activation.SetState(ActivationState.Invalid); // Mark this activation as unusable
 

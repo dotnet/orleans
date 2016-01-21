@@ -10,6 +10,7 @@ using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.Tester;
 
 namespace UnitTests.StorageTests
@@ -51,7 +52,7 @@ namespace UnitTests.StorageTests
         {
             TraceLogger.Initialize(new NodeConfiguration());
 
-            UnitTestSiloHost.CheckForAzureStorage();
+            TestUtils.CheckForAzureStorage();
         }
 
         // Use TestInitialize to run code before running each test 

@@ -19,7 +19,7 @@ using UnitTests.Tester;
 
 namespace UnitTests.TimerTests
 {
-    public class ReminderTests_Base : UnitTestSiloHost
+    public class ReminderTests_Base : HostedTestClusterPerFixture
     {
         internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(100); // the experiment shouldnt be that long that the sums of leeways exceeds a period
         internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(5);
@@ -33,29 +33,23 @@ namespace UnitTests.TimerTests
         protected const long failAfter = 2; // NOTE: match this sleep with 'failCheckAfter' used in PerGrainFailureTest() so you dont try to get counter immediately after failure as new activation may not have the reminder statistics
         protected const long failCheckAfter = 6; // safe value: 9
 
-        protected readonly TraceLogger log;
+        protected TraceLogger log;
 
         public TestContext TestContext { get; set; }
 
-        protected ReminderTests_Base(TestingSiloOptions siloOptions)
-            : base(siloOptions)
+        public void DoTestInitialize()
         {
-            log = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Application);
-        }
-
-        public static void DoClassInitialize()
-        {
-            Console.WriteLine("ReminderTests ClassInitialize");
-
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             TraceLogger.Initialize(cfg);
 #if DEBUG
             TraceLogger.AddTraceLevelOverride("Storage", Severity.Verbose3);
             TraceLogger.AddTraceLevelOverride("Reminder", Severity.Verbose3);
 #endif
+            log = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Application);
+            Console.WriteLine("base.DoTestInitialize completed");
         }
 
-        public void DoCleanup()
+        public void DoTestCleanup()
         {
             Console.WriteLine("{0} TestCleanup {1} - Outcome = {2}",
                 GetType().Name, TestContext.TestName, TestContext.CurrentTestOutcome);
@@ -64,27 +58,19 @@ namespace UnitTests.TimerTests
             // so we must proxy the call through a grain.
             var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
-
-            RestartAllAdditionalSilos();
-            RestartDefaultSilos();
-        }
-
-        public static void DoClassCleanup()
-        {
-            Console.WriteLine("ClassCleanup");
-
-            StopAllSilos();
         }
 
         #region Test methods
         #region Basic test
         public async Task Test_Reminders_Basic_StopByRef()
         {
+            Console.WriteLine(TestContext.TestName + " started");
             log.Info(TestContext.TestName);
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             IGrainReminder r1 = await grain.StartReminder(DR);
             IGrainReminder r2 = await grain.StartReminder(DR);
+            Console.WriteLine(TestContext.TestName + " reminders started");
             try
             {
                 // First handle should now be out of date once the seconf handle to the same reminder was obtained
@@ -179,7 +165,7 @@ namespace UnitTests.TimerTests
             Thread.Sleep(period.Multiply(5));
             // start another silo ... although it will take it a while before it stabilizes
             log.Info("Starting another silo");
-            StartAdditionalSilos(1);
+            this.HostedCluster.StartAdditionalSilos(1);
 
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);

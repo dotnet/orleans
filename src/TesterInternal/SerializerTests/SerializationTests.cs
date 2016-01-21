@@ -6,15 +6,8 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class SerializationTests : UnitTestSiloHost
+    public class SerializationTests : HostedTestClusterEnsureDefaultStarted
     {
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            //ResetDefaultRuntimes();
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
         public void Serialization_LargeTestData()
         {

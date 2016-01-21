@@ -9,31 +9,24 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
-
 namespace UnitTests.General
 {
     [TestClass]
-    public class DeadlockDetectionTests : UnitTestSiloHost
+    public class DeadlockDetectionTests : HostedTestClusterPerFixture
     {
         private const int numIterations = 30;
 
-        public DeadlockDetectionTests()
-            : base( new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                AdjustConfig = config =>
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(
+                new TestingSiloOptions
                 {
-                    config.Globals.PerformDeadlockDetection = true;
-                }
-            } )
-        {
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+                    StartFreshOrleans = true,
+                    AdjustConfig = config =>
+                    {
+                        config.Globals.PerformDeadlockDetection = true;
+                    }
+                });
         }
 
         // 2 silos, loop across all cases (to force all grains to be local and remote):

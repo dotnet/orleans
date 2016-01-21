@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("Config_StorageErrors.xml")]
     [DeploymentItem("ClientConfig_StreamProviders.xml")]
     [DeploymentItem("OrleansProviders.dll")]
-    public class StreamPubSubReliabilityTests : UnitTestSiloHost
+    public class StreamPubSubReliabilityTests : HostedTestClusterPerFixture
     {
         public TestContext TestContext { get; set; }
         protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
@@ -41,16 +41,9 @@ namespace UnitTests.StreamingTests
         protected string StreamProviderName;
         protected string StreamNamespace;
 
-        public StreamPubSubReliabilityTests()
-            : base(SiloRunOptions, ClientRunOptions)
-        { }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public static TestingSiloHost CreateSiloHost()
         {
-            //ResetAllAdditionalRuntimes();
-            //ResetDefaultRuntimes();
-            StopAllSilos();
+            return new TestingSiloHost(SiloRunOptions, ClientRunOptions);
         }
 
         [TestInitialize]
@@ -160,7 +153,7 @@ namespace UnitTests.StreamingTests
 
         private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
-            List<SiloHandle> silos = GetActiveSilos().ToList();
+            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
                 ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider) siloHandle.Silo.TestHook.GetStorageProvider(providerName);

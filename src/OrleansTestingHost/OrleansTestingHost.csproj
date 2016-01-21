@@ -34,7 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -62,6 +62,7 @@
     <Compile Include="TestingSiloHost.cs" />
     <Compile Include="TestingSiloOptions.cs" />
     <Compile Include="TestingUtils.cs" />
+    <Compile Include="Utils\ThreadSafeRandom.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">

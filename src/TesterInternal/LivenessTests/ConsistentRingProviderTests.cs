@@ -10,8 +10,9 @@ using UnitTests.Tester;
 
 namespace UnitTests.LivenessTests
 {
+    [DeploymentItem("ClientConfigurationForTesting.xml")]
     [TestClass]
-    public class ConsistentRingProviderTests: UnitTestSiloHost
+    public class ConsistentRingProviderTests
     {
         public ConsistentRingProviderTests()
         {

@@ -175,5 +175,13 @@ namespace UnitTests.StorageTests
                 Tuple.Create("GrainId", GetId(grainReference))
             }.ToList();
         }
+
+        public void ResetHistory()
+        {
+            // initCount = 0;
+            closeCount = readCount = writeCount = deleteCount = 0;
+            LastId = null;
+            LastState = null;
+        }
     }
 }

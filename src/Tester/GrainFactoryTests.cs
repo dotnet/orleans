@@ -9,24 +9,8 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class GrainFactoryTests : UnitTestSiloHost
+    public class GrainFactoryTests : HostedTestClusterEnsureDefaultStarted
     {
-        public GrainFactoryTests()
-            : base(true)
-        {
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
         [ExpectedException(typeof(OrleansException))]
         public void GetGrain_Ambiguous()

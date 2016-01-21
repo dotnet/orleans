@@ -9,6 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 
 using Orleans.Runtime;
+using Tester;
 using UnitTests.Tester;
 
 namespace UnitTests
@@ -20,7 +21,7 @@ namespace UnitTests
     [TestClass]
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class LoggerTest:UnitTestSiloHost
+    public class LoggerTest : HostedTestClusterEnsureDefaultStarted
     {
         private double timingFactor;
 
@@ -41,7 +42,7 @@ namespace UnitTests
                 new Tuple<string, Severity>("Grain.Two", Severity.Verbose3)
             };
             TraceLogger.SetTraceLevelOverrides(overrides.ToList());
-            timingFactor = UnitTestSiloHost.CalibrateTimings();
+            timingFactor = TestUtils.CalibrateTimings();
         }
 
         [TestCleanup]

@@ -13,22 +13,16 @@ namespace UnitTests.General
     [DeploymentItem("OrleansStartupConfigurationForTesting.xml")]
     [DeploymentItem("OrleansDependencyInjection.dll")]
     [TestClass]
-    public class DependencyInjectionGrainTests : UnitTestSiloHost
+    public class DependencyInjectionGrainTests : HostedTestClusterPerFixture
     {
-        public DependencyInjectionGrainTests()
-            : base(new TestingSiloOptions
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(new TestingSiloOptions
             {
                 StartPrimary = true,
                 StartSecondary = false,
                 SiloConfigFile = new FileInfo("OrleansStartupConfigurationForTesting.xml")
-            })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            });
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]

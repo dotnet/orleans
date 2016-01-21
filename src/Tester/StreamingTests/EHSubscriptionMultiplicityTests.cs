@@ -18,7 +18,7 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class EHSubscriptionMultiplicityTests : UnitTestSiloHost
+    public class EHSubscriptionMultiplicityTests : HostedTestClusterPerFixture
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHSubscriptionMultiplicityTestsNamespace";
@@ -34,14 +34,19 @@ namespace UnitTests.StreamingTests
             new EventHubStreamProviderConfig(StreamProviderName);
 
         public EHSubscriptionMultiplicityTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                AdjustConfig = AdjustClusterConfiguration
-            })
         {
             runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, GrainClient.Logger);
+        }
+
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                    AdjustConfig = AdjustClusterConfiguration
+                });
         }
 
         public static void AdjustClusterConfiguration(ClusterConfiguration config)
@@ -61,13 +66,6 @@ namespace UnitTests.StreamingTests
             // make sure all node configs exist, for dynamic cluster queue balancer
             config.GetConfigurationForNode("Primary");
             config.GetConfigurationForNode("Secondary_1");
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("EventHub"), TestCategory("Streaming")]

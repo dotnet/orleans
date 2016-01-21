@@ -62,11 +62,11 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>$(SolutionDir)packages\WindowsAzure.Storage.5.0.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\WindowsAzure.Storage.5.0.2\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -115,6 +115,11 @@
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
     <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\CachedMessageBlockTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\FixedSizeBufferTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\FixedSizeObjectPoolTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\ObjectPoolTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\PooledQueueCacheTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
@@ -196,6 +201,7 @@
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
+    <Compile Include="TestAssemblyCleanup.cs" />
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />

@@ -15,42 +15,8 @@ using UnitTests.Tester;
 namespace UnitTests
 {
     [TestClass]
-    public class ReentrancyTests : UnitTestSiloHost
+    public class ReentrancyTests : HostedTestClusterEnsureDefaultStarted
     {
-        private const bool DebugMode = 
-#if DEBUG
-            true; // TEST HACK
-#else
-            false;
-#endif
-        private static readonly TestingSiloOptions testOptions = new TestingSiloOptions
-        {
-            StartPrimary = true, 
-            StartSecondary = !DebugMode
-        };
-
-        public ReentrancyTests() : base(testOptions)
-        { }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            try
-            {
-                //ResetDefaultRuntimes();
-                StopAllSilos();
-            }
-            catch (Exception ex)
-            {
-                Assert.Fail("ClassCleanup unexpected exception {0}: {1}", ex.Message, ex.StackTrace);
-            }
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void ReentrantGrain()
         {
@@ -90,7 +56,7 @@ namespace UnitTests
                     Assert.Fail("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace);
                 }
             }
-            if (Primary.Silo.GlobalConfig.PerformDeadlockDetection)
+            if (this.HostedCluster.Primary.Silo.GlobalConfig.PerformDeadlockDetection)
             {
                 Assert.IsTrue(deadlock, "Non-reentrant grain should deadlock");
             }
@@ -124,7 +90,7 @@ namespace UnitTests
                     Assert.Fail("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace);
                 }
             }
-            if (Primary.Silo.GlobalConfig.PerformDeadlockDetection)
+            if (this.HostedCluster.Primary.Silo.GlobalConfig.PerformDeadlockDetection)
             {
                 Assert.IsTrue(deadlock, "Non-reentrant grain should deadlock");
             }

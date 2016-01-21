@@ -1,31 +1,17 @@
-﻿
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.TestingHost;
 using TestGrainInterfaces;
 using UnitTests.Tester;
 
 namespace Tester
 {
     [TestClass]
-    public class GrainInterfaceHierarchyTests : UnitTestSiloHost
+    public class GrainInterfaceHierarchyTests : HostedTestClusterEnsureDefaultStarted
     {
-
-        public GrainInterfaceHierarchyTests()
-            : base(new TestingSiloOptions {StartPrimary = true, StartSecondary = false})
-        {
-        }
-
         private T GetHierarchyGrain<T>() where T : IDoSomething, IGrainWithIntegerKey
         {
             return GrainFactory.GetGrain<T>(GetRandomGrainId());
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional")]

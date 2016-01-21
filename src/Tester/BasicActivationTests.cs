@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -15,36 +14,26 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class BasicActivationTests : UnitTestSiloHost
+    public class BasicActivationTests : HostedTestClusterEnsureDefaultStarted
     {
-
-        public BasicActivationTests()
-            : base(new TestingSiloOptions { StartFreshOrleans = true })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ActivateAndUpdate()
         {
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(1);
-            ITestGrain g2 = GrainClient.GrainFactory.GetGrain<ITestGrain>(2);
-            Assert.AreEqual(1L, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(1L, g1.GetKey().Result);
-            Assert.AreEqual("1", g1.GetLabel().Result);
-            Assert.AreEqual(2L, g2.GetKey().Result);
-            Assert.AreEqual("2", g2.GetLabel().Result);
+            long g1Key = GetRandomGrainId();
+            long g2Key = GetRandomGrainId();
+            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(g1Key);
+            ITestGrain g2 = GrainClient.GrainFactory.GetGrain<ITestGrain>(g2Key);
+            Assert.AreEqual(g1Key, g1.GetPrimaryKeyLong());
+            Assert.AreEqual(g1Key, g1.GetKey().Result);
+            Assert.AreEqual(g1Key.ToString(), g1.GetLabel().Result);
+            Assert.AreEqual(g2Key, g2.GetKey().Result);
+            Assert.AreEqual(g2Key.ToString(), g2.GetLabel().Result);
 
             g1.SetLabel("one").Wait();
             Assert.AreEqual("one", g1.GetLabel().Result);
-            Assert.AreEqual("2", g2.GetLabel().Result);
+            Assert.AreEqual(g2Key.ToString(), g2.GetLabel().Result);
 
-            ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>(1);
+            ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>(g1Key);
             Assert.AreEqual("one", g1a.GetLabel().Result);
         }
 
@@ -179,7 +168,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate")]
         public void BasicActivation_MultipleGrainInterfaces()
         {
-            ITestGrain simple = GrainClient.GrainFactory.GetGrain<ITestGrain>(50);
+            ITestGrain simple = GrainClient.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
 
             simple.GetMultipleGrainInterfaces_List().Wait();
             logger.Info("GetMultipleGrainInterfaces_List() worked");
@@ -199,7 +188,7 @@ namespace UnitTests.General
             TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
             GrainClient.SetResponseTimeout(shortTimeout);
 
-            ITestGrain grain = GrainClient.GrainFactory.GetGrain<ITestGrain>(12);
+            ITestGrain grain = GrainClient.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
             int num = 10;
             for (long i = 0; i < num; i++)
             {
@@ -228,7 +217,7 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("RequestContext"), TestCategory("GetGrain")]
         public void BasicActivation_TestRequestContext()
         {
-            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(1);
+            ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
             Task<Tuple<string, string>> promise1 = g1.TestRequestContext();
             Tuple<string, string> requstContext = promise1.Result;
             logger.Info("Request Context is: " + requstContext);

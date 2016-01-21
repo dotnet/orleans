@@ -1,31 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using System.Net;
-using Orleans.TestingHost;
-
-
-// ReSharper disable InconsistentNaming
 
 namespace Tests.GeoClusterTests
 {
-
     [TestClass]
     [DeploymentItem("ClientConfigurationForTesting.xml")]
     [DeploymentItem("OrleansConfigurationForTesting.xml")]
     public class BasicMultiClusterTest : TestingClusterHost
     {
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            TestingSiloHost.StopAllSilos();
-        }
-
         // Kill all clients and silos.
         [TestCleanup]
         public void TestCleanup()
@@ -61,7 +46,6 @@ namespace Tests.GeoClusterTests
         [Timeout(120000)]
         public void CreateTwoIndependentClusters()
         {
-           
             // create cluster A with one silo and clientA
             var clusterA = "A";
             NewCluster(clusterA, 1);
@@ -81,8 +65,5 @@ namespace Tests.GeoClusterTests
 
             StopAllClientsAndClusters(); // don't rely on VS to clean up in a timely way... do it explicitly
         }
-
-       
-
     }
 }
