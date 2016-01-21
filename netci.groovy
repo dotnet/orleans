@@ -26,7 +26,7 @@ def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0
         publishers {
             archiveXUnit {
                 xUnitDotNET {
-                    pattern('src/TestResults/xUnit-Results.xml')
+                    pattern('src/TestResults/xUnit-*.xml')
                     skipNoTestFiles(false)
                     failIfNotNew(true)
                     deleteOutputFiles(true)
