@@ -85,9 +85,11 @@ public override Task OnActivateAsync()
 }
 ```
 
-## Using Extended Primary Key
+The stock ticker example used in the [Interaction with Libraries and Services](Interaction-with-Libraries-and-Services) uses a string keys to activate grains representing different stock symbols.
 
-If you have a system that doesn't fit well with either GUIDs or longs, you can opt for an extended primary key which allows you to use a string to reference a grain.
+## Using Compound Primary Key
+
+If you have a system that doesn't fit well with either GUIDs or longs, you can opt for a compound primary key which allows you to use a combination of a GUID or long and a string to reference a grain.
 
 You can inherit your interface from 'IGrainWithGuidCompoundKey' or 'IGrainWithIntegerCompoundKey" interface like this:
 
@@ -104,9 +106,6 @@ In client code, this adds a second argument to the `GetGrain` method on the grai
 var grain = GrainClient.GrainFactory.GetGrain<IExample>(0, "a string!");
 ```
 
-Notice we still have a primary key, which can still be either a GUID or a long. 
-We can choose to ignore this by setting the primary key to zero, or we can combine the primary key and secondary key together as a joined key.
-
 To access the extended key in the grain, we can call an overload on the `GetPrimaryKey` method:
 
 ``` csharp
@@ -121,8 +120,6 @@ public class ExampleGrain : Orleans.GrainBase, IExampleGrain
     }
 }
 ```
-
-The stock ticker example used in the [Interaction with Libraries and Services](Interaction-with-Libraries-and-Services) uses `[ExtendedPrimaryKey]` to activate grains representing different stock symbols.
 
 ## Next
 
