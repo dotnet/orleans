@@ -36,8 +36,8 @@ namespace UnitTests.StreamingTests
                                 {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
                             };
                         config.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
-                        config.GetConfigurationForNode("Primary");
-                        config.GetConfigurationForNode("Secondary_1");
+                        config.GetOrAddConfigurationForNode("Primary");
+                        config.GetOrAddConfigurationForNode("Secondary_1");
                     }
                 });
         }

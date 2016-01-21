@@ -453,18 +453,18 @@ namespace Orleans.Runtime.Host
             if (string.IsNullOrWhiteSpace(Name))
                 throw new ArgumentException("SiloName not defined - cannot initialize config");
 
-            NodeConfig = Config.GetConfigurationForNode(Name);
+            NodeConfig = Config.GetOrAddConfigurationForNode(Name);
             Type = NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
 
             if (TraceFilePath != null)
             {
-                var traceFileName = Config.GetConfigurationForNode(Name).TraceFileName;
+                var traceFileName = Config.GetOrAddConfigurationForNode(Name).TraceFileName;
                 if (traceFileName != null && !Path.IsPathRooted(traceFileName))
-                    Config.GetConfigurationForNode(Name).TraceFileName = TraceFilePath + "\\" + traceFileName;
+                    Config.GetOrAddConfigurationForNode(Name).TraceFileName = TraceFilePath + "\\" + traceFileName;
             }
 
             ConfigLoaded = true;
-            InitializeLogger(config.GetConfigurationForNode(Name));
+            InitializeLogger(config.GetOrAddConfigurationForNode(Name));
         }
 
         private void InitializeLogger(NodeConfiguration nodeCfg)

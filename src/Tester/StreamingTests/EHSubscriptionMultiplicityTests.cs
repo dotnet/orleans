@@ -64,8 +64,8 @@ namespace UnitTests.StreamingTests
             config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
 
             // make sure all node configs exist, for dynamic cluster queue balancer
-            config.GetConfigurationForNode("Primary");
-            config.GetConfigurationForNode("Secondary_1");
+            config.GetOrAddConfigurationForNode("Primary");
+            config.GetOrAddConfigurationForNode("Secondary_1");
         }
 
         [TestMethod, TestCategory("EventHub"), TestCategory("Streaming")]

@@ -118,7 +118,7 @@ namespace Orleans.Runtime.Host
                 Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
                 Generation = generation.ToString(CultureInfo.InvariantCulture),
 
-                HostName = host.Config.GetConfigurationForNode(host.Name).DNSHostName,
+                HostName = host.Config.GetOrAddConfigurationForNode(host.Name).DNSHostName,
                 ProxyPort = (proxyEndpoint != null ? proxyEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
 
                 RoleName = serviceRuntimeWrapper.RoleName, 
