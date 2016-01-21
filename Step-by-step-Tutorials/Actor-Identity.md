@@ -106,16 +106,16 @@ In client code, this adds a second argument to the `GetGrain` method on the grai
 var grain = GrainClient.GrainFactory.GetGrain<IExample>(0, "a string!");
 ```
 
-To access the extended key in the grain, we can call an overload on the `GetPrimaryKey` method:
+To access the compound key in the grain, we can call an overload on the `GetPrimaryKey` method:
 
 ``` csharp
 public class ExampleGrain : Orleans.GrainBase, IExampleGrain
 {
     public Task Hello()
     {
-	string extendedKey;
-        long primaryKey = this.GetPrimaryKey(out extendedKey);
-        Console.WriteLine("Hello from " + extendedKey);
+	string keyExtension;
+        long primaryKey = this.GetPrimaryKey(out keyExtension);
+        Console.WriteLine("Hello from " + keyExtension);
         return TaskDone.Done;
     }
 }
