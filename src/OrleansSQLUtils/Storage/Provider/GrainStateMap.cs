@@ -8,7 +8,7 @@ namespace Orleans.SqlUtils.StorageProvider
     /// <summary>
     /// Map of grain state to SQL tables
     /// </summary>
-    internal class GrainStateMap
+    public class GrainStateMap
     {
         /// <summary>
         /// No need to use ConcurrentDictionary since it is instantiated only once and then does only lookups

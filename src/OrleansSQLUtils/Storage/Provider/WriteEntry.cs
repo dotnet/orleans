@@ -6,12 +6,12 @@ namespace Orleans.SqlUtils.StorageProvider
     /// <summary>
     /// Entry for a write
     /// </summary>
-    internal sealed class WriteEntry
+    public sealed class WriteEntry
     {
         /// <summary>
         /// Grain identity
         /// </summary>
-        internal GrainIdentity GrainIdentity { get; private set; }
+        public GrainIdentity GrainIdentity { get; private set; }
 
         /// <summary>
         /// Grain state to write
