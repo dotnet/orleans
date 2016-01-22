@@ -3,16 +3,16 @@
 
 SET CMDHOME=%~dp0.
 
-if exist "%CMDHOME%\..\..\..\Test" (
-  SET DEFAULT_FILE="%CMDHOME%\..\..\..\Test\OrleansTestStorageKey.txt"
+if exist "%CMDHOME%\..\..\..\TestVso" (
+  SET DEFAULT_FILE="%CMDHOME%\..\..\..\TestVso\OrleansTestStorageKey.txt"
 ) else (
-  SET DEFAULT_FILE="%CMDHOME%\..\..\src\Test\OrleansTestStorageKey.txt"
+  SET DEFAULT_FILE="%CMDHOME%\..\..\src\TestVso\OrleansTestStorageKey.txt"
 )
 
-if exist "%CMDHOME%\..\..\..\Test" (
-  SET DEFAULT_SECRETS_FILE="%CMDHOME%\..\..\..\Test\OrleansTestSecrets.json"
+if exist "%CMDHOME%\..\..\..\TestVso" (
+  SET DEFAULT_SECRETS_FILE="%CMDHOME%\..\..\..\TestVso\OrleansTestSecrets.json"
 ) else (
-  SET DEFAULT_SECRETS_FILE="%CMDHOME%\..\..\src\Test\OrleansTestSecrets.json"
+  SET DEFAULT_SECRETS_FILE="%CMDHOME%\..\..\src\TestVso\OrleansTestSecrets.json"
 )
 
 echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH is %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH% >> SetupTestScriptOutput.txt 
