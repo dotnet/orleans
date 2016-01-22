@@ -53,9 +53,9 @@ namespace UnitTests.StreamingTests
 
                         // Make sure a node config exist for each silo in the cluster.
                         // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                        // GetConfigurationForNode will materialize a node in the configuration for each silo, if one does not already exist.
-                        config.GetConfigurationForNode("Primary");
-                        config.GetConfigurationForNode("Secondary_1");
+                        // GetOrAddConfigurationForNode will materialize a node in the configuration for each silo, if one does not already exist.
+                        config.GetOrAddConfigurationForNode("Primary");
+                        config.GetOrAddConfigurationForNode("Secondary_1");
                     }
                 });
         }

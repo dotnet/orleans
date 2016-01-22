@@ -154,7 +154,7 @@ namespace Orleans.Runtime
 
             OrleansConfig = config;
             globalConfig = config.Globals;
-            config.OnConfigChange("Defaults", () => nodeConfig = config.GetConfigurationForNode(name));
+            config.OnConfigChange("Defaults", () => nodeConfig = config.GetOrAddConfigurationForNode(name));
 
             if (!TraceLogger.IsInitialized)
                 TraceLogger.Initialize(nodeConfig);

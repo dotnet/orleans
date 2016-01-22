@@ -209,7 +209,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         /// <param name="name">Silo name.</param>
         /// <returns>NodeConfiguration associated with the specified silo.</returns>
-        public NodeConfiguration GetConfigurationForNode(string name)
+        public NodeConfiguration GetOrAddConfigurationForNode(string name)
         {
             NodeConfiguration n;
             if (Overrides.TryGetValue(name, out n)) return n;
@@ -386,7 +386,7 @@ namespace Orleans.Runtime.Configuration
             sb.Append("Primary node: ").AppendLine(PrimaryNode == null ? "null" : PrimaryNode.ToString());
             sb.AppendLine("Platform version info:").Append(ConfigUtilities.RuntimeVersionInfo());
             sb.AppendLine("Global configuration:").Append(Globals.ToString());
-            NodeConfiguration nc = GetConfigurationForNode(siloName);
+            NodeConfiguration nc = GetOrAddConfigurationForNode(siloName);
             sb.AppendLine("Silo configuration:").Append(nc.ToString());
             sb.AppendLine();
             return sb.ToString();

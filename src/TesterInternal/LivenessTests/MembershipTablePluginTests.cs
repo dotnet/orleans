@@ -37,7 +37,7 @@ namespace UnitTests.LivenessTests
 
             ClusterConfiguration cfg = new ClusterConfiguration();
             cfg.LoadFromFile("OrleansConfigurationForTesting.xml");
-            TraceLogger.Initialize(cfg.GetConfigurationForNode("Primary"));
+            TraceLogger.Initialize(cfg.GetOrAddConfigurationForNode("Primary"));
 
             TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
             TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);

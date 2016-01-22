@@ -781,7 +781,7 @@ namespace UnitTests.SchedulerTests
 
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.StandardLoad();
-            NodeConfiguration config = orleansConfig.GetConfigurationForNode("Primary");
+            NodeConfiguration config = orleansConfig.GetOrAddConfigurationForNode("Primary");
             StatisticsCollector.Initialize(config);
             SchedulerStatisticsGroup.Init();
         }
