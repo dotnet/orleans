@@ -16,7 +16,7 @@ using UnitTests.Tester;
 namespace Tester.StreamingTests
 {
     [ExcludeFromCodeCoverage]
-    public abstract class StreamFilteringTestsBase : UnitTestSiloHost
+    public abstract class StreamFilteringTestsBase : HostedTestClusterPerFixture
     {
         protected Guid StreamId;
         protected string StreamNamespace;
@@ -24,31 +24,23 @@ namespace Tester.StreamingTests
 
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
 
-        public StreamFilteringTestsBase(TestingSiloOptions siloOptions, TestingClientOptions clientOptions)
-            : base(siloOptions, clientOptions)
-        {
-        }
-
         protected void TestInitialize()
         {
-            logger.Info("TestInitialize.");
             StreamId = Guid.NewGuid();
             StreamNamespace = Guid.NewGuid().ToString();
         }
 
         protected void TestCleanup()
         {
-            logger.Info("TestCleanup.");
-
             if (StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME.Equals(streamProviderName))
             {
                 try
                 {
                     logger.Info("TestCleanup - DeleteAllUsedAzureQueues {0}", streamProviderName);
                     AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(
-                        streamProviderName, 
-                        DeploymentId,
-                        StorageTestConstants.DataConnectionString, 
+                        streamProviderName,
+                        TestingSiloHost.Instance.DeploymentId,
+                        StorageTestConstants.DataConnectionString,
                         logger).Wait();
                 }
                 catch (Exception exc)
@@ -273,15 +265,9 @@ namespace Tester.StreamingTests
             ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
         };
 
-        public StreamFilteringTests_SMS()
-            : base(siloOptions, clientOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(siloOptions, clientOptions);
         }
 
         [TestInitialize]
@@ -366,16 +352,9 @@ namespace Tester.StreamingTests
             ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
         };
 
-        public StreamFilteringTests_AQ()
-            : base(siloOptions, clientOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(siloOptions, clientOptions);
         }
 
         [TestInitialize]

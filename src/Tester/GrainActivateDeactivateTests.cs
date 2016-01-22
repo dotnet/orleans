@@ -3,27 +3,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
     [TestClass]
-    public class GrainActivateDeactivateTests : UnitTestSiloHost
+    public class GrainActivateDeactivateTests : HostedTestClusterEnsureDefaultStarted
     {
         private IActivateDeactivateWatcherGrain watcher;
-
-        public GrainActivateDeactivateTests()
-            : base(new TestingSiloOptions { StartFreshOrleans = true, StartSecondary = false }) // Only need single silo
-        {
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            StopAllSilos();
-        }
 
         [TestInitialize]
         public void TestInitialize()
@@ -42,7 +30,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task WatcherGrain_GetGrain()
         {
             IActivateDeactivateWatcherGrain grain = GrainClient.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(1);

@@ -7,14 +7,8 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class PolymorphicInterfaceTest : UnitTestSiloHost
+    public class PolymorphicInterfaceTest : HostedTestClusterEnsureDefaultStarted
     {
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic_SimpleTest()
         {

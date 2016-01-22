@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         /// </summary>
         private static readonly string OrleansCoreAssembly = typeof(IGrain).Assembly.GetName().FullName;
 
-        private static readonly ConcurrentDictionary<Tuple<Type, string, bool, bool>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, string, bool, bool>, string>();
+        private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
 
         private static readonly ConcurrentDictionary<Tuple<Type, bool>, List<Type>> ReferencedTypes = new ConcurrentDictionary<Tuple<Type, bool>, List<Type>>();
 
@@ -37,8 +37,15 @@ namespace Orleans.Runtime
             if (typeInfo.IsNestedPublic || typeInfo.IsNestedPrivate)
             {
                 if (typeInfo.DeclaringType.IsGenericType)
-                    return GetTemplatedName(GetUntemplatedTypeName(typeInfo.DeclaringType.Name), typeInfo.DeclaringType, typeInfo.GetGenericArguments(), _ => true, language) + "." + GetUntemplatedTypeName(typeInfo.Name);
-                
+                {
+                    return GetTemplatedName(
+                        GetUntemplatedTypeName(typeInfo.DeclaringType.Name),
+                        typeInfo.DeclaringType,
+                        typeInfo.GetGenericArguments(),
+                        _ => true,
+                        language) + "." + GetUntemplatedTypeName(typeInfo.Name);
+                }
+
                 return GetTemplatedName(typeInfo.DeclaringType, language: language) + "." + GetUntemplatedTypeName(typeInfo.Name);
             }
 
@@ -419,17 +426,7 @@ namespace Orleans.Runtime
             }
             return generalType.GetTypeInfo().IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));        
         }
- 
-        public static bool IsGrainStateType(Type type)
-        {
-            var generalType = typeof(GrainState);
-            if (type.Assembly.ReflectionOnly)
-            {
-                generalType = ToReflectionOnlyType(generalType);
-            }
-            return generalType.GetTypeInfo().IsAssignableFrom(type) && TypeHasAttribute(type, typeof(GrainStateAttribute));
-        }
-            
+        
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);
@@ -595,25 +592,25 @@ namespace Orleans.Runtime
         /// <returns>
         /// A string representation of the <paramref name="type"/>.
         /// </returns>
-        public static string GetParseableName(this Type type, string nameSuffix = null, bool includeNamespace = true, bool includeGenericParameters = true)
+        public static string GetParseableName(this Type type, TypeFormattingOptions options = null)
         {
-            return
-                ParseableNameCache.GetOrAdd(
-                    Tuple.Create(type, nameSuffix, includeNamespace, includeGenericParameters),
-                    _ =>
-                    {
-                        var builder = new StringBuilder();
-                        var typeInfo = type.GetTypeInfo();
-                        GetParseableName(
-                            type,
-                            nameSuffix ?? string.Empty,
-                            builder,
-                            new Queue<Type>(
-                                typeInfo.IsGenericTypeDefinition ? typeInfo.GetGenericArguments() : typeInfo.GenericTypeArguments),
-                            includeNamespace,
-                            includeGenericParameters);
-                        return builder.ToString();
-                    });
+            options = options ?? new TypeFormattingOptions();
+            return ParseableNameCache.GetOrAdd(
+                Tuple.Create(type, options),
+                _ =>
+                {
+                    var builder = new StringBuilder();
+                    var typeInfo = type.GetTypeInfo();
+                    GetParseableName(
+                        type,
+                        builder,
+                        new Queue<Type>(
+                            typeInfo.IsGenericTypeDefinition
+                                ? typeInfo.GetGenericArguments()
+                                : typeInfo.GenericTypeArguments),
+                        options);
+                    return builder.ToString();
+                });
         }
 
         /// <summary>
@@ -628,33 +625,28 @@ namespace Orleans.Runtime
         /// <param name="typeArguments">
         /// The type arguments of <paramref name="type"/>.
         /// </param>
-        /// <param name="includeNamespace">
-        /// A value indicating whether or not to include the namespace name.
+        /// <param name="options">
+        /// The type formatting options.
         /// </param>
         private static void GetParseableName(
             Type type,
-            string nameSuffix,
             StringBuilder builder,
             Queue<Type> typeArguments,
-            bool includeNamespace = true,
-            bool includeGenericParameters = true)
+            TypeFormattingOptions options)
         {
             var typeInfo = type.GetTypeInfo();
             if (typeInfo.IsArray)
             {
                 builder.AppendFormat(
                     "{0}[{1}]",
-                    typeInfo.GetElementType()
-                        .GetParseableName(
-                            includeNamespace: includeNamespace,
-                            includeGenericParameters: includeGenericParameters),
+                    typeInfo.GetElementType().GetParseableName(options),
                     string.Concat(Enumerable.Range(0, type.GetArrayRank() - 1).Select(_ => ',')));
                 return;
             }
 
             if (typeInfo.IsGenericParameter)
             {
-                if (includeGenericParameters)
+                if (options.IncludeGenericTypeParameters)
                 {
                     builder.Append(typeInfo.GetUnadornedTypeName());
                 }
@@ -665,57 +657,63 @@ namespace Orleans.Runtime
             if (typeInfo.DeclaringType != null)
             {
                 // This is not the root type.
-                GetParseableName(typeInfo.DeclaringType, string.Empty, builder, typeArguments, includeNamespace, includeGenericParameters);
-                builder.Append('.');
+                GetParseableName(typeInfo.DeclaringType, builder, typeArguments, options);
+                builder.Append(options.NestedTypeSeparator);
             }
-            else if (!string.IsNullOrWhiteSpace(type.Namespace) && includeNamespace)
+            else if (!string.IsNullOrWhiteSpace(type.Namespace) && options.IncludeNamespace)
             {
-                // This is the root type.
-                builder.AppendFormat("global::{0}.", type.Namespace);
+                // This is the root type, so include the namespace.
+                var namespaceName = type.Namespace;
+                if (options.NestedTypeSeparator != '.')
+                {
+                    namespaceName = namespaceName.Replace('.', options.NestedTypeSeparator);
+                }
+
+                if (options.IncludeGlobal)
+                {
+                    builder.AppendFormat("global::");
+                }
+
+                builder.AppendFormat("{0}{1}", namespaceName, options.NestedTypeSeparator);
             }
 
             if (typeInfo.IsConstructedGenericType)
             {
                 // Get the unadorned name, the generic parameters, and add them together.
-                var unadornedTypeName = typeInfo.GetUnadornedTypeName() + nameSuffix;
+                var unadornedTypeName = typeInfo.GetUnadornedTypeName() + options.NameSuffix;
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
                     Enumerable.Range(0, Math.Min(typeInfo.GetGenericArguments().Count(), typeArguments.Count))
                         .Select(_ => typeArguments.Dequeue())
                         .ToList();
-                if (generics.Count > 0)
+                if (generics.Count > 0 && options.IncludeTypeParameters)
                 {
                     var genericParameters = string.Join(
                         ",",
-                        generics.Select(
-                            generic =>
-                            GetParseableName(
-                                generic,
-                                includeNamespace: includeNamespace,
-                                includeGenericParameters: includeGenericParameters)));
+                        generics.Select(generic => GetParseableName(generic, options)));
                     builder.AppendFormat("<{0}>", genericParameters);
                 }
             }
             else if (typeInfo.IsGenericTypeDefinition)
             {
                 // Get the unadorned name, the generic parameters, and add them together.
-                var unadornedTypeName = type.GetUnadornedTypeName() + nameSuffix;
+                var unadornedTypeName = type.GetUnadornedTypeName() + options.NameSuffix;
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
                     Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
                         .Select(_ => typeArguments.Dequeue())
                         .ToList();
-                if (generics.Count > 0)
+                if (generics.Count > 0 && options.IncludeTypeParameters)
                 {
                     var genericParameters = string.Join(
                         ",",
-                        generics.Select(_ => includeGenericParameters ? _.ToString() : string.Empty));
+                        generics.Select(_ => options.IncludeGenericTypeParameters ? _.ToString() : string.Empty));
                     builder.AppendFormat("<{0}>", genericParameters);
                 }
             }
             else
             {
-                builder.Append(EscapeIdentifier(type.GetUnadornedTypeName() + nameSuffix));
+                builder.Append(EscapeIdentifier(type.GetUnadornedTypeName() + options.NameSuffix));
             }
         }
 

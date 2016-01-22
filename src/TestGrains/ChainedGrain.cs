@@ -7,7 +7,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ChainedGrainState : GrainState
+    [Serializable]
+    public class ChainedGrainState
     {
         public int Id { get; set; }
 

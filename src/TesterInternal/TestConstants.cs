@@ -11,5 +11,6 @@ namespace UnitTests
 
         public static readonly TimeSpan InitTimeout =
             Debugger.IsAttached ? TimeSpan.FromMinutes(10) : TimeSpan.FromMinutes(1);
+        
     }
 }

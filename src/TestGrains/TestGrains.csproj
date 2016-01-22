@@ -55,7 +55,10 @@
     <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ConcurrentGrain.cs" />
+    <Compile Include="ConsumerEventCountingGrain.cs" />
+    <Compile Include="DeadlockGrain.cs" />
     <Compile Include="DerivedServiceType.cs" />
+    <Compile Include="EnumResultGrain.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="ExternalTypeGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
@@ -70,14 +73,18 @@
     <Compile Include="GenericGrains.cs" />
     <Compile Include="GetGrainGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
+    <Compile Include="KeyExtensionTestGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
     <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
     <Compile Include="MyObserverSubscriptionManager.cs" />
     <Compile Include="PolymorphicTestGrain.cs" />
+    <Compile Include="ProducerEventCountingGrain.cs" />
     <Compile Include="PromiseForwardGrain.cs" />
     <Compile Include="ProxyGrain.cs" />
+    <Compile Include="ReentrantGrain.cs" />
     <Compile Include="ReminderTestGrain.cs" />
+    <Compile Include="RequestContextTestGrain.cs" />
     <Compile Include="SerializationGenerationGrain.cs" />
     <Compile Include="ServiceType.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
@@ -102,7 +109,7 @@
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="LivenessTestGrain.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
-    <Compile Include="StreamLifecycleTestGrains.cs" />
+    <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansEventSourcing\OrleansEventSourcing.csproj">

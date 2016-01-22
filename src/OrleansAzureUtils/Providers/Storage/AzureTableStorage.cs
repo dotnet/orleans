@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Data.Services.Common;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -103,8 +101,7 @@ namespace Orleans.Storage
             
             if (useJsonFormat)
             {
-                jsonSettings = new Newtonsoft.Json.JsonSerializerSettings();
-                jsonSettings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All;
+                jsonSettings = jsonSettings = OrleansJsonSerializer.SerializerSettings;
             }
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
@@ -130,7 +127,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.ReadStateAsync"/>
-        public async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -144,35 +141,36 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    ConvertFromStorageFormat(grainState, entity);
-                    grainState.Etag = record.ETag;
+                    grainState.State = ConvertFromStorageFormat(entity);
+                    grainState.ETag = record.ETag;
                 }
             }
+
             // Else leave grainState in previous default condition
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IStorageProvider.WriteStateAsync"/>
-        public async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
             if (Log.IsVerbose3)
-                Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.Etag, tableName);
+                Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.ETag, tableName);
 
             var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
-            ConvertToStorageFormat(grainState, entity);
-            var record = new GrainStateRecord { Entity = entity, ETag = grainState.Etag };
+            ConvertToStorageFormat(grainState.State, entity);
+            var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             try
             {
                 await tableDataManager.Write(record);
-                grainState.Etag = record.ETag;
+                grainState.ETag = record.ETag;
             }
             catch (Exception exc)
             {
                 Log.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
-                    grainType, grainReference, grainState.Etag, tableName, exc.Message), exc);
+                    grainType, grainReference, grainState.ETag, tableName, exc.Message), exc);
                 throw;
             }
         }
@@ -184,14 +182,14 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IStorageProvider.ClearStateAsync"/>
-        public async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
-            if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.Etag, isDeleteStateOnClear, tableName);
+            if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.ETag, isDeleteStateOnClear, tableName);
             var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
-            var record = new GrainStateRecord { Entity = entity, ETag = grainState.Etag };
+            var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             string operation = "Clearing";
             try
             {
@@ -204,12 +202,13 @@ namespace Orleans.Storage
                 {
                     await tableDataManager.Write(record);
                 }
-                grainState.Etag = record.ETag; // Update in-memory data to the new ETag
+
+                grainState.ETag = record.ETag; // Update in-memory data to the new ETag
             }
             catch (Exception exc)
             {
                 Log.Error((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
-                    operation, grainType, grainReference, grainState.Etag, tableName, exc.Message), exc);
+                    operation, grainType, grainReference, grainState.ETag, tableName, exc.Message), exc);
                 throw;
             }
         }
@@ -224,16 +223,14 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal void ConvertToStorageFormat(GrainState grainState, GrainStateEntity entity)
+        internal void ConvertToStorageFormat(object grainState, GrainStateEntity entity)
         {
-            // Dehydrate
-            var dataValues = grainState.AsDictionary();
             int dataSize;
 
             if (useJsonFormat)
             {
                 // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
-                string data = Newtonsoft.Json.JsonConvert.SerializeObject(dataValues, jsonSettings);
+                string data = Newtonsoft.Json.JsonConvert.SerializeObject(grainState, jsonSettings);
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
@@ -245,7 +242,7 @@ namespace Orleans.Storage
             {
                 // Convert to binary format
 
-                byte[] data = SerializationManager.SerializeToByteArray(dataValues);
+                byte[] data = SerializationManager.SerializeToByteArray(grainState);
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
@@ -264,26 +261,22 @@ namespace Orleans.Storage
         /// <summary>
         /// Deserialize from Azure storage format
         /// </summary>
-        /// <param name="grainState">The grain state data to be deserialized in to</param>
         /// <param name="entity">The Azure table entity the stored data</param>
-        internal void ConvertFromStorageFormat(GrainState grainState, GrainStateEntity entity)
+        internal object ConvertFromStorageFormat(GrainStateEntity entity)
         {
-            Dictionary<string, object> dataValues = null;
+            object dataValue = null;
             try
             {
                 if (entity.Data != null)
                 {
                     // Rehydrate
-                    dataValues = SerializationManager.DeserializeFromByteArray<Dictionary<string, object>>(entity.Data);
+                    dataValue = SerializationManager.DeserializeFromByteArray<object>(entity.Data);
                 }
                 else if (entity.StringData != null)
                 {
-                    dataValues = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(entity.StringData, jsonSettings);
-                }
-                if (dataValues != null)
-                {
-                    grainState.SetAll(dataValues);
-                }
+                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(entity.StringData, jsonSettings);
+                } 
+
                 // Else, no data found
             }
             catch (Exception exc)
@@ -297,20 +290,16 @@ namespace Orleans.Storage
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", entity.StringData);
                 }
-                if (dataValues != null)
+                if (dataValue != null)
                 {
-                    int i = 1;
-                    foreach (var dvKey in dataValues.Keys)
-                    {
-                        object dvValue = dataValues[dvKey];
-                        sb.AppendLine();
-                        sb.AppendFormat("Data #{0} Key={1} Value={2} Type={3}", i, dvKey, dvValue, dvValue.GetType());
-                        i++;
-                    }
+                    sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
+
                 Log.Error(0, sb.ToString(), exc);
                 throw new AggregateException(sb.ToString(), exc);
             }
+
+            return dataValue;
         }
 
         private string GetKeyString(GrainReference grainReference)

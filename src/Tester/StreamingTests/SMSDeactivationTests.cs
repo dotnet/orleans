@@ -12,11 +12,11 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SMSDeactivationTests : UnitTestSiloHost
+    public class SMSDeactivationTests : HostedTestClusterPerFixture
     {
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
-        private readonly DeactivationTestRunner runner;
+        private DeactivationTestRunner runner;
 
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
@@ -29,17 +29,15 @@ namespace UnitTests.StreamingTests
             ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
         };
 
-        public SMSDeactivationTests()
-            : base(siloOptions, clientOptions)
+        public static TestingSiloHost CreateSiloHost()
         {
-            runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
+            return new TestingSiloHost(siloOptions, clientOptions);
         }
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestInitialize]
+        public void TestInitialize()
         {
-            StopAllSilos();
+            runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]

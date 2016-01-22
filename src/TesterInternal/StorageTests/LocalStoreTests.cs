@@ -66,17 +66,17 @@ namespace UnitTests.StorageTests
 
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
             TestStoreGrainState state = new TestStoreGrainState();
+            var stateProperties = AsDictionary(state);
+            var keys = GetKeys(name, reference);
+            store.WriteRow(keys, stateProperties, null);
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            var keys = GetKeys(name, reference);
-            TestStoreGrainState storedState = new TestStoreGrainState();
             var data = store.ReadRow(keys);
-            storedState.SetAll(data);
             TimeSpan readTime = sw.Elapsed;
             Console.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
-            Assert.AreEqual(state.A, storedState.A, "A");
-            Assert.AreEqual(state.B, storedState.B, "B");
-            Assert.AreEqual(state.C, storedState.C, "C");
+            Assert.AreEqual(state.A, data["A"], "A");
+            Assert.AreEqual(state.B, data["B"], "B");
+            Assert.AreEqual(state.C, data["C"], "C");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -87,21 +87,20 @@ namespace UnitTests.StorageTests
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
-            TestStoreGrainState state = TestStoreGrainState.NewRandomState();
+            var state = TestStoreGrainState.NewRandomState();
             Stopwatch sw = new Stopwatch();
             sw.Start();
             var keys = GetKeys(name, reference);
-            store.WriteRow(keys, state.AsDictionary(), state.Etag);
+            var stateProperties = AsDictionary(state.State);
+            store.WriteRow(keys, stateProperties, state.ETag);
             TimeSpan writeTime = sw.Elapsed;
             sw.Restart();
-            TestStoreGrainState storedState = new TestStoreGrainState();
             var data = store.ReadRow(keys);
-            storedState.SetAll(data);
             TimeSpan readTime = sw.Elapsed;
             Console.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.AreEqual(state.A, storedState.A, "A");
-            Assert.AreEqual(state.B, storedState.B, "B");
-            Assert.AreEqual(state.C, storedState.C, "C");
+            Assert.AreEqual(state.State.A, data["A"], "A");
+            Assert.AreEqual(state.State.B, data["B"], "B");
+            Assert.AreEqual(state.State.C, data["C"], "C");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -112,7 +111,7 @@ namespace UnitTests.StorageTests
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
-            IDictionary<string, object> data = TestStoreGrainState.NewRandomState().AsDictionary();
+            var data = TestStoreGrainState.NewRandomState();
 
             Console.WriteLine("Using store = {0}", store.GetType().FullName);
             Stopwatch sw = new Stopwatch();
@@ -120,12 +119,12 @@ namespace UnitTests.StorageTests
             var keys = GetKeys(name, reference);
 
             sw.Restart();
-            string eTag = store.WriteRow(keys, data, null);
+            string eTag = store.WriteRow(keys, AsDictionary(data.State), null);
             Console.WriteLine("Write returned Etag={0} after {1} {2}", eTag, sw.Elapsed, StorageProviderUtils.PrintOneWrite(keys, data, eTag));
 
             sw.Restart();
-            data = store.ReadRow(keys);
-            Console.WriteLine("Read returned {0} after {1}", StorageProviderUtils.PrintOneWrite(keys, data, eTag), sw.Elapsed);
+            var storedData = store.ReadRow(keys);
+            Console.WriteLine("Read returned {0} after {1}", StorageProviderUtils.PrintOneWrite(keys, storedData, eTag), sw.Elapsed);
             Assert.IsNotNull(data, "Should get some data from Read");
 
             sw.Restart();
@@ -133,16 +132,16 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(ok, "Row deleted OK after {0}. Etag={1} Keys={2}", sw.Elapsed, eTag, StorageProviderUtils.PrintKeys(keys));
 
             sw.Restart();
-            data = store.ReadRow(keys); // Try to re-read after delete
-            Console.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(data));
+            storedData = store.ReadRow(keys); // Try to re-read after delete
+            Console.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(storedData));
             Assert.IsNotNull(data, "Should not get null data from Re-Read");
-            Assert.IsTrue(data.Count == 0, "Should get no data from Re-Read but got: {0}", StorageProviderUtils.PrintData(data));
+            Assert.IsTrue(storedData.Count == 0, "Should get no data from Re-Read but got: {0}", StorageProviderUtils.PrintData(storedData));
 
             sw.Restart();
             const string oldEtag = null;
-            eTag = store.WriteRow(keys, data, oldEtag);
-            Console.WriteLine("Write for Keys={0} Etag={1} Data={2} returned New Etag={3} after {4}", 
-                StorageProviderUtils.PrintKeys(keys), oldEtag, StorageProviderUtils.PrintData(data), 
+            eTag = store.WriteRow(keys, storedData, oldEtag);
+            Console.WriteLine("Write for Keys={0} Etag={1} Data={2} returned New Etag={3} after {4}",
+                StorageProviderUtils.PrintKeys(keys), oldEtag, StorageProviderUtils.PrintData(storedData),
                 eTag, sw.Elapsed);
 
             sw.Restart();
@@ -163,9 +162,10 @@ namespace UnitTests.StorageTests
                 Tuple.Create("GrainType", name),
                 Tuple.Create("GrainId", "1")
             }.ToList();
-            TestStoreGrainState state = TestStoreGrainState.NewRandomState();
+            var grainState = TestStoreGrainState.NewRandomState();
+            var state = grainState.State;
             state.A = name;
-            store.WriteRow(keys, state.AsDictionary(), state.Etag);
+            store.WriteRow(keys, AsDictionary(state), grainState.ETag);
 
             // Write #2
             keys = new[]
@@ -173,9 +173,10 @@ namespace UnitTests.StorageTests
                 Tuple.Create("GrainType", name),
                 Tuple.Create("GrainId", "2")
             }.ToList();
-            state = TestStoreGrainState.NewRandomState();
+            grainState = TestStoreGrainState.NewRandomState();
+            state = grainState.State;
             state.A = name;
-            store.WriteRow(keys, state.AsDictionary(), state.Etag);
+            store.WriteRow(keys, AsDictionary(state), grainState.ETag);
 
             // Multi Read
             keys = new[]
@@ -194,9 +195,10 @@ namespace UnitTests.StorageTests
             string name = TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
-            
+
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
-            TestStoreGrainState state = TestStoreGrainState.NewRandomState();
+            var grainState = TestStoreGrainState.NewRandomState();
+            var state = grainState.State;
             Stopwatch sw = new Stopwatch();
             sw.Start();
             IList<Tuple<string, string>> keys = new[]
@@ -204,17 +206,15 @@ namespace UnitTests.StorageTests
                 Tuple.Create("GrainType", name),
                 Tuple.Create("GrainId", reference.GrainId.GetPrimaryKey().ToString("N"))
             }.ToList();
-            store.WriteRow(keys, state.AsDictionary(), state.Etag);
+            store.WriteRow(keys, AsDictionary(state), grainState.ETag);
             TimeSpan writeTime = sw.Elapsed;
             sw.Restart();
-            TestStoreGrainState storedState = new TestStoreGrainState();
             var data = store.ReadRow(keys);
-            storedState.SetAll(data);
             TimeSpan readTime = sw.Elapsed;
             Console.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.AreEqual(state.A, storedState.A, "A");
-            Assert.AreEqual(state.B, storedState.B, "B");
-            Assert.AreEqual(state.C, storedState.C, "C");
+            Assert.AreEqual(state.A, data["A"], "A");
+            Assert.AreEqual(state.B, data["B"], "B");
+            Assert.AreEqual(state.C, data["C"], "C");
         }
 
         // ---------- Utility methods ----------
@@ -228,46 +228,34 @@ namespace UnitTests.StorageTests
             };
             return keys.ToList();
         }
+
+        private static Dictionary<string, object> AsDictionary(object state)
+        {
+            return state.GetType().GetProperties()
+                .Select(v => new KeyValuePair<string, object>(v.Name, v.GetValue(state)))
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
+        }
     }
 
     #region Grain State class for these tests
-    public class TestStoreGrainState : GrainState
+    [Serializable]
+    public class TestStoreGrainState
     {
         public string A { get; set; }
         public int B { get; set; }
         public long C { get; set; }
 
-        public TestStoreGrainState()
-            : base("System.Object")
+        internal static GrainState<TestStoreGrainState> NewRandomState()
         {
-        }
-
-        public static TestStoreGrainState NewRandomState()
-        {
-            return new TestStoreGrainState
+            return new GrainState<TestStoreGrainState>
             {
-                A = TestConstants.random.Next().ToString(CultureInfo.InvariantCulture),
-                B = TestConstants.random.Next(),
-                C = TestConstants.random.Next()
+                State = new TestStoreGrainState
+                {
+                    A = TestConstants.random.Next().ToString(CultureInfo.InvariantCulture),
+                    B = TestConstants.random.Next(),
+                    C = TestConstants.random.Next()
+                }
             };
-        }
-
-        public override IDictionary<string, object> AsDictionary()
-        {
-            Dictionary<string, object> values = new Dictionary<string, object>();
-            values["A"] = this.A;
-            values["B"] = this.B;
-            values["C"] = this.C;
-            return values;
-        }
-
-        public override void SetAll(IDictionary<string, object> values)
-        {
-            object value;
-            if (values.TryGetValue("A", out value)) A = (string) value;
-            //if (values.TryGetValue("B", out value)) B = (int)value;
-            if (values.TryGetValue("B", out value)) B = value is Int64 ? (int) (long) value : (int) value;
-            if (values.TryGetValue("C", out value)) { C = value is Int32 ? (int) value : (long) value; }
         }
     }
     #endregion

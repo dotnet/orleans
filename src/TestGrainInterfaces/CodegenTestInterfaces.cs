@@ -115,11 +115,33 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public abstract class SomeAbstractClass : ISomeInterface
     {
+        [NonSerialized]
+        private int nonSerializedIntField;
+
         public abstract int Int { get; set; }
 
         public List<ISomeInterface> Interfaces { get; set; }
 
         public List<SomeAbstractClass> Classes { get; set; }
+
+        [Obsolete("This field should not be serialized", true)]
+        public int ObsoleteIntWithError { get; set; }
+
+        [Obsolete("This field should be serialized")]
+        public int ObsoleteInt { get; set; }
+
+        public int NonSerializedInt
+        {
+            get
+            {
+                return this.nonSerializedIntField;
+            }
+
+            set
+            {
+                this.nonSerializedIntField = value;
+            }
+        }
 
         [Serializable]
         public enum SomeEnum

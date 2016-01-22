@@ -10,19 +10,20 @@ using UnitTests.Tester;
 namespace UnitTests.CatalogTests
 {
     [TestClass]
-    public class DuplicateActivationsTests : UnitTestSiloHost
+    public class DuplicateActivationsTests : HostedTestClusterPerFixture
     {
-        public DuplicateActivationsTests()
-            : base(new TestingSiloOptions
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(new TestingSiloOptions
             {
                 AdjustConfig = config =>
                 {
-                    foreach (var nodeConfig in config.Overrides.Values) {
+                    foreach (var nodeConfig in config.Overrides.Values)
+                    {
                         nodeConfig.MaxActiveThreads = 1;
                     }
                 },
-            })
-        {
+            });
         }
 
         [TestMethod, TestCategory("Catalog"), TestCategory("Functional")]

@@ -15,11 +15,12 @@
     <description>
       Microsoft Orleans library for hosting silo in a testing project.
     </description>
-    <copyright>Copyright Microsoft 2015</copyright>
+    <copyright>Copyright Microsoft 2016</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />      
+      <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
     </dependencies>
   </metadata>
   <files>
@@ -30,6 +31,7 @@
     <file src="OrleansConfigurationForTesting.xml" target="content" />
 
     <file src="TestingHost.Install.ps1" target="tools\install.ps1" />
+    
     <file src="$SRC_DIR$OrleansTestingHost\**\*.cs" target="src" />
   </files>
 </package>

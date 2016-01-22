@@ -11,7 +11,7 @@ Orleans - Distributed Actor Model
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/orleans?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
-[![Help Wanted Issues](https://badge.waffle.io/dotnet/orleans.svg?label=help%20wanted&title=Help Wanted Issues)](http://waffle.io/dotnet/orleans)
+[![Help Wanted Issues](https://badge.waffle.io/dotnet/orleans.svg?label=up-for-grabs&title=Help Wanted Issues)](http://waffle.io/dotnet/orleans)
 
 Orleans is a framework that provides a straight-forward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
 
@@ -95,6 +95,10 @@ Console.WriteLine(await friend.SayHello("Good morning, my friend!"));
 
 Community
 =========
+
+* Ask questions by [opening an issue on GitHub](https://github.com/dotnet/orleans/issues) or on [Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
+
+* [Chat on Gitter](https://gitter.im/dotnet/orleans)
 
 * Follow the [@ProjectOrleans](https://twitter.com/ProjectOrleans) Twitter account for Orleans project news announcements.
 

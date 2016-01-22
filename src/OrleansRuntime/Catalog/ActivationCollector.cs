@@ -332,9 +332,9 @@ namespace Orleans.Runtime
                 condemned.Add(activation);
             }
 
-            if (Silo.CurrentSilo.TestHookup.Debug_OnDecideToCollectActivation != null)
+            if (Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation != null)
             {
-                Silo.CurrentSilo.TestHookup.Debug_OnDecideToCollectActivation(activation.Grain);
+                Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation(activation.Grain);
             }
         }
 

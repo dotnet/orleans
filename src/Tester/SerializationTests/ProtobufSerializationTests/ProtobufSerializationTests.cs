@@ -10,7 +10,7 @@ using System;
 namespace UnitTests.Serialization
 {
     [TestClass]
-    [DeploymentItem("OrleansProtobufUtils.dll")]
+    [DeploymentItem("OrleansGoogleUtils.dll")]
     public class ProtobufSerializationTests
     {
         [TestInitialize]

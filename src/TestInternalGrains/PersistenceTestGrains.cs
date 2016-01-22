@@ -16,21 +16,21 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class PersistenceTestGrainState : GrainState
+    [Serializable]
+    public class PersistenceTestGrainState
     {
+        public PersistenceTestGrainState()
+        {
+            SortedDict = new SortedDictionary<int, int>();
+        }
+
         public int Field1 { get; set; }
         public string Field2 { get; set; }
         public SortedDictionary<int, int> SortedDict { get; set; }
-
-        public override void SetAll(IDictionary<string, object> values)
-        {
-            base.SetAll(values);
-            if (SortedDict == null)
-                SortedDict = new SortedDictionary<int, int>();
-        }
     }
 
-    public class PersistenceGenericGrainState<T> : GrainState
+    [Serializable]
+    public class PersistenceGenericGrainState<T>
     {
         public T Field1 { get; set; }
         public string Field2 { get; set; }
@@ -86,9 +86,9 @@ namespace UnitTests.Grains
             return Task.FromResult(State.Field1);
         }
 
-        public Task DoDelete()
+        public async Task DoDelete()
         {
-            return ClearStateAsync();
+            await ClearStateAsync();
         }
     }
 
@@ -133,7 +133,7 @@ namespace UnitTests.Grains
 
         public async Task DoWrite(int val, bool recover)
         {
-            var original = State.AsDictionary();
+            var original = SerializationManager.DeepCopy(State);
             try
             {
                 State.Field1 = val;
@@ -144,13 +144,13 @@ namespace UnitTests.Grains
                 if (!recover) throw;
 
                 GetLogger().Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
-                State.SetAll(original);
+                State = (PersistenceTestGrainState)original;
             }
         }
 
         public async Task<int> DoRead(bool recover)
         {
-            var original = State.AsDictionary();
+            var original = SerializationManager.DeepCopy(State);
             try
             {
                 await ReadStateAsync();
@@ -160,7 +160,7 @@ namespace UnitTests.Grains
                 if (!recover) throw;
 
                 GetLogger().Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
-                State.SetAll(original);
+                State = (PersistenceTestGrainState)original;
             }
             return State.Field1;
         }
@@ -370,7 +370,8 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public class NestedPersistenceTestGrainState : GrainState
+        [Serializable]
+        public class NestedPersistenceTestGrainState
         {
             public int Field1 { get; set; }
             public string Field2 { get; set; }
@@ -378,20 +379,20 @@ namespace UnitTests.Grains
         }
     }
 
-    public class UserState : GrainState
+    [Serializable]
+    public class UserState
     {
+        public UserState()
+        {
+            Friends = new List<IUser>();
+        }
+
         public string Name { get; set; }
         public string Status { get; set; }
         public List<IUser> Friends { get; set; }
-
-        public override void SetAll(IDictionary<string, object> values)
-        {
-            base.SetAll(values);
-            if (Friends == null)
-                Friends = new List<IUser>();
-        }
     }
 
+    [Serializable]
     public class DerivedUserState : UserState
     {
         public int Field1 { get; set; }
@@ -462,21 +463,19 @@ namespace UnitTests.Grains
         }
     }
 
-    public class StateForIReentrentGrain : GrainState
+    [Serializable]
+    public class StateForIReentrentGrain
     {
+        public StateForIReentrentGrain()
+        {
+            DictOne = new Dictionary<string, int>();
+            DictTwo = new Dictionary<string, int>();
+        }
+
         public int One { get; set; }
         public int Two { get; set; }
         public Dictionary<string, int> DictOne { get; set; }
         public Dictionary<string, int> DictTwo { get; set; }
-
-        public override void SetAll(IDictionary<string, object> values)
-        {
-            base.SetAll(values);
-            if (DictOne == null)
-                DictOne = new Dictionary<string, int>();
-            if (DictTwo == null)
-                DictTwo = new Dictionary<string, int>();
-        }
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
@@ -823,7 +822,8 @@ namespace UnitTests.Grains
         }
     }
 
-    public class InternalGrainStateData : GrainState
+    [Serializable]
+    public class InternalGrainStateData
     {
         public int One { get; set; }
     }
@@ -852,7 +852,8 @@ namespace UnitTests.Grains
         int Field1 { get; set; }
     }
 
-    public class StateInheritanceTestGrainData : GrainState, IBaseStateData
+    [Serializable]
+    public class StateInheritanceTestGrainData : IBaseStateData
     {
         private int Field2 { get; set; }
 

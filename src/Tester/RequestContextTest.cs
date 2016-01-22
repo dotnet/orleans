@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -9,19 +8,8 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class RequestContextTests : UnitTestSiloHost
+    public class RequestContextTests : HostedTestClusterEnsureDefaultStarted
     {
-        public RequestContextTests()
-            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
-
         [TestMethod, TestCategory("RequestContext"), TestCategory("Functional")]
         public async Task RequestContextCallerToCalleeFlow()
         {

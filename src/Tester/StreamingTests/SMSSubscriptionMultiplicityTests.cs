@@ -13,33 +13,32 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class SMSSubscriptionMultiplicityTests : UnitTestSiloHost
+    public class SMSSubscriptionMultiplicityTests : HostedTestClusterPerFixture
     {
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSSubscriptionMultiplicityTestsNamespace";
-        private readonly SubscriptionMultiplicityTestRunner runner;
+        private SubscriptionMultiplicityTestRunner runner;
 
-        public SMSSubscriptionMultiplicityTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-            }, new TestingClientOptions()
-            {
-                AdjustConfig = config =>
-                {
-                    config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName, new Dictionary<string, string>());
-                },
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-            runner = new SubscriptionMultiplicityTestRunner(SMSStreamProviderName, GrainClient.Logger);
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+                }, new TestingClientOptions()
+                {
+                    AdjustConfig = config =>
+                    {
+                        config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName, new Dictionary<string, string>());
+                    },
+                });
         }
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestInitialize]
+        public void TestInitialize()
         {
-            StopAllSilos();
+            runner = new SubscriptionMultiplicityTestRunner(SMSStreamProviderName, GrainClient.Logger);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]

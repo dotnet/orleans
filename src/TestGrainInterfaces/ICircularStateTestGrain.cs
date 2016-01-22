@@ -10,7 +10,8 @@ namespace TestGrainInterfaces
         Task<CircularTest1> GetState();
     }
 
-    public class CircularStateTestState : GrainState
+    [Serializable]
+    public class CircularStateTestState
     {
         public CircularTest1 CircularTest1 { get; set; }
     }

@@ -21,7 +21,7 @@ namespace UnitTests.Stats
     }
 
     /// <summary>
-    /// Indirection for hookup to client stats / metrics collector singleton instances
+    /// Indirection for a test hook to client stats / metrics collector singleton instances
     /// </summary>
     internal static class MockStatsCollectorClient
     {

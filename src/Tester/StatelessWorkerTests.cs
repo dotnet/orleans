@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Orleans.Runtime;
@@ -14,20 +12,9 @@ using Orleans.Runtime;
 namespace UnitTests.General
 {
     [TestClass]
-    public class StatelessWorkerTests : UnitTestSiloHost
+    public class StatelessWorkerTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly int ExpectedMaxLocalActivations = 1; // System.Environment.ProcessorCount;
-
-        public StatelessWorkerTests()
-            : base(new TestingSiloOptions { StartFreshOrleans = true, StartSecondary = false })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
-        }
 
         [TestMethod, TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker()

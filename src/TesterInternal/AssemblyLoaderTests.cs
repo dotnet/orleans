@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace UnitTests
 {
@@ -18,9 +19,11 @@ namespace UnitTests
 
         [ClassInitialize]
         public static void MyClassInitialize(TestContext testContext)
-        {}
+        {
+            SerializationManager.InitializeForTesting();
+        }
 
-        [TestMethod, TestCategory("AssemblyLoader"), TestCategory("Functional")]
+        [TestMethod, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDiscoverAssemblyLoaderTestAssembly()
         {
             logger.Info("AssemblyLoaderTests.ClientShouldDiscoverDummyStreamProviderAssembly");

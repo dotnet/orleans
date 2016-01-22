@@ -512,7 +512,7 @@ namespace Orleans.Runtime.Configuration
                 if (!string.IsNullOrWhiteSpace(interfaceName) &&
                     !netInterface.Name.StartsWith(interfaceName, StringComparison.Ordinal)) continue;
 
-                bool isLoopbackInterface = (i == NetworkInterface.LoopbackInterfaceIndex);
+                bool isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
                 // get list of all unicast IPs from current interface
                 UnicastIPAddressInformationCollection ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
 

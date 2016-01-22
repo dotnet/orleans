@@ -10,29 +10,24 @@ using UnitTests.Tester;
 namespace UnitTests.General
 {
     [TestClass]
-    public class GenericGrainsInAzureStorageTests : UnitTestSiloHost
+    public class GenericGrainsInAzureStorageTests : HostedTestClusterPerFixture
     {
-        public GenericGrainsInAzureStorageTests()
-            : base(new TestingSiloOptions
-            {
-                StartPrimary = true,
-                StartSecondary = false,
-                AdjustConfig = config =>
+        public static TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(
+                new TestingSiloOptions
                 {
-                    const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage";
-                    const string myProviderName = "AzureStore";
-                    var properties = new Dictionary<string, string>();
-                    properties.Add("DataConnectionString", "UseDevelopmentStorage=true");
-                    config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
-                }
-            })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    AdjustConfig = config =>
+                    {
+                        const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage";
+                        const string myProviderName = "AzureStore";
+                        var properties = new Dictionary<string, string>();
+                        properties.Add("DataConnectionString", "UseDevelopmentStorage=true");
+                        config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
+                    }
+                });
         }
 
         [TestMethod, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]

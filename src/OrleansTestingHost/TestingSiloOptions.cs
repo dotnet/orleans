@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
 {
@@ -35,7 +36,8 @@ namespace Orleans.TestingHost
             StartSecondary = true;
             StartClient = true;
             PickNewDeploymentId = true;
-            BasePort = -1; // use default from configuration file
+            // BasePort = -1; // use default from configuration file
+            BasePort = ThreadSafeRandom.Next(2000, 9999);
             ProxyBasePort = -1; 
             MachineName = ".";
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;

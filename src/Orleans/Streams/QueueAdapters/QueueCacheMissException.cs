@@ -2,8 +2,6 @@ using System;
 using System.Globalization;
 using System.Runtime.Serialization;
 
-using Orleans.Streams;
-
 namespace Orleans.Streams
 {
     /// <summary>

@@ -1,7 +1,5 @@
+
 using System;
-using System.Diagnostics;
-using System.IO;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost
 {
@@ -11,6 +9,8 @@ namespace Orleans.TestingHost
         // private const string DefaultStorageDataConnectionString ="DefaultEndpointsProtocol=https;AccountName=XXX;AccountKey=YYY"
         public static string DataConnectionString { get; set; }
         private const string DEFAULT_STORAGE_DATA_CONNECTION_STRING = "UseDevelopmentStorage=true";
+
+        public static string EventHubConnectionString { get; set; }
 
         static StorageTestConstants()
         {

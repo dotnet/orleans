@@ -1,15 +1,56 @@
 param($installPath, $toolsPath, $package, $project)
 
-$bondSerializerTypeName = 'Orleans.Serialization.BondSerializer, BondSerializer'
+$bondSerializerTypeName = 'Orleans.Serialization.BondSerializer, OrleansBondUtils'
 
 function UnregisterSerializer(
+    [OutputType([void])]
     [Parameter(Mandatory=$true)]
-    [string]$filePath,
+    [string]$fileKey,
+    [Parameter(Mandatory=$true)]
+    [System.__ComObject]$project,
     [Parameter(Mandatory=$true)]
     [string]$type
     )
 {
+    Try
+    {
+        $project.Save([string]::Empty)
+    }
+    Catch
+    {
+    }
+    
+    Try
+    {
+        $projectItem = $project.ProjectItems.Item($fileKey)
+        Write-Host "Removing Bond Serializer from $fileKey"
+    }
+    Catch
+    {
+        return
+    }
+    
+    if ($projectItem -eq $null) {
+        Write-Error "The project item for $fileKey was null"
+        return
+    }
+
+    Try
+    {
+        $projectItem.Save([string]::Empty)
+    }
+    Catch
+    {
+    }
+    
+    $projectDocument = $projectItem.Document
+    if ($projectDocument -eq $null) {
+        Write-Error "The project document for $fileKey was null"
+    }
+
+    $filePath = $projectDocument.FullName
     if ([System.IO.File]::Exists($filePath) -eq $false) {
+        Write-Error "The file $filePath was not found"
         return
     }
 
@@ -28,20 +69,10 @@ function UnregisterSerializer(
 
     if ($providerNode -ne $null)
     {
-        $providerNode.ParentNode.RemoveChild($providerNode);
-        $fileXml.Save($filePath);
+        $providerNode.ParentNode.RemoveChild($providerNode) | Out-Null
+        $fileXml.Save($filePath)
     }
-
-    Out-Null
 }
 
-
-$configXml = $project.ProjectItems.Item("OrleansConfiguration.xml")
-if ($configXml -ne $null -and $configXml.Document -ne $null) {
-	UnregisterSerializer -filePath $configXml.Document.FullName -type $bondSerializerTypeName
-}
-
-$configXml = $project.ProjectItems.Item("ClientConfiguration.xml")
-if ($configXml -ne $null -and $configXml.Document -ne $null) {
-	UnregisterSerializer -filePath $configXml.Document.FullName -type $bondSerializerTypeName
-}
+UnregisterSerializer -fileKey "OrleansConfiguration.xml" -project $project -type $bondSerializerTypeName
+UnregisterSerializer -fileKey "ClientConfiguration.xml" -project $project -type $bondSerializerTypeName

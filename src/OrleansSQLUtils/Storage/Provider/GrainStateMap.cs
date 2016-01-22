@@ -25,7 +25,7 @@ namespace Orleans.SqlUtils.StorageProvider
 
         internal GrainStateMap Register(string grainType,
             Action<SqlCommand, DataTable> prepareReadSqlCommand,
-            Func<SqlDataReader, IDictionary<string, object>> createState,
+            Func<SqlDataReader, object> createState,
             Func<IEnumerable<WriteEntry>, DataTable> prepareDataTable, 
             Action<SqlCommand, DataTable> prepareUpsertSqlCommand)
         {
@@ -46,7 +46,7 @@ namespace Orleans.SqlUtils.StorageProvider
         /// <returns></returns>
         public GrainStateMap Register<TGrainType>(
             Action<SqlCommand, DataTable> prepareReadSqlCommand,
-            Func<SqlDataReader, IDictionary<string, object>> createState,
+            Func<SqlDataReader, object> createState,
             Func<IEnumerable<WriteEntry>, DataTable> prepareDataTable,
             Action<SqlCommand, DataTable> prepareUpsertSqlCommand)
         {
@@ -64,12 +64,12 @@ namespace Orleans.SqlUtils.StorageProvider
         private readonly Action<SqlCommand, DataTable> _prepareReadSqlCommand;
         private readonly Action<SqlCommand, DataTable> _prepareUpsertSqlCommand;
         private readonly Func<IEnumerable<WriteEntry>, DataTable> _prepareDataTable;
-        private readonly Func<SqlDataReader, IDictionary<string, object>> _createState;
+        private readonly Func<SqlDataReader, object> _createState;
 
 
         internal GrainStateMapEntry(
             Action<SqlCommand, DataTable> prepareReadSqlCommand,
-            Func<SqlDataReader, IDictionary<string, object>> createState,
+            Func<SqlDataReader, object> createState,
             Func<IEnumerable<WriteEntry>, DataTable> prepareDataTable,
             Action<SqlCommand, DataTable> prepareUpsertSqlCommand
             )
@@ -95,7 +95,7 @@ namespace Orleans.SqlUtils.StorageProvider
             return _prepareDataTable(batch);
         }
 
-        public IDictionary<string, object> CreateState(SqlDataReader reader)
+        public object CreateState(SqlDataReader reader)
         {
             return _createState(reader);
         }

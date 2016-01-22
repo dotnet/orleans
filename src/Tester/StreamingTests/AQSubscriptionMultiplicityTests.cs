@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
@@ -15,41 +14,42 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("OrleansConfigurationForStreamingUnitTests.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class AQSubscriptionMultiplicityTests : UnitTestSiloHost
+    public class AQSubscriptionMultiplicityTests : HostedTestClusterPerTest
     {
         private const string AQStreamProviderName = "AzureQueueProvider";                 // must match what is in OrleansConfigurationForStreamingUnitTests.xml
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
-        private readonly SubscriptionMultiplicityTestRunner runner;
+        private SubscriptionMultiplicityTestRunner runner;
 
-        public AQSubscriptionMultiplicityTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-            }, new TestingClientOptions()
-            {
-                AdjustConfig = config =>
-                {
-                    config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName, new Dictionary<string, string>());
-                    config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
-                },
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+                }, new TestingClientOptions()
+                {
+                    AdjustConfig = config =>
+                    {
+                        config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName, new Dictionary<string, string>());
+                        config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
+                    },
+                });
         }
 
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
+        [TestInitialize]
+        public void InitializeOrleans()
         {
-            StopAllSilos();
+            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
         }
 
         [TestCleanup]
         public void TestCleanup()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            if (this.HostedCluster != null)
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            }
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]

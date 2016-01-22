@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
@@ -86,7 +85,27 @@ namespace Orleans.Runtime
         /// <param name="grainReference">Reference to the grain to be queried.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<int> GetGrainActivationCount(GrainReference grainReference);
+        /// <summary>
+        /// Return the total count of all current grain activations across all silos.
+        /// </summary>
+        /// <returns>Completion promise for this operation.</returns>
         Task<int> GetTotalActivationCount();
+
+        /// <summary>
+        /// Execute a control command on the specified providers on all silos in the cluster.
+        /// Commands are sent to all known providers on each silo which match both the <c>providerTypeFullName</c> AND <c>providerName</c> parameters.
+        /// </summary>
+        /// <remarks>
+        /// Providers must implement the <c>Orleans.Providers.IControllable</c> 
+        /// interface in order to receive these control channel commands.
+        /// </remarks>
+        /// <param name="providerTypeFullName">Class full name for the provider type to send this command to.</param>
+        /// <param name="providerName">Provider name to send this command to.</param>
+        /// <param name="command">An id / serial number of this command. 
+        /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
+        /// <param name="arg">An opaque command argument.
+        /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
+        /// <returns>Completion promise for this operation.</returns>
         Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
         
         /// <summary>

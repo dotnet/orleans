@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
@@ -16,26 +15,10 @@ namespace UnitTests
     /// Summary description for ErrorHandlingGrainTest
     /// </summary>
     [TestClass]
-    public class ErrorGrainTest : UnitTestSiloHost
+    public class ErrorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
         private readonly TraceLogger Logger = TraceLogger.GetLogger("AssemblyLoaderTests", TraceLogger.LoggerType.Application);
-
-        public ErrorGrainTest()
-        {
-        }
-
-        public ErrorGrainTest(int dummy) : base(new TestingSiloOptions
-                    {
-                        StartSecondary = false, 
-                    })
-        {
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-        }
 
         [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling")]
         public async Task ErrorGrain_GetGrain()
@@ -174,7 +157,7 @@ namespace UnitTests
             Logger.Info(1, "DONE.");
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
         public void ArgumentTypes_ListOfGrainReferences()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -219,7 +202,7 @@ namespace UnitTests
             Assert.AreEqual(30, result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("General"), TestCategory("SimpleGrain")]
+        [TestMethod, TestCategory("Functional"), TestCategory("SimpleGrain")]
         public void SimpleGrain_GuidDistribution()
         {
             int n = 0x1111;

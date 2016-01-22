@@ -25,7 +25,6 @@ namespace UnitTests.RemindersTest
         public TestContext TestContext { get; set; }
 
         private string deploymentId;
-        private SiloAddress siloAddress;
         private static string connectionString;
         private const string testDatabaseName = "OrleansTest";
         private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
@@ -33,7 +32,6 @@ namespace UnitTests.RemindersTest
         private readonly TraceLogger logger = TraceLogger.GetLogger("MySqlRemindersTableTests",
             TraceLogger.LoggerType.Application);
 
-        private Guid serviceId;
         private SqlReminderTable reminder;
 
         // Use ClassInitialize to run code before running the first test in the class
@@ -51,10 +49,8 @@ namespace UnitTests.RemindersTest
 
         private async Task Initialize()
         {
-            serviceId = Guid.NewGuid();
             deploymentId = "test-" + Guid.NewGuid();
             int generation = SiloAddress.AllocateNewGeneration();
-            siloAddress = SiloAddress.NewLocalAddress(generation);
 
             logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
 
@@ -101,10 +97,10 @@ namespace UnitTests.RemindersTest
 
 
         [TestMethod, TestCategory("Reminders"), TestCategory("MySql")]
-        public async Task RemindersTable_MySql_UpsertReminderTwice()
+        public async Task RemindersTable_MySql_UpsertReminderParallel()
         {
             await Initialize();
-            await ReminderTablePluginTests.ReminderTableUpsertTwice(reminder);
+            await ReminderTablePluginTests.ReminderTableUpsertParallel(reminder);
         }
     }
 }

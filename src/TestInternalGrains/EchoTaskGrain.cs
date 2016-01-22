@@ -11,7 +11,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class EchoTaskGrainState : GrainState
+    [Serializable]
+    public class EchoTaskGrainState
     {
         public int MyId { get; set; }
         public string LastEcho { get; set; }

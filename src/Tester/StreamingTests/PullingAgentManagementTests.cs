@@ -16,30 +16,23 @@ namespace UnitTests.StreamingTests
     [DeploymentItem("ClientConfigurationForStreamTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
-    public class PullingAgentManagementTests : UnitTestSiloHost
+    public class PullingAgentManagementTests : HostedTestClusterPerFixture
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
 
-        public PullingAgentManagementTests()
-            : base(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartSecondary = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-            },
-            new TestingClientOptions()
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-        }
-
-        // Use ClassCleanup to run code after all tests in a class have run
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartSecondary = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+                },
+                new TestingClientOptions()
+                {
+                    ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
+                });
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]

@@ -45,8 +45,9 @@ namespace Orleans.CodeGenerator.Utilities
             return
                 SyntaxFactory.ParseTypeName(
                     type.GetParseableName(
-                        includeNamespace: includeNamespace,
-                        includeGenericParameters: includeGenericParameters));
+                        new TypeFormattingOptions(
+                            includeNamespace: includeNamespace,
+                            includeGenericParameters: includeGenericParameters)));
         }
         
         /// <summary>
@@ -63,7 +64,9 @@ namespace Orleans.CodeGenerator.Utilities
         /// </returns>
         public static NameSyntax GetNameSyntax(this Type type, bool includeNamespace = true)
         {
-            return SyntaxFactory.ParseName(type.GetParseableName(includeNamespace: includeNamespace));
+            return
+                SyntaxFactory.ParseName(
+                    type.GetParseableName(new TypeFormattingOptions(includeNamespace: includeNamespace)));
         }
 
         /// <summary>
@@ -175,7 +178,9 @@ namespace Orleans.CodeGenerator.Utilities
         public static ArrayTypeSyntax GetArrayTypeSyntax(this Type type, bool includeNamespace = true)
         {
             return
-                SyntaxFactory.ArrayType(SyntaxFactory.ParseTypeName(type.GetParseableName(includeNamespace: includeNamespace)))
+                SyntaxFactory.ArrayType(
+                    SyntaxFactory.ParseTypeName(
+                        type.GetParseableName(new TypeFormattingOptions(includeNamespace: includeNamespace))))
                     .AddRankSpecifiers(
                         SyntaxFactory.ArrayRankSpecifier().AddSizes(SyntaxFactory.OmittedArraySizeExpression()));
         }

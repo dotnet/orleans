@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
@@ -8,18 +9,15 @@ namespace UnitTests.RemindersTest
 {
     internal class ReminderTablePluginTests
     {
-        public TestContext TestContext { get; set; }
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ReminderTablePluginTests");
-
-        internal static async Task ReminderTableUpsertTwice(IReminderTable reminder)
+        internal static async Task ReminderTableUpsertParallel(IReminderTable reminder)
         {
             var grainRef = MakeTestGrainReference();
             var period = TimeSpan.FromMinutes(1);
             var reminderName = "testReminderName";
             var startAt = DateTime.UtcNow.Add(TimeSpan.FromMinutes(1));
-            var etag1 = await UpsertReminder(reminder, grainRef, reminderName, startAt, period);
-            var etag2 = await UpsertReminder(reminder, grainRef, reminderName, startAt, period);
-            Assert.AreNotEqual(etag1, etag2);
+            var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(x => UpsertReminder(reminder, grainRef, reminderName, startAt, period)));
+
+            Assert.IsTrue(results.Distinct().Count() == results.Length);
         }
 
         private static async Task<string> UpsertReminder(IReminderTable reminder, GrainReference grainRef, string reminderName, DateTime startAt, TimeSpan period)

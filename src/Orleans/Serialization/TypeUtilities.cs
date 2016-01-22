@@ -215,11 +215,11 @@ namespace Orleans.Serialization
                         return true;
                     }
                 }
-                
-                return IsTypeIsInaccessibleForSerialization(
-                    typeInfo.GetGenericTypeDefinition(),
-                    fromModule,
-                    fromAssembly);
+
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetGenericTypeDefinition(), fromModule, fromAssembly))
+                {
+                    return true;
+                }
             }
 
             if ((typeInfo.IsNotPublic || !typeInfo.IsVisible) && !AreInternalsVisibleTo(typeInfo.Assembly, fromAssembly))
@@ -237,14 +237,25 @@ namespace Orleans.Serialization
                 }
             }
 
+            // For arrays, check the element type.
             if (typeInfo.IsArray)
             {
-                return IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly);
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly))
+                {
+                    return true;
+                }
             }
 
-            var result = typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
-            
-            return result;
+            // For nested types, check that the declaring type is accessible.
+            if (typeInfo.IsNested)
+            {
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.DeclaringType, fromModule, fromAssembly))
+                {
+                    return true;
+                }
+            }
+
+            return typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
         }
 
         /// <summary>
@@ -266,12 +277,7 @@ namespace Orleans.Serialization
             // Check InternalsVisibleTo attributes on the from-assembly, pointing to the to-assembly.
             var serializationAssemblyName = toAssembly.GetName().FullName;
             var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
-            if (internalsVisibleTo.All(_ => _.AssemblyName != serializationAssemblyName))
-            {
-                return true;
-            }
-
-            return false;
+            return internalsVisibleTo.Any(_ => _.AssemblyName == serializationAssemblyName);
         }
     }
 }

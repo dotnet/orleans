@@ -40,7 +40,8 @@ namespace Tester.CodeGenTests
         Task<@event> @static();
     }
 
-    public class GenericGrainState<T> : GrainState
+    [Serializable]
+    public class GenericGrainState<T>
     {
         public T @event { get; set; }
     }

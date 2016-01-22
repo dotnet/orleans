@@ -7,6 +7,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
 using Orleans.AzureUtils;
+using Tester;
 using UnitTests.StorageTests;
 using UnitTests.Tester;
 
@@ -38,7 +39,7 @@ namespace UnitTests.MembershipTests
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
 
-            UnitTestSiloHost.CheckForAzureStorage();
+            TestUtils.CheckForAzureStorage();
         }
 
         private async Task Initialize()

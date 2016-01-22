@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using System.Collections.Generic;
@@ -16,17 +15,11 @@ namespace UnitTests.General
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
     [TestClass]
-    public class GenericGrainTests : UnitTestSiloHost
+    public class GenericGrainTests : HostedTestClusterEnsureDefaultStarted
     {
-        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
         private static int grainId = 0;
 
-        public GenericGrainTests()
-            : base(new TestingSiloOptions { StartPrimary = true, StartSecondary = false })
-        {
-        }
-
-        public TGrainInterface GetGrain<TGrainInterface>(int i) where TGrainInterface : IGrainWithIntegerKey
+        public TGrainInterface GetGrain<TGrainInterface>(long i) where TGrainInterface : IGrainWithIntegerKey
         {
             return GrainFactory.GetGrain<TGrainInterface>(i);
         }
@@ -34,12 +27,6 @@ namespace UnitTests.General
         public TGrainInterface GetGrain<TGrainInterface>() where TGrainInterface : IGrainWithIntegerKey 
         {
             return GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         /// Can instantiate multiple concrete grain types that implement
