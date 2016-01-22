@@ -14,3 +14,5 @@ title: Orleans Presentations
 * [Orleans Streaming Presentation from Virtual Meetup May 2015](http://dotnet.github.io/orleans/Presentations/Orleans Streaming - Virtual meetup - 5-22-2015.pptx)
 
 * [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx)
+
+* [Orleans Roadmap, Virtual Meetup January 21st 2016](http://dotnet.github.io/orleans/Presentations/Orleans Roadmap 1-21-2016.pptx)
