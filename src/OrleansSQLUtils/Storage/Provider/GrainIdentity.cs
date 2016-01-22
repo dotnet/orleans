@@ -5,7 +5,7 @@ namespace Orleans.SqlUtils.StorageProvider
     /// <summary>
     /// Represents identity of a grain 
     /// </summary>
-    internal class GrainIdentity
+    public class GrainIdentity
     {
         internal string GrainType { get; set; }
         internal int ShardKey { get; set; }
