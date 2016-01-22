@@ -26,8 +26,8 @@ def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0
         publishers {
             archiveXUnit {
                 xUnitDotNET {
-                    pattern('src/TestResults/xUnit-*.xml')
-                    skipNoTestFiles(false)
+                    pattern('src/TestResults/xUnit-Results.xml')
+                    skipNoTestFiles(true)
                     failIfNotNew(true)
                     deleteOutputFiles(true)
                     stopProcessingIfError(true)
@@ -35,7 +35,7 @@ def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0
                     
                 msTest {
                     pattern('src/TestResults/*.trx')
-                    skipNoTestFiles(false)
+                    skipNoTestFiles(true)
                     failIfNotNew(true)
                     deleteOutputFiles(true)
                     stopProcessingIfError(true)
