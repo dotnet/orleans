@@ -34,6 +34,12 @@ namespace UnitTests.Grains
         }
     }
 
+    public class AsyncObserverArg
+    {
+        public string A { get; set; }
+        public int B { get; set; }
+    }
+
     public class StreamLifecycleTestGrainBase : Grain<StreamLifecycleTestGrainState>
     {
         protected Logger logger;
@@ -454,6 +460,13 @@ namespace UnitTests.Grains
             }
 
             return TaskDone.Done;
+        }
+    }
+
+    public class ClosedTypeStreamObserver : MyStreamObserver<AsyncObserverArg>
+    {
+        public ClosedTypeStreamObserver(Logger logger) : base(logger)
+        {
         }
     }
 }

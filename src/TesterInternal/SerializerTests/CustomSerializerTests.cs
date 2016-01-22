@@ -5,6 +5,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 
 namespace UnitTests.SerializerTests
 {
@@ -131,6 +132,14 @@ namespace UnitTests.SerializerTests
         public void Serialize_GrainMethodAsyncReturnOnlyType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass6)), "No serializer generated for return type of parameterless Task grain method");
+        }
+        
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Serialize_AsyncObserverArgumentType()
+        {
+            var z = new ClosedTypeStreamObserver(TraceLogger.GetLogger("SerializationTests", TraceLogger.LoggerType.Runtime));
+
+            Assert.IsNotNull(SerializationManager.GetSerializer(typeof(AsyncObserverArg)), "No serializer generated for argument type of async observer");
         }
     }
 }

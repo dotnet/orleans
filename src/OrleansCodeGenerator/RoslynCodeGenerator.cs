@@ -429,10 +429,13 @@ namespace Orleans.CodeGenerator
             if (typeInfo.IsSerializable)
                 RecordType(type, module, targetAssembly, includedTypes);
 
-            Type grainStateType;
+            Type typeToRecord;
             // If a type extends Grain<T>, add T to the list of candidates for serialization
-            if (IsPersistentGrain(typeInfo, out grainStateType))
-                RecordType(grainStateType, module, targetAssembly, includedTypes);
+            if (IsPersistentGrain(typeInfo, out typeToRecord))
+                RecordType(typeToRecord, module, targetAssembly, includedTypes);
+
+            if (IsAsyncObserver(typeInfo, out typeToRecord))
+                RecordType(typeToRecord, module, targetAssembly, includedTypes);
 
             // Collect the types which require code generation.
             if (GrainInterfaceData.IsGrainInterface(type))
@@ -458,6 +461,19 @@ namespace Orleans.CodeGenerator
             if (typeof(Grain<>) != typeInfo.BaseType.GetGenericTypeDefinition()) return false;
 
             stateType = typeInfo.BaseType.GetGenericArguments()[0];
+            return true;
+        }
+
+        private static bool IsAsyncObserver(TypeInfo typeInfo, out Type argType)
+        {
+            argType = null;
+
+            var baseInterface = typeInfo.GetInterfaces().FirstOrDefault(x =>
+                x.IsGenericType &&
+                x.GetGenericTypeDefinition() == typeof(Streams.IAsyncObserver<>));
+            if (baseInterface == null) return false;
+
+            argType = baseInterface.GetGenericArguments()[0];
             return true;
         }
 
