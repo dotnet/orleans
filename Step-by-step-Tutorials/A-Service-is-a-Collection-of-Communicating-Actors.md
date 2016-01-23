@@ -23,7 +23,7 @@ Add a couple of methods to describe relationships and employment level:
 
 
 ``` csharp
-public interface IEmployee : Orleans.IGrain
+public interface IEmployee : IGrainWithGuidKey
 {
     Task<int> GetLevel();
     Task Promote(int newLevel);
@@ -36,7 +36,7 @@ public interface IEmployee : Orleans.IGrain
 and
 
 ``` csharp
-public interface IManager : Orleans.IGrain
+public interface IManager : IGrainWithGuidKey
 {
     Task<IEmployee> AsEmployee();
     Task<List<IEmployee>> GetDirectReports();
@@ -56,7 +56,7 @@ With these two interfaces as our starting point, the implementation classes are 
 Here's what it looks like:
 
 ``` csharp
-public class Employee : Orleans.Grain, Interfaces.IEmployee
+public class Employee : Grain, Interfaces.IEmployee
 {
     public Task<int> GetLevel()
     {
@@ -88,7 +88,7 @@ public class Employee : Orleans.Grain, Interfaces.IEmployee
  and
 
 ``` csharp
-public class Manager : Orleans.Grain, IManager
+public class Manager : Grain, IManager
 {
     public override Task OnActivateAsync()
     {
@@ -161,7 +161,7 @@ This ability is essential in making the programming model a smooth transition fr
 Let's add the ability for employees to send messages to each other:
 
 ``` csharp
-public interface IEmployee : Orleans.IGrain
+public interface IEmployee : IGrainWithGuidKey
 {
     ...
     Task Greeting(IEmployee  from, string message);
@@ -172,7 +172,7 @@ public interface IEmployee : Orleans.IGrain
 then:
 
 ``` csharp
-public class Employee : Orleans.Grain, Interfaces.IEmployee
+public class Employee : Grain, Interfaces.IEmployee
 {
     public Task Greeting(IEmployee from, string message)
     {
