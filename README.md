@@ -100,11 +100,11 @@ Community
 
 * [Chat on Gitter](https://gitter.im/dotnet/orleans)
 
-* Follow the [@ProjectOrleans](https://twitter.com/ProjectOrleans) Twitter account for Orleans project news announcements.
+* Follow the [@ProjectOrleans](https://twitter.com/ProjectOrleans) Twitter account for Orleans announcements.
 
 * [OrleansContrib - Repository of community add-ons to Orleans](https://github.com/OrleansContrib/) Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
 
-* Guidelines for developers wanting to [contribute code changes to Project Orleans](http://dotnet.github.io/orleans/Contributing).
+* Guidelines for developers wanting to [contribute code changes to Orleans](http://dotnet.github.io/orleans/Contributing).
 
 * You are also encouraged to report bugs or start a technical discussion by starting a new [thread](https://github.com/dotnet/orleans/issues) on GitHub.
 
