@@ -288,6 +288,26 @@ namespace UnitTests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation.ToString());
         }
 
+        [TestMethod, TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        public async Task DeactivateOnIdleWhileActivate()
+        {
+            int id = random.Next();
+            IDeactivatingWhileActivatingTestGrain grain = GrainClient.GrainFactory.GetGrain<IDeactivatingWhileActivatingTestGrain>(id);
+
+            try
+            {
+                string activation = await grain.DoSomething();
+                Assert.Fail("Should have thrown.");
+            }
+            catch(Exception exc)
+            {
+                logger.Info("Thrown as expected:", exc);
+                Exception e = exc.GetBaseException();
+                Assert.IsTrue(e.Message.Contains("Forwarding failed"),
+                        "Did not get expected exception message returned: " + e.Message);
+            }  
+        }
+
         private async Task CheckNumActivateDeactivateCalls(
             int expectedActivateCalls,
             int expectedDeactivateCalls,
