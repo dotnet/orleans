@@ -111,7 +111,7 @@ namespace Orleans.Runtime
             }
         }
 
-        
+
         public GrainTypeManager GrainTypeManager { get; private set; }
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
@@ -792,6 +792,12 @@ namespace Orleans.Runtime
                     {
                         data.AddOnInactive(() => DestroyActivationVoid(data));
                     }
+                }
+                else if (data.State == ActivationState.Activating)
+                {
+                    throw new GrainRefusedToActivateException(String.Format(
+                        "Activation {0} refused to activate by calling DeactivateOnIdle from within OnActivateAsync",
+                            data.ToString()));
                 }
                 else
                 {

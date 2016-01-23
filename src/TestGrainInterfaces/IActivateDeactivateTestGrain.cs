@@ -46,4 +46,10 @@ namespace UnitTests.GrainInterfaces
 
         Task ForwardCall(IBadActivateDeactivateTestGrain otherGrain);
     }
+
+    public interface IDeactivatingWhileActivatingTestGrain : IGrainWithIntegerKey
+    {
+        Task<string> DoSomething();
+    }
+    
 }
