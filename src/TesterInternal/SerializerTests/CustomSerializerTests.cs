@@ -134,12 +134,32 @@ namespace UnitTests.SerializerTests
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass6)), "No serializer generated for return type of parameterless Task grain method");
         }
         
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [TestMethod, TestCategory("Serialization")]
         public void Serialize_AsyncObserverArgumentType()
         {
-            var z = new ClosedTypeStreamObserver(TraceLogger.GetLogger("SerializationTests", TraceLogger.LoggerType.Runtime));
-
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(AsyncObserverArg)), "No serializer generated for argument type of async observer");
+
+            var original = new AsyncObserverArg("A", 1);
+            var obj = SerializationManager.RoundTripSerializationForTesting(original);
+            Assert.AreEqual(original, obj, "Objects of type AsyncObserverArg aren't equal after serialization roundtrip");
+        }
+
+        [TestMethod, TestCategory("Serialization")]
+        public void Serialize_AsyncObservableArgumentType()
+        {
+            Assert.IsNotNull(SerializationManager.GetSerializer(typeof(AsyncObservableArg)), "No serializer generated for argument type of async observable");
+        }
+
+        [TestMethod, TestCategory("Serialization")]
+        public void Serialize_AsyncStreamArgumentType()
+        {
+            Assert.IsNotNull(SerializationManager.GetSerializer(typeof(AsyncStreamArg)), "No serializer generated for argument type of async stream");
+        }
+
+        [TestMethod, TestCategory("Serialization")]
+        public void Serialize_StreamSubscriptionHandleType()
+        {
+            Assert.IsNotNull(SerializationManager.GetSerializer(typeof(StreamSubscriptionHandleArg)), "No serializer generated for argument type of stream subscription handle");
         }
     }
 }
