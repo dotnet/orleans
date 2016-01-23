@@ -131,7 +131,7 @@ var e0 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
 var e1 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
 var e2 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
 var e3 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
-var e4 = grainFactory.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var e4 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
 
 var m0 = grainFactory.GetGrain<IManager>(Guid.NewGuid());
 var m1 = grainFactory.GetGrain<IManager>(Guid.NewGuid());
