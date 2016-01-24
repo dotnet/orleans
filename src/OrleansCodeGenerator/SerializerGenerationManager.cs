@@ -31,6 +31,16 @@ namespace Orleans.CodeGenerator
         /// The processed types.
         /// </summary>
         private static readonly HashSet<Type> ProcessedTypes;
+        
+        /// <summary>
+        /// The generic interface types whose type arguments needs serializators generation
+        /// </summary>
+        internal static readonly HashSet<Type> KnownGenericIntefaceTypes;
+
+        /// <summary>
+        /// The generic base types whose type arguments needs serializators generation
+        /// </summary>
+        internal static readonly HashSet<Type> KnownGenericBaseTypes;
 
         /// <summary>
         /// Initializes static members of the <see cref="SerializerGenerationManager"/> class.
@@ -39,6 +49,20 @@ namespace Orleans.CodeGenerator
         {
             TypesToProcess = new HashSet<Type>();
             ProcessedTypes = new HashSet<Type>();
+            KnownGenericIntefaceTypes = new HashSet<Type>
+            {
+                typeof(Streams.IAsyncObserver<>),
+                typeof(Streams.IAsyncStream<>),
+                typeof(Streams.IAsyncObservable<>)
+            };
+
+            KnownGenericBaseTypes = new HashSet<Type>
+            {
+                typeof(Grain<>),
+                typeof(Streams.StreamSubscriptionHandleImpl<>),
+                typeof(Streams.StreamSubscriptionHandle<>)
+            };
+
             Log = TraceLogger.GetLogger(typeof(SerializerGenerationManager).Name);
         }
         

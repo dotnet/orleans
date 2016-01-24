@@ -144,7 +144,6 @@
     <Compile Include="SerializerTests\MessageSerializerTests.cs" />
     <Compile Include="SerializerTests\RoundTripSerializerTests.cs" />
     <Compile Include="SerializerTests\SerializationTests.cs" />
-    <Compile Include="SerializerTests\SerializerGenerationTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs" />

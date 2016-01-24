@@ -428,11 +428,9 @@ namespace Orleans.CodeGenerator
             // If a type was encountered which can be accessed and is marked as [Serializable], process it for serialization.
             if (typeInfo.IsSerializable)
                 RecordType(type, module, targetAssembly, includedTypes);
-
-            Type grainStateType;
-            // If a type extends Grain<T>, add T to the list of candidates for serialization
-            if (IsPersistentGrain(typeInfo, out grainStateType))
-                RecordType(grainStateType, module, targetAssembly, includedTypes);
+            
+            ConsiderGenericBaseTypeArguments(typeInfo, module, targetAssembly, includedTypes);
+            ConsiderGenericInterfacesArguments(typeInfo, module, targetAssembly, includedTypes);
 
             // Collect the types which require code generation.
             if (GrainInterfaceData.IsGrainInterface(type))
@@ -449,16 +447,35 @@ namespace Orleans.CodeGenerator
                 includedTypes.Add(type);
         }
 
-        private static bool IsPersistentGrain(TypeInfo typeInfo, out Type stateType)
+        private static void ConsiderGenericBaseTypeArguments(
+            TypeInfo typeInfo,
+            Module module,
+            Assembly targetAssembly,
+            ISet<Type> includedTypes)
         {
-            stateType = null;
+            if (typeInfo.BaseType == null) return;
+            if (!typeInfo.BaseType.IsConstructedGenericType) return;
+            if (!SerializerGenerationManager.KnownGenericBaseTypes.Contains(typeInfo.BaseType.GetGenericTypeDefinition())) return;
 
-            if (typeInfo.BaseType == null) return false;
-            if (!typeInfo.BaseType.IsGenericType) return false;
-            if (typeof(Grain<>) != typeInfo.BaseType.GetGenericTypeDefinition()) return false;
+            foreach (var type in typeInfo.BaseType.GetGenericArguments())
+            {
+                RecordType(type, module, targetAssembly, includedTypes);
+            }
+        }
 
-            stateType = typeInfo.BaseType.GetGenericArguments()[0];
-            return true;
+        private static void ConsiderGenericInterfacesArguments(
+            TypeInfo typeInfo,
+            Module module,
+            Assembly targetAssembly,
+            ISet<Type> includedTypes)
+        {
+            var interfaces = typeInfo.GetInterfaces().Where(x =>
+                x.IsConstructedGenericType
+                && SerializerGenerationManager.KnownGenericIntefaceTypes.Contains(x.GetGenericTypeDefinition()));
+            foreach (var type in interfaces.SelectMany(v => v.GetGenericArguments()))
+            {
+                RecordType(type, module, targetAssembly, includedTypes);
+            }
         }
 
         /// <summary>
