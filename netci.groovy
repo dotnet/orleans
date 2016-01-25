@@ -32,14 +32,6 @@ def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0
                     deleteOutputFiles(true)
                     stopProcessingIfError(true)
                 }
-                    
-                msTest {
-                    pattern('src/TestResults/*.trx')
-                    skipNoTestFiles(true)
-                    failIfNotNew(true)
-                    deleteOutputFiles(true)
-                    stopProcessingIfError(true)
-                }
                 
                 failedThresholds {
                     unstable(0)
