@@ -119,15 +119,7 @@ Orleans offers us a way to deal with this, by marking the grain `[Reentrant]`, w
 [Reentrant]
 public class Employee : Orleans.Grain, Interfaces.IEmployee
 {
-    public async Task Greeting(GreetingData data)
-    {
-        Console.WriteLine("{0} said: {1}", 
-                      data.From.GetPrimaryKey().ToString(), 
-                      data.Message);
-        await data.From.Greeting(
-            new GreetingData { 
-                From = this.AsReference<IEmployee>(), 
-                Message = "Hi yourself!" });
+    ...
 }  
 ```
 
