@@ -78,7 +78,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()
         {
-            HostedCluster.logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
+            logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
             await TestingUtils.WaitUntilAsync(CheckCounters, Timeout);
         }
 

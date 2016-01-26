@@ -65,7 +65,7 @@ namespace UnitTests.StreamingTests
             // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
             // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824 
             var numAgents = results.Select(Convert.ToInt32).ToArray();
-            HostedCluster.logger.Info("Got back NumberRunningAgents: {0}." + Utils.EnumerableToString(numAgents));
+            logger.Info("Got back NumberRunningAgents: {0}." + Utils.EnumerableToString(numAgents));
             foreach (var agents in numAgents)
             {
                 Assert.AreEqual(numExpectedAgentsPerSilo, agents, "numExpectedAgentsPerSilo-" + callContext);

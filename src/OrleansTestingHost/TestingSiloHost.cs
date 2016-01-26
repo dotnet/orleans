@@ -54,7 +54,7 @@ namespace Orleans.TestingHost
 
         public IGrainFactory GrainFactory { get; private set; }
 
-        public Logger logger
+        protected Logger logger
         {
             get { return GrainClient.Logger; }
         }

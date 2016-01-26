@@ -40,7 +40,7 @@ namespace UnitTests.StreamingTests
         public override void Dispose()
         {
             if(HostedCluster != null)
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, HostedCluster.logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
 
             base.Dispose();
         }
@@ -48,56 +48,56 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQMultipleParallelSubscriptionTest()
         {
-            HostedCluster.logger.Info("************************ AQMultipleParallelSubscriptionTest *********************************");
+            logger.Info("************************ AQMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQMultipleLinearSubscriptionTest()
         {
-            HostedCluster.logger.Info("************************ AQMultipleLinearSubscriptionTest *********************************");
+            logger.Info("************************ AQMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQMultipleSubscriptionTest_AddRemove()
         {
-            HostedCluster.logger.Info("************************ AQMultipleSubscriptionTest_AddRemove *********************************");
+            logger.Info("************************ AQMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQResubscriptionTest()
         {
-            HostedCluster.logger.Info("************************ AQResubscriptionTest *********************************");
+            logger.Info("************************ AQResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQResubscriptionAfterDeactivationTest()
         {
-            HostedCluster.logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
+            logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQActiveSubscriptionTest()
         {
-            HostedCluster.logger.Info("************************ AQActiveSubscriptionTest *********************************");
+            logger.Info("************************ AQActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQTwoIntermitentStreamTest()
         {
-            HostedCluster.logger.Info("************************ AQTwoIntermitentStreamTest *********************************");
+            logger.Info("************************ AQTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQSubscribeFromClientTest()
         {
-            HostedCluster.logger.Info("************************ AQSubscribeFromClientTest *********************************");
+            logger.Info("************************ AQSubscribeFromClientTest *********************************");
             await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
         }
     }
