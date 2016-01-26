@@ -127,7 +127,7 @@ namespace UnitTests.General
             catch (Exception exc)
             {
                 Exception baseException = exc.GetBaseException();
-                Console.WriteLine("Received exception: {0}", baseException);
+                logger.Info("Received exception: {0}", baseException);
                 Assert.IsInstanceOfType(baseException, typeof(OrleansException));
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
@@ -308,7 +308,7 @@ namespace UnitTests.General
 
             public void StateChanged(int a, int b)
             {
-                Console.WriteLine("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
+                GrainClient.Logger.Verbose("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
                 if (action != null)
                 {
                     action(a, b, result);

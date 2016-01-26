@@ -19,7 +19,7 @@ namespace UnitTests.Grains
     {
         public Task GetAbstractModel(IEnumerable<NameObjectCollectionBase> list)
         {
-            Console.WriteLine("GetAbstractModel: Success");
+            base.GetLogger().Verbose("GetAbstractModel: Success");
             return TaskDone.Done;
         }
 

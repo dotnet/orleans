@@ -150,8 +150,6 @@ namespace UnitTests.Serialization
             var orleansDeser = SerializationManager.RoundTripSerializationForTesting(original);
             Assert.AreEqual(typeof(InnerType), jsonDeser.MyDictionary["obj1"].GetType());
             Assert.AreEqual(original, orleansDeser);
-    
-            Console.WriteLine("Done OK.");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
@@ -181,8 +179,6 @@ namespace UnitTests.Serialization
             Assert.AreEqual(typeof(JObject), orleansJsonDeser.MyDictionary["obj1"].GetType());
             // The below assert fails, but only since JObject does not correctly implement Equals.
             //Assert.AreEqual(jsonDeser, orleansJsonDeser);
-
-            Console.WriteLine("Done OK.");
         }
 
         /// <summary>

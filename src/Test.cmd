@@ -39,4 +39,4 @@ set TESTER=%OutDir%\Tester.dll
 if .%FILTERS%. == .. set FILTERS=-trait "Category=BVT"
 
 @echo on
-packages\xunit.runner.console.2.1.0\tools\xunit.console %TESTER% %FILTERS% -xml "TestResults/xUnit-Results.xml" -parallel none -noshadow > TestResults/xUnit-output.log
+packages\xunit.runner.console.2.1.0\tools\xunit.console %TESTER% %FILTERS% -xml "TestResults/xUnit-Results.xml" -parallel none -noshadow

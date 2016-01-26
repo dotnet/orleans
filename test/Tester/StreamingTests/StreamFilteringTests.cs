@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
@@ -83,12 +84,16 @@ namespace Tester.StreamingTests
             }
 
             // Check initial counts
+            var sb = new StringBuilder();
             int[] counts = new int[numConsumers];
             for (int i = 0; i < numConsumers; i++)
             {
                 counts[i] = await consumers[i].GetReceivedCount();
-                Console.WriteLine("Baseline count = {0} for consumer {1}", counts[i], i);
+                sb.AppendFormat("Baseline count = {0} for consumer {1}", counts[i], i);
+                sb.AppendLine();
             }
+
+            logger.Info(sb.ToString());
 
             // Get producer to send some messages
             for (int round = 1; round <= 10; round++)
@@ -120,7 +125,7 @@ namespace Tester.StreamingTests
                     }
 
                     int count = await consumers[i].GetReceivedCount();
-                    Console.WriteLine("Received count = {0} in round {1} for consumer {2}", count, round, i);
+                    logger.Info("Received count = {0} in round {1} for consumer {2}", count, round, i);
                     count.Should().Be(expected, "Expected count in round {0} for consumer {1}", round, i);
                     counts[i] = expected; // Set new baseline
                 }
@@ -141,7 +146,7 @@ namespace Tester.StreamingTests
             catch (AggregateException ae)
             {
                 Exception exc = ae.GetBaseException();
-                Console.WriteLine("Got exception " + exc);
+                logger.Info("Got exception " + exc);
                 throw exc;
             }
         }
@@ -170,7 +175,7 @@ namespace Tester.StreamingTests
                 await TestingUtils.WaitUntilAsync(async tryLast => await producer.GetSendCount() >= 2, timeout);
             }
             int count = await consumer.GetReceivedCount();
-            Console.WriteLine("Received count = {0} after first send for consumer {1}", count, consumer);
+            logger.Info("Received count = {0} after first send for consumer {1}", count, consumer);
             count.Should().Be(expectedCount, "Expected count after first send");
 
             await producer.SendItem(2);
@@ -181,7 +186,7 @@ namespace Tester.StreamingTests
                 await TestingUtils.WaitUntilAsync(async tryLast => await producer.GetSendCount() >= 3, timeout);
             }
             count = await consumer.GetReceivedCount();
-            Console.WriteLine("Received count = {0} after second send for consumer {1}", count, consumer);
+            logger.Info("Received count = {0} after second send for consumer {1}", count, consumer);
             count.Should().Be(expectedCount, "Expected count after second send");
 
             await producer.SendItem(3);
@@ -192,7 +197,7 @@ namespace Tester.StreamingTests
                 await TestingUtils.WaitUntilAsync(async tryLast => await producer.GetSendCount() >= 4, timeout);
             }
             count = await consumer.GetReceivedCount();
-            Console.WriteLine("Received count = {0} after third send for consumer {1}", count, consumer);
+            logger.Info("Received count = {0} after third send for consumer {1}", count, consumer);
             count.Should().Be(expectedCount, "Expected count after second send");
         }
 
@@ -219,7 +224,7 @@ namespace Tester.StreamingTests
                 await TestingUtils.WaitUntilAsync(async tryLast => await producer.GetSendCount() >= 2, timeout);
             }
             int count = await consumer.GetReceivedCount();
-            Console.WriteLine("Received count = {0} after first send for consumer {1}", count, consumer);
+            logger.Info("Received count = {0} after first send for consumer {1}", count, consumer);
             count.Should().Be(expectedCount, "Expected count after first send");
 
             await producer.SendItem(2);
@@ -230,7 +235,7 @@ namespace Tester.StreamingTests
                 await TestingUtils.WaitUntilAsync(async tryLast => await producer.GetSendCount() >= 3, timeout);
             }
             count = await consumer.GetReceivedCount();
-            Console.WriteLine("Received count = {0} after second send for consumer {1}", count, consumer);
+            logger.Info("Received count = {0} after second send for consumer {1}", count, consumer);
             count.Should().Be(expectedCount, "Expected count after second send");
 
             await producer.SendItem(3);
@@ -240,7 +245,7 @@ namespace Tester.StreamingTests
                 await TestingUtils.WaitUntilAsync(async tryLast => await producer.GetSendCount() >= 4, timeout);
             }
             count = await consumer.GetReceivedCount();
-            Console.WriteLine("Received count = {0} after third send for consumer {1}", count, consumer);
+            logger.Info("Received count = {0} after third send for consumer {1}", count, consumer);
             count.Should().Be(expectedCount, "Expected count after second send");
         }
     }
@@ -329,7 +334,7 @@ namespace Tester.StreamingTests
                 }
                 catch (ArgumentException ae)
                 {
-                    Console.WriteLine("Got the expected exception type: {0}", ae);
+                    logger.Info("Got the expected exception type: {0}", ae);
                     throw;
                 }
             });
@@ -384,7 +389,7 @@ namespace Tester.StreamingTests
                 }
                 catch (ArgumentException ae)
                 {
-                    Console.WriteLine("Got the expected exception type: {0}", ae);
+                    logger.Info("Got the expected exception type: {0}", ae);
                     throw;
                 }
 
