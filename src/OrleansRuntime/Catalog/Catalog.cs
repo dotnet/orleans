@@ -480,9 +480,7 @@ namespace Orleans.Runtime
 
                 initStage = 3;
                 await InvokeActivate(activation, requestContextData);
-
-                ActivationCollector.ScheduleCollection(activation);
-
+   
                 // Success!! Log the result, and start processing messages
                 if (logger.IsVerbose) logger.Verbose("InitActivation is done: {0}", address);
             }
@@ -793,6 +791,15 @@ namespace Orleans.Runtime
                         data.AddOnInactive(() => DestroyActivationVoid(data));
                     }
                 }
+                else if (data.State == ActivationState.Activating)
+                {
+                    // Change the ActivationData state here, since we're about to give up the lock.
+                    data.PrepareForDeactivation(); // Don't accept any new messages
+                    ActivationCollector.TryCancelCollection(data);
+                    // we are currently executing OnActivateAsync, so schedule destroy action for after OnActivateAsync is done.
+                    // data.IsCurrentlyExecuting is not tracking OnActivateAsync, so can't use it here.
+                    data.AddOnInactive(() => DestroyActivationVoid(data));                 
+                }
                 else
                 {
                     alreadBeingDestroyed = true;
@@ -1066,6 +1073,7 @@ namespace Orleans.Runtime
                     if (activation.State == ActivationState.Activating)
                     {
                         activation.SetState(ActivationState.Valid); // Activate calls on this activation are finished
+                        ActivationCollector.ScheduleCollection(activation);
                     }
                     if (!activation.IsCurrentlyExecuting)
                     {
