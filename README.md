@@ -67,7 +67,7 @@ Code Examples
 
 Create an interface for your grain:
 ```c#
-public interface IHello : Orleans.IGrainWithIntegerKey
+public interface IHello : Orleans.IGrainWithStringKey
 {
   Task<string> SayHello(string greeting);
 }
