@@ -309,7 +309,8 @@ BEGIN
 			[SuspectingSilos],
 			[SuspectingTimes],
 			[StartTime],
-			[IAmAliveTime]
+			[IAmAliveTime],
+[ETag]
 		)
 		VALUES
 		(
@@ -327,7 +328,8 @@ BEGIN
 			@suspectingSilos,
 			@suspectingTimes,
 			@startTime,
-			@iAmAliveTime
+			@iAmAliveTime,
+@versionEtag
 		);
 
 		IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
@@ -835,7 +837,8 @@ BEGIN
 			[SuspectingSilos],
 			[SuspectingTimes],
 			[StartTime],
-			[IAmAliveTime]
+			[IAmAliveTime],
+[ETag]
 		)
 		VALUES
 		(
@@ -853,7 +856,8 @@ BEGIN
 			@suspectingSilos,
 			@suspectingTimes,
 			@startTime,
-			@iAmAliveTime
+			@iAmAliveTime,
+@versionEtag + 1
 		);
 
 		IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
