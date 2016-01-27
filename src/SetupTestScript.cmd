@@ -2,9 +2,13 @@
 @ECHO off
 setlocal EnableDelayedExpansion
 SET CMDHOME=%~dp0
+if not [%1]==[] (SET TargetDir=%1%) else (SET TargetDir=.)
+if not [%2]==[] pushd %2
 
 echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH is %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH% >> SetupTestScriptOutput.txt 
 echo CMDHOME is %CMDHOME% >> SetupTestScriptOutput.txt
+echo Current directory is "%CD%" (search will be started from here) >> SetupTestScriptOutput.txt
+echo Target directory is "%TargetDir%" (file will be copied here) >> SetupTestScriptOutput.txt
 
 if NOT "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%" == "" (
   if exist "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestSecrets.json" (
@@ -34,7 +38,21 @@ IF NOT "!result!"=="" (
 	)
 )
 
-goto Copy
+:Copy
+echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
+if not exist "!SECRETS_FILE!" (
+	echo SECRETS_FILE !SECRETS_FILE! does not exist. No secrets will be copied. >> SetupTestScriptOutput.txt 
+) else (
+	echo SECRETS_FILE !SECRETS_FILE! exists and will be copied. >> SetupTestScriptOutput.txt 
+	copy /y "!SECRETS_FILE!" %TargetDir% >> SetupTestScriptOutput.txt 
+)
+
+echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
+set >> SetupTestScriptOutput.txt
+
+if not [%2]==[] popd
+endlocal
+goto:eof
 
 :GetDirectoryNameOfFileAbove
 @echo off
@@ -61,14 +79,3 @@ goto:eof
 
 
 
-:Copy
-echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
-if not exist "!SECRETS_FILE!" (
-	echo SECRETS_FILE !SECRETS_FILE! does not exist. No secrets will be copied. >> SetupTestScriptOutput.txt 
-) else (
-	echo SECRETS_FILE !SECRETS_FILE! exists and will be copied. >> SetupTestScriptOutput.txt 
-	copy /y "!SECRETS_FILE!"  . >> SetupTestScriptOutput.txt 
-)
-
-echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
-set >> SetupTestScriptOutput.txt 
