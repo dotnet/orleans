@@ -360,6 +360,31 @@ namespace UnitTests.Grains
         }
     }
 
+    internal class DeactivatingWhileActivatingTestGrain : Grain, IDeactivatingWhileActivatingTestGrain
+    {
+        private Logger logger;
+
+        public override Task OnActivateAsync()
+        {
+            logger = GetLogger();
+            logger.Info("OnActivateAsync");
+            this.DeactivateOnIdle();
+            return TaskDone.Done;
+        }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("OnDeactivateAsync");
+            return TaskDone.Done;
+        }
+
+        public Task<string> DoSomething()
+        {
+            logger.Info("DoSomething");
+            throw new NotImplementedException("DoSomething should not have been called");
+        }
+    }
+
     internal class CreateGrainReferenceTestGrain : Grain, ICreateGrainReferenceTestGrain
     {
         private Logger logger;
