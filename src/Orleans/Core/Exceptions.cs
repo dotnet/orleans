@@ -175,23 +175,5 @@ namespace Orleans.Runtime
             : base(info, context)
         { }
     }
-
-    /// <summary>
-    /// Exception to indicate that the activation refused to activate by calling DeactivateOnIdle from within OnActivateAsync.
-    /// </summary>
-    [Serializable]
-    internal class GrainRefusedToActivateException : OrleansException
-    {
-        public GrainRefusedToActivateException() : base("Grain Refused To Activate") { }
-
-        public GrainRefusedToActivateException(string message) : base(message) { }
-
-        public GrainRefusedToActivateException(string message, Exception innerException) : base(message, innerException) { }
-
-        protected GrainRefusedToActivateException(SerializationInfo info, StreamingContext context)
-                : base(info, context)
-        {
-        }
-    }
 }
 

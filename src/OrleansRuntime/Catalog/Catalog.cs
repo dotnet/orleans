@@ -793,10 +793,16 @@ namespace Orleans.Runtime
                         data.AddOnInactive(() => DestroyActivationVoid(data));
                     }
                 }
+                else if (data.State == ActivationState.Create)
+                {
+                    throw new InvalidOperationException(String.Format(
+                        "Activation {0} has called DeactivateOnIdle from within a constructor, which is not allowed.",
+                            data.ToString()));
+                }
                 else if (data.State == ActivationState.Activating)
                 {
-                    throw new GrainRefusedToActivateException(String.Format(
-                        "Activation {0} refused to activate by calling DeactivateOnIdle from within OnActivateAsync",
+                    throw new InvalidOperationException(String.Format(
+                        "Activation {0} has called DeactivateOnIdle from within OnActivateAsync, which is not allowed.",
                             data.ToString()));
                 }
                 else
