@@ -190,6 +190,14 @@ April 15th 2015
 * Numerous other fixes and improvements.
 
 
+## [Community Virtual Meetup #3](https://www.youtube.com/watch?v=07Up88bpl20)
+[Yevhen Bobrov](https://github.com/yevhen) on a Uniform API for Orleans
+March 6th 2015
+
+## [Community Virtual Meetup #2](https://www.youtube.com/watch?v=D4kJKSFfNjI)
+Orleans team live Q&A and roadmap
+January 12th 2015
+
 
 ## Orleans Open Source v1.0 Update (January 2015)
 
@@ -222,4 +230,7 @@ LoadAwarePlacementAttribute | ActivationCountBasedPlacementAttribute
   See this wiki page for advice on how to [convert legacy Orleans grain interface / class projects over to using NuGet packages](Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet).
 
 
+## [Community Virtual Meetup #1](http://www.youtube.com/watch?v=6COQ8XzloPg)
+[Jakub Konecki](https://github.com/jkonecki) on Event Sourced Grains
+December 18th 2014
 
