@@ -154,6 +154,12 @@ If you were using the Local Silo environment from the SDK folder for testing you
 * Added version to SDK msi product and folder name.
 * Other fixes and improvements.
 
+
+## [Community Virtual Meetup #5](https://www.youtube.com/watch?v=eSepBlfY554)
+[Gabriel Kliot](https://github.com/gabikliot) on the new Orleans Streaming API
+May 22nd 2015
+
+
 ## [v1.0.7](https://github.com/dotnet/orleans/releases/tag/v1.0.7) May 15th  2015
 
 ### Release notes
@@ -166,6 +172,12 @@ If you were using the Local Silo environment from the SDK folder for testing you
 * Replaced ExtendedPrimaryKeyAttribute with IGrainWithGuidCompoundKey and IGrainWithIntegerCompoundKey.
 * Added support for grain classes that are implementations of generic grain interfaces with concrete type arguments.
 * Numerous other fixes and improvements.
+
+
+## [Community Virtual Meetup #4](https://www.youtube.com/watch?v=56Xz68lTB9c)
+[Reuben Bond](https://github.com/ReubenBond) on using Orleans at FreeBay
+April 15th 2015
+
 
 ## [v1.0.5](https://github.com/dotnet/orleans/releases/tag/v1.0.5) March 30th  2015
 
