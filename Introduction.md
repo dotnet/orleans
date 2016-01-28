@@ -4,7 +4,7 @@ title: Introduction
 ---
 {% include JB/setup %}
 
-Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo Reach, Halo 4 and Haslo 5 cloud services, as well as by a number of other companies.
+Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. It was created by Microsoft Research and designed for use in the cloud. Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo Reach, Halo 4 and Halo 5 cloud services, as well as by a number of other companies.
  
 
 Following Orleans' release as an open source framework on January 2015, it has quickly gained popularity and recognition. Leveraging an active developer community and the dedication of the Orleans team, features are added and improved on a daily basis. Microsoft Research continues to invest in Orleans, making it the framework of choice for .NET distributed development.
