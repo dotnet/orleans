@@ -37,6 +37,9 @@ A patch release for two bug fixes
 * [Missing argument to trace format in TraceLogger.Initialize](https://github.com/dotnet/orleans/pull/1134)
 * [Make ConsoleText resilient to ObjectDisposedExceptions](https://github.com/dotnet/orleans/pull/1195)
 
+## [Community Virtual Meetup #7](https://www.youtube.com/watch?v=FKL-PS8Q9ac)
+Christmas Special - [Yevhen Bobrov](https://github.com/yevhen) on [Orleankka](https://github.com/yevhen/Orleankka)
+December 17th 2015
 
 ## [v1.1.0](https://github.com/dotnet/orleans/releases/tag/v1.1.0) December 14nd 2015
 
@@ -64,7 +67,11 @@ A patch release for two bug fixes
   * Added `[KnownType]` attribute for generating serializers for arbitrary types
 * Upgraded to Azure Storage 5.0
 * Upgraded to .NET 4.5.1
-Ot * her fixes and improvements
+* Other fixes and improvements
+
+## Community Virtual Meetup #6
+[MSR PhDs on Geo Distributed Orleansp](https://www.youtube.com/watch?v=fOl8ophHtug) 
+October 23rd 2015
 
 ## [v1.0.10](https://github.com/dotnet/orleans/releases/tag/v1.0.10) September 22nd 2015
 
