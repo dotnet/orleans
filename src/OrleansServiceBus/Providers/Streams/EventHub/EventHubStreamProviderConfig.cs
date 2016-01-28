@@ -1,6 +1,7 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Orleans.Providers;
 
 namespace Orleans.ServiceBus.Providers
@@ -12,17 +13,21 @@ namespace Orleans.ServiceBus.Providers
 
         public string StreamProviderName { get; private set; }
 
-        public int CacheSize { get { return 1024; } }
+        public const string CacheSizeMbName = "CacheSizeMb";
+        private const int DefaultCacheSizeMb = 100; // default to 100mb cache.
+        public int CacheSizeMb { get; private set; }
 
         public EventHubStreamProviderConfig(string streamProviderName)
         {
             StreamProviderName = streamProviderName;
+            CacheSizeMb = DefaultCacheSizeMb;
         }
 
         public void WriteProperties(Dictionary<string, string> properties)
         {
             if (EventHubSettingsType!=null)
                 properties.Add(EventHubConfigTypeName, EventHubSettingsType.AssemblyQualifiedName);
+            properties.Add(CacheSizeMbName, CacheSizeMb.ToString(CultureInfo.InvariantCulture));
         }
 
         public virtual void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
@@ -32,6 +37,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentOutOfRangeException("providerConfiguration", "StreamProviderName not set.");
             }
+            CacheSizeMb = providerConfiguration.GetIntProperty(CacheSizeMbName, DefaultCacheSizeMb);
         }
     }
 }
