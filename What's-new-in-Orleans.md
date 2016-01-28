@@ -4,7 +4,31 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
-# [v1.1.1](https://github.com/dotnet/orleans/releases/tag/v1.1.1) January 11th 2016
+## Community Virtual Meetup #8
+[Orleans core team present the roadmap](https://www.youtube.com/watch?v=4BiCyhvSOs4) 
+January 21st 2016
+
+
+## [v1.1.2](https://github.com/dotnet/orleans/releases/tag/v1.1.2) January 20th 2016
+
+### Release notes
+
+A patch release with bug fixes, primarily for codegen and serializer corner cases.
+
+* [Add support for generic type constraints in codegen](https://github.com/dotnet/orleans/pull/1137)
+* [Correctly specify struct type constraint in generated code](https://github.com/dotnet/orleans/pull/1178)
+* [fix issue:GetReminder throws exception when reminder don't exists #1167](https://github.com/dotnet/orleans/pull/1182)
+* [Cleanup/fix usage of IsNested vs. IsNestedXXX & serialize nested types.](https://github.com/dotnet/orleans/pull/1240)
+* [Correctly serialize [Obsolete] fields and properties.](https://github.com/dotnet/orleans/pull/1241)
+* [Nested serialization of Guid with Json serializer.](https://github.com/dotnet/orleans/pull/1249)
+* [Fix a race in StreamConsumer.SubscribeAsync.](https://github.com/dotnet/orleans/pull/1261)
+* [fix deepcopy issue #1278](https://github.com/dotnet/orleans/pull/1280)
+* [Check declaring types when performing accessibility checks for code gen.](https://github.com/dotnet/orleans/pull/1284)
+* [Allow to configure PubSub for SMS.](https://github.com/dotnet/orleans/pull/1285)
+* [Make Namespace access modifier public in ImplicitStreamSubscriptionAttribute. Add Provider property.](https://github.com/dotnet/orleans/pull/1270)
+
+
+## [v1.1.1](https://github.com/dotnet/orleans/releases/tag/v1.1.1) January 11th 2016
 
 ### Release notes
 
@@ -14,7 +38,7 @@ A patch release for two bug fixes
 * [Make ConsoleText resilient to ObjectDisposedExceptions](https://github.com/dotnet/orleans/pull/1195)
 
 
-# [v1.1.0](https://github.com/dotnet/orleans/releases/tag/v1.1.0) December 14nd 2015
+## [v1.1.0](https://github.com/dotnet/orleans/releases/tag/v1.1.0) December 14nd 2015
 
 ### Release notes
 
@@ -42,7 +66,7 @@ A patch release for two bug fixes
 * Upgraded to .NET 4.5.1
 Ot * her fixes and improvements
 
-# [v1.0.10](https://github.com/dotnet/orleans/releases/tag/v1.0.10) September 22nd 2015
+## [v1.0.10](https://github.com/dotnet/orleans/releases/tag/v1.0.10) September 22nd 2015
 
 ### Release notes
 
@@ -69,7 +93,7 @@ Ot * her fixes and improvements
 * Numerous bug fixes and improvements, mostly to streaming
 
 
-# [v1.0.9](https://github.com/dotnet/orleans/releases/tag/v1.0.9) July 15th  2015
+## [v1.0.9](https://github.com/dotnet/orleans/releases/tag/v1.0.9) July 15th  2015
 
 ### This release includes several significant API changes that require adjustments in existing code created with v1.0.8 or earlier versions of Orleans  ###
 
@@ -111,7 +135,7 @@ If you were using the Local Silo environment from the SDK folder for testing you
 * Removed binaries and local silo environment from the SDK.
 * Numerous bug fixes and other improvements.
 
-# [v1.0.8](https://github.com/dotnet/orleans/releases/tag/v1.0.8) May 26th  2015
+## [v1.0.8](https://github.com/dotnet/orleans/releases/tag/v1.0.8) May 26th  2015
 
 ### Release notes
 
@@ -123,7 +147,7 @@ If you were using the Local Silo environment from the SDK folder for testing you
 * Added version to SDK msi product and folder name.
 * Other fixes and improvements.
 
-# [v1.0.7](https://github.com/dotnet/orleans/releases/tag/v1.0.7) May 15th  2015
+## [v1.0.7](https://github.com/dotnet/orleans/releases/tag/v1.0.7) May 15th  2015
 
 ### Release notes
 
@@ -136,7 +160,7 @@ If you were using the Local Silo environment from the SDK folder for testing you
 * Added support for grain classes that are implementations of generic grain interfaces with concrete type arguments.
 * Numerous other fixes and improvements.
 
-# [v1.0.5](https://github.com/dotnet/orleans/releases/tag/v1.0.5) March 30th  2015
+## [v1.0.5](https://github.com/dotnet/orleans/releases/tag/v1.0.5) March 30th  2015
 
 ### Release notes
 
@@ -148,7 +172,7 @@ If you were using the Local Silo environment from the SDK folder for testing you
 
 
 
-# Orleans Open Source v1.0 Update (January 2015)
+## Orleans Open Source v1.0 Update (January 2015)
 
 ###Initial stable production-quality release.
 
