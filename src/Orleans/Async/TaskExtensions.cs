@@ -11,6 +11,16 @@ namespace Orleans
     /// </summary>
     public static class PublicOrleansTaskExtentions
     {
+        private static readonly Task<object> CanceledTask;
+        private static readonly Task<object> CompletedTask = Task.FromResult(default(object));
+
+        static PublicOrleansTaskExtentions()
+        {
+            var completion = new TaskCompletionSource<object>();
+            completion.SetCanceled();
+            CanceledTask = completion.Task;
+        }
+
         /// <summary>
         /// Observes and ignores a potential exception on a given Task.
         /// If a Task fails and throws an exception which is never observed, it will be caught by the .NET finalizer thread.
@@ -49,7 +59,7 @@ namespace Orleans
             switch (task.Status)
             {
                 case TaskStatus.RanToCompletion:
-                    return Task.FromResult(default(object));
+                    return CompletedTask;
 
                 case TaskStatus.Faulted:
                     {
@@ -58,7 +68,7 @@ namespace Orleans
 
                 case TaskStatus.Canceled:
                     {
-                        return CancelledTask;
+                        return CanceledTask;
                     }
 
                 default:
@@ -92,7 +102,7 @@ namespace Orleans
 
                 case TaskStatus.Canceled:
                     {
-                        return CancelledTask;
+                        return CanceledTask;
                     }
 
                 default:
@@ -126,16 +136,6 @@ namespace Orleans
         private static async Task<object> BoxAwait<T>(Task<T> task)
         {
             return await task;
-        }
-
-        private static Task<object> CancelledTask
-        {
-            get
-            {
-                var completion = new TaskCompletionSource<object>();
-                completion.SetCanceled();
-                return completion.Task;
-            }
         }
 
         private static Task<object> TaskFromFaulted(Task task)
