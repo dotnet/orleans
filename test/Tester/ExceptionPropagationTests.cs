@@ -1,10 +1,8 @@
+using System;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using System;
 using Xunit;
-using Tester;
 
 namespace UnitTests.General
 {
@@ -14,24 +12,67 @@ namespace UnitTests.General
     public class ExceptionPropagationTests : HostedTestClusterEnsureDefaultStarted
     {
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task BasicExceptionPropagation()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => grain.ThrowsInvalidOperationException());
+
+            Assert.Equal("Test exception", exception.Message);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task ExceptionPropagationDoesNotUnwrapAggregateExceptions()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            var exception = await Assert.ThrowsAsync<AggregateException>(
+                () => grain.ThrowsAggregateExceptionWrappingInvalidOperationException());
+
+            var nestedEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerException);
+            Assert.Equal("Test exception", nestedEx.Message);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task ExceptionPropagationDoesNoFlattenAggregateExceptions()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            var exception = await Assert.ThrowsAsync<AggregateException>(
+                () => grain.ThrowsNestedAggregateExceptionsWrappingInvalidOperationException());
+
+            var nestedAggEx = Assert.IsAssignableFrom<AggregateException>(exception.InnerException);
+            var doubleNestedEx = Assert.IsAssignableFrom<InvalidOperationException>(nestedAggEx.InnerException);
+            Assert.Equal("Test exception", doubleNestedEx.Message);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task TaskCancelationPropagation()
         {
             IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
-            var actualException = default(Exception);
-            try
-            {
-                await grain.Cancelled();
-            }
-            catch (Exception exception)
-            {
-                actualException = exception;
-            }
+            await Assert.ThrowsAsync<TaskCanceledException>(
+                () => grain.Canceled());
+        }
 
-            Assert.IsNotNull(actualException, "Expected grain call to throw a cancellation exception.");
-            Assert.IsTrue(actualException is AggregateException);
-            Assert.AreEqual(
-                typeof(TaskCanceledException),
-                ((AggregateException)actualException).InnerException.GetType());
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task GrainForwardingExceptionPropagation()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            var otherGrainId = GetRandomGrainId();
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => grain.GrainCallToThrowsInvalidOperationException(otherGrainId));
+
+            Assert.Equal("Test exception", exception.Message);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task GrainForwardingExceptionPropagationDoesNotUnwrapAggregateExceptions()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            var otherGrainId = GetRandomGrainId();
+            var exception = await Assert.ThrowsAsync<AggregateException>(
+                () => grain.GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException(otherGrainId));
+
+            var nestedEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerException);
+            Assert.Equal("Test exception", nestedEx.Message);
         }
     }
 }
