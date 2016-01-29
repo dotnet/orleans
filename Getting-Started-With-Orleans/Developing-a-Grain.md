@@ -8,8 +8,7 @@ title: Developing a Grain
 
 Grains interact with each other by invoking methods declared as part of the respective grain interfaces. 
 A grain class implements one or more previously declared grain interfaces. 
-All methods of a grain interface are required to be asynchronous. 
-That is, their return types have to be `Task`s (see [Asynchrony and Tasks](Asynchrony-and-Tasks) for more details). 
+All methods of a grain interface must return a `Task`(see [Asynchrony and Tasks](Asynchrony-and-Tasks) for more details). 
 
 The following is an excerpt from the [Presence Service](/orleans/Samples-Overview/Presence-Service) sample: 
 
