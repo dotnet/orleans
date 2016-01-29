@@ -53,11 +53,23 @@ public class PlayerGrain : Grain, IPlayerGrain
 
 ## Grain Reference
 
-A grain reference is a logical endpoint that allows other grains, as well as an [Orleans Client](/Orleans/Getting-Started-With-Orleans/Clients) code, to invoke methods and properties of a particular grain interface implemented by a grain. 
-A grain reference is a proxy object that implements the corresponding grain interface. 
-A grain reference can be constructed by passing the identity of the grain to the `GetGrain()` method of the factory class auto-generated at compile time for the corresponding grain interface, or receiving the return value of a method or property. 
-A grain reference can be passed as an argument to a method call.
+A Grain Reference is a proxy object that implements the same grain interface implemented by the corresponding grain class. Using asynchronous messaging, it provides full-duplex communication with other grains, as well as [Orleans Client](/Orleans/Getting-Started-With-Orleans/Clients) code.
+A grain reference can be constructed by passing the identity of a grain to the `GrainFactory.GetGrain<T>()` method, where T is the grain interface. Developers can use grain references like any other .NET object. It can be passed to a method, used as a method return value, etc.
 
+The following are examples of how to construct a grain reference of the `IPlayerGrain` interface defined above.
+
+In Orleans Client code:
+
+```csharp
+    //construct the grain reference of a specific player
+    IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
+```
+From inside a Grain class:
+
+```csharp
+    //construct the grain reference of a specific player
+    IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
+```
 ##Next
 
 [Developing a Client](Developing-a-Client)
