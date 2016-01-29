@@ -179,13 +179,9 @@ namespace Orleans.Runtime.ReminderService
             return await ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
 
-        private async Task<List<Tuple<ReminderTableEntry, string>>> FindAllReminderEntries()
+        private Task<List<Tuple<ReminderTableEntry, string>>> FindAllReminderEntries()
         {
-            Expression<Func<ReminderTableEntry, bool>> query =
-                instance => instance.ServiceId.Equals(ReminderTableEntry.ConstructServiceIdStr(ServiceId));
-
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
-            return queryResults.ToList();
+            return FindReminderEntries(0, 0);
         }
 
         internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry)
