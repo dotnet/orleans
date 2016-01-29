@@ -4,10 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.TestingHost;
-using Tester.TestStreamProviders.Generator;
-using Tester.TestStreamProviders.Generator.Generators;
 using TestGrainInterfaces;
 using UnitTests.Grains;
 
@@ -16,38 +13,20 @@ namespace Tester.StreamingTests
     public class ImplicitSubscritionRecoverableStreamTestRunner
     {
         private readonly IGrainFactory grainFactory;
-        private readonly string streamProviderTypeName;
         private readonly string streamProviderName;
-        private readonly GeneratorAdapterConfig adapterConfig;
 
-        public ImplicitSubscritionRecoverableStreamTestRunner(IGrainFactory grainFactory, string streamProviderTypeName, string streamProviderName, GeneratorAdapterConfig adapterConfig)
+        public ImplicitSubscritionRecoverableStreamTestRunner(IGrainFactory grainFactory, string streamProviderName)
         {
             this.grainFactory = grainFactory;
-            this.streamProviderTypeName = streamProviderTypeName;
             this.streamProviderName = streamProviderName;
-            this.adapterConfig = adapterConfig;
         }
 
-        public async Task Recoverable100EventStreamsWithTransientErrors(string streamNamespace)
+        public async Task Recoverable100EventStreamsWithTransientErrors(Func<string, int, int, Task> generateFn, string streamNamespace, int streamCount, int eventsInStream)
         {
             try
             {
-                var generatorConfig = new SimpleGeneratorConfig
-                {
-                    StreamNamespace = streamNamespace,
-                    EventsInStream = 100
-                };
-
-                var mgmt = grainFactory.GetGrain<IManagementGrain>(0);
-                object[] results = await mgmt.SendControlCommandToProvider(streamProviderTypeName, streamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-                Assert.AreEqual(2, results.Length, "expected responses");
-                bool[] bResults = results.Cast<bool>().ToArray();
-                foreach (var result in bResults)
-                {
-                    Assert.AreEqual(true, result, "Control command result");
-                }
-
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(generatorConfig, generatorConfig.EventsInStream, assertIsTrue), TimeSpan.FromSeconds(30));
+                await generateFn(streamNamespace, streamCount, eventsInStream);
+                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(30));
             }
             finally
             {
@@ -56,27 +35,13 @@ namespace Tester.StreamingTests
             }
         }
 
-        public async Task Recoverable100EventStreamsWith1NonTransientError(string streamNamespace)
+        public async Task Recoverable100EventStreamsWith1NonTransientError(Func<string, int, int, Task> generateFn, string streamNamespace, int streamCount, int eventsInStream)
         {
             try
             {
-                var generatorConfig = new SimpleGeneratorConfig
-                {
-                    StreamNamespace = streamNamespace,
-                    EventsInStream = 100
-                };
-
-                var mgmt = grainFactory.GetGrain<IManagementGrain>(0);
-                object[] results = await mgmt.SendControlCommandToProvider(streamProviderTypeName, streamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-                Assert.AreEqual(2, results.Length, "expected responses");
-                bool[] bResults = results.Cast<bool>().ToArray();
-                foreach (var result in bResults)
-                {
-                    Assert.AreEqual(true, result, "Control command result");
-                }
-
+                await generateFn(streamNamespace, streamCount, eventsInStream);
                 // should eventually skip the faulted event, so event count should be one (faulted event) less that number of events in stream.
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(generatorConfig, generatorConfig.EventsInStream - 1, assertIsTrue), TimeSpan.FromSeconds(90));
+                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream - 1, assertIsTrue), TimeSpan.FromSeconds(90));
             }
             finally
             {
@@ -85,21 +50,21 @@ namespace Tester.StreamingTests
             }
         }
 
-        private async Task<bool> CheckCounters(SimpleGeneratorConfig generatorConfig, int eventsInStream, bool assertIsTrue)
+        private async Task<bool> CheckCounters(string streamNamespace, int streamCount, int eventsInStream, bool assertIsTrue)
         {
             var reporter = grainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
-            var report = await reporter.GetReport(streamProviderName, generatorConfig.StreamNamespace);
+            var report = await reporter.GetReport(streamProviderName, streamNamespace);
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.AreEqual(adapterConfig.TotalQueueCount, report.Count, "Stream count");
+                Assert.AreEqual(streamCount, report.Count, "Stream count");
                 foreach (int eventsPerStream in report.Values)
                 {
                     Assert.AreEqual(eventsInStream, eventsPerStream, "Events per stream");
                 }
             }
-            else if (adapterConfig.TotalQueueCount != report.Count ||
+            else if (streamCount != report.Count ||
                      report.Values.Any(count => count != eventsInStream))
             {
                 return false;

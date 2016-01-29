@@ -22,10 +22,10 @@ namespace UnitTests.StreamingTests
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHSubscriptionMultiplicityTestsNamespace";
-        private const string EHPath = "orleans_test";
-        private const string EHConsumerGroup = "orleanstestconsumer";
+        private const string EHPath = "ehorleanstest";
+        private const string EHConsumerGroup = "orleansnightly";
 
-        private readonly SubscriptionMultiplicityTestRunner runner;
+        private  SubscriptionMultiplicityTestRunner runner;
 
         private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
             EHConsumerGroup, EHPath);
@@ -33,7 +33,8 @@ namespace UnitTests.StreamingTests
         private static readonly EventHubStreamProviderConfig ProviderConfig =
             new EventHubStreamProviderConfig(StreamProviderName);
 
-        public EHSubscriptionMultiplicityTests()
+        [TestInitialize]
+        public void InitializeOrleans()
         {
             runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, GrainClient.Logger);
         }

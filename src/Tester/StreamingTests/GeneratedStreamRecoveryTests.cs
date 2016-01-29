@@ -1,13 +1,16 @@
 ﻿    
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using Tester.TestStreamProviders.Generator;
+using Tester.TestStreamProviders.Generator.Generators;
 using TestGrains;
 using UnitTests.Grains;
 using UnitTests.Tester;
@@ -63,7 +66,7 @@ namespace UnitTests.StreamingTests
         [TestInitialize]
         public void InitializeOrleans()
         {
-            runner = new ImplicitSubscritionRecoverableStreamTestRunner(GrainClient.GrainFactory, StreamProviderTypeName, StreamProviderName, AdapterConfig);
+            runner = new ImplicitSubscritionRecoverableStreamTestRunner(GrainClient.GrainFactory, StreamProviderName);
         }
 
 
@@ -71,14 +74,36 @@ namespace UnitTests.StreamingTests
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
-            await runner.Recoverable100EventStreamsWithTransientErrors(ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace);
+            await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents, 
+                ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace,
+                AdapterConfig.TotalQueueCount, 100);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
-            await runner.Recoverable100EventStreamsWith1NonTransientError(ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace);
+            await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents,
+                ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace,
+                AdapterConfig.TotalQueueCount, 100);
+        }
+
+        private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
+        {
+            var generatorConfig = new SimpleGeneratorConfig
+            {
+                StreamNamespace = streamNamespace,
+                EventsInStream = eventsInStream
+            };
+
+            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+            Assert.AreEqual(2, results.Length, "expected responses");
+            bool[] bResults = results.Cast<bool>().ToArray();
+            foreach (var result in bResults)
+            {
+                Assert.AreEqual(true, result, "Control command result");
+            }
         }
     }
 }
