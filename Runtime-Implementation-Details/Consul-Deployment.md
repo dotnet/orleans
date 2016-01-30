@@ -88,7 +88,7 @@ If you are interested in using Consul for your own service discovery there are [
 
 ##Implementation Detail
 
-The Membership Provider makes use of Consul's Key/Value store functionality.  When each Silo starts it registers two KV entries, one which contains the Silo details and one which holds the last time the Silo reported it was alive. Once your Silo is running you can view these entries in your web browser [here](http://localhost:8500/v1/kv/?keys), this will display something like:
+The Membership Table Provider makes use of [Consul's Key/Value store](https://www.consul.io/intro/getting-started/kv.html) functionality with CAS.  When each Silo starts it registers two KV entries, one which contains the Silo details and one which holds the last time the Silo reported it was alive (the latter refers to diagnostics "I am alive" entries and not to failure detection hearbeats which are sent directly between the silos and are not written into the table). All writes to the table arre performed with CAS to provide concurrency control, as necessitated by Orleans's [Cluster Management Protocol](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management). Once the Silo is running you can view these entries in your web browser [here](http://localhost:8500/v1/kv/?keys), this will display something like:
 
 	[
 		"orleans/MyOrleansDeployment/192.168.1.26:11111@191780753",
@@ -129,7 +129,7 @@ When the Clients connect, they read the KVs for all silos in the cluster in one 
 ##Limitations
 
 ###Orleans Extended Membership Protocol (Table Version & ETag)
-Consul does not currently support atomic updates so the Consul Membership Provider is not able to support the Orleans Extended Membership Protocol.  This protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented.  Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.
+Consul KV currrently does not currently support atomic updates. Therefore, the Orleans Consul Membership Provider only implements the the Orleans Basic Membership Protocol, as described [here](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management) and does not support the Extended Membership Protocol.  This Extended protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented. Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.
 
 ###Multiple Datacenters
 The Key Value Pairs in Consul are not currently replicated between Consul datacenters.  There is a [separate project](https://github.com/hashicorp/consul-replicate) to address this but it has not yet been proven to support Orleans.
@@ -142,10 +142,10 @@ When Consul starts on Windows it logs the following message:
 
 This is displayed simply due to lack of focus on testing when running in a Windows environment and not because of any actual known issues.  Read the [discussion here](https://groups.google.com/forum/#!topic/consul-tool/DvXYgZtUZyU) before deciding if Consul is the right choice for you.
 
-##Potential Development
+##Potential Future Enhanecements 
 
 1) Prove that the Consul KV replication project is able to support an Orleans cluster in a WAN environment between multiple Consul datacenters.
 
 2) Implement the Reminder Table in Consul.  
 
-3) Implement the Extended Protocol.  The team behind Consul do plan on implementing atomic operations, once this functionality is available it will be possible to remove the limitations in the provider.
+3) Implement the Extended Membership Protocol. The team behind Consul does plan on implementing atomic operations, once this functionality is available it will be possible to remove the limitations in the provider.
