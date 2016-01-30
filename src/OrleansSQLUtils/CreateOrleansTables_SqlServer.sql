@@ -83,8 +83,7 @@ GO
 CREATE TABLE [OrleansQuery]
 (	
     [QueryKey] VARCHAR(64) NOT NULL,
-    [QueryText] NVARCHAR(MAX) NOT NULL,
-    [Description] NVARCHAR(MAX) NOT NULL,
+    [QueryText] NVARCHAR(MAX) NOT NULL
 
 	CONSTRAINT OrleansQuery_Key PRIMARY KEY([QueryKey])
 );
@@ -217,7 +216,7 @@ BEGIN
 	-- ROWVERSION is applied automatically whereas an etag mechanism of using UNIQUEIDENTIFIER in SQL Server is not.
 	-- Also some queries could be tuned better on SQL Server 2005 and later such as error handling or SQL Server 2008
 	-- and later using MERGE for UPSERT (reminders).
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpdateIAmAlivetimeKey',
@@ -234,11 +233,10 @@ BEGIN
 			AND ([Address] = @address AND @address IS NOT NULL)
 			AND ([Port] = @port AND @port IS NOT NULL)
 			AND ([Generation] = @generation AND @generation IS NOT NULL);
-		COMMIT TRANSACTION;',
-		N''
+		COMMIT TRANSACTION;'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		-- There should ever be only one version row. A new one is tried to insert only once when a silo starts.
@@ -270,11 +268,10 @@ BEGIN
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT CAST(0 AS BIT);
-		END',
-		N''
+		END'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(		
 		'InsertMembershipKey',
@@ -361,11 +358,10 @@ BEGIN
 		ELSE
 		BEGIN	
 			SELECT CAST(0 AS BIT);
-		END', 
-		N''
+		END'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpdateMembershipKey',
@@ -425,11 +421,10 @@ BEGIN
 		ELSE
 		BEGIN	
 			SELECT CAST(0 AS BIT);
-		END',
-		N''
+		END'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpsertReminderRowKey',
@@ -473,11 +468,10 @@ BEGIN
 				AND [GrainId] = @grainId AND @grainId IS NOT NULL
 				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
 			END	
-			COMMIT TRANSACTION;',
-		N''
+			COMMIT TRANSACTION;'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpsertReportClientMetricsKey',
@@ -534,11 +528,10 @@ BEGIN
 				@connectedGatewaysCount
 			);
 		END
-		COMMIT TRANSACTION;',
-		N''
+		COMMIT TRANSACTION;'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpsertSiloMetricsKey',
@@ -619,8 +612,7 @@ BEGIN
 				@clientCount
 			);
 		END
-		COMMIT TRANSACTION;',
-		N''
+		COMMIT TRANSACTION;'
 	);
 END
 ELSE
@@ -745,7 +737,7 @@ BEGIN
 		CONSTRAINT FK_OrleansSiloMetricsTable_OrleansMembershipVersionTable_DeploymentId FOREIGN KEY([DeploymentId]) REFERENCES [OrleansMembershipVersionTable]([DeploymentId])
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpdateIAmAlivetimeKey',
@@ -762,11 +754,10 @@ BEGIN
 			AND ([Address] = @address AND @address IS NOT NULL)
 			AND ([Port] = @port AND @port IS NOT NULL)
 			AND ([Generation] = @generation AND @generation IS NOT NULL);
-		COMMIT TRANSACTION;',
-		N''
+		COMMIT TRANSACTION;'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'InsertMembershipVersionKey',
@@ -796,11 +787,10 @@ BEGIN
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT CAST(0 AS BIT);
-		END',
-		N''
+		END'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'InsertMembershipKey',
@@ -888,11 +878,10 @@ BEGIN
 		ELSE
 		BEGIN	
 			SELECT CAST(0 AS BIT);
-		END', 
-		N''
+		END'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpdateMembershipKey',
@@ -953,11 +942,10 @@ BEGIN
 		ELSE
 		BEGIN	
 			SELECT CAST(0 AS BIT);
-		END',
-		N''
+		END'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpsertReminderRowKey',
@@ -1003,11 +991,10 @@ BEGIN
 				AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;
 		END	
 		COMMIT TRANSACTION;
-		SELECT @newEtag AS ETag;',
-		N''
+		SELECT @newEtag AS ETag;'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpsertReportClientMetricsKey',
@@ -1064,11 +1051,10 @@ BEGIN
 				@connectedGatewaysCount
 			);
 		END
-		COMMIT TRANSACTION;',
-		N''
+		COMMIT TRANSACTION;'
 	);
 
-	INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+	INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 	VALUES
 	(
 		'UpsertSiloMetricsKey',
@@ -1149,12 +1135,11 @@ BEGIN
 				@clientCount
 			);
 		END
-		COMMIT TRANSACTION;',
-		N''
+		COMMIT TRANSACTION;'
 	);
 END
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'ActiveGatewaysQueryKey',
@@ -1167,11 +1152,10 @@ VALUES
 		[OrleansMembershipTable]
 	WHERE
 		[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL
-		AND [Status]   = @status AND @status IS NOT NULL;',
-	N''
+		AND [Status]   = @status AND @status IS NOT NULL;'
 );
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'MembershipReadRowKey',
@@ -1202,11 +1186,10 @@ VALUES
 		AND ([Address] = @address AND @address IS NOT NULL)
 		AND ([Port]    = @port AND @port IS NOT NULL)
 		AND ([Generation] = @generation AND @generation IS NOT NULL)
-		WHERE v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;',
-	N''
+		WHERE v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;'
 );
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'MembershipReadAllKey',
@@ -1234,11 +1217,10 @@ VALUES
 		[OrleansMembershipVersionTable] v
 		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.[DeploymentId] = m.[DeploymentId]
 	WHERE
-		v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;',
-	N''
+		v.[DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;'
 );
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'DeleteMembershipTableEntriesKey',
@@ -1249,11 +1231,10 @@ VALUES
 
     DELETE FROM [OrleansMembershipVersionTable]
     WHERE [DeploymentId] = @deploymentId AND @deploymentId IS NOT NULL;
-    COMMIT TRANSACTION;',
-	N''
+    COMMIT TRANSACTION;'
 );
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'ReadReminderRowsKey',
@@ -1267,11 +1248,10 @@ VALUES
 	FROM [OrleansRemindersTable]
 	WHERE
 		[ServiceId] = @serviceId AND @serviceId IS NOT NULL
-		AND [GrainId] = @grainId AND @grainId IS NOT NULL;',
-	N''
+		AND [GrainId] = @grainId AND @grainId IS NOT NULL;'
 );
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'ReadReminderRowKey',
@@ -1286,11 +1266,10 @@ VALUES
     WHERE
         [ServiceId] = @serviceId AND @serviceId IS NOT NULL
         AND [GrainId] = @grainId AND @grainId IS NOT NULL
-        AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;',
-	N''
+        AND [ReminderName] = @reminderName AND @reminderName IS NOT NULL;'
 );
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'ReadRangeRows1Key',
@@ -1305,11 +1284,10 @@ VALUES
 	WHERE
 		[ServiceId] = @serviceId AND @serviceId IS NOT NULL
 		AND ([GrainIdConsistentHash] > @beginHash AND @beginHash IS NOT NULL
-				AND [GrainIdConsistentHash] <= @endHash AND @endHash IS NOT NULL);',
-	N''
+				AND [GrainIdConsistentHash] <= @endHash AND @endHash IS NOT NULL);'
 );
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'ReadRangeRows2Key',
@@ -1324,12 +1302,11 @@ VALUES
 	WHERE
 		[ServiceId] = @serviceId AND @serviceId IS NOT NULL
 		AND ([GrainIdConsistentHash] > @beginHash AND @beginHash IS NOT NULL
-				OR [GrainIdConsistentHash] <= @endHash AND @endHash IS NOT NULL);',
-	N''
+				OR [GrainIdConsistentHash] <= @endHash AND @endHash IS NOT NULL);'
 );
 
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'InsertOrleansStatisticsKey',
@@ -1353,12 +1330,11 @@ VALUES
 			@isDelta,
 			@statValue,
 			@statistic;
-		COMMIT TRANSACTION;',
-	N''
+		COMMIT TRANSACTION;'
 );
 
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'DeleteReminderRowKey',
@@ -1373,10 +1349,10 @@ VALUES
 			AND ETag = @etag AND @etag IS NOT NULL
 		SET @rowsDeleted = @@ROWCOUNT;		
 		COMMIT TRANSACTION;
-		SELECT CAST(@rowsDeleted AS BIT);',
-	N'');
+		SELECT CAST(@rowsDeleted AS BIT);'
+	);
 
-INSERT INTO [OrleansQuery]([QueryKey], [QueryText], [Description])
+INSERT INTO [OrleansQuery]([QueryKey], [QueryText])
 VALUES
 (
 	'DeleteReminderRowsKey',
@@ -1385,8 +1361,7 @@ VALUES
 	  DELETE FROM [OrleansRemindersTable]
 	  WHERE
 	      [ServiceId] = @serviceId AND @serviceId IS NOT NULL;
-	 COMMIT TRANSACTION;',
-	N''
+	 COMMIT TRANSACTION;'
 );
 
 GO
