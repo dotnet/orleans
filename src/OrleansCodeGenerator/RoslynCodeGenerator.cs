@@ -35,6 +35,11 @@ namespace Orleans.CodeGenerator
         private static readonly Logger Logger = TraceLogger.GetLogger("CodeGenerator");
 
         /// <summary>
+        /// The serializer generation manager.
+        /// </summary>
+        private static readonly SerializerGenerationManager SerializerGenerationManager = new SerializerGenerationManager();
+
+        /// <summary>
         /// The static instance.
         /// </summary>
         private static readonly RoslynCodeGenerator StaticInstance = new RoslynCodeGenerator();
