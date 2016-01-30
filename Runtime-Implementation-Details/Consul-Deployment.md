@@ -12,10 +12,10 @@ There is a very detailed overview of Consul including comparisons with similar s
 Consul is written in GO and is [open source](https://github.com/hashicorp/consul); compiled downloads are available for [Mac OS X, FreeBSD, Linux, Solaris and Windows](https://www.consul.io/downloads.html)
 
 ##Why Choose Consul?
-As an Orleans Membership Provider, Consul is a good choice when you need to deliver an on-premise solution which does not require your potential customers to have existing infrastructure **and** a co-operative IT provider.  Consul is a very lightweight single executable, has no dependencies and as such can easily be built into your own middleware solution.  And when Consul is already your solution for discovering, checking and maintaining your microservices, it makes sense that Orleans membership doesn't introduce additional complexity.
+As an [Orleans Membership Provider](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management), Consul is a good choice when you need to deliver an **on-premise solution** which does not require your potential customers to have existing infrastructure **and** a co-operative IT provider.  Consul is a very lightweight single executable, has no dependencies and as such can easily be built into your own middleware solution.  And when Consul is already your solution for discovering, checking and maintaining your microservices, it makes sense to fully integrate with Orleans membership for simplicity and ease of operation. We therefore implemented a membership table in Consul (also known as "Orleans Custom System Store"), which fully integrates with Orleans's [Cluster Management](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management).
 
 ##Setting up Consul
-There is very extensive documentation available on Consul.io about setting up a stable Consul cluster and it doesn't make sense to repeat that here; however for your convenience we include this guide so you can very quickly get Orleans running with a standalone Consul agent.
+There is very extensive documentation available on [Consul.io](https://www.consul.io) about setting up a stable Consul cluster and it doesn't make sense to repeat that here; however for your convenience we include this guide so you can very quickly get Orleans running with a standalone Consul agent.
 
 1) Create a folder to install Consul into, e.g. C:\Consul
 
@@ -44,7 +44,7 @@ There are many other parameters, and the option to use a json configuration file
 ##Configuration of Orleans
 
 ###Server
-There is currently a known issue with the "Custom" membership provider implementation in Orleans which means a Membership Provider **has** to implement both membership and reminder protocols otherwise the OrleansConfiguration.xml config file will fail to parse correctly.  For this reason you have to provide a placeholder SystemStore in the xml and then configure the provider in code before starting the Silo.
+There is currently a known issue with the "Custom" membership provider OrleansConfiguration.xml configuration file that will fail to parse correctly.  For this reason you have to provide a placeholder SystemStore in the xml and then configure the provider in code before starting the Silo.
 
 **OrleansConfiguration.xml**
 
@@ -84,7 +84,7 @@ The client configuration is much simpler
   	</ClientConfiguration>
 
 ##Client SDK
-If you are interested in using Consul for your own service discovery.  There are [Client SDKs](https://www.consul.io/downloads_tools.html) for most popular languages.
+If you are interested in using Consul for your own service discovery there are [Client SDKs](https://www.consul.io/downloads_tools.html) for most popular languages.
 
 ##Implementation Detail
 
