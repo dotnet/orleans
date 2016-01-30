@@ -6,7 +6,7 @@ title: Cluster Management in Orleans
 
 Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as **Silo Membership**. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.
 
-The protocol relies on an external service to provide an abstraction of `MembershipTable`. `MembershipTable` is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 4 implementations of the `MembershipTable`: based on [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/), SQL server, [Apache ZooKeeper](https://ZooKeeper.apache.org/) and in-memory emulation for development.
+The protocol relies on an external service to provide an abstraction of `MembershipTable`. `MembershipTable` is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 5 implementations of the `MembershipTable`: based on [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/), SQL server, [Apache ZooKeeper](https://ZooKeeper.apache.org/), [Consul IO](https://www.consul.io) and in-memory emulation for development.
 In addition to the `MembershipTable` each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on a set alive silos. We start by describing the internal implementation of the Orleans's membership protocol below and later on describe the implementation of the `MembershipTable`. 
 
 
@@ -94,7 +94,7 @@ In the extended version of the protocol all writes are serialized via one row. T
 
 ### Membership Table:
 
-As already mentioned, `MembershipTable` is used as a rendezvous point for silos to find each other and Orleans clients to find silos and also helps coordinate the agreement on the membership view. We currently have 4 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache ZooKeeper and in-memory emulation for development. The interface for `MembershipTable` is defined in [**`IMembershipTable`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs).
+As already mentioned, `MembershipTable` is used as a rendezvous point for silos to find each other and Orleans clients to find silos and also helps coordinate the agreement on the membership view. We currently have5 implementation of the `MembershipTable`: based on Azure Table, SQL server, Apache ZooKeeper, Consul IO and in-memory emulation for development. The interface for `MembershipTable` is defined in [**`IMembershipTable`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs).
 
 1.  [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/) - in this implementation we use Azure deployment ID as partition key and the silo identity (`ip:port:epoch`) as row key. Together they guarantee a unique key per silo. For concurrency control we use optimistic concurrency control based on [Azure Table ETags](http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx). Every time we read from the table we store the etag for every read row and use that eTag when we try to write back. etags are automatically assigned and checked by Azure Table service on every write. For multi-row transactions we utilize the support for [batch transactions provided by Azure table](http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx), which guarantees serializale transactions over rows with the same partition key.
 
@@ -102,7 +102,9 @@ As already mentioned, `MembershipTable` is used as a rendezvous point for silos 
 
 3.  [Apache ZooKeeper](https://ZooKeeper.apache.org/) - in this implementation we use the configured deployment ID as a root node and the silo identity (`ip:port@epoch`) as its child node. Together they guarantee a unique path per silo. For concurrency control we use optimistic concurrency control based on the [node version](http://zookeeper.apache.org/doc/r3.4.6/zookeeperOver.html#Nodes+and+ephemeral+nodes). Every time we read from the deployment root node we store the version for every read child silo node and use that version when we try to write back. Each time a node's data changes, the version number increases atomically by the ZooKeeper service. For multi-row transactions we utilize the [multi method](http://zookeeper.apache.org/doc/r3.4.6/api/org/apache/zookeeper/ZooKeeper.html#multi(java.lang.Iterable)), which guarantees serializale transactions over silo nodes with the same parent deployment ID node.
 
-4. In-memory emulation for development setup. We use a special system grain, called `MembershipTableGrain`, for that implementation. This grain lives on a designated primary silo, which is only used for a **development setup**. In any real production usage primary silo **is not required**.
+4.  [COnsul IO](https://www.consul.io) - we used [Consul's Key/Value store](https://www.consul.io/intro/getting-started/kv.html) to impelemen the membershop table. Refer to [Consul-Deployment](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Consul-Deployment) for more details.
+
+5. In-memory emulation for development setup. We use a special system grain, called `MembershipTableGrain`, for that implementation. This grain lives on a designated primary silo, which is only used for a **development setup**. In any real production usage primary silo **is not required**.
 
 
 ### Configuration:
@@ -124,6 +126,8 @@ There are 4 types of liveness implemented. The type of the liveness protocol is 
 3. `SqlServer` - membership table is stored in a relational database.
 
 4. `ZooKeeper` - membership table is stored in a ZooKeeper [ensemble](http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup).
+
+5. `Consul` - configured as Custom system store with `MembershipTableAssembly = "OrleansConsulUtils"`.  Refer to [Consul-Deployment](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Consul-Deployment) for more details.
 	
 For all liveness types the common configuration variables are defined in `Globals.Liveness` element:
 	
@@ -164,7 +168,6 @@ A natural question that might be asked is why not to rely completely on [Apache 
 ### Acknowledgements:
 
 We would to acknowledge the contribution of [Alex Kogan](https://www.linkedin.com/pub/alex-kogan/4/b52/3a2) to the design and implementation of the first version of this protocol. This work was done as part of summer internship in Microsoft Research in the Summer of 2011.
-The implementation of ZooKeeper based `MembershipTable` was done by [Shay Hazor](https://github.com/shayhatsor) and the implementation of SQL `MembershipTable` was done by [Veikko Eeva](https://github.com/veikkoeeva).
-
+The implementation of ZooKeeper based `MembershipTable` was done by [Shay Hazor](https://github.com/shayhatsor), the implementation of SQL `MembershipTable` was done by [Veikko Eeva](https://github.com/veikkoeeva), and the implementation of Consul based `MembershipTable` was done by [Paul North](https://github.com/PaulNorth).
 
 
