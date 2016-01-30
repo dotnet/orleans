@@ -4,9 +4,15 @@ title: Reentrant Grains
 ---
 {% include JB/setup %}
 
-Grains can be marked [Reentrant] which allows the Orleans runtime to perform some optimizations with respect to interleaving processing of different requests.
+By default, the Orleans scheduler requires an activation to completely finish processing one request before invoking the next request. 
+An activation cannot receive a new request until all of the `Task`s created (directly or indirectly) in the processing of the current request have been resolved and all of their associated closures executed.
+`Grain` implementation classes may be marked with the `[Reentrant]` attribute to indicate that turns belonging to different requests may be freely interleaved.
 
-Reentrant grain code will never run multiple pieces of grain code in parallel (execution of grain code will always be single-threaded), but reentrant grains **may **see the execution of code for different requests interleaving. That is, the continuation turns from different requests may interleave.
+In other words, a reentrant activation may start executing another request while a previous request has not finished processing and has pending closures. 
+Execution of turns of both requests are still limited to a single thread. 
+So the activation is still executing one turn at a time, and each turn is executing on behalf of only one of the activation’s requests.
+
+Reentrant grain code will never run multiple pieces of grain code in parallel (execution of grain code will always be single-threaded), but reentrant grains **may** see the execution of code for different requests interleaving. That is, the continuation turns from different requests may interleave.
 
 For example, with the below pseudo-code, when Foo and Bar are 2 methods of the same grain class:
 
@@ -24,7 +30,7 @@ Task Bar()
 }
 ```
 
-If this grain is marked [Reentrant], the execution of Foo and Bar may interleave. 
+If this grain is marked `[Reentrant]`, the execution of Foo and Bar may interleave. 
 
 For example, the following order of execution is possible:
 
