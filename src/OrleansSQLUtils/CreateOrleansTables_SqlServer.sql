@@ -105,8 +105,7 @@ BEGIN
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
 		[Timestamp] DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(), 
-		[Version] BIGINT NOT NULL,		
-		[ETag] ROWVERSION NOT NULL,
+		[Version] BIGINT NOT NULL DEFAULT 0,
     
 		CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY ([DeploymentId])	
 	);
@@ -246,12 +245,10 @@ BEGIN
 		BEGIN TRANSACTION;		
 		INSERT INTO [OrleansMembershipVersionTable]
 		(
-			[DeploymentId],
-			[Version]	    
+			[DeploymentId] 
 		)
 		SELECT	
-			@deploymentId,
-			@version        
+			@deploymentId   
 		WHERE NOT EXISTS
 		(			
 			SELECT 1
@@ -337,10 +334,10 @@ BEGIN
 			UPDATE [OrleansMembershipVersionTable]
 			SET
 				[Timestamp]	= GETUTCDATE(),
-				[Version]	= @version
+				[Version]	= @versionEtag + 1
 			WHERE
 				([DeploymentId]	= @deploymentId AND @deploymentId IS NOT NULL)
-				AND ([ETag]		= @versionEtag AND @versionEtag IS NOT NULL);
+				AND ([Version]		= @versionEtag AND @versionEtag IS NOT NULL);
 
 			-- Here the rowcount should always be either zero (no update)
 			-- or one (exactly one entry updated). Having more means that multiple
@@ -405,10 +402,10 @@ BEGIN
 			UPDATE [OrleansMembershipVersionTable]
 			SET
 				[Timestamp]	= GETUTCDATE(),
-				[Version]	= @version
+				[Version]	= @versionEtag + 1
 			WHERE
 				DeploymentId	= @deploymentId AND @deploymentId IS NOT NULL
-				AND ETag		= @versionEtag AND @versionEtag IS NOT NULL;
+				AND Version		= @versionEtag AND @versionEtag IS NOT NULL;
 
 			IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
 		END
@@ -622,12 +619,7 @@ BEGIN
 	(
 		[DeploymentId] NVARCHAR(150) NOT NULL, 
 		[Timestamp] DATETIME NOT NULL DEFAULT GETUTCDATE(),
-		[Version] BIGINT NOT NULL,
-
-		-- ETag should also always be unique, but there will ever be only one row.
-		-- This is BINARY(8) to be as much compatible with the later SQL Server
-		-- editions as possible.
-		[ETag] BINARY(8) NOT NULL DEFAULT 0,
+		[Version] BIGINT NOT NULL DEFAULT 0,
     
 		CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY([DeploymentId])	
 	);
@@ -765,12 +757,10 @@ BEGIN
 		BEGIN TRANSACTION;
 		INSERT INTO [OrleansMembershipVersionTable]
 		(
-			[DeploymentId],
-			[Version]
+			[DeploymentId]
 		)
 		SELECT	
-			@deploymentId,
-			@version
+			@deploymentId
 		WHERE NOT EXISTS
 		(
 			SELECT 1
@@ -856,11 +846,10 @@ BEGIN
 			UPDATE [OrleansMembershipVersionTable]
 			SET
 				[Timestamp]	= GETUTCDATE(),
-				[Version]	= @version,
-				[ETag]		= @versionEtag + 1
+				[Version]	= @versionEtag + 1
 			WHERE
 				([DeploymentId]	= @deploymentId AND @deploymentId IS NOT NULL)
-				AND ([ETag]		= @versionEtag AND @versionEtag IS NOT NULL);
+				AND ([Version]		= @versionEtag AND @versionEtag IS NOT NULL);
 
 			-- Here the rowcount should always be either zero (no update)
 			-- or one (exactly one entry updated). Having more means that multiple
@@ -925,11 +914,10 @@ BEGIN
 			UPDATE [OrleansMembershipVersionTable]
 			SET
 				[Timestamp]	= GETUTCDATE(),
-				[Version]	= @version,
-				[ETag]		= @versionEtag + 1
+				[Version]	= @versionEtag + 1
 			WHERE
 				DeploymentId	= @deploymentId AND @deploymentId IS NOT NULL
-				AND ETag		= @versionEtag AND @versionEtag IS NOT NULL;
+				AND Version		= @versionEtag AND @versionEtag IS NOT NULL;
 
 			IF @@ROWCOUNT = 0 ROLLBACK TRANSACTION;
 		END
@@ -1177,8 +1165,7 @@ VALUES
 		m.[StartTime],
 		m.[IAmAliveTime],
 		m.[ETag],
-		v.[Version],
-		v.[ETag] AS VersionETag
+		v.[Version]
 	FROM
 		[OrleansMembershipVersionTable] v
 		-- This ensures the version table will returned even if there is no matching membership row.
@@ -1211,8 +1198,7 @@ VALUES
 		m.[StartTime],
 		m.[IAmAliveTime],
 		m.[ETag],
-		v.[Version],
-		v.[ETag] AS VersionETag
+		v.[Version]
 	FROM
 		[OrleansMembershipVersionTable] v
 		LEFT OUTER JOIN [OrleansMembershipTable] m ON v.[DeploymentId] = m.[DeploymentId]
