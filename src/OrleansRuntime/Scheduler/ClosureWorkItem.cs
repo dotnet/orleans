@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -51,12 +52,17 @@ namespace Orleans.Runtime.Scheduler
 
         public override string ToString()
         {
-            var detailedName = nameGetter != null ? "" :  // if NameGetter != null, base.ToString() will print its name.
-                String.Format(": {0}->{1}", 
-                    (continuation.Target == null) ? "" : continuation.Target.ToString(),
-                    (continuation.Method == null) ? "" : continuation.Method.ToString());
+            var detailedName = string.Empty; 
+            if (nameGetter == null) // if NameGetter != null, base.ToString() will print its name.
+            {
+                var continuationMethodInfo = continuation.GetMethodInfo();
+                detailedName = string.Format(": {0}->{1}",
+                   (continuation.Target == null) ? "" : continuation.Target.ToString(),
+                   (continuationMethodInfo == null) ? "" : continuationMethodInfo.ToString());
+            }
+               
 
-            return String.Format("{0}{1}", base.ToString(), detailedName);
+            return string.Format("{0}{1}", base.ToString(), detailedName);
         }
     }
 }
