@@ -6,6 +6,8 @@ title: Runtime Implemention Details
 
 ### [Cluster Management](Cluster-Management)
 
+### [Consul Deployment](Consul-Deployment)
+
 ### [Messaging Delivery Guarantees](Messaging-Delivery-Guarantees)
 
 ### [Runtime Tables](Runtime-Tables)
