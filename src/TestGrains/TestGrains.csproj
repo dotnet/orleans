@@ -76,6 +76,7 @@
     <Compile Include="GenericGrains.cs" />
     <Compile Include="GetGrainGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
+    <Compile Include="MethodInterceptionGrain.cs" />
     <Compile Include="KeyExtensionTestGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="EventSourcing\JournaledPersonGrain.cs" />

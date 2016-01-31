@@ -124,6 +124,7 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="OrleansTestingBase.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="StreamingTests\EHImplicitSubscriptionStreamRecoveryTests.cs" />
