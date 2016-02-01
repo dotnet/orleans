@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Placement
         internal override async Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementContext context)
         {
-            List<ActivationAddress> places = await context.Lookup(target);
+            List<ActivationAddress> places = (await context.Lookup(target)).Addresses;
             if (places.Count <= 0)
             {
                 // we return null to indicate that we were unable to select a target from places activations.

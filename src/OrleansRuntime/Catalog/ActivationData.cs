@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.CodeGeneration;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -143,7 +144,7 @@ namespace Orleans.Runtime
             nodeConfiguration = nodeConfig;
         }
 
-        public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, IActivationCollector collector, TimeSpan ageLimit)
+        public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, MultiClusterRegistrationStrategy registrationStrategy, IActivationCollector collector, TimeSpan ageLimit)
         {
             if (null == addr) throw new ArgumentNullException("addr");
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
@@ -154,7 +155,7 @@ namespace Orleans.Runtime
             Address = addr;
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
-
+            RegistrationStrategy = registrationStrategy;
             if (!Grain.IsSystemTarget && !Constants.IsSystemGrain(Grain))
             {
                 this.collector = collector;
@@ -371,6 +372,8 @@ namespace Orleans.Runtime
         #region Dispatcher
 
         public PlacementStrategy PlacedUsing { get; private set; }
+
+        public MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
         // currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
         internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }

@@ -93,6 +93,7 @@
     <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="Providers\DefaultServiceProvider.cs" />
+    <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
@@ -101,6 +102,10 @@
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistrationStrategy.cs" />
+    <Compile Include="GrainDirectory\IGrainDirectory.cs" />
+    <Compile Include="GrainDirectory\IGrainRegistrar.cs" />
+    <Compile Include="GrainDirectory\ClusterLocalRegistration.cs" />
     <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\IncomingMessageBuffer.cs" />

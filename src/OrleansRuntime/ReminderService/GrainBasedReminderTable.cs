@@ -2,12 +2,14 @@ using System;
 using System.Threading.Tasks;
 
 using Orleans.Concurrency;
+using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
+    [OneInstancePerCluster]
     internal class GrainBasedReminderTable : Grain, IReminderTableGrain
     {
         private InMemoryRemindersTable remTable;
