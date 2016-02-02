@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 
 using Orleans.Runtime.Scheduler;
@@ -142,8 +143,8 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         private void ProcessCacheRefreshResponse(
-            SiloAddress silo, 
-            IReadOnlyCollection<Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>>> refreshResponse)
+            SiloAddress silo,
+            IReadOnlyCollection<Tuple<GrainId, int, List<ActivationAddress>>> refreshResponse)
         {
             if (Log.IsVerbose2) Log.Verbose2("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
 
@@ -153,12 +154,13 @@ namespace Orleans.Runtime.GrainDirectory
             var cacheRef = cache as AdaptiveGrainDirectoryCache<List<Tuple<SiloAddress, ActivationId>>>; 
 
             // pass through returned results and update the cache if needed
-            foreach (Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>> tuple in refreshResponse)
+            foreach (Tuple<GrainId, int, List<ActivationAddress>> tuple in refreshResponse)
             {
                 if (tuple.Item3 != null)
                 {
                     // the server returned an updated entry
-                    cacheRef.AddOrUpdate(tuple.Item1, tuple.Item3, tuple.Item2);
+                    var list = tuple.Item3.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList();
+                    cacheRef.AddOrUpdate(tuple.Item1, list, tuple.Item2);
                     cnt1++;
                 }
                 else if (tuple.Item2 == -1)

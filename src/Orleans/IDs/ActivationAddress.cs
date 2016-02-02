@@ -1,5 +1,6 @@
 using System;
 using Newtonsoft.Json;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -9,6 +10,7 @@ namespace Orleans.Runtime
         public GrainId Grain { get; private set; }
         public ActivationId Activation { get; private set; }
         public SiloAddress Silo { get; private set; }
+        public MultiClusterStatus Status { get; private set; }
 
         public bool IsComplete
         {
@@ -16,11 +18,12 @@ namespace Orleans.Runtime
         }
 
         [JsonConstructor]
-        private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation)
+        private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation, MultiClusterStatus status)
         {
             Silo = silo;
             Grain = grain;
             Activation = activation;
+            Status = status;
         }
 
         public static ActivationAddress NewActivationAddress(SiloAddress silo, GrainId grain)
@@ -29,12 +32,12 @@ namespace Orleans.Runtime
             return GetAddress(silo, grain, activation);
         }
 
-        public static ActivationAddress GetAddress(SiloAddress silo, GrainId grain, ActivationId activation)
+        public static ActivationAddress GetAddress(SiloAddress silo, GrainId grain, ActivationId activation, MultiClusterStatus status = MultiClusterStatus.Owned)
         {
             // Silo part is not mandatory
             if (grain == null) throw new ArgumentNullException("grain");
 
-            return new ActivationAddress(silo, grain, activation);
+            return new ActivationAddress(silo, grain, activation, status);
         }
 
         public override bool Equals(object obj)
