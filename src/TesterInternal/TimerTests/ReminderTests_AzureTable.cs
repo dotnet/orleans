@@ -20,15 +20,16 @@ namespace UnitTests.TimerTests
     [TestClass]
     public class ReminderTests_AzureTable : ReminderTests_Base
     {
+        private static readonly Guid serviceId = Guid.NewGuid();
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
             StartFreshOrleans = true,
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
             DataConnectionString = StorageTestConstants.DataConnectionString,
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
+            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Separate testing of Reminders storage from membership storage
             AdjustConfig = config =>
             {
-                config.Globals.ServiceId = Guid.NewGuid();
+                config.Globals.ServiceId = serviceId;
             },
         };
 
