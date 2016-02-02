@@ -44,8 +44,6 @@ namespace Orleans.TestingHost
         public ClientConfiguration ClientConfig { get; private set; }
         public GlobalConfiguration Globals { get; private set; }
 
-        private TimeSpan livenessStabilizationTime;
-
         public string DeploymentId = null;
         public string DeploymentIdPrefix = null;
 
@@ -188,7 +186,7 @@ namespace Orleans.TestingHost
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
         public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
-            TimeSpan stabilizationTime = this.livenessStabilizationTime;
+            TimeSpan stabilizationTime = GetLivenessStabilizationTime(Globals, didKill);
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             await Task.Delay(stabilizationTime);
             WriteLog("WaitForLivenessToStabilize is done sleeping");
@@ -672,8 +670,6 @@ namespace Orleans.TestingHost
             {
                 config.Globals.DataConnectionString = options.DataConnectionString;
             }
-
-            host.livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
 
             host.Globals = config.Globals;
 
