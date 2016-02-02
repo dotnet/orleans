@@ -332,20 +332,31 @@ namespace UnitTests
 
             const string StatsCounterBaseName = "LoggerTest.Stats.Size";
 
-            for (int i = 1; i <= 1000; i++)
+            var createdCounters = new List<string>();
+
+            try
             {
-                StatisticName counterName = new StatisticName(StatsCounterBaseName + "." + i);
-                CounterStatistic ctr = CounterStatistic.FindOrCreate(counterName);
-                ctr.IncrementBy(i);
+                for (int i = 1; i <= 1000; i++)
+                {
+                    string name = StatsCounterBaseName + "." + i;
+                    StatisticName counterName = new StatisticName(name);
+                    CounterStatistic ctr = CounterStatistic.FindOrCreate(counterName);
+                    ctr.IncrementBy(i);
+                    createdCounters.Add(name);
+                }
+
+                LogStatistics statsLogger = new LogStatistics(TimeSpan.Zero, true);
+                statsLogger.DumpCounters().Wait();
+
+                int count = logConsumer.GetEntryCount((int)ErrorCode.PerfCounterDumpAll);
+                Console.WriteLine(count + " stats log message entries written");
+                Assert.IsTrue(count > 1, "Should be some stats log message entries - saw " + count);
+                Assert.AreEqual(0, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should not see any 'Message truncated' message");
             }
-
-            LogStatistics statsLogger = new LogStatistics(TimeSpan.Zero, true);
-            statsLogger.DumpCounters().Wait();
-
-            int count = logConsumer.GetEntryCount((int)ErrorCode.PerfCounterDumpAll);
-            Console.WriteLine(count + " stats log message entries written");
-            Assert.IsTrue(count > 1, "Should be some stats log message entries - saw " + count);
-            Assert.AreEqual(0, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should not see any 'Message truncated' message");
+            finally
+            {
+                createdCounters.ForEach(name => CounterStatistic.Delete(name));
+            }
         }
 
         [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
