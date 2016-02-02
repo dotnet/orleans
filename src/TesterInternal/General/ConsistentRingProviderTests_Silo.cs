@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -26,7 +27,7 @@ namespace UnitTests.General
         };
 
         private const int numAdditionalSilos = 3;
-        private readonly TimeSpan failureTimeout = TimeSpan.FromSeconds(17); // safe value: 30
+        private readonly TimeSpan failureTimeout = TimeSpan.FromSeconds(30);
         private readonly TimeSpan endWait = TimeSpan.FromMinutes(5);
 
         enum Fail { First, Random, Last }
@@ -104,11 +105,14 @@ namespace UnitTests.General
                 this.HostedCluster.StopSilo(fail);
             }
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            Thread.Sleep(failureTimeout);
-            foreach (var key in keysToTest) // verify after failure
+
+            AssertEventually(() =>
             {
-                VerificationScenario(key);
-            }
+                foreach (var key in keysToTest) // verify after failure
+                {
+                    VerificationScenario(key);
+                }
+            }, failureTimeout);
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
@@ -157,10 +161,12 @@ namespace UnitTests.General
             Task.WaitAll(tasks, endWait);
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            await Task.Delay(failureTimeout);
 
-            VerificationScenario(keyToCheck); // verify failed silo's key
-            VerificationScenario(PickKey(joins[0].Silo.SiloAddress)); // verify newly joined silo's key
+            AssertEventually(() =>
+            {
+                VerificationScenario(keyToCheck); // verify failed silo's key
+                VerificationScenario(PickKey(joins[0].Silo.SiloAddress)); // verify newly joined silo's key
+            }, failureTimeout);
         }
 
         // failing the secondary in this scenario exposed the bug in DomainGrain ... so, we keep it as a separate test than Ring_1F1J
@@ -184,10 +190,12 @@ namespace UnitTests.General
             Task.WaitAll(tasks, endWait);
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            await Task.Delay(failureTimeout);
 
-            VerificationScenario(keyToCheck); // verify failed silo's key
-            VerificationScenario(PickKey(joins[0].Silo.SiloAddress));
+            AssertEventually(() =>
+            {
+                VerificationScenario(keyToCheck); // verify failed silo's key
+                VerificationScenario(PickKey(joins[0].Silo.SiloAddress));
+            }, failureTimeout);
         }
 
         #endregion
@@ -346,6 +354,38 @@ namespace UnitTests.General
                 logger.Info("{0} -> {1}", ids[id], id);
             }
         }
+
+        private static void AssertEventually(Action assertion, TimeSpan timeout)
+        {
+            AssertEventually(assertion, timeout, TimeSpan.FromMilliseconds(500));
+        }
+
+        private static void AssertEventually(Action assertion, TimeSpan timeout, TimeSpan delayBetweenIterations)
+        {
+            var sw = Stopwatch.StartNew();
+
+            while (true)
+            {
+                try
+                {
+                    assertion();
+                    return;
+                }
+                catch (AssertFailedException)
+                {
+                    if (sw.ElapsedMilliseconds > timeout.TotalMilliseconds)
+                    {
+                        throw;
+                    }
+                }
+
+                if (delayBetweenIterations > TimeSpan.Zero)
+                {
+                    Thread.Sleep(delayBetweenIterations);
+                }
+            }
+        }
+
         #endregion
 
     }
