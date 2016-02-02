@@ -155,11 +155,11 @@ namespace UnitTests.TimerTests
 
             Task<bool>[] tasks = 
             {
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g1); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g2); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g3); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g4); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g5); })
+                Task.Run(() => this.PerGrainMultiReminderTestChurn(g1)),
+                Task.Run(() => this.PerGrainMultiReminderTestChurn(g2)),
+                Task.Run(() => this.PerGrainMultiReminderTestChurn(g3)),
+                Task.Run(() => this.PerGrainMultiReminderTestChurn(g4)),
+                Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
             };
 
             Thread.Sleep(period.Multiply(5));
@@ -184,39 +184,39 @@ namespace UnitTests.TimerTests
 
             // Start Default Reminder
             //g.StartReminder(DR, file + "_" + DR).Wait();
-            ExecuteWithRetries(g.StartReminder, DR);
+            await ExecuteWithRetries(g.StartReminder, DR);
             TimeSpan sleepFor = period.Multiply(2);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             // Start R1
             //g.StartReminder(R1, file + "_" + R1).Wait();
-            ExecuteWithRetries(g.StartReminder, R1);
+            await ExecuteWithRetries(g.StartReminder, R1);
             sleepFor = period.Multiply(2);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             // Start R2
             //g.StartReminder(R2, file + "_" + R2).Wait();
-            ExecuteWithRetries(g.StartReminder, R2);
+            await ExecuteWithRetries(g.StartReminder, R2);
             sleepFor = period.Multiply(2);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
 
             sleepFor = period.Multiply(1);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
 
             // Stop R1
             //g.StopReminder(R1).Wait();
-            ExecuteWithRetriesStop(g.StopReminder, R1);
+            await ExecuteWithRetriesStop(g.StopReminder, R1);
             sleepFor = period.Multiply(2);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
             // Stop R2
             //g.StopReminder(R2).Wait();
-            ExecuteWithRetriesStop(g.StopReminder, R2);
+            await ExecuteWithRetriesStop(g.StopReminder, R2);
             sleepFor = period.Multiply(1);
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
 
             // Stop Default reminder
             //g.StopReminder(DR).Wait();
-            ExecuteWithRetriesStop(g.StopReminder, DR);
+            await ExecuteWithRetriesStop(g.StopReminder, DR);
             sleepFor = period.Multiply(1) + LEEWAY; // giving some leeway
-            Thread.Sleep(sleepFor);
+            await Task.Delay(sleepFor);
 
             long last = await g.GetCounter(R1);
             AssertIsInRange(last, 4, 6, g, R1, sleepFor);
@@ -370,39 +370,70 @@ namespace UnitTests.TimerTests
             }
         }
 
-        protected void ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)
+        protected async Task ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)
         {
             for (long i = 1; i <= retries; i++)
             {
                 try
                 {
-                    function(reminderName, period, validate).WaitWithThrow(TestConstants.InitTimeout);
+                    await function(reminderName, period, validate).WithTimeout(TestConstants.InitTimeout);
                     return; // success ... no need to retry
+                }
+                catch (AggregateException aggEx)
+                {
+                    aggEx.Handle(exc => HandleError(exc, i));
                 }
                 catch (ReminderException exc)
                 {
-                    log.Info("Operation failed {0} on attempt {1}", exc, i);
-                    Thread.Sleep(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
+                    HandleError(exc, i);
                 }
             }
+
+            // execute one last time and bubble up errors if any
+            await function(reminderName, period, validate).WithTimeout(TestConstants.InitTimeout);
         }
+
         // Func<> doesnt take optional parameters, thats why we need a separate method
-        protected void ExecuteWithRetriesStop(Func<string, Task> function, string reminderName)
+        protected async Task ExecuteWithRetriesStop(Func<string, Task> function, string reminderName)
         {
             for (long i = 1; i <= retries; i++)
             {
                 try
                 {
-                    function(reminderName).WaitWithThrow(TestConstants.InitTimeout);
+                    await function(reminderName).WithTimeout(TestConstants.InitTimeout);
                     return; // success ... no need to retry
+                }
+                catch (AggregateException aggEx)
+                {
+                    aggEx.Handle(exc => HandleError(exc, i));
                 }
                 catch (ReminderException exc)
                 {
-                    log.Info("Operation failed {0} on attempt {1}", exc.ToString(), i);
-                    Thread.Sleep(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
+                    HandleError(exc, i);
                 }
             }
+
+            // execute one last time and bubble up errors if any
+            await function(reminderName).WithTimeout(TestConstants.InitTimeout);
         }
+
+        private bool HandleError(Exception ex, long i)
+        {
+            if (ex is AggregateException)
+            {
+                ex = ((AggregateException)ex).Flatten().InnerException;
+            }
+
+            if (ex is ReminderException)
+            {
+                this.log.Info("Retriable operation failed on attempt {0}: {1}", i, ex.ToString());
+                Thread.Sleep(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
+                return true;
+            }
+
+            return false;
+        }
+
         #endregion
     }
 }
