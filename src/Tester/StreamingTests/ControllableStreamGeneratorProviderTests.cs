@@ -56,9 +56,10 @@ namespace UnitTests.StreamingTests
                         // register stream provider
                         config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
 
-                        // make sure all node configs exist, for dynamic cluster queue balancer
-                        config.GetOrAddConfigurationForNode("Primary");
-                        config.GetOrAddConfigurationForNode("Secondary_1");
+                        // Make sure a node config exist for each silo in the cluster.
+                        // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
+                        config.GetOrCreateNodeConfigurationForSilo("Primary");
+                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
                     }
                 });
         }

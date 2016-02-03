@@ -684,7 +684,7 @@ namespace Orleans.TestingHost
                     break;
             }
 
-            NodeConfiguration nodeConfig = config.GetOrAddConfigurationForNode(siloName);
+            NodeConfiguration nodeConfig = config.GetOrCreateNodeConfigurationForSilo(siloName);
             nodeConfig.HostNameOrIPAddress = "loopback";
             nodeConfig.Port = basePort + instanceCount;
             nodeConfig.DefaultTraceLevel = config.Defaults.DefaultTraceLevel;

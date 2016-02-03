@@ -64,9 +64,10 @@ namespace UnitTests.StreamingTests
             config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, settings);
             config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
 
-            // make sure all node configs exist, for dynamic cluster queue balancer
-            config.GetOrAddConfigurationForNode("Primary");
-            config.GetOrAddConfigurationForNode("Secondary_1");
+            // Make sure a node config exist for each silo in the cluster.
+            // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
+            config.GetOrCreateNodeConfigurationForSilo("Primary");
+            config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
         }
 
         [TestMethod, TestCategory("EventHub"), TestCategory("Streaming")]
