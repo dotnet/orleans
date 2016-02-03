@@ -55,6 +55,8 @@ namespace Orleans.Runtime.Startup
             serviceCollection.AddTransient<GrainBasedReminderTable>();
             serviceCollection.AddTransient<PubSubRendezvousGrain>();
             serviceCollection.AddTransient<MemoryStorageGrain>();
+            serviceCollection.AddSingleton<IGrainFactory>(sp => GrainFactory.GrainFactoryDIHack);
+            serviceCollection.AddSingleton(sp => GrainFactory.GrainFactoryDIHack);
 
             return serviceCollection;
         }

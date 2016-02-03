@@ -228,7 +228,7 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.UnhandledException +=
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
-            grainFactory = new GrainFactory();
+            grainFactory = GrainFactory.GrainFactoryDIHack;
             typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
 
             // Performance metrics
