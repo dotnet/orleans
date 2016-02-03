@@ -46,6 +46,12 @@ namespace Orleans
         private readonly ConcurrentDictionary<Type, IGrainMethodInvoker> invokers =
             new ConcurrentDictionary<Type, IGrainMethodInvoker>();
 
+
+        // hacked singleton instance for DI
+        // TODO: Kill when Microsoft.Extensions.DependencyInjection is released
+        private static GrainFactory grainFactoryDIHack;
+        public static GrainFactory GrainFactoryDIHack { get { return grainFactoryDIHack ?? (grainFactoryDIHack = new GrainFactory()); } }
+
         // Make this internal so that client code is forced to access the IGrainFactory using the 
         // GrainClient (to make sure they don't forget to initialize the client).
         internal GrainFactory()
