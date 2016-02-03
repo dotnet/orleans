@@ -115,16 +115,30 @@ namespace Orleans.Runtime
 
         public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
         {
-            IProvider provider = silo.AllSiloProviders.FirstOrDefault(pr => pr.GetType().FullName.Equals(providerTypeFullName) && pr.Name.Equals(providerName));
+            IReadOnlyCollection<IProvider> allProviders = silo.AllSiloProviders;
+            IProvider provider = allProviders.FirstOrDefault(pr => pr.GetType().FullName.Equals(providerTypeFullName) && pr.Name.Equals(providerName));
             if (provider == null)
             {
-                throw new ArgumentException("Could not find provider for type " + providerTypeFullName + " and name " + providerName);
+                string allProvidersList = Utils.EnumerableToString(
+                    allProviders.Select(p => string.Format(
+                        "[Name = {0} Type = {1} Location = {2}]",
+                        p.Name, p.GetType().FullName, p.GetType().Assembly.Location)));
+                string error = string.Format(
+                    "Could not find provider for type {0} and name {1} \n"
+                    + " Providers currently loaded in silo are: {2}", 
+                    providerTypeFullName, providerName, allProvidersList);
+                logger.Error(ErrorCode.Provider_ProviderNotFound, error);
+                throw new ArgumentException(error);
             }
 
-            var controllable = provider as IControllable;
+            IControllable controllable = provider as IControllable;
             if (controllable == null)
             {
-                throw new ArgumentException("The found provider of type " + providerTypeFullName + " and name " + providerName + " is not controllable.");
+                string error = string.Format(
+                    "The found provider of type {0} and name {1} is not controllable.", 
+                    providerTypeFullName, providerName);
+                logger.Error(ErrorCode.Provider_ProviderNotControllable, error);
+                throw new ArgumentException(error);
             }
             return controllable.ExecuteCommand(command, arg);
         }
