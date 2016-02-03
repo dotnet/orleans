@@ -94,19 +94,23 @@ namespace UnitTests
 
             Assert.AreEqual<int>(12345, config.Defaults.Port, "Default port is set incorrectly");
 
-            NodeConfiguration nc = config.GetOrAddConfigurationForNode("Node1");
+            NodeConfiguration nc;
+            bool hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node1", out nc);
+            Assert.IsTrue(hasNodeConfig, "Node Node1 has config");
             Assert.AreEqual<int>(11111, nc.Port, "Port is set incorrectly for node Node1");
             Assert.IsTrue(nc.IsPrimaryNode, "Node1 should be primary node");
             Assert.IsTrue(nc.IsSeedNode, "Node1 should be seed node");
             Assert.IsFalse(nc.IsGatewayNode, "Node1 should not be gateway node");
 
-            nc = config.GetOrAddConfigurationForNode("Node2");
+            hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node2", out nc);
+            Assert.IsTrue(hasNodeConfig, "Node Node2 has config");
             Assert.AreEqual<int>(22222, nc.Port, "Port is set incorrectly for node Node2");
             Assert.IsFalse(nc.IsPrimaryNode, "Node2 should not be primary node");
             Assert.IsTrue(nc.IsSeedNode, "Node2 should be seed node");
             Assert.IsTrue(nc.IsGatewayNode, "Node2 should be gateway node");
 
-            nc = config.GetOrAddConfigurationForNode("Store");
+            hasNodeConfig = config.TryGetNodeConfigurationForSilo("Store", out nc);
+            Assert.IsTrue(hasNodeConfig, "Node Store has config");
             Assert.AreEqual<int>(12345, nc.Port, "IP port is set incorrectly for node Store");
             Assert.IsFalse(nc.IsPrimaryNode, "Store should not be primary node");
             Assert.IsFalse(nc.IsSeedNode, "Store should not be seed node");
@@ -131,7 +135,7 @@ namespace UnitTests
         {
             var oc = new ClusterConfiguration();
             oc.StandardLoad();
-            var n = oc.GetOrAddConfigurationForNode("Node1");
+            NodeConfiguration n = oc.CreateNodeConfigurationForSilo("Node1");
             string fname = n.TraceFileName;
             Console.WriteLine("LogFileName = " + fname);
             Assert.IsNotNull(fname);
@@ -157,7 +161,7 @@ namespace UnitTests
 
             var config = new ClusterConfiguration();
             config.LoadFromFile(configFileName);
-            var n = config.GetOrAddConfigurationForNode(siloName);
+            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
             Console.WriteLine("LogFileName = " + fname);
             
@@ -186,7 +190,7 @@ namespace UnitTests
 
             var config = new ClusterConfiguration();
             config.LoadFromFile(configFileName);
-            var n = config.GetOrAddConfigurationForNode(siloName);
+            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
             Console.WriteLine("LogFileName = " + fname);
 
@@ -215,7 +219,7 @@ namespace UnitTests
 
             var config = new ClusterConfiguration();
             config.LoadFromFile(configFileName);
-            var n = config.GetOrAddConfigurationForNode(siloName);
+            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
             Console.WriteLine("LogFileName = " + fname);
 
@@ -255,7 +259,7 @@ namespace UnitTests
 
             var config = new ClusterConfiguration();
             config.LoadFromFile(configFileName);
-            var n = config.GetOrAddConfigurationForNode(siloName);
+            NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
             Console.WriteLine("LogFileName = " + fname);
 
@@ -393,7 +397,7 @@ namespace UnitTests
             cfg.LoadFromFile(filename);
             Assert.AreEqual(filename, cfg.SourceFile);
 
-            TraceLogger.Initialize(cfg.GetOrAddConfigurationForNode("Primary"));
+            TraceLogger.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
             Assert.AreEqual(1, TraceLogger.LogConsumers.Count, "Number of log consumers: " + string.Join(",", TraceLogger.LogConsumers));
             Assert.AreEqual("UnitTests.DummyLogConsumer", TraceLogger.LogConsumers.Last().GetType().FullName, "Log consumer type");
 
@@ -436,7 +440,10 @@ namespace UnitTests
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
-            NodeConfiguration config = orleansConfig.GetOrAddConfigurationForNode("Primary");
+            NodeConfiguration config;
+            bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
+            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
+
 
             string limitName;
             LimitValue limit;
@@ -478,7 +485,10 @@ namespace UnitTests
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
-            NodeConfiguration config = orleansConfig.GetOrAddConfigurationForNode("Primary");
+            NodeConfiguration config;
+            bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
+            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
+
 
             string limitName = "NotPresent";
             LimitValue limit = config.LimitManager.GetLimit(limitName);
@@ -493,7 +503,10 @@ namespace UnitTests
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
-            NodeConfiguration config = orleansConfig.GetOrAddConfigurationForNode("Primary");
+            NodeConfiguration config;
+            bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
+            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
+
 
             string limitName;
             LimitValue limit;
@@ -589,7 +602,9 @@ namespace UnitTests
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
-            NodeConfiguration config = orleansConfig.GetOrAddConfigurationForNode("Primary");
+            NodeConfiguration config;
+            bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
+            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
 
             string limitName;
             LimitValue limit;

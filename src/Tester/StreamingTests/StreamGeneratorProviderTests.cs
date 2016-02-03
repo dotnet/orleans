@@ -60,8 +60,8 @@ namespace UnitTests.StreamingTests
                         config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
 
                         // make sure all node configs exist, for dynamic cluster queue balancer
-                        config.GetOrAddConfigurationForNode("Primary");
-                        config.GetOrAddConfigurationForNode("Secondary_1");
+                        config.GetOrCreateNodeConfigurationForSilo("Primary");
+                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
                     }
                 });
         }
