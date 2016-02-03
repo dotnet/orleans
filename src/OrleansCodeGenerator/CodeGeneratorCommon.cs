@@ -199,7 +199,7 @@ namespace Orleans.CodeGenerator
         /// </returns>
         public static SwitchSectionSyntax[] GenerateGrainInterfaceAndMethodSwitch(
             Type grainType,
-            IdentifierNameSyntax methodIdArgument,
+            ExpressionSyntax methodIdArgument,
             Func<MethodInfo, StatementSyntax[]> generateMethodHandler)
         {
             var interfaces = GrainInterfaceData.GetRemoteInterfaces(grainType);

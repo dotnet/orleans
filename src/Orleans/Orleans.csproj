@@ -91,6 +91,8 @@
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\IGrainState.cs" />
     <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
+    <Compile Include="Core\IGrainInvokeInterceptor.cs" />
+    <Compile Include="Core\InvocationMethodInfoMap.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="Providers\DefaultServiceProvider.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />

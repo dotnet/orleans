@@ -104,15 +104,15 @@ namespace Orleans.Runtime
             /// <param name="methodId"></param>
             /// <param name="arguments"></param>
             /// <returns></returns>
-            public Task<object> Invoke(IAddressable grain, int interfaceId, int methodId, object[] arguments)
+            public Task<object> Invoke(IAddressable grain, InvokeMethodRequest request)
             {
-                if (extensionMap == null || !extensionMap.ContainsKey(interfaceId))
+                if (extensionMap == null || !extensionMap.ContainsKey(request.InterfaceId))
                     throw new InvalidOperationException(
-                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", interfaceId));
+                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", request.InterfaceId));
 
-                var invoker = extensionMap[interfaceId].Item2;
-                var extension = extensionMap[interfaceId].Item1;
-                return invoker.Invoke(extension, interfaceId, methodId, arguments);
+                var invoker = extensionMap[request.InterfaceId].Item2;
+                var extension = extensionMap[request.InterfaceId].Item1;
+                return invoker.Invoke(extension, request);
             }
 
             public bool IsExtensionInstalled(int interfaceId)

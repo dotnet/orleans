@@ -62,6 +62,7 @@
     <Compile Include="IGeneratorTestDerivedGrain1.cs" />
     <Compile Include="IGeneratorTestDerivedGrain2.cs" />
     <Compile Include="IGeneratorTestGrain.cs" />
+    <Compile Include="IMethodInterceptionGrain.cs" />
     <Compile Include="IJournaledPersonGrain.cs" />
     <Compile Include="IGeneratedEventCollectorGrain.cs" />
     <Compile Include="IGeneratedEventReporterGrain.cs" />
