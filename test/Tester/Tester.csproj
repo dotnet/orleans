@@ -133,6 +133,7 @@
   <ItemGroup>
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="BaseClusterFixture.cs" />
+    <Compile Include="General\JsonGrainTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="StreamingTests\EHImplicitSubscriptionStreamRecoveryTests.cs" />
     <Compile Include="BasicActivationTests.cs" />

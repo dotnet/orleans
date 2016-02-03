@@ -42,6 +42,9 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
@@ -80,6 +83,7 @@
     <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MethodInterceptionGrain.cs" />
     <Compile Include="KeyExtensionTestGrain.cs" />
+    <Compile Include="JsonEchoGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="EventSourcing\JournaledPersonGrain.cs" />
     <Compile Include="EventSourcing\JournaledPerson_Events.cs" />
@@ -144,7 +148,9 @@
       <Name>TestInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <PropertyGroup>
