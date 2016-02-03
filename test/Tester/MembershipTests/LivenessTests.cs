@@ -17,18 +17,11 @@ using Xunit;
 
 namespace UnitTests.MembershipTests
 {
-    public class LivenessTestsBase<T> : OrleansTestingBase, IClassFixture<T> where T : BaseClusterFixture, IDisposable, new()
+    public class LivenessTestsBase : HostedTestClusterPerTest
     {
         private const int numAdditionalSilos = 1;
         private const int numGrains = 20;
 
-        protected TestingSiloHost HostedCluster { get; private set; }
-
-        protected LivenessTestsBase(T fixture)
-        {
-            HostedCluster = fixture.HostedCluster;
-        }
-        
         protected async Task Do_Liveness_OracleTest_1()
         {
             Console.WriteLine("DeploymentId= {0}", this.HostedCluster.DeploymentId);
@@ -185,14 +178,9 @@ namespace UnitTests.MembershipTests
         }
     }
 
-    public class LivenessTests_MembershipGrainFixture : BaseClusterFixture
+    public class LivenessTests_MembershipGrain : LivenessTestsBase
     {
-        public LivenessTests_MembershipGrainFixture() 
-            : base(CreateCluster())
-        {
-        }
-
-        private static TestingSiloHost CreateCluster()
+        public override TestingSiloHost CreateSiloHost()
         {
             var siloOptions = new TestingSiloOptions
             {
@@ -215,14 +203,6 @@ namespace UnitTests.MembershipTests
             };
 
             return new TestingSiloHost(siloOptions, clientOptions);
-        }
-    }
-
-    public class LivenessTests_MembershipGrain : LivenessTestsBase<LivenessTests_MembershipGrainFixture>
-    {
-        public LivenessTests_MembershipGrain(LivenessTests_MembershipGrainFixture fixture) : base(fixture)
-        {
-
         }
         
 		[Fact, TestCategory("Functional"), TestCategory("Liveness")]
@@ -263,14 +243,9 @@ namespace UnitTests.MembershipTests
         }
     }
 
-    public class LivenessTests_AzureTableFixture : BaseClusterFixture
+    public class LivenessTests_AzureTable : LivenessTestsBase
     {
-        public LivenessTests_AzureTableFixture()
-            : base(CreateCluster())
-        {
-        }
-
-        private static TestingSiloHost CreateCluster()
+        public override TestingSiloHost CreateSiloHost()
         {
             TestUtils.CheckForAzureStorage();
 
@@ -286,16 +261,9 @@ namespace UnitTests.MembershipTests
 
             return new TestingSiloHost(siloOptions);
         }
-    }
 
-    public class LivenessTests_AzureTable : LivenessTestsBase<LivenessTests_AzureTableFixture>
-    {
-        public LivenessTests_AzureTable(LivenessTests_AzureTableFixture fixture) : base(fixture)
-        {
-                        
-        }
-        		
-		[Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
+
+        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
         public void Silo_Config_AzureTable()
         {
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, this.HostedCluster.Globals.LivenessType, "LivenessType");
@@ -333,11 +301,23 @@ namespace UnitTests.MembershipTests
         }
     }
 
-    public class LivenessTests_ZK : LivenessTestsBase<LivenessTests_AzureTableFixture>
+    public class LivenessTests_ZK : LivenessTestsBase
     {
-        public LivenessTests_ZK(LivenessTests_AzureTableFixture fixture) : base(fixture)
+        public override TestingSiloHost CreateSiloHost()
         {
+            TestUtils.CheckForAzureStorage();
 
+            var siloOptions = new TestingSiloOptions
+            {
+                StartFreshOrleans = true,
+                StartPrimary = true,
+                StartSecondary = true,
+                DataConnectionString = StorageTestConstants.DataConnectionString,
+                LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper,
+                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+            };
+
+            return new TestingSiloHost(siloOptions);
         }
 
         //[Fact,  TestCategory("Membership"), TestCategory("ZooKeeper")]
@@ -371,23 +351,21 @@ namespace UnitTests.MembershipTests
         }
     }
 
-    public class LivenessTests_SqlServerFixture : BaseClusterFixture
+    public class LivenessTests_SqlServer : LivenessTestsBase
     {
         public const string TestDatabaseName = "OrleansTest";
 
-        public LivenessTests_SqlServerFixture()
-            : base(CreateCluster())
+        public override TestingSiloHost CreateSiloHost()
         {
-        }
+            //Console.WriteLine("Initializing relational databases...");
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
 
-        private static TestingSiloHost CreateCluster()
-        {
             var siloOptions = new TestingSiloOptions
             {
                 StartFreshOrleans = true,
                 StartPrimary = true,
                 StartSecondary = true,
-                DataConnectionString = "Set-in-ClassInitialize",
+                DataConnectionString = relationalStorage.CurrentConnectionString,
                 LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer,
                 ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
             };
@@ -396,20 +374,7 @@ namespace UnitTests.MembershipTests
             //Console.WriteLine("TestContext=");
             //Console.WriteLine(TestUtils.DumpTestContext(context));
 
-            Console.WriteLine("Initializing relational databases...");
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
-
-            siloOptions.DataConnectionString = relationalStorage.CurrentConnectionString;
-
             return new TestingSiloHost(siloOptions);
-        }
-    }
-
-    public class LivenessTests_SqlServer : LivenessTestsBase<LivenessTests_SqlServerFixture>
-    {
-        public LivenessTests_SqlServer(LivenessTests_SqlServerFixture fixture) : base(fixture)
-        {
-
         }
 
 		[Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("SqlServer")]
