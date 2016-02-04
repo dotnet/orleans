@@ -23,7 +23,7 @@ namespace UnitTests.Serialization
             Assert.AreEqual(input, output);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact(Skip = "Fix #1346"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_Some()
         {
             RoundtripSerializationTest(FSharpOption<int>.Some(0));

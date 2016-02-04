@@ -77,7 +77,7 @@ namespace UnitTests.General
             await PingTest<GenericRecord<FSharpOption<int>>>(input);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact(Skip = "Fix #1346"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_IntOption_Some()
         {
             var input = FSharpOption<int>.Some(0);
