@@ -4,14 +4,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd</ProjectGuid>
+    <ProjectGuid>2375d7d5-9b30-493f-9c2e-a6b2811a3c5a</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>TestFSharp</RootNamespace>
-    <AssemblyName>TestFSharp</AssemblyName>
+    <RootNamespace>TestFSharpInterfaces</RootNamespace>
+    <AssemblyName>TestFSharpInterfaces</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>TestFSharp</Name>
+    <Name>TestFSharpInterfaces</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -21,7 +21,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\TestFSharp.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\TestFSharpInterfaces.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,7 +30,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\TestFSharp.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\TestFSharpInterfaces.XML</DocumentationFile>
   </PropertyGroup>
   <!--BEGIN: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
   <Choose>
@@ -60,9 +60,8 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.fs">
       <Link>GlobalAssemblyInfo.fs</Link>
     </Compile>
-    <Compile Include="Types.fs" />
-    <Compile Include="Grains.fs" />
     <Content Include="packages.config" />
+    <Compile Include="IFSharpBaseInterface.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
@@ -73,16 +72,6 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\Orleans\Orleans.csproj">
-      <Name>Orleans</Name>
-      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
-      <Name>TestGrainInterfaces</Name>
-      <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
-      <Private>True</Private>
-    </ProjectReference>
   </ItemGroup>
   <!--END: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
 </Project>

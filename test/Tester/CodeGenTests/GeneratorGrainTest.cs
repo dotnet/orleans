@@ -242,5 +242,23 @@ namespace Tester.CodeGenTests
             Assert.AreEqual("StringBegin", members.stringVar);
             Assert.AreEqual(ReturnCode.Fail, members.code);
         }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+        public async Task CodeGenDerivedFromCSharpInterfaceInDifferentAssembly()
+        {
+            var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
+            var input = 1;
+            var output = await grain.Echo(input);
+            Assert.AreEqual(input, output);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("FSharp")]
+        public async Task CodeGenDerivedFromFSharpInterfaceInDifferentAssembly()
+        {
+            var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
+            var input = 1;
+            var output = await grain.Echo(input);
+            Assert.AreEqual(input, output);
+        }
     }
 }

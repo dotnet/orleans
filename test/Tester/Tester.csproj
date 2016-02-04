@@ -345,6 +345,10 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\TestFSharpInterfaces\TestFSharpInterfaces.fsproj">
+      <Project>{2375d7d5-9b30-493f-9c2e-a6b2811a3c5a}</Project>
+      <Name>TestFSharpInterfaces</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\TestFSharp\TestFSharp.fsproj">
       <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
       <Name>TestFSharp</Name>
@@ -356,6 +360,10 @@
     <ProjectReference Include="..\..\src\TestGrains\TestGrains.csproj">
       <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
       <Name>TestGrains</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\TestInterfaces\TestInterfaces.csproj">
+      <Project>{aeff3b6c-7986-4bf9-85f5-2571decf8959}</Project>
+      <Name>TestInterfaces</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
       <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>
