@@ -1,11 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
     <StorageProviders>
-      <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />
-      <Provider Type="Orleans.Storage.MemoryStorage" Name="Default" />
-      <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore"/>-->
+      <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" NumStorageGrains="1"/>
+      <Provider Type="Orleans.Storage.MemoryStorage" Name="PubSubStore" NumStorageGrains="1"/>
     </StorageProviders>
+    <StreamProviders>
+      <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
+    </StreamProviders>
     <SeedNode Address="localhost" Port="22222"/>
     <Messaging ResponseTimeout="30s"/>
   </Globals>
@@ -13,11 +15,7 @@
     <Networking Address="localhost" Port="22222"/>
     <ProxyingGateway Address="localhost" Port="40000" />
     <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
-       <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
-       <!--
-       <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose" />
-       <TraceLevelOverride LogPrefix="AssemblyLoader.Silo" TraceLevel="Warning" />
-       -->
+      <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
     </Tracing>
     <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
   </Defaults>

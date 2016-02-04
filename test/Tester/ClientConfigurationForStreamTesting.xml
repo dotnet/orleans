@@ -10,4 +10,7 @@
   </Tracing>
   <Statistics MetricsTableWriteInterval="300s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
   <Messaging ResponseTimeout="30s" ClientSenderBuckets="8192" MaxResendCount="0"/>
+  <StreamProviders>
+    <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
+  </StreamProviders>
 </ClientConfiguration>

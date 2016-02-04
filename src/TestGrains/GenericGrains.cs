@@ -544,7 +544,7 @@ namespace UnitTests.Grains
         {
             RegisterTimer(o =>
             {
-                Console.WriteLine("***Timer fired for pinging {0}***", target.GetPrimaryKey());
+                this.GetLogger().Verbose("***Timer fired for pinging {0}***", target.GetPrimaryKey());
                 return target.Ping(t);
             },
                 null,
@@ -567,13 +567,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            Console.WriteLine("***Activating*** {0}", this.GetPrimaryKey());
+            GetLogger().Verbose("***Activating*** {0}", this.GetPrimaryKey());
             return TaskDone.Done;
         }
 
         public override Task OnDeactivateAsync()
         {
-            Console.WriteLine("***Deactivating*** {0}", this.GetPrimaryKey());
+            GetLogger().Verbose("***Deactivating*** {0}", this.GetPrimaryKey());
             return TaskDone.Done;
         }
     }
