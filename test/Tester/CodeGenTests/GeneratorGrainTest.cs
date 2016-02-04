@@ -69,7 +69,7 @@ namespace Tester.CodeGenTests
 #pragma warning disable 618
             Assert.AreEqual(input.ObsoleteInt, output.ObsoleteInt);
 #pragma warning restore 618
-            
+
             Assert.AreEqual(0, output.NonSerializedInt);
 
             // Test abstract class serialization with state.
@@ -89,7 +89,7 @@ namespace Tester.CodeGenTests
             var expectedInterface = input;
             var actualInterface = await grain.RoundTripInterface(expectedInterface);
             Assert.AreEqual(input.Int, actualInterface.Int);
-            
+
             // Test enum serialization.
             const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
             var actualEnum = await grain.RoundTripEnum(ExpectedEnum);
@@ -107,18 +107,18 @@ namespace Tester.CodeGenTests
         {
             var grainName = typeof(GeneratorTestGrain).FullName;
             IGeneratorTestGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
-            
+
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.IsTrue(isNull);
 
             await grain.StringSet("Begin");
-            
+
             isNull = await grain.StringIsNullOrEmpty();
             Assert.IsFalse(isNull);
 
             MemberVariables members = await grain.GetMemberVariables();
             Assert.AreEqual("Begin", members.stringVar);
-            
+
             ASCIIEncoding encoding = new ASCIIEncoding();
             byte[] bytes = encoding.GetBytes("ByteBegin");
             string str = "StringBegin";
@@ -138,7 +138,7 @@ namespace Tester.CodeGenTests
         public async Task GeneratorDerivedGrain1ControlFlow()
         {
             IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-            
+
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.IsTrue(isNull);
 
@@ -204,7 +204,7 @@ namespace Tester.CodeGenTests
         public async Task GeneratorDerivedDerivedGrainControlFlow()
         {
             IGeneratorTestDerivedDerivedGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
-            
+
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.IsTrue(isNull);
 
@@ -242,5 +242,28 @@ namespace Tester.CodeGenTests
             Assert.AreEqual("StringBegin", members.stringVar);
             Assert.AreEqual(ReturnCode.Fail, members.code);
         }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+        public async Task CodeGenDerivedFromCSharpInterfaceInDifferentAssembly()
+        {
+            var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
+            var input = 1;
+            var output = await grain.Echo(input);
+            Assert.AreEqual(input, output);
+        }
+
+        // uncomment the following test method to verify correct code generation for #1349
+        // (do so once code generation succeeds)
+        // NOTE: also uncomment the corresponding grain class in 
+        //       TestGrains/GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs
+
+        //[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+        //public async Task CodeGenDerivedFromFSharpInterfaceInDifferentAssembly()
+        //{
+        //    var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
+        //    var input = 1;
+        //    var output = await grain.Echo(input);
+        //    Assert.AreEqual(input, output);
+        //}
     }
 }
