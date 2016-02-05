@@ -56,7 +56,7 @@ namespace Orleans.CodeGeneration
         /// </param>
         public static void GenerateAndCacheCodeForAssembly(Assembly input)
         {
-            var codeGen = CodeGeneratorInstance.Value;
+            IRuntimeCodeGenerator codeGen = CodeGeneratorInstance.Value;
             if (codeGen != null)
             {
                 codeGen.GenerateAndLoadForAssembly(input);
@@ -68,7 +68,7 @@ namespace Orleans.CodeGeneration
         /// </summary>
         public static void GenerateAndCacheCodeForAllAssemblies()
         {
-            var codeGen = CodeGeneratorInstance.Value;
+            IRuntimeCodeGenerator codeGen = CodeGeneratorInstance.Value;
             if (codeGen != null)
             {
                 codeGen.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
@@ -81,7 +81,7 @@ namespace Orleans.CodeGeneration
         /// <returns>The collection of generated assemblies.</returns>
         public static IDictionary<string, byte[]> GetGeneratedAssemblies()
         {
-            var codeGen = CodeGeneratorCacheInstance.Value;
+            ICodeGeneratorCache codeGen = CodeGeneratorCacheInstance.Value;
             if (codeGen != null)
             {
                 return codeGen.GetGeneratedAssemblies();
@@ -120,7 +120,7 @@ namespace Orleans.CodeGeneration
         /// <returns>The code generator.</returns>
         private static IRuntimeCodeGenerator LoadCodeGenerator()
         {
-            var result = AssemblyLoader.TryLoadAndCreateInstance<IRuntimeCodeGenerator>(CodeGenAssemblyName, Log);
+            IRuntimeCodeGenerator result = AssemblyLoader.TryLoadAndCreateInstance<IRuntimeCodeGenerator>(CodeGenAssemblyName, Log);
             if (result == null)
             {
                 Log.Warn(
