@@ -56,5 +56,12 @@ namespace UnitTests.StorageTests
             string tableName = "abc-123";
             AzureStorageUtils.ValidateTableName(tableName);
         }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        public void AzureStorageUtils_TablePropertyShouldBeSanitized()
+        {
+            var tableProperty = "/A\\C#?";
+            Assert.AreEqual("_A_C__", AzureStorageUtils.SanitizeTableProperty(tableProperty));
+        }
     }
 }
