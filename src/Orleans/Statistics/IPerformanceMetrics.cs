@@ -255,20 +255,21 @@ namespace Orleans.Runtime
         {
             return string.Format(Environment.NewLine 
                 + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine 
-                + "   LocalCacheActivationAddresses={4}" + Environment.NewLine
-                + "   LocalDirectoryActivationAddresses={5}"  + Environment.NewLine
-                + "   PrimaryForGrain={6}" + Environment.NewLine 
-                + "   GrainClassTypeName={7}" + Environment.NewLine
+                + "   LocalCacheActivationAddresses={3}" + Environment.NewLine
+                + "   LocalDirectoryActivationAddresses={4}"  + Environment.NewLine
+                + "   PrimaryForGrain={5}" + Environment.NewLine 
+                + "   GrainClassTypeName={6}" + Environment.NewLine
                 + "   LocalActivations:" + Environment.NewLine
-                + "{3}." + Environment.NewLine,
-                        Grain.ToDetailedString(), 
-                        SiloName,
-                        SiloAddress.ToLongString(),
-                        Utils.EnumerableToString(LocalCacheActivationAddresses),
-                        Utils.EnumerableToString(LocalDirectoryActivationAddresses),
-                        PrimaryForGrain,
-                        GrainClassTypeName, 
-                        Utils.EnumerableToString(LocalActivations, str => string.Format("      {0}", str), "\n"));
+                + "{7}." + Environment.NewLine,
+                    Grain.ToDetailedString(),                                   // {0}
+                    SiloName,                                                   // {1}
+                    SiloAddress.ToLongString(),                                 // {2}
+                    Utils.EnumerableToString(LocalCacheActivationAddresses),    // {3}
+                    Utils.EnumerableToString(LocalDirectoryActivationAddresses),// {4}
+                    PrimaryForGrain,                                            // {5}
+                    GrainClassTypeName,                                         // {6}
+                    Utils.EnumerableToString(LocalActivations,                  // {7}
+                        str => string.Format("      {0}", str), "\n"));
         }
     }
 }
