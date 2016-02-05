@@ -191,7 +191,6 @@ UpgradeLog*.htm
 
 # Microsoft Fakes
 FakesAssemblies/
-Test/
 
 # Temporary working files
 **/pingme.txt

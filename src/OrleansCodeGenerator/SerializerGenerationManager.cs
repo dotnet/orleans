@@ -15,34 +15,58 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// The serializer generation manager.
     /// </summary>
-    internal static class SerializerGenerationManager
+    internal class SerializerGenerationManager
     {
         /// <summary>
         /// The logger.
         /// </summary>
-        private static readonly TraceLogger Log;
+        private readonly TraceLogger Log;
 
         /// <summary>
         /// The types to process.
         /// </summary>
-        private static readonly HashSet<Type> TypesToProcess;
+        private readonly HashSet<Type> TypesToProcess;
 
         /// <summary>
         /// The processed types.
         /// </summary>
-        private static readonly HashSet<Type> ProcessedTypes;
+        private readonly HashSet<Type> ProcessedTypes;
+        
+        /// <summary>
+        /// The generic interface types whose type arguments needs serializators generation
+        /// </summary>
+        internal readonly HashSet<Type> KnownGenericIntefaceTypes;
 
         /// <summary>
-        /// Initializes static members of the <see cref="SerializerGenerationManager"/> class.
+        /// The generic base types whose type arguments needs serializators generation
         /// </summary>
-        static SerializerGenerationManager()
+        internal readonly HashSet<Type> KnownGenericBaseTypes;
+
+        /// <summary>
+        /// Initializes members of the <see cref="SerializerGenerationManager"/> class.
+        /// </summary>
+        internal SerializerGenerationManager()
         {
             TypesToProcess = new HashSet<Type>();
             ProcessedTypes = new HashSet<Type>();
+            KnownGenericIntefaceTypes = new HashSet<Type>
+            {
+                typeof(Streams.IAsyncObserver<>),
+                typeof(Streams.IAsyncStream<>),
+                typeof(Streams.IAsyncObservable<>)
+            };
+
+            KnownGenericBaseTypes = new HashSet<Type>
+            {
+                typeof(Grain<>),
+                typeof(Streams.StreamSubscriptionHandleImpl<>),
+                typeof(Streams.StreamSubscriptionHandle<>)
+            };
+
             Log = TraceLogger.GetLogger(typeof(SerializerGenerationManager).Name);
         }
         
-        internal static bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
+        internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
         {
             if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, targetAssembly))
             {
@@ -125,7 +149,7 @@ namespace Orleans.CodeGenerator
             return true;
         }
 
-        internal static bool GetNextTypeToProcess(out Type next)
+        internal bool GetNextTypeToProcess(out Type next)
         {
             next = null;
             if (TypesToProcess.Count == 0) return false;

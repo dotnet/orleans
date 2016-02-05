@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Concurrency;
+using Orleans.GrainDirectory;
 using Orleans.Placement;
 
 
@@ -105,6 +106,25 @@ namespace Orleans.Runtime
             }
 
             return PlacementStrategy.GetDefault();
+        }
+
+        internal static MultiClusterRegistrationStrategy GetMultiClusterRegistrationStrategy(Type grainClass)
+        {
+            var attribs = grainClass.GetCustomAttributes(typeof(Orleans.MultiCluster.RegistrationAttribute), inherit: true);
+
+            switch (attribs.Length)
+            {
+                case 0:
+                    return ClusterLocalRegistration.Singleton;
+                case 1:
+                    return ((Orleans.MultiCluster.RegistrationAttribute)attribs[0]).RegistrationStrategy;
+                default:
+                    throw new InvalidOperationException(
+                        string.Format(
+                            "More than one {0} cannot be specified for grain interface {1}",
+                            typeof(MultiClusterRegistrationStrategy).Name,
+                            grainClass.Name));
+            }
         }
     }
 }

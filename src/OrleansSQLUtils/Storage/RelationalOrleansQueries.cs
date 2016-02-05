@@ -602,8 +602,6 @@ namespace Orleans.SqlUtils
                 var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version);
-                command.Parameters.Add(versionParameter);
             }, (selector, _) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.First();
@@ -624,8 +622,6 @@ namespace Orleans.SqlUtils
                 var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version.Version);
-                command.Parameters.Add(versionParameter);
 
                 var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag);
                 command.Parameters.Add(versionEtagParameter);
@@ -694,8 +690,6 @@ namespace Orleans.SqlUtils
                 var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version.Version);
-                command.Parameters.Add(versionParameter);
 
                 var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag);
                 command.Parameters.Add(versionEtagParameter);
@@ -832,9 +826,8 @@ namespace Orleans.SqlUtils
             }
 
             int tableVersion = (int)record.GetValueOrDefault<long>("Version");
-            string versionETag = Convert.ToBase64String(record.GetValue<byte[]>("VersionETag"));
 
-            return Tuple.Create(entry, etag, tableVersion, versionETag);
+            return Tuple.Create(entry, etag, tableVersion, tableVersion.ToString());
         }
 
 
@@ -934,12 +927,6 @@ namespace Orleans.SqlUtils
         }
 
 
-        private static IDbDataParameter CreateVersionParameter(IDbCommand command, long version)
-        {            
-            return command.CreateParameter(ParameterDirection.Input, "version", version);
-        }
-
-
         private IDbDataParameter CreateEtagParameter(IDbCommand command, string etag)
         {
             var etagBytes = Convert.FromBase64String(etag);
@@ -949,8 +936,8 @@ namespace Orleans.SqlUtils
 
         private IDbDataParameter CreateVersionEtagParameter(IDbCommand command, string versionEtag)
         {
-            var etagBytes = Convert.FromBase64String(versionEtag);
-            return command.CreateParameter(ParameterDirection.Input, "versionEtag", etagBytes, etagBytes.Length);
+            long version = int.Parse(versionEtag);
+            return command.CreateParameter(ParameterDirection.Input, "versionEtag", version);
         }
 
 

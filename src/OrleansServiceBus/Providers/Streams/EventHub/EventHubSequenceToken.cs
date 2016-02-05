@@ -22,12 +22,12 @@ namespace Orleans.ServiceBus.Providers.Streams.EventHub
         public EventHubSequenceToken(string eventHubOffset, long sequenceNumber, int eventIndex)
             : base(sequenceNumber, eventIndex)
         {
-            this.EventHubOffset = eventHubOffset;
+            EventHubOffset = eventHubOffset;
         }
 
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "EventHubSequenceToken(EventHubOffset: {0}, SequenceNumber: {1}, EventIndex: {2})", this.EventHubOffset, this.SequenceNumber, this.EventIndex);
+            return string.Format(CultureInfo.InvariantCulture, "EventHubSequenceToken(EventHubOffset: {0}, SequenceNumber: {1}, EventIndex: {2})", EventHubOffset, SequenceNumber, EventIndex);
         }
     }
 }

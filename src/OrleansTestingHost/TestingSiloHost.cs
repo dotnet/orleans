@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Remoting;
+using System.Runtime.Remoting.Messaging;
+using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -44,8 +46,6 @@ namespace Orleans.TestingHost
         public ClientConfiguration ClientConfig { get; private set; }
         public GlobalConfiguration Globals { get; private set; }
 
-        private TimeSpan livenessStabilizationTime;
-
         public string DeploymentId = null;
         public string DeploymentIdPrefix = null;
 
@@ -56,7 +56,7 @@ namespace Orleans.TestingHost
 
         public IGrainFactory GrainFactory { get; private set; }
 
-        public Logger logger
+        protected Logger logger
         {
             get { return GrainClient.Logger; }
         }
@@ -113,15 +113,18 @@ namespace Orleans.TestingHost
 
             AppDomain.CurrentDomain.UnhandledException += ReportUnobservedException;
 
+            InitializeLogWriter();
             try
             {
                 string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
                 WriteLog(startMsg);
                 InitializeAsync(siloOptions, clientOptions).Wait();
+                UninitializeLogWriter();
                 Instance = this;
             }
             catch (TimeoutException te)
             {
+                FlushLogToConsole();
                 throw new TimeoutException("Timeout during test initialization", te);
             }
             catch (Exception ex)
@@ -129,10 +132,13 @@ namespace Orleans.TestingHost
                 StopAllSilos();
 
                 Exception baseExc = ex.GetBaseException();
+                FlushLogToConsole();
+
                 if (baseExc is TimeoutException)
                 {
                     throw new TimeoutException("Timeout during test initialization", ex);
                 }
+
                 // IMPORTANT:
                 // Do NOT re-throw the original exception here, also not as an internal exception inside AggregateException
                 // Due to the way MS tests works, if the original exception is an Orleans exception,
@@ -188,7 +194,7 @@ namespace Orleans.TestingHost
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
         public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
-            TimeSpan stabilizationTime = this.livenessStabilizationTime;
+            TimeSpan stabilizationTime = GetLivenessStabilizationTime(Globals, didKill);
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             await Task.Delay(stabilizationTime);
             WriteLog("WaitForLivenessToStabilize is done sleeping");
@@ -470,7 +476,7 @@ namespace Orleans.TestingHost
                 }
                 catch (Exception exc)
                 {
-                    Console.WriteLine("UpdateGeneratedAssemblies threw an exception. Ignoring it. Exception: {0}", exc);
+                    WriteLog("UpdateGeneratedAssemblies threw an exception. Ignoring it. Exception: {0}", exc);
                 }
 
                 return null;
@@ -673,8 +679,6 @@ namespace Orleans.TestingHost
                 config.Globals.DataConnectionString = options.DataConnectionString;
             }
 
-            host.livenessStabilizationTime = GetLivenessStabilizationTime(config.Globals);
-
             host.Globals = config.Globals;
 
             string siloName;
@@ -688,7 +692,7 @@ namespace Orleans.TestingHost
                     break;
             }
 
-            NodeConfiguration nodeConfig = config.GetConfigurationForNode(siloName);
+            NodeConfiguration nodeConfig = config.GetOrCreateNodeConfigurationForSilo(siloName);
             nodeConfig.HostNameOrIPAddress = "loopback";
             nodeConfig.Port = basePort + instanceCount;
             nodeConfig.DefaultTraceLevel = config.Defaults.DefaultTraceLevel;
@@ -739,11 +743,11 @@ namespace Orleans.TestingHost
                 }
                 catch (RemotingException re)
                 {
-                    Console.WriteLine(re); /* Ignore error */
+                    WriteLog(re); /* Ignore error */
                 }
                 catch (Exception exc)
                 {
-                    Console.WriteLine(exc);
+                    WriteLog(exc);
                     throw;
                 }
             }
@@ -756,7 +760,7 @@ namespace Orleans.TestingHost
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc);
+                WriteLog(exc);
                 throw;
             }
 
@@ -843,15 +847,50 @@ namespace Orleans.TestingHost
             return depId;
         }
 
+        #endregion
+
+        #region Tracing helper functions. Will eventually go away entirely
+
+        private const string LogWriterContextKey = "TestingSiloHost_LogWriter";
+
         private static void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
         {
             Exception exception = (Exception)eventArgs.ExceptionObject;
-            Console.WriteLine("Unobserved exception: {0}", exception);
+            WriteLog("Unobserved exception: {0}", exception);
         }
 
-        public static void WriteLog(string format, params object[] args)
+        private static void WriteLog(string format, params object[] args)
         {
-            Console.WriteLine(format, args);
+            var trace = CallContext.LogicalGetData(LogWriterContextKey);
+            if (trace != null)
+            {
+                CallContext.LogicalSetData(LogWriterContextKey, string.Format(format, args) + Environment.NewLine);
+            }
+        }
+
+        private static void FlushLogToConsole()
+        {
+            var trace = CallContext.LogicalGetData(LogWriterContextKey);
+            if (trace != null)
+            {
+                Console.WriteLine(trace);
+                UninitializeLogWriter();
+            }
+        }
+
+        private static void WriteLog(object value)
+        {
+            WriteLog(value.ToString());
+        }
+
+        private static void InitializeLogWriter()
+        {
+            CallContext.LogicalSetData(LogWriterContextKey, string.Empty);
+        }
+
+        private static void UninitializeLogWriter()
+        {
+            CallContext.FreeNamedDataSlot(LogWriterContextKey);
         }
 
         #endregion

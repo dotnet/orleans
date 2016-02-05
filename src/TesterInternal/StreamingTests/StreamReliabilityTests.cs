@@ -941,7 +941,7 @@ namespace UnitTests.Streaming.Reliability
             }
 
             // WaitForLivenessToStabilize(!kill);
-            this.HostedCluster.WaitForLivenessToStabilizeAsync().Wait();
+            this.HostedCluster.WaitForLivenessToStabilizeAsync(kill).Wait();
         }
 
 #if USE_GENERICS

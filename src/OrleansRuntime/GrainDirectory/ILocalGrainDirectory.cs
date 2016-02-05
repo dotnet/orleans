@@ -1,9 +1,10 @@
+using Orleans.GrainDirectory;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    interface ILocalGrainDirectory
+    interface ILocalGrainDirectory : IGrainDirectory
     {
         /// <summary>
         /// Starts the local portion of the directory service.
@@ -21,28 +22,6 @@ namespace Orleans.Runtime.GrainDirectory
         Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>
-        /// Registers a new activation with the directory service.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="address">The address of the activation to register.</param>
-        Task RegisterAsync(ActivationAddress address);
-
-        /// <summary>
-        /// Removes the record for an existing activation from the directory service.
-        /// This is used when an activation is being deleted.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="address">The address of the activation to remove.</param>
-        Task UnregisterAsync(ActivationAddress address);
-
-        /// <summary>
-        /// Unregister a batch of addresses at once
-        /// </summary>
-        /// <param name="addresses"></param>
-        /// <returns></returns>
-        Task UnregisterManyAsync(List<ActivationAddress> addresses);
-
-        /// <summary>
         /// Removes the record for an existing activation from the directory service,
         /// if it was created before the passed-in timestamp.
         /// This is used when a request is received for an activation that cannot be found, 
@@ -58,17 +37,6 @@ namespace Orleans.Runtime.GrainDirectory
         Task UnregisterConditionallyAsync(ActivationAddress address);
 
         /// <summary>
-        /// Registers a new activation, in single activation mode, with the directory service.
-        /// If there is already an activation registered for this grain, then the new activation will
-        /// not be registered and the address of the existing activation will be returned.
-        /// Otherwise, the passed-in address will be returned.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="address">The address of the potential new activation.</param>
-        /// <returns>The address registered for the grain's single activation.</returns>
-        Task<ActivationAddress> RegisterSingleActivationAsync(ActivationAddress address);
-
-        /// <summary>
         /// Fetches locally known directory information for a grain.
         /// If there is no local information, either in the cache or in this node's directory partition,
         /// then this method will return false and leave the list empty.
@@ -76,25 +44,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="grain">The ID of the grain to look up.</param>
         /// <param name="addresses">An output parameter that receives the list of locally-known activations of the grain.</param>
         /// <returns>True if remote addresses are complete within freshness constraint</returns>
-        bool LocalLookup(GrainId grain, out List<ActivationAddress> addresses);
-
-        /// <summary>
-        /// Fetches complete directory information for a grain.
-        /// If there is no local information, then this method will query the appropriate remote directory node.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
-        /// <returns>A list of all known activations of the grain.</returns>
-        Task<List<ActivationAddress>> FullLookup(GrainId grain);
-
-        /// <summary>
-        /// Removes all directory information about a grain.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
-        /// <returns>An acknowledgement that the deletion has completed.
-        /// It is safe to ignore this result.</returns>
-        Task DeleteGrain(GrainId grain);
+        bool LocalLookup(GrainId grain, out AddressesAndTag addresses);
 
         /// <summary>
         /// Invalidates cache entry for the given activation address.
@@ -139,7 +89,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grain"></param>
         /// <returns></returns>
-        List<ActivationAddress> GetLocalDirectoryData(GrainId grain);
+        AddressesAndTag GetLocalDirectoryData(GrainId grain);
 
         /// <summary>
         /// For testing and troubleshhoting purposes only.

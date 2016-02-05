@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.ServiceBus;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.ServiceBus.Providers.Streams.EventHub;
 using Orleans.Streams;
@@ -24,6 +25,7 @@ namespace Orleans.ServiceBus.Providers
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
+        private IObjectPool<FixedSizeBuffer> bufferPool;
 
         public string Name { get { return adapterConfig.StreamProviderName; } }
         public bool IsRewindable { get { return true; } }
@@ -71,6 +73,7 @@ namespace Orleans.ServiceBus.Providers
 
             receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
             client = EventHubClient.CreateFromConnectionString(hubSettings.ConnectionString, hubSettings.Path);
+            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, pool => new FixedSizeBuffer(1 << 20, pool));
         }
 
         public async Task<IQueueAdapter> CreateAdapter()
@@ -133,9 +136,8 @@ namespace Orleans.ServiceBus.Providers
             {
                 Hub = hubSettings,
                 Partition = streamQueueMapper.QueueToPartition(queueId),
-                CacheSize = adapterConfig.CacheSize,
             };
-            return new EventHubAdapterReceiver(config, logger);
+            return new EventHubAdapterReceiver(config, bufferPool, logger);
         }
 
         public async Task<string[]> GetPartitionIdsAsync()

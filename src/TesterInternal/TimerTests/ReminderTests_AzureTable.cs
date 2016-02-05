@@ -20,15 +20,16 @@ namespace UnitTests.TimerTests
     [TestClass]
     public class ReminderTests_AzureTable : ReminderTests_Base
     {
+        private static readonly Guid serviceId = Guid.NewGuid();
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
             StartFreshOrleans = true,
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
             DataConnectionString = StorageTestConstants.DataConnectionString,
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
+            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Separate testing of Reminders storage from membership storage
             AdjustConfig = config =>
             {
-                config.Globals.ServiceId = Guid.NewGuid();
+                config.Globals.ServiceId = serviceId;
             },
         };
 
@@ -151,14 +152,14 @@ namespace UnitTests.TimerTests
 
             Task<bool>[] tasks = 
             {
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g1); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g2); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g3); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g4); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTestChurn(g5); })
+                Task.Run(() => PerGrainMultiReminderTestChurn(g1)),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g2)),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g3)),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g4)),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g5)),
             };
 
-            Thread.Sleep(period.Multiply(5));
+            await Task.Delay(period.Multiply(5));
 
             // start two extra silos ... although it will take it a while before they stabilize
             log.Info("Starting 2 extra silos");
@@ -185,11 +186,11 @@ namespace UnitTests.TimerTests
 
             Task<bool>[] tasks = 
             {
-                Task.Run(async () => { return await PerGrainMultiReminderTest(g1); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTest(g2); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTest(g3); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTest(g4); }),
-                Task.Run(async () => { return await PerGrainMultiReminderTest(g5); })
+                Task.Run(() => PerGrainMultiReminderTest(g1)),
+                Task.Run(() => PerGrainMultiReminderTest(g2)),
+                Task.Run(() => PerGrainMultiReminderTest(g3)),
+                Task.Run(() => PerGrainMultiReminderTest(g4)),
+                Task.Run(() => PerGrainMultiReminderTest(g5)),
             };
 
             //Block until all tasks complete.
@@ -233,13 +234,13 @@ namespace UnitTests.TimerTests
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task<bool>[] tasks = 
+            Task[] tasks = 
             {
-                Task.Run(async () => { await PerGrainFailureTest(g1); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g2); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g3); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g4); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g5); return true; })
+                Task.Run(() => PerGrainFailureTest(g1)),
+                Task.Run(() => PerGrainFailureTest(g2)),
+                Task.Run(() => PerGrainFailureTest(g3)),
+                Task.Run(() => PerGrainFailureTest(g4)),
+                Task.Run(() => PerGrainFailureTest(g5)),
             };
 
             Thread.Sleep(period.Multiply(failAfter));
@@ -271,13 +272,13 @@ namespace UnitTests.TimerTests
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task<bool>[] tasks = 
+            Task[] tasks = 
             {
-                Task.Run(async () => { await PerGrainFailureTest(g1); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g2); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g3); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g4); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g5); return true; })
+                Task.Run(() => PerGrainFailureTest(g1)),
+                Task.Run(() => PerGrainFailureTest(g2)),
+                Task.Run(() => PerGrainFailureTest(g3)),
+                Task.Run(() => PerGrainFailureTest(g4)),
+                Task.Run(() => PerGrainFailureTest(g5)),
             };
 
             Thread.Sleep(period.Multiply(failAfter));
@@ -359,12 +360,12 @@ namespace UnitTests.TimerTests
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task<bool>[] tasks = 
+            Task[] tasks = 
             {
-                Task.Run(async () => { await PerGrainFailureTest(g1); return true; }),
-                Task.Run(async () => { await PerGrainFailureTest(g2); return true; }),
-                Task.Run(async () => { await PerCopyGrainFailureTest(g3); return true; }),
-                Task.Run(async () => { await PerCopyGrainFailureTest(g4); return true; })
+                Task.Run(() => PerGrainFailureTest(g1)),
+                Task.Run(() => PerGrainFailureTest(g2)),
+                Task.Run(() => PerCopyGrainFailureTest(g3)),
+                Task.Run(() => PerCopyGrainFailureTest(g4)),
             };
 
             Thread.Sleep(period.Multiply(failAfter));

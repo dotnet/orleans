@@ -2,33 +2,52 @@
 
 import jobs.generation.Utilities;
 
-def project = 'dotnet/orleans'
+def project = GithubProject
 // Define build string
 def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\Common7\\Tools\\VsDevCmd.bat" && Build.cmd && Test.cmd'''
 
 // Generate the builds for debug and release
 
-def commitJob = job(Utilities.getFullJobName(project, '', false)) {
-  label('windows')
-  steps {
-    batchFile(buildString)
-  }
+[true, false].each { isPR ->
+    def newJob = job(Utilities.getFullJobName(project, '', isPR)) {
+        label('windows')
+        steps {
+            batchFile(buildString)
+        }
+    }
+    
+    Utilities.simpleInnerLoopJobSetup(newJob, project, isPR, 'Debug and Release')
+    // Archive only on commit builds.
+    if (!isPR) {
+        Utilities.addArchival(newJob, 'Binaries/**')
+    }
+    
+    newJob.with {
+        publishers {
+            archiveXUnit {
+                xUnitDotNET {
+                    pattern('src/TestResults/xUnit-Results.xml')
+                    skipNoTestFiles(true)
+                    failIfNotNew(true)
+                    deleteOutputFiles(true)
+                    stopProcessingIfError(true)
+                }
+                
+                failedThresholds {
+                    unstable(0)
+                    unstableNew(0)
+                    failure(0)
+                    failureNew(0)
+                }
+                skippedThresholds {
+                    unstable(100)
+                    unstableNew(100)
+                    failure(100)
+                    failureNew(100)
+                }
+                thresholdMode(ThresholdMode.PERCENT)
+                timeMargin(3000)
+            }
+        }
+    }
 }
-             
-def PRJob = job(Utilities.getFullJobName(project, '', true)) {
-  label('windows')
-  steps {
-    batchFile(buildString)
-  }
-}
-
-Utilities.addScm(commitJob, project)
-Utilities.addStandardOptions(commitJob)
-Utilities.addStandardNonPRParameters(commitJob)
-Utilities.addGithubPushTrigger(commitJob)
-Utilities.addArchival(commitJob, 'Binaries/**')
-
-Utilities.addPRTestSCM(PRJob, project)
-Utilities.addStandardOptions(PRJob)
-Utilities.addStandardPRParameters(PRJob, project)
-Utilities.addGithubPRTrigger(PRJob, 'Debug and Release')

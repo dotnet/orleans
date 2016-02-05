@@ -34,6 +34,54 @@ namespace UnitTests.Grains
         }
     }
 
+    public class GenericArg
+    {
+        public string A { get; private set; }
+        public int B { get; private set; }
+
+        public GenericArg(string a, int b)
+        {
+            A = a;
+            B = b;
+        }
+
+        public override bool Equals(object obj)
+        {
+            var item = obj as GenericArg;
+            if (item == null)
+            {
+                return false;
+            }
+
+            return A.Equals(item.A) && B.Equals(item.B);
+        }
+
+        public override int GetHashCode()
+        {
+            return (B * 397) ^ (A != null ? A.GetHashCode() : 0);
+        }
+    }
+
+    public class AsyncObserverArg : GenericArg
+    {
+        public AsyncObserverArg(string a, int b) : base(a, b) { }
+    }
+
+    public class AsyncObservableArg : GenericArg
+    {
+        public AsyncObservableArg(string a, int b) : base(a, b) { }
+    }
+
+    public class AsyncStreamArg : GenericArg
+    {
+        public AsyncStreamArg(string a, int b) : base(a, b) { }
+    }
+
+    public class StreamSubscriptionHandleArg : GenericArg
+    {
+        public StreamSubscriptionHandleArg(string a, int b) : base(a, b) { }
+    }
+
     public class StreamLifecycleTestGrainBase : Grain<StreamLifecycleTestGrainState>
     {
         protected Logger logger;
@@ -455,5 +503,21 @@ namespace UnitTests.Grains
 
             return TaskDone.Done;
         }
+    }
+
+    public class ClosedTypeStreamObserver : MyStreamObserver<AsyncObserverArg>
+    {
+        public ClosedTypeStreamObserver(Logger logger) : base(logger)
+        {
+        }
+    }
+
+    public interface IClosedTypeAsyncObservable : IAsyncObservable<AsyncObservableArg> { }
+
+    public interface IClosedTypeAsyncStream : IAsyncStream<AsyncStreamArg> { }
+
+    internal class ClosedTypeStreamSubscriptionHandle : StreamSubscriptionHandleImpl<StreamSubscriptionHandleArg>
+    {
+        public ClosedTypeStreamSubscriptionHandle() : base(null, null) { /* not a subject to the creation */ }
     }
 }

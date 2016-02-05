@@ -444,11 +444,7 @@ namespace Orleans
                     {
                         // exceptions thrown within this scope are not considered to be thrown from user code
                         // and not from runtime code.
-                        var resultPromise = objectData.Invoker.Invoke(
-                            targetOb,
-                            request.InterfaceId,
-                            request.MethodId,
-                            request.Arguments);
+                        var resultPromise = objectData.Invoker.Invoke(targetOb, request);
                         if (resultPromise != null) // it will be null for one way messages
                         {
                             resultObject = await resultPromise;

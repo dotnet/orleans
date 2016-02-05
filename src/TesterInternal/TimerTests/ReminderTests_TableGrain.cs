@@ -59,9 +59,17 @@ namespace UnitTests.TimerTests
             await Test_Reminders_Basic_ListOps();
         }
 
+        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        public async Task Rem_Grain_MultipleReminders()
+        {
+            log.Info(TestContext.TestName);
+            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            await PerGrainMultiReminderTest(grain);
+        }
+
         // Single join tests ... multi grain, multi reminders
 
-        //[TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Grain_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();

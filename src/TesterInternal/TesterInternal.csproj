@@ -66,7 +66,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -84,6 +84,18 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\test\Tester\RelationalUtilities\MySqlStorageForTesting.cs">
+      <Link>Tester\RelationalUtilities\MySqlStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\test\Tester\RelationalUtilities\RelationalStorageForTesting.cs">
+      <Link>Tester\RelationalUtilities\RelationalStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\test\Tester\RelationalUtilities\SqlServerStorageForTesting.cs">
+      <Link>Tester\RelationalUtilities\SqlServerStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\test\Tester\TestUtils.cs">
+      <Link>Tester\TestUtils.cs</Link>
+    </Compile>
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="AssemblyLoaderTests.cs" />
     <Compile Include="AsynchAgentRestartTest.cs" />
@@ -144,7 +156,6 @@
     <Compile Include="SerializerTests\MessageSerializerTests.cs" />
     <Compile Include="SerializerTests\RoundTripSerializerTests.cs" />
     <Compile Include="SerializerTests\SerializationTests.cs" />
-    <Compile Include="SerializerTests\SerializerGenerationTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs" />
@@ -203,6 +214,8 @@
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestAssemblyCleanup.cs" />
     <Compile Include="TestConstants.cs" />
+    <Compile Include="Tester\HostedTestClusterBase.cs" />
+    <Compile Include="Tester\OrleansTestingBase.cs" />
     <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
@@ -258,10 +271,6 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Tester\Tester.csproj">
-      <Project>{591ef75b-d3b0-403d-830c-39d032a73404}</Project>
-      <Name>Tester</Name>
-    </ProjectReference>
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
       <Name>TestGrainInterfaces</Name>
@@ -288,6 +297,10 @@
     <None Include="ReadMe.md" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\Build\Version.txt">
+      <Link>Version.txt</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
       <Link>CreateOrleansTables_MySql.sql</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

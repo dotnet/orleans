@@ -7,11 +7,18 @@ namespace UnitTests
     public class CounterTests
     {
         private static readonly SafeRandom random = new SafeRandom();
+        private const string CounterName = "CounterTestsCounter";
+
+        [TestCleanup]
+        public void Cleanup()
+        {
+            CounterStatistic.Delete(CounterName);
+        }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_InitialValue()
         {
-            StatisticName name = new StatisticName("Counter1");
+            StatisticName name = new StatisticName(CounterName);
             ICounter<long> ctr = CounterStatistic.FindOrCreate(name);
             Assert.AreEqual(name.ToString(), ctr.Name);
             Assert.IsTrue(ctr.ToString().Contains(name.Name));
@@ -21,7 +28,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_SetValue()
         {
-            StatisticName name = new StatisticName("Counter2");
+            StatisticName name = new StatisticName(CounterName);
             int val = random.Next(1000000);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
@@ -31,7 +38,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_Increment()
         {
-            StatisticName name = new StatisticName("Counter3");
+            StatisticName name = new StatisticName(CounterName);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             Assert.AreEqual(0, ctr.GetCurrentValue());
             ctr.Increment();
@@ -41,7 +48,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_IncrementBy()
         {
-            StatisticName name = new StatisticName("Counter4");
+            StatisticName name = new StatisticName(CounterName);
             int val = random.Next(1000000);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
@@ -55,7 +62,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_IncrementFromMinInt()
         {
-            StatisticName name = new StatisticName("Counter5");
+            StatisticName name = new StatisticName(CounterName);
             int val = int.MinValue;
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
@@ -69,7 +76,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_IncrementFromMaxInt()
         {
-            StatisticName name = new StatisticName("Counter6");
+            StatisticName name = new StatisticName(CounterName);
             int val = int.MaxValue;
             long longVal = int.MaxValue;
             Assert.AreEqual(longVal, val);
@@ -85,7 +92,7 @@ namespace UnitTests
         [TestMethod, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_DecrementBy()
         {
-            StatisticName name = new StatisticName("Counter7");
+            StatisticName name = new StatisticName(CounterName);
             int startValue = 10;
             int newValue = startValue - 1;
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);

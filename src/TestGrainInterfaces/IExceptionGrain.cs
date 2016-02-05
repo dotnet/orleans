@@ -9,10 +9,16 @@ namespace UnitTests.GrainInterfaces
     /// </summary>
     public interface IExceptionGrain : IGrainWithIntegerKey
     {
-        /// <summary>
-        /// Returns a canceled <see cref="Task"/>.
-        /// </summary>
-        /// <returns>A canceled <see cref="Task"/>.</returns>
-        Task Cancelled();
+        Task Canceled();
+
+        Task ThrowsInvalidOperationException();
+
+        Task ThrowsAggregateExceptionWrappingInvalidOperationException();
+
+        Task ThrowsNestedAggregateExceptionsWrappingInvalidOperationException();
+
+        Task GrainCallToThrowsInvalidOperationException(long otherGrainId);
+
+        Task GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException(long otherGrainId);
     }
 }
