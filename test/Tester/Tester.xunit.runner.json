@@ -3,6 +3,6 @@
   "diagnosticMessages": true,
   "parallelizeAssembly": false,
   "parallelizeTestCollections": false,
-  "methodDisplay": "method",
+  "methodDisplay": "classAndMethod",
   "shadowCopy": false
 }
