@@ -58,6 +58,8 @@
     <Compile Include="IExtensionTestGrain.cs" />
     <Compile Include="IExternalTypeGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
+    <Compile Include="IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain.cs" />
+    <Compile Include="IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs" />
     <Compile Include="IGeneratorTestDerivedDerivedGrain.cs" />
     <Compile Include="IGeneratorTestDerivedGrain1.cs" />
     <Compile Include="IGeneratorTestDerivedGrain2.cs" />
@@ -124,6 +126,14 @@
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestFSharpInterfaces\TestFSharpInterfaces.fsproj">
+      <Project>{2375d7d5-9b30-493f-9c2e-a6b2811a3c5a}</Project>
+      <Name>TestFSharpInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj">
+      <Project>{aeff3b6c-7986-4bf9-85f5-2571decf8959}</Project>
+      <Name>TestInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

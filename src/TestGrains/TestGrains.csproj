@@ -66,6 +66,8 @@
     <Compile Include="GeneratedEventCollectorGrain.cs" />
     <Compile Include="GeneratedEvent.cs" />
     <Compile Include="GeneratedStreamTestConstants.cs" />
+    <Compile Include="GeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain.cs" />
+    <Compile Include="GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs" />
     <Compile Include="ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.cs" />
     <Compile Include="ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.cs" />
     <Compile Include="GeneratedEventReporterGrain.cs" />
@@ -129,9 +131,17 @@
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestFSharpInterfaces\TestFSharpInterfaces.fsproj">
+      <Project>{2375d7d5-9b30-493f-9c2e-a6b2811a3c5a}</Project>
+      <Name>TestFSharpInterfaces</Name>
+    </ProjectReference>
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
       <Name>TestGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj">
+      <Project>{aeff3b6c-7986-4bf9-85f5-2571decf8959}</Project>
+      <Name>TestInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup />
