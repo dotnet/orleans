@@ -963,6 +963,9 @@ namespace Orleans
         Provider_NotLoaded                      = ProviderManagerBase + 11,
         Provider_Manager_Already_Loaded         = ProviderManagerBase + 12,
         Provider_CatalogNoStorageProvider_3     = ProviderManagerBase + 13,
+        Provider_ProviderLoadedOk               = ProviderManagerBase + 14,
+        Provider_ProviderNotFound               = ProviderManagerBase + 15,
+        Provider_ProviderNotControllable        = ProviderManagerBase + 16,
 
         AzureQueueBase = Runtime + 3200,
         AzureQueue_01 = AzureQueueBase + 1,

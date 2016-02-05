@@ -5,18 +5,23 @@
       <Provider Type="UnitTests.General.MockBootstrapProvider" Name="bootstrap1" />
       <Provider Type="UnitTests.General.GrainCallBootstrapper" Name="bootstrap2" />
       <Provider Type="UnitTests.General.LocalGrainInitBootstrapper" Name="bootstrap3" />
+      <Provider Type="UnitTests.General.ControllableBootstrapProvider" Name="bootstrap4" />
     </BootstrapProviders>
+    <StorageProviders>
+      <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" NumStorageGrains="1" />
+      <Provider Type="Orleans.Storage.MemoryStorage" Name="Default" NumStorageGrains="1" />
+    </StorageProviders>
     <SeedNode Address="localhost" Port="22222" />
   </Globals>
   <Defaults>
+    <Networking Address="localhost" Port="22222"/>
+    <ProxyingGateway Address="localhost" Port="40000" />
     <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false" WriteMessagingTraces="false">
-      <!--
-      <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
-      <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose2" />
-      <TraceLevelOverride LogPrefix="Runtime.Message" TraceLevel="Verbose" />
-      <TraceLevelOverride LogPrefix="Runtime.Catalog" TraceLevel="Verbose" />
-      -->
+      <TraceLevelOverride LogPrefix="ProviderLoader" TraceLevel="Verbose" />
+      <TraceLevelOverride LogPrefix="BootstrapProviderManager" TraceLevel="Verbose" />
+      <TraceLevelOverride LogPrefix="ManagementGrain" TraceLevel="Verbose" />
     </Tracing>
+    <Statistics MetricsTableWriteInterval="3600s" PerfCounterWriteInterval="30s" LogWriteInterval="3600s" WriteLogStatisticsToTable="false" />
   </Defaults>
   <Override Node="Primary">
     <Networking Port="22222" />
