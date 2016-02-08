@@ -1096,7 +1096,7 @@ namespace Orleans.Runtime
         {
             foreach (var  tc in TelemetryConsumers.OfType<IMetricTelemetryConsumer>())
             {
-                tc.IncrementMetric(name, value);
+                tc.DecrementMetric(name, value);
             }
         }
 
