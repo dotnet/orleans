@@ -141,7 +141,7 @@ namespace Orleans
         private static Task<object> TaskFromFaulted(Task task)
         {
             var completion = new TaskCompletionSource<object>();
-            completion.SetException(task.Exception);
+            completion.SetException(task.Exception.InnerException);
             return completion.Task;
         }
     }
@@ -289,7 +289,7 @@ namespace Orleans
             }
             else if (task.IsFaulted)
             {
-                resolver.TrySetException(task.Exception.Flatten());
+                resolver.TrySetException(task.Exception);
             }
             else if (task.IsCanceled)
             {
@@ -303,7 +303,7 @@ namespace Orleans
                 {
                     if (t.IsFaulted)
                     {
-                        resolver.TrySetException(t.Exception.Flatten());
+                        resolver.TrySetException(t.Exception.InnerException);
                     }
                     else if (t.IsCanceled)
                     {
@@ -311,7 +311,7 @@ namespace Orleans
                     }
                     else
                     {
-                        resolver.TrySetResult(t.Result);
+                        resolver.TrySetResult(t.GetResult());
                     }
                 });
             }
