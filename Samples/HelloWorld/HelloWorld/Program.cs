@@ -5,6 +5,7 @@
 using System;
 using Orleans;
 using HelloWorldInterfaces;
+using Orleans.Runtime.Configuration;
 
 namespace HelloWorld
 {
@@ -25,7 +26,8 @@ namespace HelloWorld
                 AppDomainInitializerArguments = args,
             });
 #endif
-            GrainClient.Initialize("DevTestClientConfiguration.xml");
+            var config = ClientConfiguration.LocalhostSilo();
+            GrainClient.Initialize(config);
 
             var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
             Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning, my friend!").Result);
