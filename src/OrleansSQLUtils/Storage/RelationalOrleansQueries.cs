@@ -325,7 +325,7 @@ namespace Orleans.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal async Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
         {
-            var query = beginHash < endHash ? orleansQueries.ReadRangeRows1Key : orleansQueries.ReadRangeRows2Key;
+            var query = (int)beginHash < (int)endHash ? orleansQueries.ReadRangeRows1Key : orleansQueries.ReadRangeRows2Key;
             var ret = await storage.ReadAsync(query, command =>
             {                
                 var serviceIdParameter = CreateServiceIdParameter(command, serviceId);

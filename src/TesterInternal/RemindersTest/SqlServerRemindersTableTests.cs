@@ -94,10 +94,10 @@ namespace UnitTests.RemindersTest
 
 
         [TestMethod, TestCategory("Reminders"), TestCategory("SqlServer")]
-        public async Task RemindersTable_SqlServer_UpsertReminderInParallel()
+        public async Task RemindersTable_SqlServer_RemindersTest()
         {
             await Initialize();
-            await ReminderTablePluginTests.ReminderTableUpsertParallel(reminder);
+            await ReminderTablePluginTests.ReminderTableTest(reminder);
         }
 
         #region sampleSpecificMembershipAndRemidersTableConfiguration
