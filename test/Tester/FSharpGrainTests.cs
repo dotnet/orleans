@@ -80,7 +80,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_IntOption_Some()
         {
-            var input = FSharpOption<int>.Some(0);
+            var input = FSharpOption<int>.Some(10);
             await PingTest<FSharpOption<int>>(input);
         }
 

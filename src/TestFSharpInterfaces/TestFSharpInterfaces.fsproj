@@ -62,6 +62,7 @@
     </Compile>
     <Content Include="packages.config" />
     <Compile Include="IFSharpBaseInterface.fs" />
+    <Compile Include="IFSharpParameters.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
