@@ -23,7 +23,7 @@ using UnitTests.Tester;
 namespace UnitTests.StorageTests
 {
     /// <summary>
-    /// PersistenceGrainTests using AzureStore - Requires access to external Azure table storage
+    /// Base_PersistenceGrainTests - a base class for testing persistence providers
     /// </summary>
     public abstract class Base_PersistenceGrainTests_AzureStore : HostedTestClusterPerFixture
     {
@@ -261,8 +261,9 @@ namespace UnitTests.StorageTests
 
         protected async Task Grain_AzureStore_SiloRestart()
         {
-            var initialDeploymentId = this.HostedCluster.DeploymentId;
             var initialServiceId = this.HostedCluster.Globals.ServiceId;
+            var initialDeploymentId = this.HostedCluster.DeploymentId;
+
             Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
@@ -305,7 +306,7 @@ namespace UnitTests.StorageTests
                 grainNoState => grainNoState.PingAsync(),
                 grainMemory => grainMemory.DoSomething(),
                 grainMemoryStore => grainMemoryStore.GetValue(),
-                grainAzureTable => grainAzureTable.GetValue());
+                grainAzureStore => grainAzureStore.GetValue());
         }
 
         protected void Persistence_Perf_Write()
@@ -319,7 +320,7 @@ namespace UnitTests.StorageTests
                 grainNoState => grainNoState.EchoAsync(testName),
                 grainMemory => grainMemory.DoWrite(n),
                 grainMemoryStore => grainMemoryStore.DoWrite(n),
-                grainAzureTable => grainAzureTable.DoWrite(n));
+                grainAzureStore => grainAzureStore.DoWrite(n));
         }
 
         protected void Persistence_Perf_Write_Reread()
@@ -333,23 +334,23 @@ namespace UnitTests.StorageTests
                 grainNoState => grainNoState.EchoAsync(testName),
                 grainMemory => grainMemory.DoWrite(n),
                 grainMemoryStore => grainMemoryStore.DoWrite(n),
-                grainAzureTable => grainAzureTable.DoWrite(n));
+                grainAzureStore => grainAzureStore.DoWrite(n));
 
             // Timings for Activate
             RunPerfTest(n, testName + "--ReRead", target,
                 grainNoState => grainNoState.GetLastEchoAsync(),
                 grainMemory => grainMemory.DoRead(),
                 grainMemoryStore => grainMemoryStore.DoRead(),
-                grainAzureTable => grainAzureTable.DoRead());
+                grainAzureStore => grainAzureStore.DoRead());
         }
 
        
-        protected void Persistence_Silo_StorageProvider_Azure()
+        protected void Persistence_Silo_StorageProvider_Azure(Type providerType)
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                string provider = typeof(AzureTableStorage).FullName;
+                string provider = providerType.FullName;
                 List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
                 Assert.IsTrue(providers.Contains(provider), "No storage provider found: {0}", provider);
             }
