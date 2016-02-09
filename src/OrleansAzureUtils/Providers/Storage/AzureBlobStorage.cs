@@ -228,6 +228,7 @@ namespace Orleans.Storage
                 var blob = container.GetBlockBlobReference(blobName);
                 blob.Properties.ContentType = "application/json";
 
+                var containerNotFound = false;
                 try
                 {
                     await blob.UploadTextAsync(
@@ -240,20 +241,20 @@ namespace Orleans.Storage
                 catch (StorageException exception)
                 {
                     var errorCode = exception.RequestInformation.ExtendedErrorInformation.ErrorCode;
-                    if (errorCode == BlobErrorCodeStrings.ContainerNotFound)
-                    {
-                        if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound, "Creating container: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
-                        
-                        // if the container does not exist, create it, and make another attempt
-                        await container.CreateIfNotExistsAsync().ConfigureAwait(false);
+                    containerNotFound = errorCode == BlobErrorCodeStrings.ContainerNotFound;
+                }
+                if (containerNotFound)
+                {
+                    // if the container does not exist, create it, and make another attempt
+                    if (this.Log.IsVerbose3) this.Log.Verbose3((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound, "Creating container: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
+                    await container.CreateIfNotExistsAsync().ConfigureAwait(false);
 
-                        await blob.UploadTextAsync(
-                            json,
-                            Encoding.UTF8,
-                            AccessCondition.GenerateIfMatchCondition(grainState.ETag),
-                            null,
-                            null).ConfigureAwait(false);
-                    }
+                    await blob.UploadTextAsync(
+                        json,
+                        Encoding.UTF8,
+                        AccessCondition.GenerateIfMatchCondition(grainState.ETag),
+                        null,
+                        null).ConfigureAwait(false);
                 }
 
                 grainState.ETag = blob.Properties.ETag;
