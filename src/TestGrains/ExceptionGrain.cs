@@ -47,5 +47,10 @@ namespace UnitTests.Grains
             var otherGrain = GrainFactory.GetGrain<IExceptionGrain>(otherGrainId);
             return otherGrain.ThrowsAggregateExceptionWrappingInvalidOperationException();
         }
+
+        public Task ThrowsSynchronousInvalidOperationException()
+        {
+            throw new InvalidOperationException("Test exception");
+        }
     }
 }

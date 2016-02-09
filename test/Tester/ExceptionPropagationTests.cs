@@ -74,5 +74,18 @@ namespace UnitTests.General
             var nestedEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerException);
             Assert.Equal("Test exception", nestedEx.Message);
         }
+
+        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        public async Task SynchronousExceptionThrownShouldResultInFaultedTask()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+
+            // start the grain call but don't await it nor wrap in try/catch, to make sure it doesn't throw synchronously
+            var grainCallTask = grain.ThrowsSynchronousInvalidOperationException();
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grainCallTask);
+
+            Assert.Equal("Test exception", exception.Message);
+        }
     }
 }
