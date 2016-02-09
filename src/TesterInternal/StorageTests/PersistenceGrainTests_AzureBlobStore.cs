@@ -1,6 +1,7 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using System;
 using System.IO;
@@ -20,7 +21,8 @@ namespace UnitTests.StorageTests
     [DeploymentItem("Config_AzureBlobStorage.xml")]
     public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore
     {
-        private static readonly Guid initialServiceId = Guid.NewGuid();
+
+        private static Guid serviceId = Guid.NewGuid();
 
         private static readonly TestingSiloOptions testSiloOptions = new TestingSiloOptions
         {
@@ -30,7 +32,7 @@ namespace UnitTests.StorageTests
             StartSecondary = false,
             AdjustConfig = config =>
             {
-                config.Globals.ServiceId = Guid.NewGuid();
+                config.Globals.ServiceId = serviceId;
             }
         };
 
@@ -115,7 +117,7 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void Persistence_Silo_StorageProvider_AzureBlobStore()
         {
-            base.Persistence_Silo_StorageProvider_Azure();
+            base.Persistence_Silo_StorageProvider_Azure(typeof(AzureBlobStorage));
         }
 
     }

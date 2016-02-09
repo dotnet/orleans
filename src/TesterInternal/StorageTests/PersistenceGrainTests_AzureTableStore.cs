@@ -16,12 +16,13 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.StorageTests
 {
     /// <summary>
-    /// PersistenceGrainTests using AzureStore - Requires access to external Azure table storage
+    /// PersistenceGrainTests using AzureTableStore - Requires access to external Azure table storage
     /// </summary>
     [TestClass]
     [DeploymentItem("Config_AzureTableStorage.xml")]
     public class PersistenceGrainTests_AzureTableStore : Base_PersistenceGrainTests_AzureStore
     {
+        private static Guid serviceId = Guid.NewGuid();
 
         private static readonly TestingSiloOptions testSiloOptions = new TestingSiloOptions
         {
@@ -31,7 +32,7 @@ namespace UnitTests.StorageTests
             StartSecondary = false,
             AdjustConfig = config =>
             {
-                config.Globals.ServiceId = Guid.NewGuid();
+                config.Globals.ServiceId = serviceId;
             }
         };
 
@@ -116,7 +117,7 @@ namespace UnitTests.StorageTests
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void Persistence_Silo_StorageProvider_AzureTableStore()
         {
-            base.Persistence_Silo_StorageProvider_Azure();
+            base.Persistence_Silo_StorageProvider_Azure(typeof(AzureTableStorage));
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
