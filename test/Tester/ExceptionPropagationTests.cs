@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using FluentAssertions.Collections;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
@@ -86,6 +87,44 @@ namespace UnitTests.General
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grainCallTask);
 
             Assert.Equal("Test exception", exception.Message);
+        }
+
+        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        public void ExceptionPropagationForwardsEntireAggregateException()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            var grainCall = grain.ThrowsMultipleExceptionsAggregatedInFaultedTask();
+
+            // use Wait() so that we get the entire AggregateException ('await' would just catch the first inner exception)
+            var exception = Assert.Throws<AggregateException>(
+                () => grainCall.Wait());
+
+            // make sure that all exceptions in the task are present, and not just the first one.
+            Assert.Equal(2, exception.InnerExceptions.Count);
+            var firstEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[0]);
+            Assert.Equal("Test exception 1", firstEx.Message);
+            var secondEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[1]);
+            Assert.Equal("Test exception 2", secondEx.Message);
+        }
+
+        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        public async Task SynchronousAggregateExceptionThrownShouldResultInFaultedTaskWithOriginalAggregateExceptionUnmodifiedAsInnerException()
+        {
+            IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+
+            // start the grain call but don't await it nor wrap in try/catch, to make sure it doesn't throw synchronously
+            var grainCallTask = grain.ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions();
+
+            // assert that the faulted task has an inner exception of type AggregateException, which should be our original exception
+            var exception = await Assert.ThrowsAsync<AggregateException>(() => grainCallTask);
+
+            Assert.Equal("Test AggregateException message", exception.Message);
+            // make sure that all exceptions in the task are present, and not just the first one.
+            Assert.Equal(2, exception.InnerExceptions.Count);
+            var firstEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[0]);
+            Assert.Equal("Test exception 1", firstEx.Message);
+            var secondEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[1]);
+            Assert.Equal("Test exception 2", secondEx.Message);
         }
     }
 }

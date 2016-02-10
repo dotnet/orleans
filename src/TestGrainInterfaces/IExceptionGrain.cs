@@ -22,5 +22,9 @@ namespace UnitTests.GrainInterfaces
         Task GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException(long otherGrainId);
 
         Task ThrowsSynchronousInvalidOperationException();
+
+        Task ThrowsMultipleExceptionsAggregatedInFaultedTask();
+
+        Task ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions();
     }
 }
