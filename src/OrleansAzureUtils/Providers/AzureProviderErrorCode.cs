@@ -17,7 +17,7 @@ namespace Orleans.Providers.Azure
         AzureTableProvider_InitProvider             = AzureTableProviderBase + 9,
         AzureTableProvider_ParamConnectionString    = AzureTableProviderBase + 10,
 
-        AzureBlobProviderBase                       = ProvidersBase + 200,
+        AzureBlobProviderBase                       = ProvidersBase + 300,
         AzureBlobProvider_BlobNotFound              = AzureBlobProviderBase + 1,
         AzureBlobProvider_ContainerNotFound         = AzureBlobProviderBase + 2,
         AzureBlobProvider_BlobEmpty                 = AzureBlobProviderBase + 3,
