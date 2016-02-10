@@ -4,13 +4,13 @@ title: Front Ends for Orleans Services
 ---
 {% include JB/setup %}
 
-Exposing silo gateway ports as public endpoints of an Orleans cluster is not recommended. 
+Exposing silo gateway ports as public endpoints of an Orleans cluster is not recommended.
 Instead, Orleans is intended to be fronted by your own API.
 
-Creating an HTTP API, or web application is a common scenario. 
+Creating an HTTP API, or web application is a common scenario.
 Let's extend the Employee/Manager scenario from the  [Declarative-Persistence](Declarative-Persistence) walk-through to see what steps are required to publish grain data over HTTP.
 
-##Creating the ASP.NET application
+## Creating the ASP.NET application
 First, you should add a new ASP.NET Web Application to your solution. Then, select the Web API template, although you could use MVC or Web Forms.
 
 
@@ -20,7 +20,7 @@ Next, add a reference to the _Orleans.dll_ file in the project references.
 
 Now add the _ClientConfiguration.xml_ file used in the Orleans Host application to the root of the ASP.NET project.
 
-As with the Orleans host we created earlier, we need to initialize Orleans. 
+As with the Orleans host we created earlier, we need to initialize Orleans.
 This is best done in the _Global.asax.cs_ file like this:
 
 ``` csharp
@@ -64,7 +64,7 @@ Note that the controller is asynchronous, and we can just pass back the `Task` w
 
 ## Running the Application
 
-Now let's test the application. 
+Now let's test the application.
 
 Build the project, and start the local silo.
 
