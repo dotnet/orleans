@@ -58,6 +58,9 @@ namespace Orleans.Runtime
                     return;
                 }
 
+                // load the code generator before intercepting assembly loading
+                CodeGeneratorManager.Initialize(); 
+
                 // initialize serialization for all assemblies to be loaded.
                 AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
 
