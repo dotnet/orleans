@@ -124,11 +124,11 @@ Decoding the string will give you the actual Orleans Membership data:
 
 ```js
 {
-    "Hostname":"[YOUR_MACHINE_NAME]",
-    "ProxyPort":22222,
-    "StartTime":"2016-01-29T16:25:54.9538838Z",
-    "Status":3,
-    "SuspectingSilos":[]
+    "Hostname": "[YOUR_MACHINE_NAME]",
+    "ProxyPort": 22222,
+    "StartTime": "2016-01-29T16:25:54.9538838Z",
+    "Status": 3,
+    "SuspectingSilos": []
 }
 ```
 
