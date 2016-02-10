@@ -105,8 +105,6 @@ await friend.Subscribe(obj);
 
 Now whenever our grain on the server calls the `SendUpdateMessage` method, all subscribed clients will receive the message. In our client code, the `Chat` instance in variable `c` will receive the message and output it to the console. 
 
-Kkeep in mind that if your messages from the grain to the cleint will be sent after some time (periodicaly), you should keep the client alive using some loop or another mechanism for it to receive the messages. Also, the clint should periodicaly resubscribe to the grain, in order to deal with grain deactivations or failures.
-
 **Note:** Support for observers might be removed in a future version and replaced with a Simple Message Stream [SMS](http://dotnet.github.io/orleans/Orleans-Streams/), which can support the same concept with more power, flexibility, and reliability.
 
 ##Next
