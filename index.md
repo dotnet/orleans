@@ -65,7 +65,7 @@ await grain.SayHello("World");
 
 ## Where Next?
 
-To learn more about the concepts in Orleans, read the getting [started guide](Getting-Started-With-Orleans/Core-Concepts).
+To learn more about the concepts in Orleans, read the [introduction](Introduction).
 
 There are a number of [step-by-step tutorials](Step-by-step-Tutorials).
 
