@@ -11,7 +11,7 @@ Thus, you would no more find an application with just one actor type and one act
 In this tutorial, we're going to construct multiple actors from a couple of classes with different communication interfaces.
 Not everything will be explained while putting together the application, we will go back and elaborate on a few things after we have it working.
 
-##Employees and Managers
+## Employees and Managers
 
 This example will use the relationship of employees and managers to demonstrate the concept of multiple actors - it's one we all understand and relate to.
 
@@ -204,7 +204,7 @@ The use of a GUID to represent the name of a person leaves something for you to 
 
 `TaskDone.Done`, used in the code above, is a convenience object defined by Orleans to allow code to succinctly return an already completed `Task`.
 
-###Asynchrony Bites Us!
+### Asynchrony Bites Us!
 
 In the image above, you may notice that the last message comes out after the request to press Enter -- why is that?
 All the client requests to add a direct report dutifully wait for the addition to finish, i.e. they are fully synchronous.

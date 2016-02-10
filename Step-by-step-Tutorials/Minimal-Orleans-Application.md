@@ -6,7 +6,7 @@ title: Minimal Orleans Application
 This tutorial provides step by step instructions for creating a basic functioning Orleans application. It is designed to be self-contained and minimalistic, with the following traits.
 
 
-- It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.  
+- It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.
 - Tested in both Visual Studio 2013 and 2015 using Orleans 1.0.9.
 - Has no reliance on SQL or Azure
 
@@ -30,7 +30,7 @@ The Solution will eventually look like this.  (Missing files will be added in se
 3. Create a New class library called GrainInterfaces
 4. Create a New class library called GrainCollection
 
-We use just the default project types in c#. 
+We use just the default project types in c#.
 
 
 #### Delete the Extras
@@ -68,7 +68,7 @@ public interface IHello : Orleans.IGrainWithIntegerKey
     Task<string> SayHello(string msg);
 }
 ```
-        
+
 ## Creating our Implementation
 
 In GrainCollection create a class  HelloGrain.cs
@@ -86,7 +86,7 @@ class HelloGrain : Orleans.Grain, IHello
 ```
 
 ## Host
-The host requires the most amount of attention to get Orleans up and running.    Throughout future tutorials, much of this will change, or go away (Orleans comes with a nice precanned SiloHost and the Extension provides a template that simplifies this).  
+The host requires the most amount of attention to get Orleans up and running.    Throughout future tutorials, much of this will change, or go away (Orleans comes with a nice precanned SiloHost and the Extension provides a template that simplifies this).
 
 However this small implementation should demonstrate the basics of getting started.
 
@@ -218,7 +218,7 @@ At this point we should be able to run Host. A console should appear with a larg
 Within the appropriate bin directory (Debug/Release) there will be a number of log files showing this information as well.  The amount and method of logging is configurable.
 
 
-##Further Reading
+## Further Reading
 
 List of Orleans Packages
 http://dotnet.github.io/orleans/NuGets

@@ -4,7 +4,7 @@ title: Orleans Streams Quick Start
 ---
 {% include JB/setup %}
 
-This guide will show you a quick way to setup and use Orleans Streams. 
+This guide will show you a quick way to setup and use Orleans Streams.
 To learn more about the details of the streaming features, read other parts of this documentation.
 
 ## Required Configurations
@@ -30,7 +30,7 @@ Producing events for streams is relatively easy. You should first get access to 
 
 ``` csharp
 //Pick a guid for a chat room grain and chat room stream
-var guid = some guid identifying the chat room 
+var guid = some guid identifying the chat room
 //Get one of the providers which we defined in config
 var streamProvider = GetStreamProvider("SMSProvider");
 //Get the reference to a stream
@@ -81,5 +81,5 @@ Again, this guide skips lots of details and is only good for showing the big pic
 Reactive programming can be a very powerful approach to solve many problems. You could for example use LINQ in the subscriber to filter numbers and do all sorts of interesting stuff.
 
 
-##Next
+## Next
 [Orleans Streams Programming APIs](Streams-Programming-APIs)

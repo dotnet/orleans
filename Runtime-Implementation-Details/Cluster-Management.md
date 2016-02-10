@@ -7,12 +7,12 @@ title: Cluster Management in Orleans
 Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as **Silo Membership**. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.
 
 The protocol relies on an external service to provide an abstraction of `MembershipTable`. `MembershipTable` is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 5 implementations of the `MembershipTable`: based on [Azure Table Storage](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/), SQL server, [Apache ZooKeeper](https://ZooKeeper.apache.org/), [Consul IO](https://www.consul.io) and in-memory emulation for development.
-In addition to the `MembershipTable` each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on a set alive silos. We start by describing the internal implementation of the Orleans's membership protocol below and later on describe the implementation of the `MembershipTable`. 
+In addition to the `MembershipTable` each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on a set alive silos. We start by describing the internal implementation of the Orleans's membership protocol below and later on describe the implementation of the `MembershipTable`.
 
 
 ### The Basic Membership Protocol:
 
-1. Upon startup every silo writes itself into a well-known `MembershipTable` (passed via config). A combination of silo identity (`ip:port:epoch`) and service deployment id are used as unique keys in the table. Epoch is just time in ticks when this silo started, and as such `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment. 
+1. Upon startup every silo writes itself into a well-known `MembershipTable` (passed via config). A combination of silo identity (`ip:port:epoch`) and service deployment id are used as unique keys in the table. Epoch is just time in ticks when this silo started, and as such `ip:port:epoch` is guaranteed to be unique in a given Orleans deployment.
 
 2. Silos monitor each other directly, via application pings ("are you alive" `heartbeats`). Pings are sent as direct messages from silo to silo, over the same TCP sockets that silos communicate. That way, pings fully correlate with actual networking problems and server health. Every silo pings X other silos. A silo picks whom to ping by calculating consistent hashes on other silos' identity, forming a virtual ring of all identities and picking X successor silos on the ring (this is a well-known distributed technique called [consistent hashing](http://en.wikipedia.org/wiki/Consistent_hashing) and is widely used in many distributed hash tables, like [Chord DHT](http://en.wikipedia.org/wiki/Chord_(peer-to-peer))).
 
@@ -27,12 +27,12 @@ In addition to the `MembershipTable` each silo participates in fully distributed
 	5.2 One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control provided by the `MembershipTable`.
 
 
-        5.3 The suspecting silo S reads P's row. 
-        
-        5.4 If S is the last suspector (there have already been Z-1 suspectors within time period T, as written in the suspicion column), S decides to declare P as Dead. In this case, S adds itself to list of suspectors and also writes in P's Status column that P is Dead. 
+    5.3 The suspecting silo S reads P's row.
+
+    5.4 If S is the last suspector (there have already been Z-1 suspectors within time period T, as written in the suspicion column), S decides to declare P as Dead. In this case, S adds itself to list of suspectors and also writes in P's Status column that P is Dead.
 
 
-        5.5 Otherwise, if S is not the last suspector, S just adds itself to the suspectors column. 
+    5.5 Otherwise, if S is not the last suspector, S just adds itself to the suspectors column.
 
 	5.6 In either case the write back uses the version number or etag that was read, so the updates to this row are serialized. In case the write has failed due to version/etag mismatch, S retries (read again, and try to write, unless P was already marked dead).
 
@@ -49,7 +49,7 @@ In addition to the `MembershipTable` each silo participates in fully distributed
 ### Properties of the Basic Membership Protocol and FAQ:
 
 1. **Can handle any number of failures** – our algorithm can handle any number of failures (that is, f<=n), including full cluster restart. This is in contrast with “traditional” [Paxos](http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, which require quorum, which is usually a majority. We have seen in production situations when more than half of the silos were down. Our system stayed functional, while Paxos based membership would not be able to make progress.
-2. **Traffic to the table is very light** - The actual pings go directly between servers and not to the table. This would generate a lot of traffic plus would be less accurate from the failure detection perspective - if a silo could not reach the table, it would miss to write its I am alive heartbeat and others would kill him. 
+2. **Traffic to the table is very light** - The actual pings go directly between servers and not to the table. This would generate a lot of traffic plus would be less accurate from the failure detection perspective - if a silo could not reach the table, it would miss to write its I am alive heartbeat and others would kill him.
 3. **Tunable accuracy vs. completeness** – [both perfect and accurate failure detection is not possible in general](http://www.cs.yale.edu/homes/aspnes/pinewiki/FailureDetectors.html). One usually wants an ability to tradeoff accuracy (don’t want to declare a silo that is really alive as dead) with completeness (want to declare dead a silo that is indeed dead as soon as possible). The configurable #votes to declare dead and  #missed pings allows to trade those two.
 
 4. **Scale** - the basic protocol can handle thousands and probably even tens of thousands of servers. This is in contrast with traditional [Paxos](http://en.wikipedia.org/wiki/Paxos_(computer_science)) based solutions, such as group communication protocols, which are known not to scale beyond tens.
@@ -65,7 +65,7 @@ In addition to the `MembershipTable` each silo participates in fully distributed
 
 ### Extension to totally order membership views:
 
-The basic membership protocol described above was later extended to support totally ordered membership views. We will briefly describe the reasons for this extension and how it is implemented. The extension does not change anything in the above design, just adds an additional property that all membership configurations are globally totally ordered. 
+The basic membership protocol described above was later extended to support totally ordered membership views. We will briefly describe the reasons for this extension and how it is implemented. The extension does not change anything in the above design, just adds an additional property that all membership configurations are globally totally ordered.
 
 **Why it is useful to totally order membership views?**
 
@@ -80,7 +80,7 @@ The basic membership protocol described above was later extended to support tota
 2. We add a membership-version row to the table that tracks table changes.
 
 3. When silo S wants to write suspicion or death declaration for silo P:
- 
+
     3.1 S reads the latest table content. If P is already dead, do nothing. Otherwise,
 
     3.2 In the same transaction, write the changes to P's row as well as increment the version number and write it back to the table.
@@ -117,8 +117,9 @@ The default values were tuned in years of production usage in Azure and we belie
 
 Sample config element:
 
-    <Liveness ProbeTimeout = "5s" TableRefreshTimeout ="10s  DeathVoteExpirationTimeout ="80s" NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" />
-
+```xml
+<Liveness ProbeTimeout = "5s" TableRefreshTimeout ="10s  DeathVoteExpirationTimeout ="80s" NumMissedProbesLimit = "3" NumProbedSilos="3" NumVotesForDeathDeclaration="2" />
+```
 
 There are 4 types of liveness implemented. The type of the liveness protocol is configured via the `SystemStoreType` attribute of the `SystemStore` element in the `Globals` section in `OrleansConfiguration.xml` file.
 
@@ -131,9 +132,9 @@ There are 4 types of liveness implemented. The type of the liveness protocol is 
 4. `ZooKeeper` - membership table is stored in a ZooKeeper [ensemble](http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup).
 
 5. `Consul` - configured as Custom system store with `MembershipTableAssembly = "OrleansConsulUtils"`.  Refer to [Consul-Deployment](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Consul-Deployment) for more details.
-	
+
 For all liveness types the common configuration variables are defined in `Globals.Liveness` element:
-	
+
 1. `ProbeTimeout` - The number of seconds to probe other silos for their liveness or for the silo to send "I am alive" heartbeat messages about itself. Default is 10 seconds.
 
 2. `TableRefreshTimeout` - The number of seconds to fetch updates from the membership table. Default is 60 seconds.
@@ -154,7 +155,7 @@ For all liveness types the common configuration variables are defined in `Global
 
 10. `MaxJoinAttemptTime` - The number of seconds to attempt to join a cluster of silos before giving up. Default is 5 minutes.
 
-11. `ExpectedClusterSize` - The expected size of a cluster. Need not be very accurate, can be an overestimate. Used to tune the exponential backoff algorithm of retries to write to Azure table. Default is 20.       
+11. `ExpectedClusterSize` - The expected size of a cluster. Need not be very accurate, can be an overestimate. Used to tune the exponential backoff algorithm of retries to write to Azure table. Default is 20.
 
 ### Design Rationale:
 
@@ -165,7 +166,6 @@ A natural question that might be asked is why not to rely completely on [Apache 
 2) **Direct failure detection** - when using ZK's group membership with ephemeral nodes the failure detection is performed between the Orleans servers (ZK clients) and ZK servers. This may not necessarily correlate with the actual network problems between Orleans servers. _Our desire was that the failure detection would accurately reflect the intra-cluster state of the communication._ Specifically, in our design, if an Orleans silo cannot communicate with the `MembershipTable` it is not considered dead and can keep working. As opposite to that, have we used ZK group membership with ephemeral nodes a disconnection from a ZK server may cause an Orleans silo (ZK client) to be declared dead, while it may actually be alive and fully functional.
 
 3) **Portability and flexibility** - as part of Orleans's philosophy, we do not want to force a strong dependence on any particular technology, but rather have a flexible design where different components can be easily switched with different implementations. This is exactly the purpuse that `MembershipTable` abstraction serves.
-
 
 
 ### Acknowledgements:
