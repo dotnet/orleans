@@ -18,7 +18,7 @@ Currently implemented stream providers support a number of configuration options
 
 **Simple Message Stream Provider Configuration**. SMS Stream Provider currently supports only a single configuration option:
 
-1. **FireAndForgetDelivery**: this option specifies if the messages sent by SMS stream producer are sent as fire and forget without the way to know if they were delivered or not. When FireAndForgetDelivery is set to false (messages are sent not as FireAndForget), the stream producer's call `stream.OnNext()` returns a Task that represents the processing status of the stream consumer. If this Task succeeds, the producer knows for sure that the message was delivered and processed successfully. If FireAndForgetDelivery is set to true, the returned Task only expresses that the Orleans runtime has accepted the message and queued it for further delivery. The default value for FireAndForgetDelivery is false. 
+1. **FireAndForgetDelivery**: this option specifies if the messages sent by SMS stream producer are sent as fire and forget without the way to know if they were delivered or not. When FireAndForgetDelivery is set to false (messages are sent not as FireAndForget), the stream producer's call `stream.OnNext()` returns a Task that represents the processing status of the stream consumer. If this Task succeeds, the producer knows for sure that the message was delivered and processed successfully. If FireAndForgetDelivery is set to true, the returned Task only expresses that the Orleans runtime has accepted the message and queued it for further delivery. The default value for FireAndForgetDelivery is false.
 
 **Persistent Stream Provider Configuration**. All persistent stream providers support the following configuration options:
 
@@ -42,12 +42,12 @@ If you want to use a different queueing technology, you need to write a queue ad
 1. Start by defining a `MyQueueFactory` class that implements [**`IQueueAdapterFactory`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs). You need to:
 
      a. Initialize the factory: read the passed config values, potentially allocate some data structures if you need to, etc.
-     
+
      b. Implement a method that returns your `IQueueAdapter`.
-     
+
      c. Implement a method that returns `IQueueAdapterCache`. Theoretically, you can build your own `IQueueAdapterCache`, but you don't have to. It is a good idea just to allocate and return an Orleans `SimpleQueueAdapterCache`.
-     
-     d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you don't have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`. 
+
+     d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you don't have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`.
 
 2. Implement `MyQueueAdapter` class that implements the [**`IQueueAdapter`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs) interface, which is an interfaces that manages access to a **sharded queue**. `IQueueAdapter` manages access to a set of queues/queue partitions (those are the queues that were returned by `IStreamQueueMapper`). It provides an ability to enqueue a message in a specified the queue and create an `IQueueAdapterReceiver` for a particular queue.
 
@@ -73,8 +73,8 @@ It is also possible to write a completely new Stream Provider. In such a case th
 
 We currently do not envision scenarios where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenario, we would like to hear about it and work together on simplifying writing new Stream Providers.
 
-##Next
-Back to the [Orleans documentation](../) 
+## Next
+Back to the [Orleans documentation](../)
 
 Back to the [Orleans Streams ](./)
 

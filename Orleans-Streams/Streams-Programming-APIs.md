@@ -4,15 +4,15 @@ title: Orleans Streams Programming APIs
 ---
 {% include JB/setup %}
 
-Applications interact with streams via APIs that are very similar to the well known [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx). The main difference is that Orleans stream extensions are **asynchronous**, to make processing more efficient in Orleans' distributed and scalable compute fabric. 
+Applications interact with streams via APIs that are very similar to the well known [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx). The main difference is that Orleans stream extensions are **asynchronous**, to make processing more efficient in Orleans' distributed and scalable compute fabric.
 
 ### Async Stream<a name="Async-Stream"></a>
 
 An application starts by using a *stream provider* to get a handle to a stream. You can read more about stream providers [here](http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers), but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:
 
 ``` csharp
-IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
-IAsyncStream<T> stream = streamProvider.GetStream<T>(Guid, "MyStreamNamespace"); 
+IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider");
+IAsyncStream<T> stream = streamProvider.GetStream<T>(Guid, "MyStreamNamespace");
 ```
 
 Application can get a reference to the stream provider either by calling the `GetStreamProvider` method on the `Grain` class when inside a grain, or by calling `GrainClient.GetStreamProvider()` method when on the client.
@@ -22,7 +22,7 @@ Application can get a reference to the stream provider either by calling the `Ge
 
 ### Producing and Consuming<a name="Producing-and-Consuming"></a>
 
-`IAsyncStream<T>` implements both 
+`IAsyncStream<T>` implements both
 [**`Orleans.Streams.IAsyncObserver<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObserver.cs) and
 [**`Orleans.Streams.IAsyncObservable<T>`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObservable.cs) interfaces.
 That way an application can use the stream either to produce new events into the stream by using `Orleans.Streams.IAsyncObserver<T>` or to subscribe to and consume events from a stream by using `Orleans.Streams.IAsyncObservable<T>`.
@@ -41,13 +41,13 @@ public interface IAsyncObservable<T>
 }
 ```
 
-To produce events into the stream, an application just calls 
+To produce events into the stream, an application just calls
 
 ``` csharp
 await stream.OnNextAsync<T>(event)
 ```
 
-To subscribe to a stream, an application calls  
+To subscribe to a stream, an application calls
 
 ``` csharp
 StreamSubscriptionHandle<T> subscriptionHandle = await stream.SubscribeAsync(IAsyncObserver)
@@ -77,13 +77,13 @@ IList<StreamSubscriptionHandle<T>> allMyHandles = await IAsyncStream<T>.GetAllSu
 
 If the producer of a stream dies (or its grain is deactivated), there is nothing it needs to do. Next time this grain wants to produce more events it can get the stream handle again and produce new events in the same way.
 
-Consumer logic is a little bit more involved. As we said before, once consumer grain subscribed to a stream, this subscription is valid until it explicitly unsubscribes. If the consumer of the stream dies (or its grain is deactivated) and new event is generated on the stream, the consumer grain will be automatically re-activated (just like any regular Orleans grain is automatically activated upon message to it). The only thing that the grain code needs to do now is to provide a `IAsyncObserver<T>` to process the data. The consumer basically need to re-attach processing logic as part of `OnActivateAsync` method. To do that it can call: 
+Consumer logic is a little bit more involved. As we said before, once consumer grain subscribed to a stream, this subscription is valid until it explicitly unsubscribes. If the consumer of the stream dies (or its grain is deactivated) and new event is generated on the stream, the consumer grain will be automatically re-activated (just like any regular Orleans grain is automatically activated upon message to it). The only thing that the grain code needs to do now is to provide a `IAsyncObserver<T>` to process the data. The consumer basically need to re-attach processing logic as part of `OnActivateAsync` method. To do that it can call:
 
 ``` csharp
 StreamSubscriptionHandle<int> newHandle = await subscriptionHandle.ResumeAsync(IAsyncObserver)
 ```
 
-The consumer uses the previous handle it got when it first subscribed in order to "resume processing". Notice that `ResumeAsync` merely updates an existing subscription with the new instance of `IAsyncObserver` logic and does not change the fact that this consumer is already subscribed to this stream. 
+The consumer uses the previous handle it got when it first subscribed in order to "resume processing". Notice that `ResumeAsync` merely updates an existing subscription with the new instance of `IAsyncObserver` logic and does not change the fact that this consumer is already subscribed to this stream.
 
 How the consumer has an old subscriptionHandle? There are 2 options. The consumer may have persisted the handle it was given back from the original `SubscribeAsync` operation and can use it now. Alternatively, if the consumer does not have the handle, it can ask the `IAsyncStream<T>` for all its active subscription handles, by calling:
 
@@ -103,12 +103,12 @@ In addition, Orleans Streams also support **"Implicit Subscriptions"**. In this 
 
 Grain implementation class of type `MyGrainType` can declare an attribute `[ImplicitStreamSubscription("MyStreamNamespace")]`. This tells the streaming runtime that when an event is generated on a stream whose identity is GUID XXX and `"MyStreamNamespace"` namespace, it should be delivered to grain whose identity is XXX of type `MyGrainType`. That is, the runtime maps stream `<XXX, MyStreamNamespace>` to consumer grain `<XXX, MyGrainType>`.
 
-The presence  of `ImplicitStreamSubscription`causes the streaming runtime to automatically subscribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wants events to be processed. Essentially, it need to attach the `IAsyncObserver`. Therefore, when the grain is activated, the grain code inside `OnActivateAsync` needs to call: 
+The presence  of `ImplicitStreamSubscription`causes the streaming runtime to automatically subscribe this grain to a stream and deliver the stream events to it. However, the grain code still needs to tell the runtime how it wants events to be processed. Essentially, it need to attach the `IAsyncObserver`. Therefore, when the grain is activated, the grain code inside `OnActivateAsync` needs to call:
 
 ``` csharp
-IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider"); 
-IAsyncStream<T> stream = streamProvider.GetStream<T>(this.GetPrimaryKey(), "MyStreamNamespace"); 
-StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObserver<T>);  
+IStreamProvider streamProvider = base.GetStreamProvider("SimpleStreamProvider");
+IAsyncStream<T> stream = streamProvider.GetStream<T>(this.GetPrimaryKey(), "MyStreamNamespace");
+StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObserver<T>);
 ```
 
 ### Writing Subscription Logic<a name="Writing-Subscription-Logic"></a>
@@ -153,9 +153,9 @@ The order of events delivery between an individual producer and an individual co
 
 With SMS the producer explicitly controls the order of events seen by the consumer by controlling the way he publishes them. By default (if the `FireAndForget` options for SMS provider is set to false) and if the producer awaits every `OnNextAsync` call, the events arrive in FIFO order. In SMS it is up to the producer to decide how to handle delivery failures that will be indicated by a broken `Task` returned by the `OnNextAsync` call.
 
-Azure Queue streams do not guarantee FIFO order, since the underlying Azure Queues do not guarantee order in failure cases (they do guarantee FIFO order in failure free executions). When a producer produces the event into Azure Queue, if the enqueue operation failed, it is up to the producer to attempt another enqueue and later on deal with potential duplicates messages. On the delivery side, Orleans Streaming runtime dequeues the event from the Azure Queue and attempts to deliver it for processing to consumers. Orleans Streaming runtime deletes the event from the queue only upon successful processing. If the delivery or processing failed, the event is not delete from the queue and will automatically re-appear in the queue much later. The Streaming runtime will try to deliver it again, thus potentially breaking the FIFO order. The described behaivour matches the regular semantics of Azure Queues.  
+Azure Queue streams do not guarantee FIFO order, since the underlying Azure Queues do not guarantee order in failure cases (they do guarantee FIFO order in failure free executions). When a producer produces the event into Azure Queue, if the enqueue operation failed, it is up to the producer to attempt another enqueue and later on deal with potential duplicates messages. On the delivery side, Orleans Streaming runtime dequeues the event from the Azure Queue and attempts to deliver it for processing to consumers. Orleans Streaming runtime deletes the event from the queue only upon successful processing. If the delivery or processing failed, the event is not delete from the queue and will automatically re-appear in the queue much later. The Streaming runtime will try to deliver it again, thus potentially breaking the FIFO order. The described behaivour matches the regular semantics of Azure Queues.
 
-**Application Defined Order**: To deal with the above ordering issues, application can optionally specify its own ordering. This is achived via a notion of [**`StreamSequenceToken`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs). `StreamSequenceToken` is an opaque `IComparable` object that can be used to order events. 
+**Application Defined Order**: To deal with the above ordering issues, application can optionally specify its own ordering. This is achived via a notion of [**`StreamSequenceToken`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs). `StreamSequenceToken` is an opaque `IComparable` object that can be used to order events.
 A producer can pass an optional `StreamSequenceToken` to the `OnNext` call. This `StreamSequenceToken` will be passed all the way to the consumer and will be delivered together with the event. That way, application can reason and reconstruct it's order independently from the streaming runtime.
 
 ### Rewindable Streams<a name="Rewindable-Streams"></a>
@@ -166,17 +166,17 @@ The consumer of a rewindable stream can pass a `StreamSequenceToken` to the `Sub
 
 The ability to rewind a stream is very useful in recovery scenarios. For example, consider a grain that subscribes to a stream and periodically checkpoints its state together with the latest sequence token. When recovering from a failure, the grain can re-subscribe to the same stream from the latest checkpointed sequence token, thereby recovering without losing any events that were generated since the last checkpoint.
 
-**Current Status of Rewindable Streams:** 
+**Current Status of Rewindable Streams:**
 Both SMS and Azure Queue providers are not-rewindable  and Orleans currently does not include an implementation of rewindable streams. We are actively working on this.
 
 
 ### Stateless Automatically Scaled-Out Processing<a name="Stateless-Automatically-Scaled-Out-Processing"></a>
 
-By default Orleans Streaming is targeted to support a large number of relatively small streams, each is processed by one or more statefull grains. Collectively, the processing of all the streams together is sharded among a large number of regular (statefull) grains. The application code controls this sharding by assigning stream ids, grain ids and explicitly subscribing. **The goal is sharded statefull processing**. 
+By default Orleans Streaming is targeted to support a large number of relatively small streams, each is processed by one or more statefull grains. Collectively, the processing of all the streams together is sharded among a large number of regular (statefull) grains. The application code controls this sharding by assigning stream ids, grain ids and explicitly subscribing. **The goal is sharded statefull processing**.
 
 However, there is also an interesting scenario of **automatically scaled-out stateless processing**. In this scenario application has a small number of streams (or even one large stream) and the goal is stateless processing. For example, a global stream of all messages for all events and the processing involving some kind of decoding/deciphering and potentially forwarding them for further statefull processing into another set of streams. The stateless scaled-out stream processing can be supported in Orleans via `StatelessWorker` grains.
 
-**Current Status of Stateless Automatically Scaled-Out Processing:** 
+**Current Status of Stateless Automatically Scaled-Out Processing:**
 This is currently not implemented (due to priority constrains). An attempt to subscribe to a stream from a `StatelessWorker` grain will result in undefined behavior. [We are currently considering to support this option](https://github.com/dotnet/orleans/issues/433).
 
 ### Grains and Orleans Clients<a name="Grains0and-Orleans-Clients"></a>
@@ -186,7 +186,7 @@ Orleans streams work **uniformly across grains and Orleans clients**. That is, e
 
 ### Fully Managed and Reliable Streaming Pub-Sub<a name="Fully-Managed-and-Reliable-Streaming-Pub-Sub"></a>
 
-To track stream subscriptions, Orleans uses a runtime component called **Streaming Pub-Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers. 
+To track stream subscriptions, Orleans uses a runtime component called **Streaming Pub-Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers.
 
 Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub component itself is implemented as grains (called `PubSubRendezvousGrain`) and it is using Orleans Declarative Persistence for those grain. `PubSubRendezvousGrain` uses storage provider named `PubSubStore`. As with any grain, you can designate an implementation for a storage provider.  For Streaming Pub-Sub you can change the implementation of the `PubSubStore` in the config file:
 
@@ -224,9 +224,9 @@ It is also possible to register a stream provider programatically, via calling o
 ``` csharp
 public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
 
-public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStreamProvider 
+public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStreamProvider
 ```
 on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
 
-##Next
+## Next
 [Orleans Stream Providers](Stream-Providers)

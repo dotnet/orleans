@@ -16,29 +16,29 @@ We refer by the word "queue" to any durable storage technology that can ingest s
 All Orleans Persistent Stream Providers share a common implementation [**`PersistentStreamProvider`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/PersistentStreams/PersistentStreamProvider.cs).
 This generic stream provider is parametrized with a technology specific [**`IQueueAdapter`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs).
 
-When stream producer generates a new stream item and calls `stream.OnNext()`, 
+When stream producer generates a new stream item and calls `stream.OnNext()`,
 Orleans Streaming Runtime invokes the appropriate method on the `IQueueAdapter` of that stream provider that
 enqueues the item directly into an appropriate queue.
 
 ### Pulling Agents<a name="Pulling-Agents"></a>
 
-At the heart of the Persistent Stream Provider are the pulling agents. 
-Pulling agents pull events from a set of durable queues and deliver them to the application code in grains that consumes them.  One can think of the pulling agents as a distributed "micro-service" -- a partitioned, highly available, and elastic distributed component. 
+At the heart of the Persistent Stream Provider are the pulling agents.
+Pulling agents pull events from a set of durable queues and deliver them to the application code in grains that consumes them.  One can think of the pulling agents as a distributed "micro-service" -- a partitioned, highly available, and elastic distributed component.
 The pulling agents run inside the same silos that host application grains and are fully managed by the Orleans Streaming Runtime.
 
 ### StreamQueueMapper and StreamQueueBalancer<a name="StreamQueueMapper-and-StreamQueueBalancer"></a>
 
-Pulling agents are parametrized with `IStreamQueueMapper` and `StreamQueueBalancerType`. 
+Pulling agents are parametrized with `IStreamQueueMapper` and `StreamQueueBalancerType`.
 
 [**`IStreamQueueMapper`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs)
 provides a list of all queues and is also responsible for mapping streams to queues.
 That way, the producer side of the Persistent Stream Provider know which queue to enqueue the message into.
 
-[**`StreamQueueBalancerType`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/PersistentStreams/StreamQueueBalancerType.cs) 
-expresses the way queues are balanced across Orleans silos and agents. 
+[**`StreamQueueBalancerType`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/PersistentStreams/StreamQueueBalancerType.cs)
+expresses the way queues are balanced across Orleans silos and agents.
 The goal is to assign queues to agents in a balanced way, to prevent bottlenecks and support elasticity.
-When new silo is added to the Orleans cluster, queues are automatically rebalanced across the old and new silos. 
-StreamQueueBalancer allows to customize that process. Orleans has a number of built in StreamQueueBalancers, 
+When new silo is added to the Orleans cluster, queues are automatically rebalanced across the old and new silos.
+StreamQueueBalancer allows to customize that process. Orleans has a number of built in StreamQueueBalancers,
 to support different balancing scenarios (large and small number of queues) and different environments (Azure, on prem, static).
 
 ### Pulling Protocol<a name="Pulling-Protocol"></a>
@@ -65,5 +65,5 @@ The latter is provided by the built-in Orleans messaging delivery mechanism. Eve
 
 With regard to bringing stream events from the queue to the agent Orleans Streaming provides a new special Backpressure mechanism. Since the agent decouples de-queuing of events from the queue and delivering them to consumers, it is possible that a single slow consumer will fall behind so much that the `IQueueCache` will fill up. To prevent `IQueueCache` from growing indefinitely, we limit its size (the size limit is configurable). However, the agent never throws away undelivered events. Instead, when the cache starts to fill up, the agents slows the rate of dequeing events from the queue. That way, we can "ride" the slow delivery periods by adjusting the rate at which we consume from the queue ("backpressure") and get back into fast consumption rate later on. To detect the "slow delivery" valleys the `IQueueCache` uses an internal data structure of cache buckets that track the progress of delivery of events to individual stream consumer. This results in a very responsive and self-adjusting systems.
 
-##Next
+## Next
 [Orleans Streams Extensibility](Streams-Extensibility)
