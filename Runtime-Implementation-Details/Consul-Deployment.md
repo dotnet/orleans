@@ -122,7 +122,7 @@ Decoding the string will give you the actual Orleans Membership data:
 
 **http://localhost:8500/v1/KV/orleans/MyOrleansDeployment/[SiloAddress]**
 
-```js
+```
 {
     "Hostname": "[YOUR_MACHINE_NAME]",
     "ProxyPort": 22222,
