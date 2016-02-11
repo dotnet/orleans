@@ -97,10 +97,10 @@ namespace UnitTests.RemindersTest
 
 
         [TestMethod, TestCategory("Reminders"), TestCategory("MySql")]
-        public async Task RemindersTable_MySql_UpsertReminderParallel()
+        public async Task RemindersTable_MySql_RemindersTest()
         {
             await Initialize();
-            await ReminderTablePluginTests.ReminderTableUpsertParallel(reminder);
+            await ReminderTablePluginTests.ReminderTableTest(reminder);
         }
     }
 }
