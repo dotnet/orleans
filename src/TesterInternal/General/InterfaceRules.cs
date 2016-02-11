@@ -1,8 +1,11 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using UnitTests.Grains;
 using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
 
 namespace UnitTests.General
@@ -124,6 +127,30 @@ namespace UnitTests.General
         }
 
         public TestContext TestContext { get; set; }
+
+        [TestMethod, TestCategory("BVT"), TestCategory("JSON")]
+        public void JSON_JsonEchoGrain_IsConcreteGrainClass()
+        {
+            Type grainClass = typeof(JsonEchoGrain);
+
+            IEnumerable<string> complaints;
+            bool isConcreteGrainClass = TypeUtils.IsConcreteGrainClass(grainClass, out complaints);
+            if (complaints != null)
+            {
+                foreach (string problem in complaints)
+                {
+                    Console.WriteLine(problem);
+                }
+            }
+
+            Type grainMarker = typeof(IGrain);
+            Type grainBase = typeof(Grain);
+            Assert.IsTrue(grainMarker.IsAssignableFrom(grainClass), "{0} is {1}", grainClass, grainMarker);
+            Assert.IsTrue(grainBase.IsAssignableFrom(grainClass), "{0} is {1}", grainClass, grainBase);
+            Assert.IsTrue(grainBase.GetTypeInfo().IsAssignableFrom(grainClass), "{0} is {1}", grainClass, grainBase);
+
+            Assert.IsTrue(isConcreteGrainClass, "IsConcreteGrainClass {0}", grainClass);
+        }
 
         #region simple interfaces
 
