@@ -896,6 +896,14 @@ namespace UnitTests.Grains
 
         private readonly int _instanceFilterValue2 = _staticFilterValue2;
 
+        private Logger logger;
+
+        public override Task OnActivateAsync()
+        {
+            logger = GetLogger("SerializationTestGrain-" + IdentityString);
+            return base.OnActivateAsync();
+        }
+
         public Task Test_Serialize_Func()
         {
             Func<int, bool> staticFilterFunc = i => i == _staticFilterValue3;
@@ -963,7 +971,7 @@ namespace UnitTests.Grains
             foreach (
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
-                Console.WriteLine("{0} -- Compare value={1}", what, val);
+                logger.Verbose("{0} -- Compare value={1}", what, val);
                 Assert.AreEqual(func1(val), func2(val), "{0} -- Wrong function after round-trip of {1} with value={2}",
                     what, func1, val);
             }
@@ -977,7 +985,7 @@ namespace UnitTests.Grains
             foreach (
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
-                Console.WriteLine("{0} -- Compare value={1}", what, val);
+                logger.Verbose("{0} -- Compare value={1}", what, val);
                 Assert.AreEqual(pred1(val), pred2(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}",
                     what, pred1, val);
             }

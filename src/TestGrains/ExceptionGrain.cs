@@ -47,5 +47,30 @@ namespace UnitTests.Grains
             var otherGrain = GrainFactory.GetGrain<IExceptionGrain>(otherGrainId);
             return otherGrain.ThrowsAggregateExceptionWrappingInvalidOperationException();
         }
+
+        public Task ThrowsSynchronousInvalidOperationException()
+        {
+            throw new InvalidOperationException("Test exception");
+        }
+
+        public Task ThrowsMultipleExceptionsAggregatedInFaultedTask()
+        {
+            var tcs = new TaskCompletionSource<object>();
+            tcs.SetException(new[]
+            {
+                new InvalidOperationException("Test exception 1"),
+                new InvalidOperationException("Test exception 2"),
+            });
+
+            return tcs.Task;
+        }
+
+        public Task ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions()
+        {
+            throw new AggregateException(
+                "Test AggregateException message",
+                new InvalidOperationException("Test exception 1"),
+                new InvalidOperationException("Test exception 2"));
+        }
     }
 }

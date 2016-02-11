@@ -41,6 +41,14 @@ namespace Orleans.CodeGeneration
             new ReadOnlyDictionary<string, byte[]>(new Dictionary<string, byte[]>());
 
         /// <summary>
+        /// Loads the code generator on demand
+        /// </summary>
+        public static void Initialize()
+        {
+            var codegen = CodeGeneratorInstance.Value;
+        }
+
+        /// <summary>
         /// Ensures code for the <paramref name="input"/> assembly has been generated and loaded.
         /// </summary>
         /// <param name="input">

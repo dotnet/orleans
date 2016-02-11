@@ -499,5 +499,18 @@ namespace Orleans.Runtime.Configuration
                     break;
             }
         }
+
+        /// <summary>
+        /// Retuurns a ClientConfiguration object for connecting to a local silo (for testing).
+        /// </summary>
+        /// <param name="gatewayPort">Client gateway TCP port</param>
+        /// <returns>ClientConfiguration object that can be passed to GrainClient class for initialization</returns>
+        public static ClientConfiguration LocalhostSilo(int gatewayPort = 40000)
+        {
+            var config = new ClientConfiguration {GatewayProvider = GatewayProviderType.Config};
+            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, gatewayPort));
+
+            return config;
+        }
     }
 }

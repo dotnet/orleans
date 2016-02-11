@@ -23,9 +23,15 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class ChainedGrain : Grain<ChainedGrainState>, IChainedGrain
     {
+        private Logger logger;
+
+        public override Task OnActivateAsync()
+        {
+            logger = GetLogger("ChainedGrain-" + IdentityString);
+            return base.OnActivateAsync();
+        }
+
         #region IChainedGrain Members
-
-
 
         Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 
 
@@ -60,16 +66,12 @@ namespace UnitTests.Grains
         {
             if ((nextIsSet && State.Next != null) || (!nextIsSet && State.Next == null))
             {
-                //Console.ForegroundColor = ConsoleColor.Green;
-                //Console.WriteLine(String.Format("Id={0} validated successfully: Next={1}", Id, Next));
-                //Console.ResetColor();
+                // logger.Verbose("Id={0} validated successfully: Next={1}", State.Id, State.Next);
                 return TaskDone.Done;
             }
 
             string msg = String.Format("ChainGrain Id={0} is in an invalid state. Next={1}", State.Id, State.Next);
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(msg);
-            Console.ResetColor();
+            logger.Warn(0, msg);
             throw new OrleansException(msg);
         }
 

@@ -1,18 +1,17 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -24,11 +23,9 @@ using UnitTests.Tester;
 namespace UnitTests.StorageTests
 {
     /// <summary>
-    /// PersistenceGrainTests using AzureStore - Requires access to external Azure storage
+    /// Base_PersistenceGrainTests - a base class for testing persistence providers
     /// </summary>
-    [TestClass]
-    [DeploymentItem("Config_AzureTableStorage.xml")]
-    public class PersistenceGrainTests_AzureStore : HostedTestClusterPerFixture
+    public abstract class Base_PersistenceGrainTests_AzureStore : HostedTestClusterPerFixture
     {
         private readonly double timingFactor;
 
@@ -38,32 +35,12 @@ namespace UnitTests.StorageTests
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
 
-        private static readonly Guid initialServiceId = Guid.NewGuid();
-
-        private static readonly TestingSiloOptions testSiloOptions = new TestingSiloOptions
-        {
-            SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            AdjustConfig = config =>
-            {
-                config.Globals.ServiceId = initialServiceId;
-            }
-        };
-
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(testSiloOptions);
-        }
-
-        public PersistenceGrainTests_AzureStore()
+        public Base_PersistenceGrainTests_AzureStore()
         {
             timingFactor = TestUtils.CalibrateTimings();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_AzureStore_Delete()
+        protected async Task Grain_AzureStore_Delete()
         {
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -81,8 +58,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, val, "Value after Delete + New Write");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_AzureStore_Read()
+        protected async Task Grain_AzureStore_Read()
         {
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -92,8 +68,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, val, "Initial value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_GuidKey_AzureStore_Read_Write()
+        protected async Task Grain_GuidKey_AzureStore_Read_Write()
         {
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -115,8 +90,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, val, "Value after Re-Read");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_LongKey_AzureStore_Read_Write()
+        protected async Task Grain_LongKey_AzureStore_Read_Write()
         {
             long id = random.Next();
             IAzureStorageTestGrain_LongKey grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain_LongKey>(id);
@@ -138,8 +112,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, val, "Value after Re-Read");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_LongKeyExtended_AzureStore_Read_Write()
+        protected async Task Grain_LongKeyExtended_AzureStore_Read_Write()
         {
             long id = random.Next();
             string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
@@ -169,8 +142,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(extKey, extKeyValue, "Extended Key");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_GuidKeyExtended_AzureStore_Read_Write()
+        protected async Task Grain_GuidKeyExtended_AzureStore_Read_Write()
         {
             var id = Guid.NewGuid();
             string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
@@ -200,8 +172,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(extKey, extKeyValue, "Extended Key");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_Generic_AzureStore_Read_Write()
+        protected async Task Grain_Generic_AzureStore_Read_Write()
         {
             long id = random.Next();
 
@@ -224,8 +195,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, val, "Value after Re-Read");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_Generic_AzureStore_DiffTypes()
+        protected async Task Grain_Generic_AzureStore_DiffTypes()
         {
             long id1 = random.Next();
             long id2 = id1;
@@ -289,10 +259,11 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expected3, val3, "Value after Re-Read - 3");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public async Task Grain_AzureStore_SiloRestart()
+        protected async Task Grain_AzureStore_SiloRestart()
         {
+            var initialServiceId = this.HostedCluster.Globals.ServiceId;
             var initialDeploymentId = this.HostedCluster.DeploymentId;
+
             Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
@@ -324,8 +295,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, val, "Value after Re-Read");
         }
 
-        [TestMethod, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
-        public void Persistence_Perf_Activate()
+        protected void Persistence_Perf_Activate()
         {
             const string testName = "Persistence_Perf_Activate";
             int n = LoopIterations_Grain;
@@ -336,11 +306,10 @@ namespace UnitTests.StorageTests
                 grainNoState => grainNoState.PingAsync(),
                 grainMemory => grainMemory.DoSomething(),
                 grainMemoryStore => grainMemoryStore.GetValue(),
-                grainAzureTable => grainAzureTable.GetValue());
+                grainAzureStore => grainAzureStore.GetValue());
         }
 
-        [TestMethod, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
-        public void Persistence_Perf_Write()
+        protected void Persistence_Perf_Write()
         {
             const string testName = "Persistence_Perf_Write";
             int n = LoopIterations_Grain;
@@ -351,11 +320,10 @@ namespace UnitTests.StorageTests
                 grainNoState => grainNoState.EchoAsync(testName),
                 grainMemory => grainMemory.DoWrite(n),
                 grainMemoryStore => grainMemoryStore.DoWrite(n),
-                grainAzureTable => grainAzureTable.DoWrite(n));
+                grainAzureStore => grainAzureStore.DoWrite(n));
         }
 
-        [TestMethod, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
-        public void Persistence_Perf_Write_Reread()
+        protected void Persistence_Perf_Write_Reread()
         {
             const string testName = "Persistence_Perf_Write_Read";
             int n = LoopIterations_Grain;
@@ -366,76 +334,23 @@ namespace UnitTests.StorageTests
                 grainNoState => grainNoState.EchoAsync(testName),
                 grainMemory => grainMemory.DoWrite(n),
                 grainMemoryStore => grainMemoryStore.DoWrite(n),
-                grainAzureTable => grainAzureTable.DoWrite(n));
+                grainAzureStore => grainAzureStore.DoWrite(n));
 
             // Timings for Activate
             RunPerfTest(n, testName + "--ReRead", target,
                 grainNoState => grainNoState.GetLastEchoAsync(),
                 grainMemory => grainMemory.DoRead(),
                 grainMemoryStore => grainMemoryStore.DoRead(),
-                grainAzureTable => grainAzureTable.DoRead());
+                grainAzureStore => grainAzureStore.DoRead());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public void AzureStore_ConvertToFromStorageFormat_GrainReference()
-        {
-            // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
-            Guid id = Guid.NewGuid();
-            IUser grain = GrainClient.GrainFactory.GetGrain<IUser>(id);
-
-            var initialState = new GrainStateContainingGrainReferences { Grain = grain };
-            var entity = new AzureTableStorage.GrainStateEntity();
-            var storage = new AzureTableStorage();
-            storage.InitLogger(logger);
-            storage.ConvertToStorageFormat(initialState, entity);
-            Assert.IsNotNull(entity.Data, "Entity.Data");
-            var convertedState = new GrainStateContainingGrainReferences();
-            convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
-            Assert.IsNotNull(convertedState, "Converted state");
-            Assert.AreEqual(initialState.Grain, convertedState.Grain, "Grain");
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public void AzureStore_ConvertToFromStorageFormat_GrainReference_List()
-        {
-            // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
-            Guid[] ids = {Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()};
-            IUser[] grains = new IUser[3];
-            grains[0] = GrainClient.GrainFactory.GetGrain<IUser>(ids[0]);
-            grains[1] = GrainClient.GrainFactory.GetGrain<IUser>(ids[1]);
-            grains[2] = GrainClient.GrainFactory.GetGrain<IUser>(ids[2]);
-
-            var initialState = new GrainStateContainingGrainReferences();
-            foreach (var g in grains)
-            {
-                initialState.GrainList.Add(g);
-                initialState.GrainDict.Add(g.GetPrimaryKey().ToString(), g);
-            }
-            var entity = new AzureTableStorage.GrainStateEntity();
-            var storage = new AzureTableStorage();
-            storage.InitLogger(logger);
-            storage.ConvertToStorageFormat(initialState, entity);
-            Assert.IsNotNull(entity.Data, "Entity.Data");
-            var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
-            Assert.IsNotNull(convertedState, "Converted state");
-            Assert.AreEqual(initialState.GrainList.Count, convertedState.GrainList.Count, "GrainList size");
-            Assert.AreEqual(initialState.GrainDict.Count, convertedState.GrainDict.Count, "GrainDict size");
-            for (int i = 0; i < grains.Length; i++)
-            {
-                string iStr = ids[i].ToString();
-                Assert.AreEqual(initialState.GrainList[i], convertedState.GrainList[i], "GrainList #{0}", i);
-                Assert.AreEqual(initialState.GrainDict[iStr], convertedState.GrainDict[iStr], "GrainDict #{0}", i);
-            }
-            Assert.AreEqual(initialState.Grain, convertedState.Grain, "Grain");
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public void Persistence_Silo_StorageProvider_Azure()
+       
+        protected void Persistence_Silo_StorageProvider_Azure(Type providerType)
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                string provider = typeof(AzureTableStorage).FullName;
+                string provider = providerType.FullName;
                 List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
                 Assert.IsTrue(providers.Contains(provider), "No storage provider found: {0}", provider);
             }
@@ -444,7 +359,7 @@ namespace UnitTests.StorageTests
         #region Utility functions
         // ---------- Utility functions ----------
 
-        private void RunPerfTest(int n, string testName, TimeSpan target,
+        protected void RunPerfTest(int n, string testName, TimeSpan target,
             Func<IEchoTaskGrain, Task> actionNoState,
             Func<IPersistenceTestGrain, Task> actionMemory,
             Func<IMemoryStorageTestGrain, Task> actionMemoryStore,

@@ -44,7 +44,7 @@ namespace UnitTests.Tester
             Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
             foreach (var pair in statuses)
             {
-                Console.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                logger.Info("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
                 Assert.AreEqual(
                     SiloStatus.Active,
                     pair.Value,
