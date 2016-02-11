@@ -9,7 +9,7 @@ title: Grain Persistence
 1. Allow different grain types to use different types of storage providers (e.g., one uses Azure table, and one uses SQL Azure) or the same type of storage provider but with different configurations (e.g., both use Azure table, but one uses storage account #1 and one uses storage account #2)
 2. Allow configuration of a storage provider instance to be swapped (e.g., Dev-Test-Prod) with just config file changes, and no code changes required.
 3. Provide a framework to allow additional storage providers to be written later, either by the Orleans team or others.
-4. Provide a minimal set of production-grade storage providers, both to demonstrate viability of the storage provider framework, and cover common storage types that will be used by a majority of users. Phase 1 will ship with a non-persistent in-memory store for developer testing scenarios, and a persistent unsharded Azure table storage provider.
+4. Provide a minimal set of production-grade storage providers
 5. Storage providers have complete control over how they store grain state data in persistent backing store. Corollary: Orleans is not providing a comprehensive ORM storage solution, but allows custom storage providers to support specific ORM requirements as and when required.
 
 ## Grain Persistence API
@@ -111,9 +111,9 @@ The following attributes can be added to the `<Provider />` element to configure
 
 ```xml
 <Provider Type="Orleans.Storage.ShardedStorageProvider" Name="ShardedStorage">
-    <Provider ... />
-    <Provider ... />
-    <Provider ... />
+    <Provider />
+    <Provider />
+    <Provider />
 </Provider>
 ```
 Simple storage provider for writing grain state data shared across a number of other storage providers.
@@ -137,8 +137,8 @@ The storage provider instance to use for a given grain type is determined by the
 
 Different grain types can use different configured storage providers, even if both are the same type: for example, two different Azure table storage provider instances, connected to different Azure storage accounts (see config file example above).
 
-For the Phase 1 implementation, all configuration details for storage providers will be defined statically in the silo configuration that is read at silo startup.
-There will be _no_ mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
+All configuration details for storage providers is defined statically in the silo configuration that is read at silo startup.
+There are _no_ mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
 However, this is a prioritization / workload constraint rather than a fundamental design constraint.
 
 ## State Storage APIs
