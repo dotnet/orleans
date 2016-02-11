@@ -45,12 +45,85 @@ The Orleans Provider Manager framework provides a mechanism to specify & registe
         <Provider Type="Orleans.Storage.MemoryStorage" Name="DevStore" />
         <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"
             DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1" />
-        <Provider Type="Orleans.Storage.AzureTableStorage" Name="store2"
+        <Provider Type="Orleans.Storage.AzureBlobStorage" Name="store2"
             DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2"  />
     </StorageProviders>
 ```
 
-Note: storage provider types `Orleans.Storage.AzureTableStorage` and `Orleans.Storage.MemoryStorage` are two standard storage providers built in to the Orleans runtime.
+## Configuring Storage Providers
+
+### AzureTableStorage
+
+```xml
+<Provider Type="Orleans.Storage.AzureTableStorage" Name="TableStore"
+    DataConnectionString="UseDevelopmentStorage=true" />
+```
+
+The following attributes can be added to the `<Provider />` element to configure the provider:
+
+* __`DataConnectionString="..."`__ (mandatory) - The Azure storage connection string to use
+* __`TableName="OrleansGrainState"`__ (optional) - The table name to use in table storage, defaults to `OrleansGrainState`
+* __`DeleteStateOnClear="false"`__ (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to `false`
+* __`UseJsonFormat="false"`__ (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to `false`
+
+> __Note:__ state should not exceed 64KB, a limit imposed by Table Storage.
+
+### AzureBlobStorage
+
+```xml
+<Provider Type="Orleans.Storage.AzureTableStorage" Name="BlobStore"
+    DataConnectionString="UseDevelopmentStorage=true" />
+```
+
+The following attributes can be added to the `<Provider />` element to configure the provider:
+
+* __`DataConnectionString="..."`__ (mandatory) - The Azure storage connection string to use
+* __`ContainerName="grainstate"`__ (optional) - The blob storage container to use, defaults to `grainstate`
+* __`PreserveReferencesHandling="false"`__ (optional) - Preserves reference handling for objects during json serialization, defaults to `false`
+* __`SerializeTypeNames="false"`__ (optional) - Serializes the names of the types in the json, defaults to `false`
+* __`UseFullAssemblyNames="false"`__ (optional) - Serializes types with full assembly names (true) or simple (false), defaults to `false`
+* __`IndentJSON="false"`__ (optional) - Indents the serialized json, defaults to `false`
+
+<!--
+### SqlStorageProvider
+
+```xml
+<Provider Type="Orleans.SqlUtils.StorageProvider.SqlStorageProvider" Name="SqlStore"
+    ConnectionString="..." />
+```
+* __`ConnectionString="..."`__ (mandatory) - The SQL connection string to use
+* __`MapName=""`__ ???
+* __`ShardCredentials=""`__ ???
+* __`StateMapFactoryType=""`__ (optional) defaults to `Lazy`???
+* __`Ignore="false"`__ (optional) - If true, disables persistence, defaults to `false`
+-->
+
+### MemoryStorage
+
+```xml
+<Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStorage"  />
+```
+> __Note:__ This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.
+
+* __`NumStorageGrains="10"`__ (optional) - The number of grains to use to store the state, defaults to `10`
+
+### ShardedStorageProvider
+
+```xml
+<Provider Type="Orleans.Storage.ShardedStorageProvider" Name="ShardedStorage">
+    <Provider ... />
+    <Provider ... />
+    <Provider ... />
+</Provider>
+```
+Simple storage provider for writing grain state data shared across a number of other storage providers.
+
+A consistent hash function (default is Jenkins Hash) is used to decide which
+shard (in the order they are defined in the config file) is responsible for storing
+state data for a specified grain, then the Read / Write / Clear request
+is bridged over to the appropriate underlying provider for execution.
+
+## Notes on Storage Providers
 
 If there is no `[StorageProvider]` attribute specified for a `Grain<T>` grain class, then a provider named `Default` will be searched for instead.
 If not found then this is treated as a missing storage provider.

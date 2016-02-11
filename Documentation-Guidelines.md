@@ -4,37 +4,37 @@ title: Documentation guidelines
 ---
 {% include JB/setup %}
 
-The Orleans documentation is built in [Markdown](https://help.github.com/articles/markdown-basics/). 
+The Orleans documentation is built in [Markdown](https://help.github.com/articles/markdown-basics/).
 We use a few simple conventions to ensure a homogeneous style throughout the full set of documents.
 
 These standards are being introduced.
 If you have issues with these guidelines then raise an issue or a Pull Request.
 If you find documentation that fails to meet the guidelines, then make a fix and submit a pull request. Also if you are using windows 10 you can go to the store and find free MarkDown editors like [this](https://www.microsoft.com/store/apps/9wzdncrdd2p3)
 
-#Structure
+# Structure
 
-##Language
+## Language
 The documentation will follow US-English spelling.
 Desktop tools like http://markdownpad.com have spell checking features.
 
-##Paragraph structure
+## Paragraph structure
 Each sentence should be written on a single line, and only one sentence per line.
 This makes merging changes easier and also helps identify verbose language.
 
 Paragraphs in Markdown are just one or more lines of consecutive text followed by one or more blank lines.
 
-##Headings
+## Headings
 Heading should be used to structure a document.
-Avoid using other emphasis features like ALLCAPS, *Italics* or **bold** to identify a new topic. 
+Avoid using other emphasis features like ALLCAPS, *Italics* or **bold** to identify a new topic.
 Using a header is not only more consistent, but also allows linking to the header.
 
-##Footers
+## Footers
 At the end of a page, it is helpful to link to the next logical page in the documentation.
-If the page is the last in a sub-section then linking back to the index page is useful. 
+If the page is the last in a sub-section then linking back to the index page is useful.
 
-#Styles
+# Styles
 
-##Code formatting
+## Code formatting
 Blocks of example code should be formatted with the triple back tick format followed by the language
 
 	``` csharp
@@ -71,11 +71,11 @@ If showing text that is an output (e.g. text file content or console output) you
 	1 said: Thanks!
 	0 said: Thanks!
 
- 
 
-##File names and paths
-When referencing a filename, directory/folder or URI then use standard italics to format. 
-This can be done by surrounding the string with either with a single asterisk (`*`) or a single underscore (`_`) 
+
+## File names and paths
+When referencing a filename, directory/folder or URI then use standard italics to format.
+This can be done by surrounding the string with either with a single asterisk (`*`) or a single underscore (`_`)
 
 Examples:
 
@@ -84,26 +84,26 @@ Examples:
 * *../src/Grain.cs*
 
 
-##Tables
+## Tables
 
 Markdown supports [tabular data](https://help.github.com/articles/github-flavored-markdown/#tables).
 Tables could be used to structure data so that is is easily consumable for the reader.
 
-Suffix |     Unit 
+Suffix |     Unit
 -------|-------------
-ms     | millisecond(s)  
-s      | second(s)  
-m      | minute(s)    
+ms     | millisecond(s)
+s      | second(s)
+m      | minute(s)
 
 
-##Links 
+## Links
 When referencing another concept, the concept should be linked to.
 Forward and backward references with in a page can be linked to via the header. e.g. link back to [Structure](#structure)
-Links to other documents can either link to the page, or a sub-section/header within the page. 
+Links to other documents can either link to the page, or a sub-section/header within the page.
 External links should be exposed as a the full link e.g. https://github.com/dotnet/roslyn
 
 
 
-#Contribution
+# Contribution
 The Orleans documentation is managed as Markdown files in a Git repository hosted on [GitHub in the gh-pages branch](https://github.com/dotnet/orleans/tree/gh-pages).
 See the [GitHub Pages](https://pages.github.com/) documentation on how to use the `gh-pages` branch convention for "Project site" documents.
