@@ -9,7 +9,7 @@ title: Grain Persistence
 1. Allow different grain types to use different types of storage providers (e.g., one uses Azure table, and one uses SQL Azure) or the same type of storage provider but with different configurations (e.g., both use Azure table, but one uses storage account #1 and one uses storage account #2)
 2. Allow configuration of a storage provider instance to be swapped (e.g., Dev-Test-Prod) with just config file changes, and no code changes required.
 3. Provide a framework to allow additional storage providers to be written later, either by the Orleans team or others.
-4. Provide a minimal set of production-grade storage providers, both to demonstrate viability of the storage provider framework, and cover common storage types that will be used by a majority of users. Phase 1 will ship with a non-persistent in-memory store for developer testing scenarios, and a persistent unsharded Azure table storage provider.
+4. Provide a minimal set of production-grade storage providers
 5. Storage providers have complete control over how they store grain state data in persistent backing store. Corollary: Orleans is not providing a comprehensive ORM storage solution, but allows custom storage providers to support specific ORM requirements as and when required.
 
 ## Grain Persistence API
@@ -45,12 +45,85 @@ The Orleans Provider Manager framework provides a mechanism to specify & registe
         <Provider Type="Orleans.Storage.MemoryStorage" Name="DevStore" />
         <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"
             DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1" />
-        <Provider Type="Orleans.Storage.AzureTableStorage" Name="store2"
+        <Provider Type="Orleans.Storage.AzureBlobStorage" Name="store2"
             DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2"  />
     </StorageProviders>
 ```
 
-Note: storage provider types `Orleans.Storage.AzureTableStorage` and `Orleans.Storage.MemoryStorage` are two standard storage providers built in to the Orleans runtime.
+## Configuring Storage Providers
+
+### AzureTableStorage
+
+```xml
+<Provider Type="Orleans.Storage.AzureTableStorage" Name="TableStore"
+    DataConnectionString="UseDevelopmentStorage=true" />
+```
+
+The following attributes can be added to the `<Provider />` element to configure the provider:
+
+* __`DataConnectionString="..."`__ (mandatory) - The Azure storage connection string to use
+* __`TableName="OrleansGrainState"`__ (optional) - The table name to use in table storage, defaults to `OrleansGrainState`
+* __`DeleteStateOnClear="false"`__ (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to `false`
+* __`UseJsonFormat="false"`__ (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to `false`
+
+> __Note:__ state should not exceed 64KB, a limit imposed by Table Storage.
+
+### AzureBlobStorage
+
+```xml
+<Provider Type="Orleans.Storage.AzureTableStorage" Name="BlobStore"
+    DataConnectionString="UseDevelopmentStorage=true" />
+```
+
+The following attributes can be added to the `<Provider />` element to configure the provider:
+
+* __`DataConnectionString="..."`__ (mandatory) - The Azure storage connection string to use
+* __`ContainerName="grainstate"`__ (optional) - The blob storage container to use, defaults to `grainstate`
+* __`PreserveReferencesHandling="false"`__ (optional) - Preserves reference handling for objects during json serialization, defaults to `false`
+* __`SerializeTypeNames="false"`__ (optional) - Serializes the names of the types in the json, defaults to `false`
+* __`UseFullAssemblyNames="false"`__ (optional) - Serializes types with full assembly names (true) or simple (false), defaults to `false`
+* __`IndentJSON="false"`__ (optional) - Indents the serialized json, defaults to `false`
+
+<!--
+### SqlStorageProvider
+
+```xml
+<Provider Type="Orleans.SqlUtils.StorageProvider.SqlStorageProvider" Name="SqlStore"
+    ConnectionString="..." />
+```
+* __`ConnectionString="..."`__ (mandatory) - The SQL connection string to use
+* __`MapName=""`__ ???
+* __`ShardCredentials=""`__ ???
+* __`StateMapFactoryType=""`__ (optional) defaults to `Lazy`???
+* __`Ignore="false"`__ (optional) - If true, disables persistence, defaults to `false`
+-->
+
+### MemoryStorage
+
+```xml
+<Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStorage"  />
+```
+> __Note:__ This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.
+
+* __`NumStorageGrains="10"`__ (optional) - The number of grains to use to store the state, defaults to `10`
+
+### ShardedStorageProvider
+
+```xml
+<Provider Type="Orleans.Storage.ShardedStorageProvider" Name="ShardedStorage">
+    <Provider />
+    <Provider />
+    <Provider />
+</Provider>
+```
+Simple storage provider for writing grain state data shared across a number of other storage providers.
+
+A consistent hash function (default is Jenkins Hash) is used to decide which
+shard (in the order they are defined in the config file) is responsible for storing
+state data for a specified grain, then the Read / Write / Clear request
+is bridged over to the appropriate underlying provider for execution.
+
+## Notes on Storage Providers
 
 If there is no `[StorageProvider]` attribute specified for a `Grain<T>` grain class, then a provider named `Default` will be searched for instead.
 If not found then this is treated as a missing storage provider.
@@ -64,8 +137,8 @@ The storage provider instance to use for a given grain type is determined by the
 
 Different grain types can use different configured storage providers, even if both are the same type: for example, two different Azure table storage provider instances, connected to different Azure storage accounts (see config file example above).
 
-For the Phase 1 implementation, all configuration details for storage providers will be defined statically in the silo configuration that is read at silo startup.
-There will be _no_ mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
+All configuration details for storage providers is defined statically in the silo configuration that is read at silo startup.
+There are _no_ mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
 However, this is a prioritization / workload constraint rather than a fundamental design constraint.
 
 ## State Storage APIs

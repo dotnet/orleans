@@ -66,7 +66,7 @@ The silo host project includes a configuration file _DevTestServerConfiguration.
                         DataConnectionString="UseDevelopmentStorage=true" />
         -->
         <!--
-        <Provider Type="Orleans.Storage.AzureTableStorage"
+        <Provider Type="Orleans.Storage.AzureBlobStorage"
                         Name="AzureStore"
                         DataConnectionString="[removed for brevity]" />
         -->
@@ -83,7 +83,9 @@ In the case of the latter, you will have to create a Azure storage account and e
 
 With one of those enabled, we're ready to tackle the grain code.
 
-Note: The built-in storage provider classes `Orleans.Storage.MemoryStorage` and `Orleans.Storage.AzureTableStorage` are in the  _OrleansProviders.dll_ and _OrleansAzureUtils.dll_ assemblies respectively, so make sure those assemblies are referenced in your silo worker role project with _CopyLocal='True'_.
+> Note: The built-in storage provider classes `Orleans.Storage.AzureBlobStorage` and `Orleans.Storage.AzureTableStorage`
+are in the  _OrleansAzureUtils.dll_ assembly, make sure this assembly is referenced in your silo worker role project
+with _CopyLocal='True'_.
 
 ## Declaring State
 
