@@ -101,7 +101,7 @@ namespace Orleans.Storage
             
             if (useJsonFormat)
             {
-                jsonSettings = jsonSettings = OrleansJsonSerializer.SerializerSettings;
+                jsonSettings = OrleansJsonSerializer.SerializerSettings;
             }
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
