@@ -4,6 +4,11 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+
+## Community Virtual Meetup #8.5
+[Networking discussion hosted by @Jason-Bragg](https://youtu.be/F1Yoe88HEvg) 
+February 11th 2016
+
 ## Community Virtual Meetup #8
 [Orleans core team present the roadmap](https://www.youtube.com/watch?v=4BiCyhvSOs4) 
 January 21st 2016
