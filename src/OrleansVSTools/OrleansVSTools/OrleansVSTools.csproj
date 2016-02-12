@@ -187,32 +187,32 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Core.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Core.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Core.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Core.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.CounterControl.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.CounterControl.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.CounterControl.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.CounterControl.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansHost.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansHost.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansHost.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansHost.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansProviders.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansProviders.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansProviders.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansProviders.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansRuntime.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Server.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Server.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Server.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Server.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.0.0\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg">
@@ -235,8 +235,8 @@
       <Link>Packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Newtonsoft.Json.6.0.8\Newtonsoft.Json.6.0.8.nupkg">
-      <Link>Packages\Newtonsoft.Json.6.0.8.nupkg</Link>
+    <Content Include="..\..\packages\Newtonsoft.Json.7.0.1\Newtonsoft.Json.7.0.1.nupkg">
+      <Link>Packages\Newtonsoft.Json.7.0.1.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="..\..\packages\System.Collections.Immutable.1.1.36\System.Collections.Immutable.1.1.36.nupkg">
@@ -247,12 +247,12 @@
       <Link>Packages\System.Reflection.Metadata.1.0.21.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Grains.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Templates.Grains.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.1.0.nupkg</Link>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <None Include="OrleansVSTools.snk" />
