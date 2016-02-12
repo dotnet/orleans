@@ -497,6 +497,12 @@ namespace Orleans.Runtime.Configuration
                     if (!UseAzureSystemStore && !HasStaticGateways)
                         throw new ArgumentException("Config does not specify GatewayProviderType, and also does not have the adequate defaults: no Azure and or Gateway element(s) are specified.","GatewayProvider");
                     break;
+                case GatewayProviderType.SqlServer:
+                    if (!UseSqlSystemStore)
+                        throw new ArgumentException("Config specifies SqlServer based GatewayProviderType, but DeploymentId or DataConnectionString are not specified or not complete.", "GatewayProvider");
+                    break;
+                case GatewayProviderType.ZooKeeper:
+                    break;
             }
         }
 
