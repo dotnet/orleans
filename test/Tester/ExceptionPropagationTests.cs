@@ -12,7 +12,7 @@ namespace UnitTests.General
     /// </summary>
     public class ExceptionPropagationTests : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task BasicExceptionPropagation()
         {
             IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -33,7 +33,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ExceptionPropagationDoesNoFlattenAggregateExceptions()
         {
             IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -45,7 +45,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", doubleNestedEx.Message);
         }
 
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task TaskCancelationPropagation()
         {
             IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -53,7 +53,7 @@ namespace UnitTests.General
                 () => grain.Canceled());
         }
 
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task GrainForwardingExceptionPropagation()
         {
             IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -76,7 +76,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SynchronousExceptionThrownShouldResultInFaultedTask()
         {
             IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -107,7 +107,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception 2", secondEx.Message);
         }
 
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SynchronousAggregateExceptionThrownShouldResultInFaultedTaskWithOriginalAggregateExceptionUnmodifiedAsInnerException()
         {
             IExceptionGrain grain = GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
