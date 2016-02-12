@@ -77,15 +77,12 @@ namespace Orleans.CodeGenerator
                 source = GenerateSourceCode(code);
 
                 // Compile the code and load the generated assembly.
-                if (logger.IsVerbose3)
-                {
-                    logger.LogWithoutBulkingAndTruncating(
-                        Severity.Verbose3,
-                        ErrorCode.CodeGenSourceGenerated,
-                        "Generating assembly {0} with source:\n{1}",
-                        assemblyName,
-                        source);
-                }
+                logger.LogWithoutBulkingAndTruncating(
+                    Severity.Verbose3,
+                    ErrorCode.CodeGenSourceGenerated,
+                    "Generating assembly {0} with source:\n{1}",
+                    assemblyName,
+                    source);
             }
             
             var compilation =
