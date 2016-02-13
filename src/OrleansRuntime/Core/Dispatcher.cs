@@ -362,8 +362,6 @@ namespace Orleans.Runtime
                 // Now we can actually scheduler processing of this request
                 targetActivation.RecordRunning(message);
                 var context = new SchedulingContext(targetActivation);
-                if (Message.WriteMessagingTraces) 
-                    message.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
                 Scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context), context);
@@ -384,8 +382,6 @@ namespace Orleans.Runtime
                 RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + targetActivation);
                 return;
             }
-            if (Message.WriteMessagingTraces) 
-                message.AddTimestamp(Message.LifecycleTag.EnqueueWaiting);
             
             bool enqueuedOk = targetActivation.EnqueueMessage(message);
             if (!enqueuedOk)

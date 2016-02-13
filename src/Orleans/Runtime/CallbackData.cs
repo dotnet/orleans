@@ -144,8 +144,6 @@ namespace Orleans.Runtime
                     unregister();
                 }     
             }
-            if (Message.WriteMessagingTraces) response.AddTimestamp(Message.LifecycleTag.InvokeIncoming);
-            if (logger.IsVerbose2) logger.Verbose2("Message {0} timestamps: {1}", response, response.GetTimestampString());
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
                 ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);

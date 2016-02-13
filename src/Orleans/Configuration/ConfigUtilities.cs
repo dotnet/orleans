@@ -85,11 +85,6 @@ namespace Orleans.Runtime.Configuration
             {
                 config.TraceFilePattern = root.GetAttribute("TraceToFile");
             }
-            if (root.HasAttribute("WriteMessagingTraces"))
-            {
-                config.WriteMessagingTraces = ParseBool(root.GetAttribute("WriteMessagingTraces"),
-                    "Invalid boolean value for WriteMessagingTraces attribute on Tracing element for " + nodeName);
-            }
             if (root.HasAttribute("LargeMessageWarningThreshold"))
             {
                 config.LargeMessageWarningThreshold = ParseInt(root.GetAttribute("LargeMessageWarningThreshold"),
@@ -468,7 +463,6 @@ namespace Orleans.Runtime.Configuration
             }
             sb.Append("     Trace to Console: ").Append(config.TraceToConsole).AppendLine();
             sb.Append("     Trace File Name: ").Append(string.IsNullOrWhiteSpace(config.TraceFileName) ? "" : Path.GetFullPath(config.TraceFileName)).AppendLine();
-            sb.Append("     Write Messaging Traces: ").Append(config.WriteMessagingTraces).AppendLine();
             sb.Append("     LargeMessageWarningThreshold: ").Append(config.LargeMessageWarningThreshold).AppendLine();
             sb.Append("     PropagateActivityId: ").Append(config.PropagateActivityId).AppendLine();
             sb.Append("     BulkMessageLimit: ").Append(config.BulkMessageLimit).AppendLine();

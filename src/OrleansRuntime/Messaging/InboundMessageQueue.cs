@@ -57,8 +57,6 @@ namespace Orleans.Runtime.Messaging
 
         public void PostMessage(Message msg)
         {
-            if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueIncoming);
-
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectQueueStats)
             {

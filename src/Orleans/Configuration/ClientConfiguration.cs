@@ -83,7 +83,6 @@ namespace Orleans.Runtime.Configuration
 
         public Severity DefaultTraceLevel { get; set; }
         public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
-        public bool WriteMessagingTraces { get; set; }
         public bool TraceToConsole { get; set; }
         public int LargeMessageWarningThreshold { get; set; }
         public bool PropagateActivityId { get; set; }
@@ -184,7 +183,6 @@ namespace Orleans.Runtime.Configuration
             TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
-            WriteMessagingTraces = false;
             LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;

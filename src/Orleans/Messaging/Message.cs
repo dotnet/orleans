@@ -41,7 +41,7 @@ namespace Orleans.Runtime
             TARGET_GRAIN,
             TARGET_SILO,
             TARGET_OBSERVER,
-            TIMESTAMPS,
+            TIMESTAMPS, // DEPRECATED - leave that enum value to maintain next enum numerical values
             IS_UNORDERED,
 
             PRIOR_MESSAGE_ID,
@@ -81,13 +81,9 @@ namespace Orleans.Runtime
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
         private static readonly TraceLogger logger;
-        private static readonly Dictionary<string, TransitionStats[,]> lifecycleStatistics;
-
-        internal static bool WriteMessagingTraces { get; set; }
         
         static Message()
         {
-            lifecycleStatistics = new Dictionary<string, TransitionStats[,]>();
             logger = TraceLogger.GetLogger("Message", TraceLogger.LoggerType.Runtime);
         }
 
@@ -536,10 +532,6 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (this.ContainsHeader(Header.TIMESTAMPS))
-            {
-                response.SetHeader(Header.TIMESTAMPS, this.GetHeader(Header.TIMESTAMPS));
-            }
             if (this.ContainsHeader(Header.DEBUG_CONTEXT))
             {
                 response.SetHeader(Header.DEBUG_CONTEXT, this.GetHeader(Header.DEBUG_CONTEXT));
@@ -552,7 +544,6 @@ namespace Orleans.Runtime
             {
                 response.SetHeader(Header.EXPIRATION, this.GetHeader(Header.EXPIRATION));
             }
-            if (Message.WriteMessagingTraces) response.AddTimestamp(LifecycleTag.CreateResponse);
 
             var contextData = RequestContext.Export();
             if (contextData != null)
@@ -680,193 +671,6 @@ namespace Orleans.Runtime
         {
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
-
-        #region Message timestamping
-
-        private class TransitionStats
-        {
-            ulong count;
-            TimeSpan totalTime;
-            TimeSpan maxTime;
-
-            public TransitionStats()
-            {
-                count = 0;
-                totalTime = TimeSpan.Zero;
-                maxTime = TimeSpan.Zero;
-            }
-
-            public void RecordTransition(TimeSpan time)
-            {
-                lock (this)
-                {
-                    count++;
-                    totalTime += time;
-                    if (time > maxTime)
-                    {
-                        maxTime = time;
-                    }
-                }
-            }
-
-            public override string ToString()
-            {
-                var sb = new StringBuilder();
-
-                if (count > 0)
-                {
-                    sb.AppendFormat("{0}\t{1}\t{2}", count, totalTime.Divide(count), maxTime);
-                }
-
-                return sb.ToString();
-            }
-        }
-
-        public void AddTimestamp(LifecycleTag tag)
-        {
-            if (logger.IsVerbose2)
-            {
-                if (LogVerbose(tag))
-                    logger.Verbose("Message {0} {1}", tag, this);
-                else if (logger.IsVerbose2)
-                    logger.Verbose2("Message {0} {1}", tag, this);
-            }
-
-            if (WriteMessagingTraces)
-            {
-                var now = DateTime.UtcNow;
-                var timestamp = new List<object> {tag, now};
-
-                object val;
-                List<object> list = null;
-                if (headers.TryGetValue(Header.TIMESTAMPS, out val))
-                {
-                    list = val as List<object>;
-                }
-                if (list == null)
-                {
-                    list = new List<object>();
-                    lock (headers)
-                    {
-                        headers[Header.TIMESTAMPS] = list;
-                    }
-                }
-                else if (list.Count > 0)
-                {
-                    var last = list[list.Count - 1] as List<object>;
-                    if (last != null)
-                    {
-                        var context = DebugContext;
-                        if (String.IsNullOrEmpty(context))
-                        {
-                            context = "Unspecified";
-                        }
-                        TransitionStats[,] entry;
-                        bool found;
-                        lock (lifecycleStatistics)
-                        {
-                            found = lifecycleStatistics.TryGetValue(context, out entry);
-                        }
-                        if (!found)
-                        {
-                            var newEntry = new TransitionStats[32, 32];
-                            for (int i = 0; i < 32; i++) for (int j = 0; j < 32; j++) newEntry[i, j] = new TransitionStats();
-                            lock (lifecycleStatistics)
-                            {
-                                if (!lifecycleStatistics.TryGetValue(context, out entry))
-                                {
-                                    entry = newEntry;
-                                    lifecycleStatistics.Add(context, entry);
-                                }
-                            }
-                        }
-                        int from = (int)(LifecycleTag)(last[0]);
-                        int to = (int)tag;
-                        entry[from, to].RecordTransition(now.Subtract((DateTime)last[1]));
-                    }
-                }
-                list.Add(timestamp);
-            }
-            if (OnTrace != null)
-                OnTrace(this, tag);
-        }
-
-        private static bool LogVerbose(LifecycleTag tag)
-        {
-            return tag == LifecycleTag.EnqueueOutgoing ||
-                   tag == LifecycleTag.CreateNewPlacement ||
-                   tag == LifecycleTag.EnqueueIncoming ||
-                   tag == LifecycleTag.InvokeIncoming;
-        }
-
-        public List<Tuple<string, DateTime>> GetTimestamps()
-        {
-            var result = new List<Tuple<string, DateTime>>();
-
-            object val;
-            List<object> list = null;
-            if (headers.TryGetValue(Header.TIMESTAMPS, out val))
-            {
-                list = val as List<object>;
-            }
-            if (list == null) return result;
-
-            foreach (object item in list)
-            {
-                var stamp = item as List<object>;
-                if ((stamp != null) && (stamp.Count == 2) && (stamp[0] is string) && (stamp[1] is DateTime))
-                {
-                    result.Add(new Tuple<string, DateTime>(stamp[0] as string, (DateTime)stamp[1]));
-                }
-            }
-            return result;
-        }
-
-        public string GetTimestampString(bool singleLine = true, bool includeTimes = true, int indent = 0)
-        {
-            var sb = new StringBuilder();
-
-            object val;
-            List<object> list = null;
-            if (headers.TryGetValue(Header.TIMESTAMPS, out val))
-            {
-                list = val as List<object>;
-            }
-            if (list == null) return sb.ToString();
-
-            bool firstItem = true;
-            var indentString = new string(' ', indent);
-            foreach (object item in list)
-            {
-                var stamp = item as List<object>;
-                if ((stamp == null) || (stamp.Count != 2) || (!(stamp[0] is string)) || (!(stamp[1] is DateTime)))
-                    continue;
-
-                if (!firstItem && singleLine)
-                {
-                    sb.Append(", ");
-                }
-                else if (!singleLine && (indent > 0))
-                {
-                    sb.Append(indentString);
-                }
-                sb.Append(stamp[0]);
-                if (includeTimes)
-                {
-                    sb.Append(" ==> ");
-                    var when = (DateTime)stamp[1];
-                    sb.Append(when.ToString("HH:mm:ss.ffffff"));
-                }
-                if (!singleLine)
-                {
-                    sb.AppendLine();
-                }
-                firstItem = false;
-            }
-            return sb.ToString();
-        }
-
-        #endregion
 
         #region Serialization
 
@@ -1003,8 +807,7 @@ namespace Orleans.Runtime
                         break;
                 }
             }
-            string times = this.GetStringHeader(Header.TIMESTAMPS);
-            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}{10}: {11}",
+            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}: {10}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
                 IsNewPlacement ? "NewPlacement " : "", // 2
@@ -1015,43 +818,8 @@ namespace Orleans.Runtime
                 Id, //7
                 ResendCount > 0 ? "[ResendCount=" + ResendCount + "]" : "", //8
                 ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //9
-                string.IsNullOrEmpty(times) ? "" : "[" + times + "]", //10
-                DebugContext); //11
+                DebugContext); //10
         }
-
-        /// <summary>
-        /// Tags used to identify points in the message processing lifecycle for logging.
-        /// Should be fewer than 32 since bit flags are used for filtering events.
-        /// </summary>
-        public enum LifecycleTag
-        {
-            Create = 0,
-            EnqueueOutgoing,
-            StartRouting,
-            AsyncRouting,
-            DoneRouting,
-            SendOutgoing,
-            ReceiveIncoming,
-            RerouteIncoming,
-            EnqueueForRerouting,
-            EnqueueForForwarding,
-            EnqueueIncoming,
-            DequeueIncoming,
-            CreateNewPlacement,
-            TaskIncoming,
-            TaskRedirect,
-            EnqueueWaiting,
-            EnqueueReady,
-            EnqueueWorkItem,
-            DequeueWorkItem,
-            InvokeIncoming,
-            CreateResponse,
-        }
-
-        /// <summary>
-        /// Global function that is set to monitor message lifecycle events
-        /// </summary>
-        internal static Action<Message, LifecycleTag> OnTrace { private get; set; }
 
         internal void SetTargetPlacement(PlacementResult value)
         {

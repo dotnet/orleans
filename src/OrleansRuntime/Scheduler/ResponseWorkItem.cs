@@ -24,7 +24,6 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
-            if (Message.WriteMessagingTraces) response.AddTimestamp(Message.LifecycleTag.DequeueWorkItem);
             target.HandleResponse(response);
         }
 

@@ -71,9 +71,6 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            if (Message.WriteMessagingTraces)
-                msg.AddTimestamp(Message.LifecycleTag.SendOutgoing);
-
             return true;
         }
 
