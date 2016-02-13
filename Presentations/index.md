@@ -10,14 +10,14 @@ title: Orleans Presentations
 
 * [Orleans Presentation from the 15th International Workshop on High Performance Transaction Systems (HPTS 2013)](http://www.hpts.ws/papers/2013/Bykov.pdf)
 
-* [Orleans Streaming Presentation from Virtual Meetup May 2015](http://dotnet.github.io/orleans/Presentations/Orleans Streaming - Virtual meetup - 5-22-2015.pptx)
-
 * [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx)
 
-* [Orleans Roadmap, Virtual Meetup January 21st 2016](http://dotnet.github.io/orleans/Presentations/Orleans Roadmap 1-21-2016.pptx)
+* [Uniform API is 42 - Virtual Meetup #3](http://dotnet.github.io/orleans/Presentations/(VM03) Uniform Api is 42.pptx)
 
-* [Uniform Api is 42 - Virtual Meetup #3](http://dotnet.github.io/orleans/Presentations/(VM03) Uniform Api is 42.pptx)
+* [Orleans Streaming - Virtual Meetup #5 - May 2015](http://dotnet.github.io/orleans/Presentations/Orleans Streaming - Virtual meetup - 5-22-2015.pptx)
 
 * [Orleankka Functional API for Orleans - Virtual Meetup #7](http://dotnet.github.io/orleans/Presentations/(VM07) Orleankka Functional API for Orleans.pptx)
+
+* [Orleans Roadmap - Virtual Meetup # 8 -January 21st 2016](http://dotnet.github.io/orleans/Presentations/Orleans Roadmap 1-21-2016.pptx)
 
 * [Walk In Distributed Systems Park With Orleans](http://dotnet.github.io/orleans/Presentations/(FWDAYSKIEV2016) Walk.In.Distributed.Systems.Park.With.Orleans.pptx)
