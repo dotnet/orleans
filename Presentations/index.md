@@ -18,6 +18,6 @@ title: Orleans Presentations
 
 * [Orleankka Functional API for Orleans - Virtual Meetup #7](http://dotnet.github.io/orleans/Presentations/(VM07) Orleankka Functional API for Orleans.pptx)
 
-* [Orleans Roadmap - Virtual Meetup # 8 -January 21st 2016](http://dotnet.github.io/orleans/Presentations/Orleans Roadmap 1-21-2016.pptx)
+* [Orleans Roadmap - Virtual Meetup # 8 - January 2016](http://dotnet.github.io/orleans/Presentations/Orleans Roadmap 1-21-2016.pptx)
 
 * [Walk In Distributed Systems Park With Orleans](http://dotnet.github.io/orleans/Presentations/(FWDAYSKIEV2016) Walk.In.Distributed.Systems.Park.With.Orleans.pptx)
