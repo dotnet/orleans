@@ -16,3 +16,9 @@ title: Orleans Presentations
 * [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx)
 
 * [Orleans Roadmap, Virtual Meetup January 21st 2016](http://dotnet.github.io/orleans/Presentations/Orleans Roadmap 1-21-2016.pptx)
+
+* [Uniform Api is 42 - Virtual Meetup #3](http://dotnet.github.io/orleans/Presentations/(VM03) Uniform Api is 42.pptx)
+
+* [Orleankka Functional API for Orleans - Virtual Meetup #7](http://dotnet.github.io/orleans/Presentations/(VM07) Orleankka Functional API for Orleans.pptx)
+*
+* [Walk In Distributed Systems Park With Orleans](http://dotnet.github.io/orleans/Presentations/(FWDAYSKIEV2016) Walk.In.Distributed.Systems.Park.With.Orleans.pptx)
