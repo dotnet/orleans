@@ -1001,6 +1001,9 @@ namespace Orleans.Runtime
                     case ResponseTypes.Rejection:
                         response = string.Format("{0} Rejection (info: {1}) ", RejectionType, RejectionInfo);
                         break;
+
+                    default:
+                        break;
                 }
             }
             string times = this.GetStringHeader(Header.TIMESTAMPS);
