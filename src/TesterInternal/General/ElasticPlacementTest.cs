@@ -85,9 +85,10 @@ namespace UnitTests.Elasticity
             logger.Info("Secondary.Silo.Metrics.ActivationCount = {0}", this.HostedCluster.Secondary.Silo.Metrics.ActivationCount);
             logger.Info("silo3.Silo.Metrics.ActivationCount = {0}", silo3.Silo.Metrics.ActivationCount);
             logger.Info("-----------------------------------------------------------------");
-            AssertIsInRange(this.HostedCluster.Primary.Silo.Metrics.ActivationCount, (perSilo * 6) / 3, leavy);
-            AssertIsInRange(this.HostedCluster.Secondary.Silo.Metrics.ActivationCount, (perSilo * 6) / 3, leavy);
-            AssertIsInRange(silo3.Silo.Metrics.ActivationCount, (perSilo * 6) / 3, leavy);
+            double expected = (6.0 * perSilo) / 3.0;
+            AssertIsInRange(this.HostedCluster.Primary.Silo.Metrics.ActivationCount, expected, leavy);
+            AssertIsInRange(this.HostedCluster.Secondary.Silo.Metrics.ActivationCount, expected, leavy);
+            AssertIsInRange(silo3.Silo.Metrics.ActivationCount, expected, leavy);
 
             logger.Info("\n\n\n----- Phase 3 -----\n\n");
             await AddTestGrains(perSilo);
@@ -99,12 +100,13 @@ namespace UnitTests.Elasticity
             logger.Info("Secondary.Silo.Metrics.ActivationCount = {0}", this.HostedCluster.Secondary.Silo.Metrics.ActivationCount);
             logger.Info("silo3.Silo.Metrics.ActivationCount = {0}", silo3.Silo.Metrics.ActivationCount);
             logger.Info("-----------------------------------------------------------------");
-            AssertIsInRange(this.HostedCluster.Primary.Silo.Metrics.ActivationCount, (9 * perSilo) / 3, leavy);
-            AssertIsInRange(this.HostedCluster.Secondary.Silo.Metrics.ActivationCount, (9 * perSilo) / 3, leavy);
-            AssertIsInRange(silo3.Silo.Metrics.ActivationCount, (9 * perSilo) / 3, leavy);
+            expected = (9.0 * perSilo) / 3.0;
+            AssertIsInRange(this.HostedCluster.Primary.Silo.Metrics.ActivationCount, expected, leavy);
+            AssertIsInRange(this.HostedCluster.Secondary.Silo.Metrics.ActivationCount, expected, leavy);
+            AssertIsInRange(silo3.Silo.Metrics.ActivationCount, expected, leavy);
 
             logger.Info("-----------------------------------------------------------------");
-            logger.Info("Test finished OK. Expected per silo = {0}", (9 * perSilo) / 3);
+            logger.Info("Test finished OK. Expected per silo = {0}", expected);
         }
 
         /// <summary>
@@ -142,12 +144,13 @@ namespace UnitTests.Elasticity
             logger.Info("Secondary.Silo.Metrics.ActivationCount = {0}", this.HostedCluster.Secondary.Silo.Metrics.ActivationCount);
             logger.Info("runtimes[1].Silo.Metrics.ActivationCount = {0}", runtimes[1].Silo.Metrics.ActivationCount);
             logger.Info("-----------------------------------------------------------------");
-            AssertIsInRange(this.HostedCluster.Primary.Silo.Metrics.ActivationCount, perSilo * 1.33, stopLeavy);
-            AssertIsInRange(this.HostedCluster.Secondary.Silo.Metrics.ActivationCount, perSilo * 1.33, stopLeavy);
-            AssertIsInRange(runtimes[1].Silo.Metrics.ActivationCount, perSilo * 1.33, stopLeavy);
+            double expected = perSilo * 1.33;
+            AssertIsInRange(this.HostedCluster.Primary.Silo.Metrics.ActivationCount, expected, stopLeavy);
+            AssertIsInRange(this.HostedCluster.Secondary.Silo.Metrics.ActivationCount, expected, stopLeavy);
+            AssertIsInRange(runtimes[1].Silo.Metrics.ActivationCount, expected, stopLeavy);
 
             logger.Info("-----------------------------------------------------------------");
-            logger.Info("Test finished OK. Expected per silo = {0}", (double)perSilo * 1.33);
+            logger.Info("Test finished OK. Expected per silo = {0}", expected);
         }
 
         /// <summary>
