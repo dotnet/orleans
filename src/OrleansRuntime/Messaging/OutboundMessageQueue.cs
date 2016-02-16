@@ -84,9 +84,6 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (Message.WriteMessagingTraces)
-                msg.AddTimestamp(Message.LifecycleTag.EnqueueOutgoing);
-
             // Shortcut messages to this silo
             if (msg.TargetSilo.Equals(messageCenter.MyAddress))
             {

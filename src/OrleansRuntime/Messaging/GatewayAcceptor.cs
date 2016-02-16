@@ -52,9 +52,6 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (Message.WriteMessagingTraces)
-                msg.AddTimestamp(Message.LifecycleTag.ReceiveIncoming);
-
             gatewayTrafficCounter.Increment();
 
             // Are we overloaded?
@@ -83,7 +80,6 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, MessageCenter.MyAddress);
                 }
 
-                if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.RerouteIncoming);
                 MessagingStatisticsGroup.OnMessageReRoute(msg);
                 MessageCenter.RerouteMessage(msg);
             }

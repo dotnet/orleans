@@ -301,7 +301,6 @@ namespace Orleans.Serialization
             // Enum names we need to recognize
             Register(typeof(Message.Categories));
             Register(typeof(Message.Directions));
-            Register(typeof(Message.LifecycleTag));
             Register(typeof(Message.RejectionTypes));
             Register(typeof(Message.ResponseTypes));
         }

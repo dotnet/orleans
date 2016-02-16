@@ -82,7 +82,6 @@ namespace Orleans.Runtime.Messaging
         private void ReceiveMessage(Message msg)
         {
             MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
-            if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.DequeueIncoming);
 
             ISchedulingContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
@@ -102,13 +101,11 @@ namespace Orleans.Runtime.Messaging
                 switch (msg.Direction)
                 {
                     case Message.Directions.Request:
-                        if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
                         MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
                         scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
                         break;
 
                     case Message.Directions.Response:
-                        if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
                         MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
                         scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
                         break;
