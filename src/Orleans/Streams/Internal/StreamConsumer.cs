@@ -53,7 +53,9 @@ namespace Orleans.Streams
         {
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
-            
+            if (observer is GrainReference)
+                throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", "observer");
+
             if (logger.IsVerbose) logger.Verbose("Subscribe Observer={0} Token={1}", observer, token);
             await BindExtensionLazy();
 
