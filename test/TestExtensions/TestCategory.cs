@@ -17,7 +17,7 @@ using Xunit.Sdk;
 /// </summary>
 
 [TraitDiscoverer("CategoryDiscoverer", "TestExtensions")]
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public class TestCategoryAttribute : Attribute, ITraitAttribute
 {
     public TestCategoryAttribute(string category) { }
