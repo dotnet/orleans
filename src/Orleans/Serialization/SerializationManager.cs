@@ -127,11 +127,18 @@ namespace Orleans.Serialization
 
         public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, bool useJsonFallbackSerializer = false)
         {
-            RegisterBuiltInSerializers();
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            AssemblyProcessor.Initialize();
-            RegisterSerializationProviders(serializationProviders);
-            fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+            try
+            {
+                RegisterBuiltInSerializers();
+                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                AssemblyProcessor.Initialize();
+                RegisterSerializationProviders(serializationProviders);
+                fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                throw ex.Flatten();
+            }
         }
 
         internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
