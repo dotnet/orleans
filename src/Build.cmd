@@ -44,19 +44,17 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
-@echo Build Release Installers =================
-
-SET CONFIGURATION=Release
-
 set STEP=VSIX
-@REM
-@REM Install Visual Studio SDK and uncomment the following lines 
-@REM to build Visual Studio project templates.
-@REM
-@REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%CMDHOME%\OrleansVSTools\OrleansVSTools.sln"
-@REM xcopy /s /y %CMDHOME%\SDK\VSIX %OutDir%\VSIX\
-@REM @if ERRORLEVEL 1 GOTO :ErrorStop
-@REM @echo BUILD ok for VSIX package for %PROJ%
+
+if "%BuildOrleansNuGet%" == "false" (
+    @echo Skipping building VSIX
+	@GOTO :EOF
+)
+
+SET OutDir=%OutDir%\VSIX
+"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%CMDHOME%\OrleansVSTools\OrleansVSTools.sln"
+@if ERRORLEVEL 1 GOTO :ErrorStop
+@echo BUILD ok for VSIX package for %PROJ%
 
 @echo ===== Build succeeded for %PROJ% =====
 @GOTO :EOF
