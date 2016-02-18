@@ -1,14 +1,15 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
 using Tester;
+using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.StreamingTests
 {
@@ -25,82 +26,43 @@ namespace UnitTests.StreamingTests
                     ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
                 }))
         {
-        }        
+        }
     }
 
-    public class SampleStreamingTests : OrleansTestingBase, IClassFixture<SampleStreamingTestsFixture>, IDisposable
+    [TestCategory("Streaming")]
+    public class SampleSmsStreamingTests : OrleansTestingBase, IClassFixture<SampleStreamingTestsFixture>
     {
-        private const string StreamNamespace = "SampleStreamNamespace"; 
-        private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
+        private const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-        private Guid streamId;
-        private string streamProvider;
-        
-        private string deploymentId;
-
-        public SampleStreamingTests(SampleStreamingTestsFixture fixture)
-        {
-            deploymentId = fixture.HostedCluster.DeploymentId;
-        }
-        
-        public void Dispose()
-        {
-            if (streamProvider != null && streamProvider.Equals(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME))
-            {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
-            }
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task SampleStreamingTests_1()
         {
             logger.Info("************************ SampleStreamingTests_1 *********************************");
-            streamId = Guid.NewGuid();
-            streamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-            await StreamingTests_Consumer_Producer(streamId, streamProvider);
+            var runner = new SampleStreamingTests(StreamProvider, logger);
+            await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_2()
         {
             logger.Info("************************ SampleStreamingTests_2 *********************************");
-            streamId = Guid.NewGuid();
-            streamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-            await StreamingTests_Producer_Consumer(streamId, streamProvider);
+            var runner = new SampleStreamingTests(StreamProvider, logger);
+            await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming" )]
+        [Fact, TestCategory("Functional")]
         public async Task SampleStreamingTests_3()
         {
-            logger.Info("************************ SampleStreamingTests_3 *********************************" );
-            streamId = Guid.NewGuid();
-            streamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-            await StreamingTests_Producer_InlineConsumer(streamId, streamProvider );
+            logger.Info("************************ SampleStreamingTests_3 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, logger);
+            await runner.StreamingTests_Producer_InlineConsumer(Guid.NewGuid());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task SampleStreamingTests_4()
-        {
-            logger.Info("************************ SampleStreamingTests_4 *********************************");
-            streamId = Guid.NewGuid();
-            streamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-            await StreamingTests_Consumer_Producer(streamId, streamProvider);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task SampleStreamingTests_5()
-        {
-            logger.Info("************************ SampleStreamingTests_5 *********************************");
-            streamId = Guid.NewGuid();
-            streamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-            await StreamingTests_Producer_Consumer(streamId, streamProvider);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional")]
         public async Task MultipleImplicitSubscriptionTest()
         {
             logger.Info("************************ MultipleImplicitSubscriptionTest *********************************");
-            streamId = Guid.NewGuid();
+            var streamId = Guid.NewGuid();
             const int nRedEvents = 5, nBlueEvents = 3;
 
             var provider = GrainClient.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
@@ -118,9 +80,59 @@ namespace UnitTests.StreamingTests
             Assert.AreEqual(nRedEvents, counters.Item1);
             Assert.AreEqual(nBlueEvents, counters.Item2);
         }
+    }
 
+    [TestCategory("Streaming")]
+    public class SampleAzureQueueStreamingTests : HostedTestClusterPerTest
+    {
+        private const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+        private SampleStreamingTestsFixture fixture;
 
-        private async Task StreamingTests_Consumer_Producer(Guid streamId, string streamProvider)
+        public override TestingSiloHost CreateSiloHost()
+        {
+            TestUtils.CheckForAzureStorage();
+            this.fixture = new SampleStreamingTestsFixture();
+            return fixture.HostedCluster;
+        }
+
+        public override void Dispose()
+        {
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, fixture.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            fixture.Dispose();
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task SampleStreamingTests_4()
+        {
+            logger.Info("************************ SampleStreamingTests_4 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, logger);
+            await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task SampleStreamingTests_5()
+        {
+            logger.Info("************************ SampleStreamingTests_5 *********************************");
+            var runner = new SampleStreamingTests(StreamProvider, logger);
+            await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
+        }
+    }
+
+    public class SampleStreamingTests
+    {
+        private const string StreamNamespace = "SampleStreamNamespace";
+        private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
+
+        private readonly string streamProvider;
+        private readonly Logger logger;
+
+        public SampleStreamingTests( string streamProvider, Logger logger)
+        {
+            this.streamProvider = streamProvider;
+            this.logger = logger;
+        }
+
+        public async Task StreamingTests_Consumer_Producer(Guid streamId)
         {
             // consumer joins first, producer later
             var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
@@ -140,7 +152,7 @@ namespace UnitTests.StreamingTests
             await consumer.StopConsuming();
         }
 
-        private async Task StreamingTests_Producer_Consumer(Guid streamId, string streamProvider)
+        public async Task StreamingTests_Producer_Consumer(Guid streamId)
         {
             // producer joins first, consumer later
             var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
@@ -161,7 +173,7 @@ namespace UnitTests.StreamingTests
             await consumer.StopConsuming();
         }
 
-        private async Task StreamingTests_Producer_InlineConsumer(Guid streamId, string streamProvider)
+        public async Task StreamingTests_Producer_InlineConsumer(Guid streamId)
         {
             // producer joins first, consumer later
             var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
