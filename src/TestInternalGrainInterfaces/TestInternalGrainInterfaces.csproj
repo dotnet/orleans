@@ -34,6 +34,10 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Core, Version=4.4.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -49,6 +53,7 @@
     <Compile Include="IClientAddressableTestRendezvousGrain.cs" />
     <Compile Include="IMultifacetFactoryTestGrain.cs" />
     <Compile Include="IMultifacetTestGrain.cs" />
+    <Compile Include="ISerializerPresenceTest.cs" />
     <Compile Include="IStressTestGrain.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -65,6 +70,9 @@
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
       <Name>TestGrainInterfaces</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->

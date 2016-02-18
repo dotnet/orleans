@@ -64,6 +64,7 @@
     <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="ReentrantTestSupportGrain.cs" />
     <Compile Include="ReminderTestGrain2.cs" />
+    <Compile Include="SerializerPresenceTestGrain.cs" />
     <Compile Include="StreamingGrain.cs" />
     <Compile Include="StreamLifecycleTestGrains.cs" />
     <Compile Include="StreamLifecycleTestInternalGrains.cs" />
