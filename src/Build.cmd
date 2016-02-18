@@ -6,6 +6,7 @@
 SET CMDHOME=%~dp0.
 if "%FrameworkDir%" == "" set FrameworkDir=%WINDIR%\Microsoft.NET\Framework
 if "%FrameworkVersion%" == "" set FrameworkVersion=v4.0.30319
+if "%VisualStudioVersion%" == "" set VisualStudioVersion=14.0
 
 SET MSBUILDEXEDIR=%FrameworkDir%\%FrameworkVersion%
 SET MSBUILDEXE=%MSBUILDEXEDIR%\MSBuild.exe
