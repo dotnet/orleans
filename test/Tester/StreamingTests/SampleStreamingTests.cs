@@ -1,29 +1,22 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
 using Tester;
+using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.StreamingTests
 {
     public class SampleStreamingTestsFixture : BaseClusterFixture
     {
         public SampleStreamingTestsFixture()
-            : base(CreateSiloHost())
-        {
-        }
-
-        private static TestingSiloHost CreateSiloHost()
-        {
-            TestUtils.CheckForAzureStorage();
-            return new TestingSiloHost(
+            : base(new TestingSiloHost(
                 new TestingSiloOptions
                 {
                     SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
@@ -31,7 +24,8 @@ namespace UnitTests.StreamingTests
                 new TestingClientOptions()
                 {
                     ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-                });
+                }))
+        {
         }
     }
 
@@ -89,20 +83,22 @@ namespace UnitTests.StreamingTests
     }
 
     [TestCategory("Streaming")]
-    public class SampleAzureQueueStreamingTests : OrleansTestingBase, IClassFixture<SampleStreamingTestsFixture>, IDisposable
+    public class SampleAzureQueueStreamingTests : HostedTestClusterPerTest
     {
         private const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        private readonly string deploymentId;
+        private SampleStreamingTestsFixture fixture;
 
-        public SampleAzureQueueStreamingTests(SampleStreamingTestsFixture fixture)
+        public override TestingSiloHost CreateSiloHost()
         {
             TestUtils.CheckForAzureStorage();
-            deploymentId = fixture.HostedCluster.DeploymentId;
+            this.fixture = new SampleStreamingTestsFixture();
+            return fixture.HostedCluster;
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, fixture.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            fixture.Dispose();
         }
 
         [Fact, TestCategory("Functional")]
