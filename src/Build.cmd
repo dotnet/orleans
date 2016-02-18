@@ -4,11 +4,16 @@
 @ECHO off
 
 SET CMDHOME=%~dp0.
-if "%FrameworkDir%" == "" set FrameworkDir=%WINDIR%\Microsoft.NET\Framework
-if "%FrameworkVersion%" == "" set FrameworkVersion=v4.0.30319
+if "%VisualStudioVersion%" == "" call "%VS140COMNTOOLS%VsDevCmd.bat"
+if "%VisualStudioVersion%" == "" (
+echo Could not find Visual Studio 14.0 in the system. Cannot continue.
+exit /b 1)
 
-SET MSBUILDEXEDIR=%FrameworkDir%\%FrameworkVersion%
+rem Get path to MSBuild Binaries
+if exist "%ProgramFiles%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles%\MSBuild\14.0\bin
+if exist "%ProgramFiles(x86)%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\MSBuild\14.0\bin
 SET MSBUILDEXE=%MSBUILDEXEDIR%\MSBuild.exe
+
 SET VERSION_FILE=%CMDHOME%\Build\Version.txt
 
 if EXIST "%VERSION_FILE%" (
@@ -51,8 +56,9 @@ if "%BuildOrleansNuGet%" == "false" (
 	@GOTO :EOF
 )
 
+set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
 SET OutDir=%OutDir%\VSIX
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%CMDHOME%\OrleansVSTools\OrleansVSTools.sln"
+"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for VSIX package for %PROJ%
 

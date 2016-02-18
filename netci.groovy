@@ -4,7 +4,7 @@ import jobs.generation.Utilities;
 
 def project = 'dotnet/orleans'
 // Define build string
-def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\Common7\\Tools\\VsDevCmd.bat" && Build.cmd && Test.cmd'''
+def buildString = '''call Build.cmd && Test.cmd'''
 
 // Generate the builds for debug and release
 
