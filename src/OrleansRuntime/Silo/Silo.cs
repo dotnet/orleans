@@ -186,7 +186,10 @@ namespace Orleans.Runtime
 
             logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC || !GCSettings.LatencyMode.Equals(GCLatencyMode.Batch))
+            {
                 logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on or with GCLatencyMode.Batch enabled - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\"> and <configuration>-<runtime>-<gcConcurrent enabled=\"false\"/>");
+                logger.Warn(ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
+            }
 
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on host {1} MachineName {2} at {3}, gen {4} --------------",
                 siloType, nodeConfig.DNSHostName, Environment.MachineName, here, generation);
