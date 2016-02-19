@@ -19,4 +19,4 @@ However, this is not as easy to do if a silo runs as part of an Azure Worker Rol
 
 *** **IMPORTANT NOTE** ***
 [Server garbage collection is available only on multiprocessor computers](https://msdn.microsoft.com/en-us/library/system.runtime.gcsettings.isservergc(v=vs.110).aspx). Therefore, 
-even if configure the Garbage Collection either via Application Configuration file (app.config or web.config) or via the scripts on the referred blog post, if the silo is running on a (virtual) machine with a single core, you will not get the benefits of `gcServer=true`.
+even if you configure the Garbage Collection either via Application Configuration file (app.config or web.config) or via the scripts on the referred blog post, if the silo is running on a (virtual) machine with a single core, you will not get the benefits of `gcServer=true`.
