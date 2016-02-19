@@ -18,4 +18,5 @@ For good performance, is it important to configure .NET garbage collection for t
 However, this is not as easy to do if a silo runs as part of an Azure Worker Role, which by default is configured to use workstation GC. This blog post shows how to set the same configuration for an Azure Worker Role -  http://blogs.msdn.com/b/cclayton/archive/2014/06/05/server-garbage-collection-mode-in-microsoft-azure.aspx
 
 *** **IMPORTANT NOTE** ***
-Even configuring the Garbage Collection by Application Configuration file (app.config or web.config) or by the scripts on the referred blog post, if the silo is running on a (virtual)machine with a single core, you will not have the benefits of `gcServer=true` and Orleans Runtime will still print warnings on log at silo startup, just as if the config wasn't set. The reason for that, is that those settings only take effect if you are running on a multi-core (virtual)machine.
+[Server garbage collection is available only on multiprocessor computers](https://msdn.microsoft.com/en-us/library/system.runtime.gcsettings.isservergc(v=vs.110).aspx). Therefore, 
+even if configure the Garbage Collection either via Application Configuration file (app.config or web.config) or via the scripts on the referred blog post, if the silo is running on a (virtual) machine with a single core, you will not get the benefits of `gcServer=true`.
