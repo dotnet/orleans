@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 
 namespace UnitTests.Serialization
 {
@@ -52,6 +53,17 @@ namespace UnitTests.Serialization
             var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
             settings.Converters.Add(new GuidJsonTestConverter());
             Do_Json_Guid_Test(settings);
+        }
+
+        [Fact(Skip = "Fix of issue #1484 is still pending"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        public void SerializationTests_Json_POCO_WithGuidConverter()
+        {
+            var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
+            settings.Converters.Add(new GuidJsonTestConverter());
+            var obj = new SimplePersistentGrain_State();
+            string objSerialized = JsonConvert.SerializeObject(obj, settings);
+            var objDeserialized = JsonConvert.DeserializeObject<object>(objSerialized, settings);
+            Assert.AreEqual(typeof(SimplePersistentGrain_State), objDeserialized.GetType());
         }
 
         private void Do_Json_Guid_Test(JsonSerializerSettings settings)
