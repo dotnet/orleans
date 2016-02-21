@@ -96,6 +96,7 @@
     <Compile Include="..\..\test\Tester\TestUtils.cs">
       <Link>Tester\TestUtils.cs</Link>
     </Compile>
+    <Compile Include="RemindersTest\AzureRemindersTableTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
@@ -181,7 +182,7 @@
     <Compile Include="MembershipTests\SqlServerMembershipTableTests.cs" />
     <Compile Include="QueuedTaskScheduler.cs" />
     <Compile Include="RemindersTest\MySqlRemindersTableTests.cs" />
-    <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
+    <Compile Include="RemindersTest\ReminderTableTestsBase.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="General\InternalSerializationTests.cs" />
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
