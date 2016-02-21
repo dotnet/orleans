@@ -23,7 +23,8 @@
       <xs:enumeration value="None" />
       <xs:enumeration value="SqlServer" />
       <xs:enumeration value="AzureTable" />
-	  <xs:enumeration value="ZooKeeper" />
+      <xs:enumeration value="ZooKeeper" />
+      <xs:enumeration value="Custom" />
     </xs:restriction>
   </xs:simpleType>
   <xs:simpleType name="LivenessType">
@@ -348,6 +349,20 @@
           accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config.
           So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
           If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConmfiguration.xml file.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="MembershipTableAssembly" type="xs:string" use="optional">
+    <xs:annotation>
+      <xs:documentation>
+        Fully qualified assembly to use for custom MembershipTable implementation. SystemStoreType must be 'Custom'.
+      </xs:documentation>
+    </xs:annotation>
+  </xs:attribute>
+    <xs:attribute name="ReminderTableAssembly" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Fully qualified assembly to use for custom RemindersTable implementation. SystemStoreType must be 'Custom'.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
