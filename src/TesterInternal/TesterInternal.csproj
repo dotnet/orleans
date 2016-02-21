@@ -130,7 +130,6 @@
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="General\TestingBootstrapProviders.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
-    <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
     <Compile Include="OrleansRuntime\Streams\CachedMessageBlockTests.cs" />
     <Compile Include="OrleansRuntime\Streams\FixedSizeBufferTests.cs" />
     <Compile Include="OrleansRuntime\Streams\FixedSizeObjectPoolTests.cs" />
@@ -190,7 +189,7 @@
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
-    <Compile Include="MembershipTests\MembershipTablePluginTests.cs" />
+    <Compile Include="MembershipTests\MembershipTableTestsBase.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureStore.cs" />
     <Compile Include="StorageTests\PersistenceProviderTests.cs" />
