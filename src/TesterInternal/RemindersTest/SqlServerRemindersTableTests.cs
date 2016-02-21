@@ -99,50 +99,5 @@ namespace UnitTests.RemindersTest
             await Initialize();
             await ReminderTablePluginTests.ReminderTableTest(reminder);
         }
-
-        #region sampleSpecificMembershipAndRemidersTableConfiguration
-        private readonly string sampleSpecificMembershipAndRemidersTableConfiguration = @"<?xml version=""1.0"" encoding=""utf-8""?>
-<OrleansConfiguration xmlns = ""urn:orleans"" >
-  <Globals >
-    <StorageProviders >
-      <Provider Type=""Orleans.Storage.MemoryStorage"" Name=""MemoryStore"" />
-    </StorageProviders>
-    <SeedNode Address = ""localhost"" Port=""11111"" />
-    <SystemStore SystemStoreType = ""Custom""  DataConnectionString=""MembershipConnectionString""
-             MembershipTableAssembly=""MembershipTableDLL""
-             ReminderTableAssembly=""RemindersTableDLL""
-             DataConnectionStringForReminders=""RemindersConnectionString""
-             AdoInvariant=""AdoInvariantValue""
-             AdoInvariantForReminders=""AdoInvariantForReminders""
-                 />
-  </Globals>
-  <Defaults>
-    <Networking Address = ""localhost"" Port=""11111"" />
-    <ProxyingGateway Address = ""localhost"" Port=""30000"" />
-    <Tracing DefaultTraceLevel = ""Info"" TraceToConsole=""true"" TraceToFile=""{0}-{1}.log"">
-      <TraceLevelOverride LogPrefix = ""Application"" TraceLevel=""Info"" />
-    </Tracing>
-    <Statistics MetricsTableWriteInterval = ""30s"" PerfCounterWriteInterval=""30s"" LogWriteInterval=""300s"" WriteLogStatisticsToTable=""true"" />
-  </Defaults>
-  <Override Node = ""Primary"" >
-    <Networking Address=""localhost"" Port=""11111"" />
-    <ProxyingGateway Address = ""localhost"" Port=""30000"" />
-  </Override>
-</OrleansConfiguration>";
-#endregion
-        [TestMethod, TestCategory("Reminders"), TestCategory("SqlServer")]
-        public void RemindersTable_SqlServer_Can_Have_Different_Reminders_And_Membership_Settings_ViaXml()
-        {
-            var config = new ClusterConfiguration();
-            var doc = new XmlDocument();
-            doc.LoadXml(sampleSpecificMembershipAndRemidersTableConfiguration);
-            config.LoadFromXml(doc.DocumentElement);
-            Assert.IsTrue(config.Globals.MembershipTableAssembly == "MembershipTableDLL");
-            Assert.IsTrue(config.Globals.ReminderTableAssembly == "RemindersTableDLL");
-            Assert.IsTrue(config.Globals.AdoInvariant == "AdoInvariantValue");
-            Assert.IsTrue(config.Globals.AdoInvariantForReminders == "AdoInvariantForReminders");
-            Assert.IsTrue(config.Globals.DataConnectionString == "MembershipConnectionString");
-            Assert.IsTrue(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
-        }
     }
 }

@@ -36,6 +36,7 @@ namespace UnitTests
     [DeploymentItem("DevTestServerConfiguration.xml")]
     [DeploymentItem("ClientConfiguration.xml")]
     [DeploymentItem("OrleansConfiguration.xml")]
+    [DeploymentItem("Config_Different_Membership_Reminders.xml")]
     public class ConfigTests
     {
         public TestContext TestContext { get; set; }
@@ -1030,6 +1031,21 @@ namespace UnitTests
             Assert.AreEqual(11, config.PreferedGatewayIndex, "PreferedGatewayIndex picked up from config object");
 
             config.CheckGatewayProviderSettings();
+        }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_Different_Membership_And_Reminders()
+        {
+            const string filename = "Config_Different_Membership_Reminders.xml";
+
+            var config = new ClusterConfiguration();
+            config.LoadFromFile(filename);
+            Assert.IsTrue(config.Globals.MembershipTableAssembly == "MembershipTableDLL");
+            Assert.IsTrue(config.Globals.ReminderTableAssembly == "RemindersTableDLL");
+            Assert.IsTrue(config.Globals.AdoInvariant == "AdoInvariantValue");
+            Assert.IsTrue(config.Globals.AdoInvariantForReminders == "AdoInvariantForReminders");
+            Assert.IsTrue(config.Globals.DataConnectionString == "MembershipConnectionString");
+            Assert.IsTrue(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
