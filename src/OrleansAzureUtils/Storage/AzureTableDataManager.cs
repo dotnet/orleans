@@ -343,16 +343,9 @@ namespace Orleans.AzureUtils
             {
                 try
                 {
-                    string queryString = TableQuery.CombineFilters(
-                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey),
-                        TableOperators.And,
-                        TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, rowKey));
-                    var query = new TableQuery<T>().Where(queryString);
-                    TableQuerySegment<T> segment = await Task.Factory
-                        .FromAsync<TableQuery<T>, TableContinuationToken, TableQuerySegment<T>>(
-                            tableReference.BeginExecuteQuerySegmented,
-                            tableReference.EndExecuteQuerySegmented<T>, query, null, null);
-                    retrievedResult = segment.Results.SingleOrDefault();
+                    TableOperation retrieveOperation = TableOperation.Retrieve<T>(partitionKey, rowKey);
+                    TableResult tableResult = await tableReference.ExecuteAsync(retrieveOperation);
+                    retrievedResult = (T)tableResult.Result;
                 }
                 catch (StorageException exception)
                 {
@@ -751,5 +744,3 @@ namespace Orleans.AzureUtils
         #endregion
     }
 }
-
-
