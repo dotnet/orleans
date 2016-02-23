@@ -4,43 +4,41 @@ using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using UnitTests.TesterInternal;
+using Xunit;
 
 // ReSharper disable ConvertToConstant.Local
 
 namespace UnitTests.SchedulerTests
 {
-    [TestClass]
-    public class QueuedTaskSchedulerTests_Set2
+    public class QueuedTaskSchedulerTests_Set2 : IDisposable
     {
         public static bool Verbose { get; set; }
 
         private const int numTasks = 1000000;
-
-        [TestInitialize]
-        public void TestSetup()
+        
+        public QueuedTaskSchedulerTests_Set2()
         {
             SynchronizationContext.SetSynchronizationContext(null);
         }
-
-        [TestCleanup]
-        public void TestTeardown()
+        
+        public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(null);
             TraceLogger.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
         }
 
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_Basic()
         {
             string testName = "Task_Basic";
             DoBaseTestRun(testName, numTasks);
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_MultiSyncContext()
         {
             string testName = "Task_MultiSyncContext";
@@ -76,7 +74,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_OneSyncContext()
         {
             string testName = "Task_OneSyncContext";
@@ -108,7 +106,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_OneContextMultiScheduler()
         {
             string testName = "Task_OneContextMultiScheduler";
@@ -146,7 +144,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_OneContextOneScheduler()
         {
             string testName = "Task_OneContextOneScheduler";
@@ -180,7 +178,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_MultiTaskScheduler()
         {
             string testName = "Task_MultiTaskScheduler";
@@ -215,7 +213,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_OneTaskScheduler()
         {
             string testName = "Task_OneTaskScheduler";
@@ -246,7 +244,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_MasterTaskScheduler()
         {
             string testName = "Task_MasterTaskScheduler";
@@ -282,7 +280,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_OneSchedulerMultiContexts()
         {
             string testName = "Task_OneSchedulerMultiContexts";
@@ -320,7 +318,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_MultiSchedulerMultiContexts()
         {
             string testName = "Task_MultiSchedulerMultiContexts";
@@ -361,7 +359,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_OrleansTaskScheduler()
         {
             string testName = "Task_OrleansTaskScheduler";
@@ -395,7 +393,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Sched_Task_OnCompletion()
         {
             var asyncContext = new AsyncTestContext();
@@ -417,7 +415,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(1, numActions, "Actions");
         }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler"), TestCategory("RequestContext")]
         public void Task_LogicalCallContext()
         {
             string testName = "Task_LogicalCallContext";

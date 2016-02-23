@@ -5,11 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 
 using Orleans.Runtime;
 using Tester;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests
@@ -18,21 +19,11 @@ namespace UnitTests
     ///This is a test class for LoggerTest and is intended
     ///to contain all LoggerTest Unit Tests
     ///</summary>
-    [TestClass]
-    [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class LoggerTest : HostedTestClusterEnsureDefaultStarted
+    public class LoggerTest : OrleansTestingBase, IDisposable
     {
         private double timingFactor;
-
-        /// <summary>
-        ///Gets or sets the test context which provides
-        ///information about and functionality for the current test run.
-        ///</summary>
-        public TestContext TestContext { get; set; }
-
-        [TestInitialize]
-        public void SetUpDefaults()
+                
+        public LoggerTest()
         {
             TraceLogger.UnInitialize();
             TraceLogger.SetRuntimeLogLevel(Severity.Verbose);
@@ -44,9 +35,8 @@ namespace UnitTests
             TraceLogger.SetTraceLevelOverrides(overrides.ToList());
             timingFactor = TestUtils.CalibrateTimings();
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public void Dispose()
         {
             TraceLogger.Flush();
             TraceLogger.UnInitialize();
@@ -55,7 +45,7 @@ namespace UnitTests
         /// <summary>
         ///A test for Logger Constructor
         ///</summary>
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_ConstructorTest()
         {
             TraceLogger target = TraceLogger.GetLogger("Test", TraceLogger.LoggerType.Runtime);
@@ -74,7 +64,7 @@ namespace UnitTests
         /// <summary>
         ///A test for Logger Constructor
         ///</summary>
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_ConstructorTest1()
         {
             TraceLogger target = TraceLogger.GetLogger("Test", TraceLogger.LoggerType.Application);
@@ -89,7 +79,7 @@ namespace UnitTests
         /// <summary>
         ///A test for SetRuntimeLogLevel
         ///</summary>
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_SetRuntimeLogLevelTest()
         {
             TraceLogger target = TraceLogger.GetLogger("Test");
@@ -100,7 +90,7 @@ namespace UnitTests
                 "Default severity level not re-calculated correctly for runtime logger with no overrides");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_SeverityLevelTest()
         {
             TraceLogger target = TraceLogger.GetLogger("Test");
@@ -115,7 +105,7 @@ namespace UnitTests
         }
 
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_GetLoggerTest()
         {
             TraceLogger logger = TraceLogger.GetLogger("GetLoggerTest", TraceLogger.LoggerType.Runtime);
@@ -130,7 +120,7 @@ namespace UnitTests
             Assert.IsTrue(ReferenceEquals(logger, logger3));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_CreateMiniDump()
         {
             var dumpFile = TraceLogger.CreateMiniDump();
@@ -141,7 +131,7 @@ namespace UnitTests
             Console.WriteLine("Logger.CreateMiniDump dump file location = " + dumpFile.FullName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_AddRemoveOverride()
         {
             const string name = "LoggerOverrideTest";
@@ -156,7 +146,7 @@ namespace UnitTests
             Assert.AreEqual(initialLevel, logger.SeverityLevel, "Logger level not reset after override removed");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_DifferentLoggers()
         {
             int n = 10000;
@@ -215,7 +205,7 @@ namespace UnitTests
             Assert.AreEqual(0, logConsumer.GetEntryCount(logCode2 + 1), "Should not see any other entries +1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_VerboseNotFiltered()
         {
             const string testName = "Logger_BulkMessageLimit_InfoNotFiltered";
@@ -249,7 +239,7 @@ namespace UnitTests
                     "Should see {0} real entries in total via logger#1", expectedLogMessages1);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_DifferentFinalLogCode()
         {
             const string testName = "Logger_BulkMessageLimit_DifferentFinalLogCode";
@@ -265,7 +255,7 @@ namespace UnitTests
             RunTestForLogFiltering(testName, n, mainLogCode, finalLogCode, expectedMainLogMessages, expectedFinalLogMessages, expectedBulkLogMessages);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_SameFinalLogCode()
         {
             const string testName = "Logger_BulkMessageLimit_SameFinalLogCode";
@@ -282,7 +272,7 @@ namespace UnitTests
                                    expectedFinalLogMessages, expectedBulkLogMessages);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_Excludes_100000()
         {
             const string testName = "Logger_BulkMessageLimit_Excludes_100000";
@@ -298,7 +288,7 @@ namespace UnitTests
             RunTestForLogFiltering(testName, n, finalLogCode, mainLogCode, expectedMainLogMessages, expectedFinalLogMessages, expectedBulkLogMessages);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_MessageSizeLimit()
         {
             const string testName = "Logger_MessageSizeLimit";
@@ -322,7 +312,7 @@ namespace UnitTests
             Assert.AreEqual(1, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should also see 'Message truncated' message");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_Stats_MessageSizeLimit()
         {
             const string testName = "Logger_Stats_MessageSizeLimit";
@@ -359,7 +349,7 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_FileLogWriter()
         {
             const string testName = "Logger_Perf_FileLogWriter";
@@ -372,7 +362,7 @@ namespace UnitTests
             RunLogWriterPerfTest(testName, n, logCode, target, log);
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_TraceLogWriter()
         {
             const string testName = "Logger_Perf_TraceLogWriter";
@@ -384,7 +374,7 @@ namespace UnitTests
             RunLogWriterPerfTest(testName, n, logCode, target, log);
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_ConsoleLogWriter()
         {
             const string testName = "Logger_Perf_ConsoleLogWriter";
@@ -396,7 +386,7 @@ namespace UnitTests
             RunLogWriterPerfTest(testName, n, logCode, target, log);
         }
 
-        //[TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        //[Fact, TestCategory("Logger"), TestCategory("Performance")]
         //public void Logger_Perf_EtwLogWriter()
         //{
         //    const string testName = "Logger_Perf_EtwLogWriter";
@@ -407,7 +397,7 @@ namespace UnitTests
         //    RunLogWriterPerfTest(testName, n, target, log);
         //}
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_Logger_Console()
         {
             const string testName = "Logger_Perf_Logger_Console";
@@ -423,7 +413,7 @@ namespace UnitTests
             RunLoggerPerfTest(testName, n, logCode, target, logger);
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_Logger_Dummy()
         {
             const string testName = "Logger_Perf_Logger_Dummy";

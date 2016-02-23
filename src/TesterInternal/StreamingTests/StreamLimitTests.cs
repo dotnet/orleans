@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -13,18 +13,13 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
+using Xunit;
 //using UnitTests.Streaming.Reliability;
 
 namespace UnitTests.StreamingTests
 {
-    [TestClass]
-    [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("ClientConfig_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
     public class StreamLimitTests : HostedTestClusterPerTest
     {
-        public TestContext TestContext { get; set; }
-
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
         {
             StartFreshOrleans = true,
@@ -51,27 +46,20 @@ namespace UnitTests.StreamingTests
 
         private string StreamNamespace;
 
-        public static TestingSiloHost CreateSiloHost()
+        public override TestingSiloHost CreateSiloHost()
         {
             //MaxConsumersPerStream = 509; // ~= 64 * 1024 / 128
             return new TestingSiloHost(siloOptions, clientOptions);
         }
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public StreamLimitTests()
         {
-            Console.WriteLine("TestInitialize - {0}", TestContext.TestName);
+            //sole.WriteLine("TestInitialize - {0}", TestContext.TestName);
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
             mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
         }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            Console.WriteLine("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-        }
-
-        [TestMethod, TestCategory("Streaming"), TestCategory("Limits")]
+        
+        [Fact, TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_FindMax_Consumers()
         {
             // 1 Stream, 1 Producer, X Consumers
@@ -105,7 +93,7 @@ namespace UnitTests.StreamingTests
             Console.WriteLine("MaxConsumersPerStream={0}", MaxConsumersPerStream);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_FindMax_Producers()
         {
             // 1 Stream, X Producers, 1 Consumer
@@ -138,7 +126,7 @@ namespace UnitTests.StreamingTests
             Console.WriteLine("MaxProducersPerStream={0}", MaxProducersPerStream);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_P1_C128_S1()
         {
             // 1 Stream, 1 Producer, 128 Consumers
@@ -147,7 +135,7 @@ namespace UnitTests.StreamingTests
                 1, 1, 128);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_P128_C1_S1()
         {
             // 1 Stream, 128 Producers, 1 Consumer
@@ -156,7 +144,7 @@ namespace UnitTests.StreamingTests
                 1, 128, 1);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_P128_C128_S1()
         {
             // 1 Stream, 128 Producers, 128 Consumers
@@ -165,7 +153,7 @@ namespace UnitTests.StreamingTests
                 1, 128, 128);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_P1_C400_S1()
         {
             // 1 Stream, 1 Producer, 400 Consumers
@@ -175,7 +163,7 @@ namespace UnitTests.StreamingTests
                 1, 1, numConsumers);
         }
 
-        [TestMethod, TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
+        [Fact, TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         public async Task SMS_Limits_Max_Producers_Burst()
         {
             if (MaxProducersPerStream == 0) await SMS_Limits_FindMax_Producers();
@@ -188,7 +176,7 @@ namespace UnitTests.StreamingTests
                 1, MaxProducersPerStream, 1, useFanOut: true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_Max_Producers_NoBurst()
         {
             if (MaxProducersPerStream == 0) await SMS_Limits_FindMax_Producers();
@@ -201,7 +189,7 @@ namespace UnitTests.StreamingTests
                 1, MaxProducersPerStream, 1, useFanOut: false);
         }
 
-        [TestMethod, TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
+        [Fact, TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         public async Task SMS_Limits_Max_Consumers_Burst()
         {
             if (MaxConsumersPerStream == 0) await SMS_Limits_FindMax_Consumers();
@@ -213,7 +201,7 @@ namespace UnitTests.StreamingTests
                 StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, 
                 1, 1, MaxConsumersPerStream, useFanOut: true);
         }
-        [TestMethod, TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_Max_Consumers_NoBurst()
         {
             if (MaxConsumersPerStream == 0) await SMS_Limits_FindMax_Consumers();
@@ -226,7 +214,7 @@ namespace UnitTests.StreamingTests
                 1, 1, MaxConsumersPerStream, useFanOut: false);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
+        [Fact, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         public async Task SMS_Limits_P9_C9_S152_Burst()
         {
             // 152 * 9 ~= 1360 target per second
@@ -238,7 +226,7 @@ namespace UnitTests.StreamingTests
                 numStreams, 9, 9, useFanOut: true);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_P9_C9_S152_NoBurst()
         {
             // 152 * 9 ~= 1360 target per second
@@ -250,7 +238,7 @@ namespace UnitTests.StreamingTests
                 numStreams, 9, 9, useFanOut: false);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
+        [Fact, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         public async Task SMS_Limits_P1_C9_S152_Burst()
         {
             // 152 * 9 ~= 1360 target per second
@@ -261,7 +249,7 @@ namespace UnitTests.StreamingTests
                 StreamTestsConstants.SMS_STREAM_PROVIDER_NAME,
                 numStreams, 1, 9, useFanOut: true);
         }
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
+        [Fact, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Limits")]
         public async Task SMS_Limits_P1_C9_S152_NoBurst()
         {
             // 152 * 9 ~= 1360 target per second
@@ -273,8 +261,7 @@ namespace UnitTests.StreamingTests
                 numStreams, 1, 9, useFanOut: false);
         }
 
-        [TestMethod, TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
-        [Ignore]
+        [Fact(Skip = "Ignore"), TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         public async Task SMS_Churn_Subscribers_P0_C10_ManyStreams()
         {
             int numStreams = 2000;
@@ -289,7 +276,7 @@ namespace UnitTests.StreamingTests
             );
         }
 
-        //[TestMethod, TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
+        //[Fact, TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         //public async Task SMS_Churn_Subscribers_P1_C9_ManyStreams_TimePeriod()
         //{
         //    await Test_Stream_Churn_TimePeriod(
@@ -300,7 +287,7 @@ namespace UnitTests.StreamingTests
         //    );
         //}
 
-        [TestMethod, TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
+        [Fact, TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         public async Task SMS_Churn_FewPublishers_C9_ManyStreams()
         {
             int numProducers = 0;
@@ -316,7 +303,7 @@ namespace UnitTests.StreamingTests
             );
         }
 
-        [TestMethod, TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
+        [Fact, TestCategory("Performance"), TestCategory("Streaming"), TestCategory("Limits"), TestCategory("Burst")]
         public async Task SMS_Churn_FewPublishers_C9_ManyStreams_PubSubDirect()
         {
             int numProducers = 0;

@@ -5,17 +5,17 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
     public class ConsistentRingProviderTests_Silo : HostedTestClusterPerTest
     {
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
@@ -32,7 +32,7 @@ namespace UnitTests.General
 
         enum Fail { First, Random, Last }
 
-        public static TestingSiloHost CreateSiloHost()
+        public override TestingSiloHost CreateSiloHost()
         {
             var host = new TestingSiloHost(siloOptions);
             string config = host.Primary.Silo.TestHook.PrintSiloConfig();
@@ -42,7 +42,7 @@ namespace UnitTests.General
 
         #region Tests
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_Basic()
         {
             this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
@@ -50,37 +50,37 @@ namespace UnitTests.General
             VerificationScenario(0);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F_Random()
         {
             await FailureTest(Fail.Random, 1);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F_Beginning()
         {
             await FailureTest(Fail.First, 1);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F_End()
         {
             await FailureTest(Fail.Last, 1);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2F_Random()
         {
             await FailureTest(Fail.Random, 2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2F_Beginning()
         {
             await FailureTest(Fail.First, 2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2F_End()
         {
             await FailureTest(Fail.Last, 2);
@@ -115,13 +115,13 @@ namespace UnitTests.General
             }, failureTimeout);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1J()
         {
             await JoinTest(1);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2J()
         {
             await JoinTest(2);
@@ -142,7 +142,7 @@ namespace UnitTests.General
             Thread.Sleep(TimeSpan.FromSeconds(15));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F1J()
         {
             this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
@@ -170,7 +170,7 @@ namespace UnitTests.General
         }
 
         // failing the secondary in this scenario exposed the bug in DomainGrain ... so, we keep it as a separate test than Ring_1F1J
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1Fsec1J()
         {
             this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
@@ -371,7 +371,7 @@ namespace UnitTests.General
                     assertion();
                     return;
                 }
-                catch (AssertFailedException)
+                catch (Microsoft.VisualStudio.TestTools.UnitTesting.AssertFailedException)
                 {
                     if (sw.ElapsedMilliseconds > timeout.TotalMilliseconds)
                     {

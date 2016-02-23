@@ -1,15 +1,15 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.SerializerTests
 {
-    [TestClass]
     public class RoundTripSerializerTests : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Serialize_TestMethodResultEnum()
         {
             var grain = GrainClient.GrainFactory.GetGrain<IEnumResultGrain>(GetRandomGrainId());

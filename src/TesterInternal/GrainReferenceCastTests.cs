@@ -1,20 +1,20 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
+using Xunit;
 using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+using UnitTests.Tester;
 
 namespace UnitTests
 {
-    [TestClass]
     public class GrainReferenceCastTests : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefCastFromMyType()
         {
             GrainReference grain = (GrainReference)GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
@@ -23,7 +23,7 @@ namespace UnitTests
             Assert.IsInstanceOfType(cast, typeof(ISimpleGrain));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefCastFromMyTypePolymorphic()
         {
             // MultifacetTestGrain implements IMultifacetReader
@@ -44,7 +44,7 @@ namespace UnitTests
         }
 
         // Test case currently fails intermittently
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastMultifacetRWReference()
         {
             // MultifacetTestGrain implements IMultifacetReader
@@ -67,7 +67,7 @@ namespace UnitTests
         }
 
         // Test case currently fails
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastMultifacetRWReferenceWaitForResolve()
         {
             // MultifacetTestGrain implements IMultifacetReader
@@ -92,7 +92,7 @@ namespace UnitTests
             Assert.AreEqual(newValue, result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void ConfirmServiceInterfacesListContents()
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
@@ -112,7 +112,7 @@ namespace UnitTests
             Assert.IsTrue(interfaces.Keys.Contains(id3), "id3 is present");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastCheckExpectedCompatIds()
         {
             Type t = typeof(ISimpleGrain);
@@ -121,7 +121,7 @@ namespace UnitTests
             Assert.IsTrue(grain.IsCompatible(expectedInterfaceId));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastCheckExpectedCompatIds2()
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
@@ -138,10 +138,10 @@ namespace UnitTests
             Assert.IsTrue(grain.IsCompatible(id3));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
-        [ExpectedException(typeof(InvalidCastException))]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastFailInternalCastFromBadType()
         {
+            Xunit.Assert.Throws<InvalidCastException>(() => { 
             Type t = typeof(ISimpleGrain);
             GrainReference grain = (GrainReference)GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
             IAddressable cast = GrainReference.CastInternal(
@@ -150,9 +150,10 @@ namespace UnitTests
                 grain,
                 GrainInterfaceData.GetGrainInterfaceId(t));
             Assert.Fail("Exception should have been raised");
+            });
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastInternalCastFromMyType()
         {
             var serviceName = typeof(SimpleGrain).FullName;
@@ -167,7 +168,7 @@ namespace UnitTests
             Assert.IsInstanceOfType(cast, typeof(ISimpleGrain));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastInternalCastUpFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
@@ -183,7 +184,7 @@ namespace UnitTests
             Assert.IsInstanceOfType(cast, typeof(IGeneratorTestGrain));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefUpCastFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
@@ -193,83 +194,89 @@ namespace UnitTests
             Assert.IsInstanceOfType(cast,typeof(IGeneratorTestGrain));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
-        [ExpectedException(typeof(InvalidCastException))]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void FailSideCastAfterResolve()
         {
-            // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-            // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            try
+            Xunit.Assert.Throws<InvalidCastException>(() =>
             {
-                IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-                Assert.IsTrue(grain.StringIsNullOrEmpty().Result);
-                // Fails the next line as grain reference is already resolved
-                IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-                Task<string> av = cast.StringConcat("a", "b", "c");
-                av.Wait();
-                Assert.IsFalse(cast.StringIsNullOrEmpty().Result); // Not reached
-            }
-            catch (AggregateException ae)
-            {
-                Exception ex = ae.InnerException;
-                while (ex is AggregateException) ex = ex.InnerException;
-                throw ex;
-            }
-            Assert.Fail("Exception should have been raised");
+                // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
+                // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
+                try
+                {
+                    IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+                    Assert.IsTrue(grain.StringIsNullOrEmpty().Result);
+                    // Fails the next line as grain reference is already resolved
+                    IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+                    Task<string> av = cast.StringConcat("a", "b", "c");
+                    av.Wait();
+                    Assert.IsFalse(cast.StringIsNullOrEmpty().Result); // Not reached
+                }
+                catch (AggregateException ae)
+                {
+                    Exception ex = ae.InnerException;
+                    while (ex is AggregateException) ex = ex.InnerException;
+                    throw ex;
+                }
+                Assert.Fail("Exception should have been raised");
+            });
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
-        [ExpectedException(typeof(InvalidCastException))]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void FailOperationAfterSideCast()
         {
-            // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-            // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            try
+            Xunit.Assert.Throws<InvalidCastException>(() =>
             {
-                IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-                // Cast works optimistically when the grain reference is not already resolved
-                IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-                // Operation fails when grain reference is completely resolved
-                Task<string> av = cast.StringConcat("a", "b", "c");
-                string val = av.Result;
-            }
-            catch (AggregateException ae)
-            {
-                Exception ex = ae.InnerException;
-                while (ex is AggregateException) ex = ex.InnerException;
-                throw ex;
-            }
-            Assert.Fail("Exception should have been raised");
+                // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
+                // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
+                try
+                {
+                    IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+                    // Cast works optimistically when the grain reference is not already resolved
+                    IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+                    // Operation fails when grain reference is completely resolved
+                    Task<string> av = cast.StringConcat("a", "b", "c");
+                    string val = av.Result;
+                }
+                catch (AggregateException ae)
+                {
+                    Exception ex = ae.InnerException;
+                    while (ex is AggregateException) ex = ex.InnerException;
+                    throw ex;
+                }
+                Assert.Fail("Exception should have been raised");
+            });
         }
 
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
-        [ExpectedException(typeof(InvalidCastException))]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void FailSideCastAfterContinueWith()
         {
-            // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-            // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            try
+            Xunit.Assert.Throws<InvalidCastException>(() =>
             {
-                IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-                IGeneratorTestDerivedGrain2 cast = null;
-                Task<bool> av = grain.StringIsNullOrEmpty();
-                Task<bool> av2 = av.ContinueWith((Task<bool> t) => Assert.IsTrue(t.Result)).ContinueWith((_AppDomain) =>
+                // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
+                // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
+                try
                 {
-                    cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-                }).ContinueWith( (_) => cast.StringConcat("a", "b", "c")).ContinueWith( (_) => cast.StringIsNullOrEmpty().Result);
-                Assert.IsFalse(av2.Result);
-            }
-            catch (AggregateException ae)
-            {
-                Exception ex = ae.InnerException;
-                while (ex is AggregateException) ex = ex.InnerException;
-                throw ex;
-            }
-            Assert.Fail("Exception should have been raised");
+                    IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+                    IGeneratorTestDerivedGrain2 cast = null;
+                    Task<bool> av = grain.StringIsNullOrEmpty();
+                    Task<bool> av2 = av.ContinueWith((Task<bool> t) => Assert.IsTrue(t.Result)).ContinueWith((_AppDomain) =>
+                    {
+                        cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+                    }).ContinueWith((_) => cast.StringConcat("a", "b", "c")).ContinueWith((_) => cast.StringIsNullOrEmpty().Result);
+                    Assert.IsFalse(av2.Result);
+                }
+                catch (AggregateException ae)
+                {
+                    Exception ex = ae.InnerException;
+                    while (ex is AggregateException) ex = ex.InnerException;
+                    throw ex;
+                }
+                Assert.Fail("Exception should have been raised");
+            });
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefUpCastFromGrandchild()
         {
             // GeneratorTestDerivedGrain1Reference derives from GeneratorTestGrainReference
@@ -297,7 +304,7 @@ namespace UnitTests
             Assert.IsNotInstanceOfType(cast, typeof(IGeneratorTestDerivedGrain1));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefUpCastFromDerivedDerivedChild()
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
@@ -310,7 +317,7 @@ namespace UnitTests
             Assert.IsNotInstanceOfType(cast, typeof(IGeneratorTestDerivedGrain1));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastAsyncGrainRefCastFromSelf()
         {
             IAddressable grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix); ;
@@ -324,7 +331,7 @@ namespace UnitTests
 
         // todo: implement white box access
 #if TODO
-        [TestMethod]
+        [Fact]
         public void CastAsyncGrainRefUpCastFromChild()
         {
             // GeneratorTestDerivedGrain1Reference derives from GeneratorTestGrainReference
@@ -350,7 +357,7 @@ namespace UnitTests
             Assert.IsTrue(grain.IsResolved);
         }
 
-        [TestMethod]
+        [Fact]
         public void CastAsyncGrainRefUpCastFromGrandchild()
         {
             // GeneratorTestDerivedGrain1Reference derives from GeneratorTestGrainReference
@@ -377,7 +384,7 @@ namespace UnitTests
             Assert.IsTrue(grain.IsResolved);
         }
 
-        [TestMethod]
+        [Fact]
         [ExpectedExceptionAttribute(typeof(InvalidCastException))]
         public void CastAsyncGrainRefFailSideCastToPeer()
         {
@@ -401,7 +408,7 @@ namespace UnitTests
             Assert.Fail("Exception should have been raised");
         }
 
-        [TestMethod]
+        [Fact]
         [ExpectedExceptionAttribute(typeof(InvalidCastException))]
         public void CastAsyncGrainRefFailDownCastToChild()
         {
@@ -424,7 +431,7 @@ namespace UnitTests
             Assert.Fail("Exception should have been raised");
         }
 
-        [TestMethod]
+        [Fact]
         [ExpectedExceptionAttribute(typeof(InvalidCastException))]
         public void CastAsyncGrainRefFailDownCastToGrandchild()
         {
@@ -447,7 +454,7 @@ namespace UnitTests
             Assert.Fail("Exception should have been raised");
         }
 #endif
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastCallMethodInheritedFromBaseClass()
         {
             // GeneratorTestDerivedGrain1Reference derives from GeneratorTestGrainReference

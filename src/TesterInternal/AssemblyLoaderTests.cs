@@ -3,27 +3,25 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Xunit;
 
 namespace UnitTests
 {
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
     public class AssemblyLoaderTests 
     {
         const string ExpectedFileName = "OrleansProviders.dll";
         private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoaderTests", TraceLogger.LoggerType.Application);
-
-        [ClassInitialize]
-        public static void MyClassInitialize(TestContext testContext)
+        
+        public AssemblyLoaderTests()
         {
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDiscoverAssemblyLoaderTestAssembly()
         {
             logger.Info("AssemblyLoaderTests.ClientShouldDiscoverDummyStreamProviderAssembly");
@@ -33,7 +31,7 @@ namespace UnitTests
             DiscoverAssemblies(loader, exclusionList);
         }
 
-        [TestMethod, TestCategory("AssemblyLoader"), TestCategory("Functional")]
+        [Fact, TestCategory("AssemblyLoader"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDetectUnexpectedExceptionsDuringReflectionOnlyLoad()
         {
             logger.Info("AssemblyLoaderTests.AssemblyLoaderShouldDetectUnexpectedExceptionsDuringReflectionOnlyLoad");
@@ -47,7 +45,7 @@ namespace UnitTests
                     DiscoverAssemblies(loader, exclusionList));
         }
 
-        [TestMethod, TestCategory("AssemblyLoader"), TestCategory("Functional")]
+        [Fact, TestCategory("AssemblyLoader"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDetectUnexpectedExceptionsDuringExcludeCriteria()
         {
             logger.Info("AssemblyLoaderTests.AssemblyLoaderShouldDetectUnexpectedExceptionsDuringExcludeCriteria");
@@ -61,7 +59,7 @@ namespace UnitTests
                     DiscoverAssemblies(loader, exclusionList));
         }
 
-        [TestMethod, TestCategory("AssemblyLoader"), TestCategory("Functional")]
+        [Fact, TestCategory("AssemblyLoader"), TestCategory("Functional")]
         public void AssemblyLoaderShouldDetectUnexpectedExceptionsDuringLoadCriteria()
         {
             logger.Info("AssemblyLoaderTests.AssemblyLoaderShouldDetectUnexpectedExceptionsDuringLoadCriteria");
@@ -75,7 +73,7 @@ namespace UnitTests
                     DiscoverAssemblies(loader, exclusionList));
         }
 
-        [TestMethod, TestCategory("AssemblyLoader"), TestCategory("Functional")]
+        [Fact, TestCategory("AssemblyLoader"), TestCategory("Functional")]
         public void AssemblyLoaderDiscoverExceptionsShouldNotBeRethrown()
         {
             logger.Info("AssemblyLoaderTests.AssemblyLoaderDiscoverExceptionsShouldNotBeRethrown");

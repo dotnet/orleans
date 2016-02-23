@@ -1,19 +1,17 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage.Table.Protocol;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
-using Tester;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    public class AzureTableDataManagerTests
+    public class AzureTableDataManagerTests : IClassFixture<AzureStorageBasicTestFixture>
     {
         private string PartitionKey;
         private UnitTestAzureTableDataManager manager;
@@ -23,15 +21,8 @@ namespace UnitTests.StorageTests
         {
             return new UnitTestAzureTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
         }
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            TestUtils.CheckForAzureStorage();
-        }
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public AzureTableDataManagerTests()
         {
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
             // Pre-create table, if required
@@ -39,7 +30,7 @@ namespace UnitTests.StorageTests
             PartitionKey = "PK-AzureTableDataManagerTests-" + Guid.NewGuid();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_CreateTableEntryAsync()
         {
             var data = GenerateNewData();
@@ -64,7 +55,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(data.StringData, tuple.Item1.StringData);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_UpsertTableEntryAsync()
         {
             var data = GenerateNewData();
@@ -79,7 +70,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(data2.StringData, tuple.Item1.StringData);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_UpdateTableEntryAsync()
         {
             var data = GenerateNewData();
@@ -131,7 +122,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_DeleteTableAsync()
         {
             var data = GenerateNewData();
@@ -172,7 +163,7 @@ namespace UnitTests.StorageTests
             Assert.IsNull(tuple);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_MergeTableAsync()
         {
             var data = GenerateNewData();
@@ -216,7 +207,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual("NewData", tuple.Item1.StringData);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_ReadSingleTableEntryAsync()
         {
             var data = GenerateNewData();
@@ -224,7 +215,7 @@ namespace UnitTests.StorageTests
             Assert.IsNull(tuple);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_InsertTwoTableEntriesConditionallyAsync()
         {
             var data1 = GenerateNewData();
@@ -276,7 +267,7 @@ namespace UnitTests.StorageTests
             };
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task AzureTableDataManager_UpdateTwoTableEntriesConditionallyAsync()
         {
             var data1 = GenerateNewData();

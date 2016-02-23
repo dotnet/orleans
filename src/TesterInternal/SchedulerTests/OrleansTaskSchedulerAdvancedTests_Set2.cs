@@ -2,18 +2,24 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using UnitTests.Grains;
 using UnitTests.TesterInternal;
+using Xunit;
 
 namespace UnitTests.SchedulerTests
 {
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [TestClass]
-    public class OrleansTaskSchedulerAdvancedTests_Set2
+    public class OrleansTaskSchedulerAdvancedTests_Set2Fixture : IDisposable
+    {
+        public void Dispose()
+        {
+            TraceLogger.UnInitialize();
+        }
+    }
+    public class OrleansTaskSchedulerAdvancedTests_Set2 : IClassFixture<OrleansTaskSchedulerAdvancedTests_Set2Fixture>, IDisposable
     {
         private static readonly object lockable = new object();
         private static readonly int waitFactor = Debugger.IsAttached ? 100 : 1;
@@ -24,28 +30,16 @@ namespace UnitTests.SchedulerTests
         public OrleansTaskSchedulerAdvancedTests_Set2()
         {
             OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            TraceLogger.UnInitialize();
-        }
-
-        [TestInitialize]
-        public void TestInit()
-        {
             context = new UnitTestSchedulingContext();
             masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public void Dispose()
         {
             masterScheduler.Stop();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_SimpleFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
@@ -69,7 +63,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(15, n, "Work items executed out of order");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_NewTask_ContinueWith_Wrapped()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -101,7 +95,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(ok, "Finished OK");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_SubTaskExecutionSequencing()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -153,7 +147,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(10, n, "Work items executed concurrently");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_ContinueWith_1_Test()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -191,7 +185,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(1, n, "Work items executed out of order");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -247,7 +241,7 @@ namespace UnitTests.SchedulerTests
             task2.Ignore();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Timeout()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -306,7 +300,7 @@ namespace UnitTests.SchedulerTests
             task2.Ignore();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Busy_Timeout()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -370,7 +364,7 @@ namespace UnitTests.SchedulerTests
         }
 
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -431,7 +425,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(task2.IsCompleted && !task2.IsFaulted, "Task-2 Status " + task2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run_Delay()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -496,7 +490,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(task2.IsCompleted && !task2.IsFaulted, "Task-2 Status " + task2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Delay()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -528,7 +522,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Turn_Execution_Order_Loop()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -632,7 +626,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -640,7 +634,7 @@ namespace UnitTests.SchedulerTests
             await Run_ActivationSched_Test1(scheduler, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1_Bounce()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -648,7 +642,7 @@ namespace UnitTests.SchedulerTests
             await Run_ActivationSched_Test1(scheduler, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task OrleansSched_Test1()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
@@ -657,7 +651,7 @@ namespace UnitTests.SchedulerTests
 
             await Run_ActivationSched_Test1(scheduler, false);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task OrleansSched_Test1_Bounce()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();

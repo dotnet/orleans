@@ -10,7 +10,7 @@ using UnitTests.Tester;
 using Orleans.Runtime.Configuration;
 using System.Net;
 using Orleans;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Tester;
 
 namespace Tests.GeoClusterTests

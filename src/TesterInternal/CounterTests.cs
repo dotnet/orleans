@@ -1,21 +1,21 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
+using System;
+using Xunit;
 
 namespace UnitTests
 {
-    [TestClass]
-    public class CounterTests
+    public class CounterTests : IDisposable
     {
         private static readonly SafeRandom random = new SafeRandom();
         private const string CounterName = "CounterTestsCounter";
-
-        [TestCleanup]
-        public void Cleanup()
+        
+        public void Dispose()
         {
             CounterStatistic.Delete(CounterName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_InitialValue()
         {
             StatisticName name = new StatisticName(CounterName);
@@ -25,7 +25,7 @@ namespace UnitTests
             Assert.AreEqual(0, ctr.GetCurrentValue());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_SetValue()
         {
             StatisticName name = new StatisticName(CounterName);
@@ -35,7 +35,7 @@ namespace UnitTests
             Assert.AreEqual(val, ctr.GetCurrentValue());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_Increment()
         {
             StatisticName name = new StatisticName(CounterName);
@@ -45,7 +45,7 @@ namespace UnitTests
             Assert.AreEqual(1, ctr.GetCurrentValue());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_IncrementBy()
         {
             StatisticName name = new StatisticName(CounterName);
@@ -59,7 +59,7 @@ namespace UnitTests
             Assert.AreEqual(val + 2, ctr.GetCurrentValue());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_IncrementFromMinInt()
         {
             StatisticName name = new StatisticName(CounterName);
@@ -73,7 +73,7 @@ namespace UnitTests
             Assert.AreEqual(val + 2, ctr.GetCurrentValue());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_IncrementFromMaxInt()
         {
             StatisticName name = new StatisticName(CounterName);
@@ -89,7 +89,7 @@ namespace UnitTests
             Assert.AreEqual(longVal + 2, ctr.GetCurrentValue());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void Counter_DecrementBy()
         {
             StatisticName name = new StatisticName(CounterName);
@@ -102,14 +102,14 @@ namespace UnitTests
             Assert.AreEqual(newValue, ctr.GetCurrentValue());
         }
 
-        //[TestMethod]
+        //[Fact]
         //[ExpectedException(typeof(System.Security.SecurityException))]
         //public void AdminRequiredToRegisterCountersWithWindows()
         //{
         //    OrleansCounterBase.RegisterAllCounters();
         //}
 
-        //[TestMethod]
+        //[Fact]
         //public void RegisterCountersWithWindows()
         //{
         //    OrleansCounterBase.RegisterAllCounters(); // Requires RunAs Administrator

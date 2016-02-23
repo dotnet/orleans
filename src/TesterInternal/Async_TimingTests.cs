@@ -2,45 +2,27 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Xunit;
 
 #pragma warning disable 618
 
 namespace UnitTests
 {
-    [TestClass]
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [DeploymentItem("ClientConfiguration.xml")]
     public class Async_TimingTests
     {
         private readonly TraceLogger logger = TraceLogger.GetLogger("AC_TimingTests", TraceLogger.LoggerType.Application);
 
         public Async_TimingTests()
         {
+            TraceLogger.Initialize(ClientConfiguration.StandardLoad());
             logger.Info("----------------------------- STARTING AC_TimingTests -------------------------------------");
         }
 
-        [ClassInitialize()]
-        public static void MyClassInitialize(TestContext testContext)
-        {
-            TraceLogger.Initialize(ClientConfiguration.StandardLoad());
-        }
-
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_Task_WithTimeout_Wait()
         {
             TimeSpan timeout = TimeSpan.FromMilliseconds(2000);
@@ -73,7 +55,7 @@ namespace UnitTests
             Assert.IsTrue(watch.Elapsed < sleepTime, watch.Elapsed.ToString());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task Async_Task_WithTimeout_Await()
         {
             TimeSpan timeout = TimeSpan.FromMilliseconds(2000);

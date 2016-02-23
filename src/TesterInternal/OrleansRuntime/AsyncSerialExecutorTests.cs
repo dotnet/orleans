@@ -1,34 +1,45 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime
 {
-    [TestClass]
-    public class AsyncSerialExecutorTests
+    public class AsyncSerialExecutorTestsFixture
     {
-        private static TraceLogger logger;
-        private SafeRandom random;
-        private int operationsInProgress;
+        public TraceLogger Logger;
+        
+        public int OperationsInProgress;
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext context)
+        public AsyncSerialExecutorTestsFixture()
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            logger = TraceLogger.GetLogger("AsyncSerialExecutorTests", TraceLogger.LoggerType.Application);
+            Logger = TraceLogger.GetLogger("AsyncSerialExecutorTests", TraceLogger.LoggerType.Application);
+        }
+    }
+
+    public class AsyncSerialExecutorTests : ICollectionFixture<AsyncSerialExecutorTestsFixture>
+    {
+        private AsyncSerialExecutorTestsFixture _fixture;
+
+        public AsyncSerialExecutorTests(AsyncSerialExecutorTestsFixture fixture)
+        {
+            _fixture = fixture;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Async")]
+        private SafeRandom random;
+
+        [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_Small()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
             List<Task> tasks = new List<Task>();
             random = new SafeRandom();
-            operationsInProgress = 0;
+            _fixture.OperationsInProgress = 0;
 
             tasks.Add(executor.AddNext(() => Operation(1)));
             tasks.Add(executor.AddNext(() => Operation(2)));
@@ -37,7 +48,7 @@ namespace UnitTests.OrleansRuntime
             await Task.WhenAll(tasks);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Async")]
+        [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_SerialSubmit()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
@@ -46,13 +57,13 @@ namespace UnitTests.OrleansRuntime
             for (int i = 0; i < 10; i++)
             {
                 int capture = i;
-                logger.Info("Submitting Task {0}.", capture);
+                _fixture.Logger.Info("Submitting Task {0}.", capture);
                 tasks.Add(executor.AddNext(() => Operation(capture)));
             }
             await Task.WhenAll(tasks);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Async")]
+        [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_ParallelSubmit()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
@@ -65,7 +76,7 @@ namespace UnitTests.OrleansRuntime
                 enqueueTasks.Add(
                     Task.Run(() =>
                     {
-                        logger.Info("Submitting Task {0}.", capture);
+                        _fixture.Logger.Info("Submitting Task {0}.", capture);
                         tasks.Add(executor.AddNext(() => Operation(capture)));
                     }));
             }
@@ -75,20 +86,20 @@ namespace UnitTests.OrleansRuntime
 
         private async Task Operation(int opNumber)
         {
-            if (operationsInProgress > 0) Assert.Fail("1: Operation {0} found {1} operationsInProgress.", opNumber, operationsInProgress);
-            operationsInProgress++;
+            if (_fixture.OperationsInProgress > 0) Assert.Fail("1: Operation {0} found {1} operationsInProgress.", opNumber, _fixture.OperationsInProgress);
+            _fixture.OperationsInProgress++;
             var delay = random.NextTimeSpan(TimeSpan.FromSeconds(2));
 
-            logger.Info("Task {0} Staring", opNumber);
+            _fixture.Logger.Info("Task {0} Staring", opNumber);
             await Task.Delay(delay);
-            if (operationsInProgress != 1) Assert.Fail("2: Operation {0} found {1} operationsInProgress.", opNumber, operationsInProgress);
+            if (_fixture.OperationsInProgress != 1) Assert.Fail("2: Operation {0} found {1} operationsInProgress.", opNumber, _fixture.OperationsInProgress);
 
-            logger.Info("Task {0} after first delay", opNumber);
+            _fixture.Logger.Info("Task {0} after first delay", opNumber);
             await Task.Delay(delay);
-            if (operationsInProgress != 1) Assert.Fail("3: Operation {0} found {1} operationsInProgress.", opNumber, operationsInProgress);
+            if (_fixture.OperationsInProgress != 1) Assert.Fail("3: Operation {0} found {1} operationsInProgress.", opNumber, _fixture.OperationsInProgress);
 
-            operationsInProgress--;
-            logger.Info("Task {0} Done", opNumber);
+            _fixture.OperationsInProgress--;
+            _fixture.Logger.Info("Task {0} Done", opNumber);
         }
     }
 }

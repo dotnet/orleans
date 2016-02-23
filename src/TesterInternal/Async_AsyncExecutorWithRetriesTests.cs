@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
+using Xunit;
 
 // ReSharper disable ConvertToLambdaExpression
 
@@ -14,7 +15,6 @@ namespace UnitTests
     /// <summary>
     /// Summary description for UnitTest1
     /// </summary>
-    [TestClass]
     public class Async_AsyncExecutorWithRetriesTests
     {
         internal static void CheckUnobservedPromises(List<string> unobservedPromises)
@@ -32,7 +32,7 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_AsyncExecutorWithRetriesTest_1()
         {
             int counter = 0;
@@ -70,7 +70,7 @@ namespace UnitTests
             Assert.Fail("Should have thrown");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_AsyncExecutorWithRetriesTest_2()
         {
             int counter = 0;
@@ -103,7 +103,7 @@ namespace UnitTests
             Assert.AreEqual(counter, value, "Counter == Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_AsyncExecutorWithRetriesTest_4()
         {
             int counter = 0;
@@ -136,7 +136,7 @@ namespace UnitTests
             Assert.AreEqual(counter, 1, "Counter == Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_AsyncExecutorWithRetriesTest_5()
         {
             int counter = 0;

@@ -1,34 +1,32 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests
 {
-    [TestClass]
     // if we paralellize tests, this should run in isolation
-    public class TimeoutTests : HostedTestClusterEnsureDefaultStarted
+    public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private TimeSpan originalTimeout;
-
-        [TestInitialize]
-        public void Initialize()
+        
+        public TimeoutTests()
         {
             originalTimeout = RuntimeClient.Current.GetResponseTimeout();
         }
-
-        [TestCleanup]
-        public void Cleanup()
+        
+        public void Dispose()
         {
             RuntimeClient.Current.SetResponseTimeout(originalTimeout);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timeout")]
+        [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public void Timeout_LongMethod()
         {
             bool finished = false;

@@ -9,33 +9,37 @@ using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using UnitTests.StorageTests;
+using Xunit;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.MembershipTests
 {
     [TestClass]
-    public abstract class MembershipTableTestsBase
+    public abstract class MembershipTableTestsBase : IClassFixture<MembershipTableTestsBase.Fixture>, IDisposable
     {
-        public TestContext TestContext { get; set; }
-
-        private static readonly string hostName = Dns.GetHostName();
-
-        private TraceLogger logger;
-
-        private IMembershipTable membershipTable;
-
-        private string deploymentId;
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext = null)
+        public class Fixture : IDisposable
         {
-            TraceLogger.Initialize(new NodeConfiguration());
+            public Fixture()
+            {
+                TraceLogger.Initialize(new NodeConfiguration());
 
-            // Set shorter init timeout for these tests
-            OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
+                // Set shorter init timeout for these tests
+                OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
+            }
+
+            public void Dispose()
+            {
+                // Reset init timeout after tests
+                OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+            }
         }
 
-        [TestInitialize]
-        public void TestInitialize()
+        private static readonly string hostName = Dns.GetHostName();
+        private TraceLogger logger;
+        private IMembershipTable membershipTable;
+        private string deploymentId;
+
+        public MembershipTableTestsBase()
         {
             logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
             deploymentId = "test-" + Guid.NewGuid();
@@ -54,24 +58,15 @@ namespace UnitTests.MembershipTests
             membershipTable = mbr;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             if (membershipTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
                 membershipTable.DeleteMembershipTableEntries(deploymentId).Wait();
                 membershipTable = null;
             }
-            logger.Info("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
         }
 
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            // Reset init timeout after tests
-            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-        }
-        
         protected abstract IMembershipTable CreateMembershipTable(TraceLogger logger);
         protected abstract string GetConnectionString();
 

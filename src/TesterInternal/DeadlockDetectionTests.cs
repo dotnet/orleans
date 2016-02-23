@@ -2,17 +2,17 @@
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
-    public class DeadlockDetectionTests : HostedTestClusterPerFixture
+    public class DeadlockDetectionTests : HostedTestClusterEnsureDefaultStarted
     {
         private const int numIterations = 30;
 
@@ -39,7 +39,7 @@ namespace UnitTests.General
         // 5) No Deadlock C, A, C
 
         // 1) Deadlock A, A
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_1()
         {
             for (int i = 0; i < numIterations; i++)
@@ -66,7 +66,7 @@ namespace UnitTests.General
         }
 
         // 2) Deadlock A, B, A
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_2()
         {
             long bBase = 100;
@@ -95,7 +95,7 @@ namespace UnitTests.General
         }
 
         // 3) Deadlock C, A, C, A
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_3()
         {
             long cBase = 200;
@@ -125,7 +125,7 @@ namespace UnitTests.General
         }
 
         // 4) No Deadlock C, C
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_4()
         {
             long cBase = 200;
@@ -142,7 +142,7 @@ namespace UnitTests.General
         }
 
         // 5) No Deadlock C, A, C
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_5()
         {
             long cBase = 200;

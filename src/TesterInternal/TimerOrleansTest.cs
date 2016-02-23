@@ -4,20 +4,20 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.TimerTests
 {
-    [TestClass]
     public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Basic()
         {
             for (int i = 0; i < 10; i++)
@@ -36,7 +36,7 @@ namespace UnitTests.TimerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Parallel()
         {
             TimeSpan period = TimeSpan.Zero;
@@ -63,7 +63,7 @@ namespace UnitTests.TimerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Migration()
         {
             Stopwatch stopwatch = new Stopwatch();
@@ -93,7 +93,7 @@ namespace UnitTests.TimerTests
             Console.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall()
         {
             const string testName = "AsyncTimerTest_GrainCall";

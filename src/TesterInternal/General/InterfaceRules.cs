@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.Grains;
 using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+using Xunit;
 
 namespace UnitTests.General
 {
@@ -78,7 +79,7 @@ namespace UnitTests.General
     {
         int IntProperty { get; }
     }
-    
+
     public interface IInheritedGrain_ObserverGrain_PropertySetter : IBaseGrain, IBaseObserver
     {
         Task<int> IntProperty { get; set; }
@@ -117,18 +118,10 @@ namespace UnitTests.General
     /// <summary>
     /// Summary description for InterfaceRules
     /// </summary>
-    [TestClass]
     public class InterfaceRulesTests
     {
-        [TestInitialize]
-        [TestCleanup]
-        public void MyTestCleanup()
-        {
-        }
 
-        public TestContext TestContext { get; set; }
-
-        [TestMethod, TestCategory("BVT"), TestCategory("JSON")]
+        [Fact, TestCategory("BVT"), TestCategory("JSON")]
         public void JSON_JsonEchoGrain_IsConcreteGrainClass()
         {
             Type grainClass = typeof(JsonEchoGrain);
@@ -154,92 +147,92 @@ namespace UnitTests.General
 
         #region simple interfaces
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_VoidMethod()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_VoidMethod));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_VoidMethod)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_IntMethod()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_IntMethod));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_IntMethod)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_IntProperty()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_IntProperty));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_IntProperty)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_PropertySetter()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_PropertySetter));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_PropertySetter)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_Observer_NonVoidMethod()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestObserver_NonVoidMethod));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestObserver_NonVoidMethod)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_Observer_Property()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestObserver_Property));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestObserver_Property)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_OutArgument()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_OutArgument));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_OutArgument)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_RefArgument()
         {
-            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_RefArgument));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(ITestGrain_RefArgument)));
         }
 
         #endregion
 
         #region inheritence
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_ObserverGrain_VoidMethod()
         {
-            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_VoidMethod));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_VoidMethod)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_ObserverGrain_IntMethod()
         {
-            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_IntMethod));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_IntMethod)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_ObserverGrain_IntProperty()
         {
-            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_IntProperty));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_IntProperty)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
-        [ExpectedException(typeof(GrainInterfaceData.RulesViolationException))]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_ObserverGrain_PropertySetter()
         {
-            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_PropertySetter));
+            Xunit.Assert.Throws<GrainInterfaceData.RulesViolationException>(() =>
+            GrainInterfaceData.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_PropertySetter)));
         }
 
         #endregion

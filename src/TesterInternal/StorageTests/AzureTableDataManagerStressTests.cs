@@ -4,29 +4,21 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
-using Tester;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    public class AzureTableDataManagerStressTests
+
+    public class AzureTableDataManagerStressTests : IClassFixture<AzureStorageBasicTestFixture>
     {
         private string PartitionKey;
         private UnitTestAzureTableDataManager manager;
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            TestUtils.CheckForAzureStorage();
-        }
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public AzureTableDataManagerStressTests()
         {
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
@@ -36,7 +28,7 @@ namespace UnitTests.StorageTests
             PartitionKey = "AzureTableDataManagerStressTests-" + Guid.NewGuid();
         }
 
-        [TestMethod, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
         public void AzureTableDataManagerStressTests_WriteAlot_SinglePartition()
         {
             const string testName = "AzureTableDataManagerStressTests_WriteAlot_SinglePartition";
@@ -48,7 +40,7 @@ namespace UnitTests.StorageTests
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [TestMethod, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
         public void AzureTableDataManagerStressTests_WriteAlot_MultiPartition()
         {
             const string testName = "AzureTableDataManagerStressTests_WriteAlot_MultiPartition";
@@ -60,7 +52,7 @@ namespace UnitTests.StorageTests
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [TestMethod, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
         public void AzureTableDataManagerStressTests_ReadAll_SinglePartition()
         {
             const string testName = "AzureTableDataManagerStressTests_ReadAll";

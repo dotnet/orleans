@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime.Configuration;
 
 namespace UnitTests.TestHelper
@@ -21,17 +20,10 @@ namespace UnitTests.TestHelper
             return dbFile;
         }
 
-        public static string GetSqlConnectionString(TestContext context)
+        public static string GetSqlConnectionString()
         {
             string dbFileName = @"TestDb.mdf";
-            string dbDirPath =
-#if DEBUG
-                // TestRunDirectory=C:\Depot\Orleans\Code\Main\OrleansV4\TestResults\Deploy_jthelin 2014-08-17 11_53_46
-                Path.Combine(context.TestRunDirectory, @"..\..\TesterInternal\Data");
-#else
-                context.DeploymentDirectory;
-#endif
-            return GetSqlConnectionString(new DirectoryInfo(dbDirPath), dbFileName);
+            return GetSqlConnectionString(new DirectoryInfo(@".\Data"), dbFileName);
         }
 
         private static string GetSqlConnectionString(DirectoryInfo dbDir, string dbFileName)

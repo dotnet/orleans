@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -15,6 +15,8 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
+using Tester;
+using Xunit;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -22,43 +24,43 @@ using UnitTests.Tester;
 
 namespace UnitTests.StorageTests
 {
+    public class PersistenceGrainTests_LocalFixture : BaseClusterFixture
+    {
+        public PersistenceGrainTests_LocalFixture()
+            : base(new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
+                    StartFreshOrleans = true,
+                    StartPrimary = true,
+                    StartSecondary = false,
+                }))
+        {
+        }
+    }
+
     /// <summary>
     /// PersistenceGrainTests - Run with only local unit test silo -- no external dependency on Azure storage
     /// </summary>
-    [TestClass]
-    [DeploymentItem("Config_DevStorage.xml")]
-    public class PersistenceGrainTests_Local : HostedTestClusterPerFixture
+    public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_LocalFixture>, IDisposable
     {
         const string ErrorInjectorStorageProvider = "ErrorInjector";
+        protected TestingSiloHost HostedCluster { get; private set; }
 
-        private static readonly TestingSiloOptions testSiloOptions = new TestingSiloOptions
+        public PersistenceGrainTests_Local(PersistenceGrainTests_LocalFixture fixture)
         {
-            SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-        };
-
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(testSiloOptions);
-        }
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
+            HostedCluster = fixture.HostedCluster;
             SerializationManager.InitializeForTesting();
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
             ResetMockStorageProvidersHistory();
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void Persistence_Silo_StorageProviders()
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
@@ -73,7 +75,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void Persistence_Silo_StorageProvider_Name_LowerCase()
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
@@ -85,17 +87,19 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
-        [ExpectedException(typeof(KeyNotFoundException))]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void Persistence_Silo_StorageProvider_Name_Missing()
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
-            IStorageProvider store = silo.Silo.TestHook.GetStorageProvider(providerName);
+            Xunit.Assert.Throws<KeyNotFoundException>(() =>
+            {
+                IStorageProvider store = silo.Silo.TestHook.GetStorageProvider(providerName);
+            });
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_CheckStateInit()
         {
             Guid id = Guid.NewGuid();
@@ -104,7 +108,7 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(ok, "CheckStateInit OK");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_CheckStorageProvider()
         {
             Guid id = Guid.NewGuid();
@@ -113,7 +117,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(typeof(MockStorageProvider).FullName, providerType, "StorageProvider provider type");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Init()
         {
             const string providerName = "test1";
@@ -127,7 +131,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(1, storageProvider.InitCount, "StorageProvider #Init");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Activate_StoredValue()
         {
             const string providerName = "test1";
@@ -145,7 +149,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(initialValue, readValue, "Read previously stored value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Activate_Error()
         {
             const string providerName = ErrorInjectorStorageProvider;
@@ -191,7 +195,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Read()
         {
             const string providerName = "test1";
@@ -206,7 +210,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, storageProvider.WriteCount, "StorageProvider #Writes");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Write()
         {
             const string providerName = "test1";
@@ -230,7 +234,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_ReRead()
         {
             const string providerName = "test1";
@@ -257,7 +261,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(42, ((PersistenceTestGrainState)storageProvider.LastState).Field1, "Store-Field1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Read_Write()
         {
             Guid guid = Guid.NewGuid();
@@ -281,7 +285,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, val, "Value after Re-Read");
         }
 
-        [TestMethod, TestCategory("Stress"), TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Stress"), TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Stress_Read()
         {
             const int numIterations = 10000;
@@ -304,7 +308,7 @@ namespace UnitTests.StorageTests
             await Task.WhenAll(promises);
 
             TimeSpan elapsed = sw.Elapsed;
-            double tps = (numIterations*2)/elapsed.TotalSeconds; // One Read and one Write per iteration
+            double tps = (numIterations * 2) / elapsed.TotalSeconds; // One Read and one Write per iteration
             //Console.WriteLine("{0} Completed {1} Read-Write operations in {2} at {3} TPS", TestContext.TestName, numIterations, elapsed, tps);
 
             for (int i = 0; i < numIterations; i++)
@@ -314,7 +318,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Write()
         {
             const string providerName = "test1";
@@ -338,7 +342,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Delete()
         {
             const string providerName = "test1";
@@ -370,7 +374,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Read_Error()
         {
             const string providerName = "test1";
@@ -433,7 +437,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, storageProvider.WriteCount, "StorageProvider #Writes-2");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Write_Error()
         {
             const string providerName = "test1";
@@ -507,7 +511,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(4, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_ReRead_Error()
         {
             const string providerName = "test1";
@@ -591,7 +595,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(43, storageProvider.GetLastState<PersistenceTestGrainState>().Field1, "Store-Field1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeRead()
         {
             string grainType = typeof(PersistenceProviderErrorGrain).FullName;
@@ -606,7 +610,7 @@ namespace UnitTests.StorageTests
             ErrorInjectionStorageProvider storageProvider = (ErrorInjectionStorageProvider)FindStorageProviderInUse(ErrorInjectorStorageProvider);
             storageProvider.SetErrorInjection(ErrorInjectionPoint.None);
 
-            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference) grain, "Field1", expectedVal);
+            storageProvider.SetValue<PersistenceTestGrainState>(grainType, (GrainReference)grain, "Field1", expectedVal);
 
             val = await grain.DoRead();
 
@@ -621,7 +625,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterRead()
         {
             string grainType = typeof(PersistenceProviderErrorGrain).FullName;
@@ -663,7 +667,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeWrite()
         {
             Guid id = Guid.NewGuid();
@@ -695,7 +699,7 @@ namespace UnitTests.StorageTests
 #endif
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterWrite()
         {
             Guid id = Guid.NewGuid();
@@ -721,7 +725,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeReRead()
         {
             string grainType = typeof(PersistenceProviderErrorGrain).FullName;
@@ -752,7 +756,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterReRead()
         {
             string grainType = typeof(PersistenceProviderErrorGrain).FullName;
@@ -786,7 +790,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_Handled_Read()
         {
             string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
@@ -823,7 +827,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_Handled_Write()
         {
             string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
@@ -858,7 +862,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_NotHandled_Write()
         {
             string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
@@ -899,7 +903,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(expectedVal, val, "Returned value after good write");
         }
 
-        [TestMethod, TestCategory("Stress"), TestCategory("CorePerf"), TestCategory("Persistence")]
+        [Fact, TestCategory("Stress"), TestCategory("CorePerf"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Loop_Read()
         {
             const int numIterations = 100;
@@ -926,7 +930,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_BadProvider()
         {
             try
@@ -957,7 +961,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void OrleansException_BadProvider()
         {
             string msg1 = "BadProvider";
@@ -983,7 +987,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(msg1, exc.InnerException.Message, "InnerException.Message should be '{0}'", msg1);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_UserGrain_Read_Write()
         {
             Guid id = Guid.NewGuid();
@@ -1021,7 +1025,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(name2, await friends[1].GetName(), "GetFriends - Friend #2 Name");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_NoState()
         {
             const string providerName = "test1";
@@ -1035,7 +1039,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(null, storageProvider, "StorageProvider found");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public async Task Grain_Serialize_Func()
         {
             Guid id = Guid.NewGuid();
@@ -1043,7 +1047,7 @@ namespace UnitTests.StorageTests
             await grain.Test_Serialize_Func();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public async Task Grain_Serialize_Predicate()
         {
             Guid id = Guid.NewGuid();
@@ -1051,7 +1055,7 @@ namespace UnitTests.StorageTests
             await grain.Test_Serialize_Predicate();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public async Task Grain_Serialize_Predicate_Class()
         {
             Guid id = Guid.NewGuid();
@@ -1059,7 +1063,7 @@ namespace UnitTests.StorageTests
             await grain.Test_Serialize_Predicate_Class();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public async Task Grain_Serialize_Predicate_Class_Param()
         {
             Guid id = Guid.NewGuid();
@@ -1069,7 +1073,7 @@ namespace UnitTests.StorageTests
             await grain.Test_Serialize_Predicate_Class_Param(pred);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public void Serialize_GrainState_DeepCopy()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
@@ -1090,7 +1094,7 @@ namespace UnitTests.StorageTests
             Assert.AreNotSame(initialState.GrainList, copy.GrainList, "List");
         }
 
-        [TestMethod, TestCategory("Persistence"), TestCategory("Serialization"), TestCategory("CorePerf"), TestCategory("Stress")]
+        [Fact, TestCategory("Persistence"), TestCategory("Serialization"), TestCategory("CorePerf"), TestCategory("Stress")]
         public async Task Serialize_GrainState_DeepCopy_Stress()
         {
             int num = 100;
@@ -1132,7 +1136,7 @@ namespace UnitTests.StorageTests
             //await Task.WhenAll(copyTask, serializeTask);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task ReentrentGrainWithState()
         {
             Guid id1 = Guid.NewGuid();
@@ -1148,7 +1152,7 @@ namespace UnitTests.StorageTests
             await Task.WhenAll(t11, t12, t21, t22);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task NonReentrentStressGrainWithoutState()
         {
             Guid id1 = Guid.NewGuid();
@@ -1158,7 +1162,7 @@ namespace UnitTests.StorageTests
 
         private const bool DoStart = true; // Task.Delay tests fail (Timeout) unless True
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task ReentrentGrain_Task_Delay()
         {
             Guid id1 = Guid.NewGuid();
@@ -1167,7 +1171,7 @@ namespace UnitTests.StorageTests
             await grain1.Task_Delay(DoStart);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task NonReentrentGrain_Task_Delay()
         {
             Guid id1 = Guid.NewGuid();
@@ -1176,7 +1180,7 @@ namespace UnitTests.StorageTests
             await grain1.Task_Delay(DoStart);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task StateInheritanceTest()
         {
             Guid id1 = Guid.NewGuid();
@@ -1226,7 +1230,7 @@ namespace UnitTests.StorageTests
                     Assert.Fail(msg);
                 }
             }
-            catch (AssertFailedException)
+            catch (Microsoft.VisualStudio.TestTools.UnitTesting.AssertFailedException)
             {
                 throw;
             }
@@ -1280,7 +1284,7 @@ namespace UnitTests.StorageTests
 
         private void ResetMockStorageProvidersHistory()
         {
-            var mockStorageProviders = new[] { "test1", "test2", "lowercase"};
+            var mockStorageProviders = new[] { "test1", "test2", "lowercase" };
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos().ToList())
             {
                 foreach (var providerName in mockStorageProviders)

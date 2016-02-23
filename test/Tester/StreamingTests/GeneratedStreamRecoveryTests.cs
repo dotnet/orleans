@@ -21,7 +21,7 @@ namespace UnitTests.StreamingTests
 {
     public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        private class Fixture : BaseClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
 

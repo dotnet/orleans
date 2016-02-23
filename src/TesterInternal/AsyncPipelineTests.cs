@@ -2,32 +2,21 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.TestHelper;
+using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.AsyncPrimitivesTests
 {
-
-    [TestClass]
-    public class AsyncPipelineTests
+    public class AsyncPipelineTests : HostedTestClusterPerTest
     {
         private const int _iterationCount = 100;
         private const int _defaultPipelineCapacity = 2;
-
-        public AsyncPipelineTests()
-        {}
-
-        [TestInitialize]
-        public void TestInitialize()
-        { }
-
-        [TestCleanup]
-        public void TestCleanup()
-        { }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void AsyncPipelineSimpleTest()
         {
             int step = 1000;
@@ -50,7 +39,7 @@ namespace UnitTests.AsyncPrimitivesTests
             Assert.IsTrue(3 * step - epsilon <= watch.ElapsedMilliseconds && watch.ElapsedMilliseconds <= 3 * step + epsilon);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void AsyncPipelineWaitTest()
         {
             Random rand = new Random(222);
@@ -96,7 +85,7 @@ namespace UnitTests.AsyncPrimitivesTests
             return result;
         }
         
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task AsyncPipelineSingleThreadedBlackBoxConsistencyTest()
         {
             await AsyncPipelineBlackBoxConsistencyTest(1);

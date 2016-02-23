@@ -1,17 +1,15 @@
 ﻿using System.IO;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
+using System;
+using Xunit;
 
 namespace UnitTests.Streaming
 {
-    [DeploymentItem("Config_AzureStreamProviders.xml")]
-    [DeploymentItem("ClientConfig_AzureStreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
     public class AQStreamingTests : HostedTestClusterPerTest
     {
         internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml");
@@ -38,47 +36,46 @@ namespace UnitTests.Streaming
 
         private SingleStreamTestRunner runner;
 
-        public static TestingSiloHost CreateSiloHost()
+        public override TestingSiloHost CreateSiloHost()
         {
             return new TestingSiloHost(aqSiloOptions, aqClientOptions);
             //return new TestingSiloHost(aqSiloOption_OnlyPrimary, aqClientOptions);
             //return new TestingSiloHost(aqSiloOption_NoClient);
         }
-
-        [TestInitialize]
-        public void Initialize()
+        
+        public AQStreamingTests()
         {
             runner = new SingleStreamTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public override void Dispose()
         {
             var deploymentId = HostedCluster.DeploymentId;
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+            base.Dispose();
         }
 
         ////------------------------ One to One ----------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_01_OneProducerGrainOneConsumerGrain()
         {
             await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_02_OneProducerGrainOneConsumerClient()
         {
             await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_03_OneProducerClientOneConsumerGrain()
         {
             await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_04_OneProducerClientOneConsumerClient()
         {
             await runner.StreamTest_04_OneProducerClientOneConsumerClient();
@@ -86,50 +83,50 @@ namespace UnitTests.Streaming
 
         //------------------------ MANY to Many different grains ----------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
         {
             await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
         {
             await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
         }
 
         //------------------------ MANY to Many Same grains ----------------------//
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_09_ManySame_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_10_ManySame_ManyConsumerGrainsManyProducerGrains()
         {
             await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_11_ManySame_ManyProducerGrainsManyConsumerClients()
         {
             await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_12_ManySame_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
@@ -137,13 +134,13 @@ namespace UnitTests.Streaming
 
         //------------------------ MANY to Many producer consumer same grain ----------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_13_SameGrain_ConsumerFirstProducerLater()
         {
             await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_14_SameGrain_ProducerFirstConsumerLater()
         {
             await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
@@ -151,20 +148,20 @@ namespace UnitTests.Streaming
 
         //----------------------------------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_15_ConsumeAtProducersRequest()
         {
             await runner.StreamTest_15_ConsumeAtProducersRequest();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
@@ -172,7 +169,7 @@ namespace UnitTests.Streaming
                 this.HostedCluster.StartAdditionalSilo);
         }
 
-        //[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        //[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task AQ_18_MultipleStreams_1J_1F_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 18, false);
@@ -181,22 +178,21 @@ namespace UnitTests.Streaming
                 this.HostedCluster.StopSilo);
         }
 
-        [TestMethod, TestCategory("Streaming")]
+        [Fact, TestCategory("Streaming")]
         public async Task AQ_19_ConsumerImplicitlySubscribedToProducerClient()
         {
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.
             await runner.StreamTest_19_ConsumerImplicitlySubscribedToProducerClient();
         }
 
-        [TestMethod, TestCategory("Streaming")]
+        [Fact, TestCategory("Streaming")]
         public async Task AQ_20_ConsumerImplicitlySubscribedToProducerGrain()
         {
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.
             await runner.StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain();
         }
 
-        [TestMethod, TestCategory("Streaming"), TestCategory("Failures")]
-        [Ignore]
+        [Fact(Skip = "Ignored"), TestCategory("Streaming"), TestCategory("Failures")]
         public async Task AQ_21_GenericConsumerImplicitlySubscribedToProducerGrain()
         {
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.

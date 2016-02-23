@@ -1,17 +1,16 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
@@ -26,14 +25,21 @@ namespace UnitTests.StorageTests
         internal static readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
     }
 
+    public class SiloInstanceTableManagerTestsFixture
+    {
+        public SiloInstanceTableManagerTestsFixture()
+        {
+            TraceLogger.Initialize(new NodeConfiguration());
+
+            TestUtils.CheckForAzureStorage();
+        }
+    }
+
     /// <summary>
     /// Tests for operation of Orleans SiloInstanceManager using AzureStore - Requires access to external Azure storage
     /// </summary>
-    [TestClass]
-    public class SiloInstanceTableManagerTests
+    public class SiloInstanceTableManagerTests : IClassFixture<SiloInstanceTableManagerTestsFixture>, IDisposable
     {
-        public TestContext TestContext { get; set; }
-
         private string deploymentId;
         private int generation;
         private SiloAddress siloAddress;
@@ -44,21 +50,7 @@ namespace UnitTests.StorageTests
         public SiloInstanceTableManagerTests()
         {
             logger = TraceLogger.GetLogger("SiloInstanceTableManagerTests", TraceLogger.LoggerType.Application);
-        }
 
-        // Use ClassInitialize to run code before running the first test in the class
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            TraceLogger.Initialize(new NodeConfiguration());
-
-            TestUtils.CheckForAzureStorage();
-        }
-
-        // Use TestInitialize to run code before running each test 
-        [TestInitialize]
-        public void TestInitialize()
-        {
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddress.NewLocalAddress(generation);
@@ -71,8 +63,7 @@ namespace UnitTests.StorageTests
         }
 
         // Use TestCleanup to run code after each test has run
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             if(manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
@@ -87,13 +78,13 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void SiloInstanceTable_Op_RegisterSiloInstance()
         {
             RegisterSiloInstance();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void SiloInstanceTable_Op_ActivateSiloInstance()
         {
             RegisterSiloInstance();
@@ -101,7 +92,7 @@ namespace UnitTests.StorageTests
             manager.ActivateSiloInstance(myEntry);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void SiloInstanceTable_Op_UnregisterSiloInstance()
         {
             RegisterSiloInstance();
@@ -109,7 +100,7 @@ namespace UnitTests.StorageTests
             manager.UnregisterSiloInstance(myEntry);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
@@ -118,7 +109,7 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(didInsert, "Did insert");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task SiloInstanceTable_Register_CheckData()
         {
             const string testName = "SiloInstanceTable_Register_CheckData";
@@ -139,7 +130,7 @@ namespace UnitTests.StorageTests
             logger.Info("End {0}", testName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task SiloInstanceTable_Activate_CheckData()
         {
             RegisterSiloInstance();
@@ -160,7 +151,7 @@ namespace UnitTests.StorageTests
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public async Task SiloInstanceTable_Unregister_CheckData()
         {
             RegisterSiloInstance();
@@ -179,7 +170,7 @@ namespace UnitTests.StorageTests
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
             RegisterSiloInstance();
@@ -197,7 +188,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(myEntry.ProxyPort, myGateway.Port.ToString(CultureInfo.InvariantCulture), "Gateway port");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void SiloAddress_ToFrom_RowKey()
         {
             string ipAddress = "1.2.3.4";

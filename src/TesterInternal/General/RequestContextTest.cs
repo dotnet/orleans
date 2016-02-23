@@ -6,27 +6,27 @@ using System.IO;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
+using Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
-    public class RequestContextTests_Local
+    public class RequestContextTests_Local : OrleansTestingBase, IDisposable
     {
         private readonly Dictionary<string, object> headers = new Dictionary<string, object>();
 
         private static bool oldPropagateActivityId;
 
-        private static readonly SafeRandom random = new SafeRandom();
-
-        [TestInitialize]
+        //private static readonly SafeRandom random = new SafeRandom();
+        
         public void TestInitialize()
         {
             oldPropagateActivityId = RequestContext.PropagateActivityId;
@@ -36,9 +36,13 @@ namespace UnitTests.General
             headers.Clear();
             GrainClient.ClientInvokeCallback = null;
         }
+        
+        public void Dispose()
+        {
+            TestCleanup();
+        }
 
-        [TestCleanup]
-        public void TestCleanup()
+        private void TestCleanup()
         {
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
@@ -46,7 +50,7 @@ namespace UnitTests.General
             GrainClient.ClientInvokeCallback = null;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_MultiThreads_ExportToMessage()
         {
             const int NumLoops = 50;
@@ -71,7 +75,7 @@ namespace UnitTests.General
             await Task.WhenAll(promises);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportToMessage()
         {
             SerializationManager.InitializeForTesting();
@@ -127,7 +131,7 @@ namespace UnitTests.General
             TestCleanup();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportImport()
         {
             SerializationManager.InitializeForTesting();
@@ -187,7 +191,7 @@ namespace UnitTests.General
             TestCleanup();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_Basic()
         {
             string name1 = "Name" + random.Next();
@@ -219,7 +223,7 @@ namespace UnitTests.General
             }
             await Task.WhenAll(promises);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_Dictionary()
         {
             string name1 = "Name" + random.Next();
@@ -266,7 +270,7 @@ namespace UnitTests.General
             await Task.WhenAll(promises);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_CrossThread()
         {
             const int NumLoops = 1000;
@@ -298,7 +302,7 @@ namespace UnitTests.General
             Assert.AreEqual(data1, CallContext.LogicalGetData(name1), "LCC.GetData-Main-Final");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_CrossThread_Dictionary()
         {
             const int NumLoops = 1000;
@@ -356,7 +360,7 @@ namespace UnitTests.General
             Assert.AreEqual(data1, result0[name1], "LCC.GetData-Main-Final");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_CrossThread()
         {
             const int NumLoops = 1000;
@@ -391,39 +395,36 @@ namespace UnitTests.General
 
     }
 
-    [TestClass]
-    public class RequestContextTests_Silo : HostedTestClusterPerFixture
+    public class RequestContextTests_SiloFixture : BaseClusterFixture
     {
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
+        public RequestContextTests_SiloFixture() : base(new TestingSiloHost(new TestingSiloOptions
         {
             StartFreshOrleans = true,
             StartPrimary = true,
             StartSecondary = false,
             PropagateActivityId = true,
-            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-        };
-
-        public static TestingSiloHost CreateSiloHost()
+            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
+        }))
         {
-            return new TestingSiloHost(siloOptions);
         }
+    }
 
-        [TestInitialize]
-        public void TestInitialize()
+    public class RequestContextTests_Silo : OrleansTestingBase, IDisposable
+    {        
+        public RequestContextTests_Silo()
         {
             RequestContext.PropagateActivityId = true; // Client-side setting
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public void Dispose()
         {
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_Simple()
         {
             Guid activityId = Guid.NewGuid();
@@ -433,7 +434,7 @@ namespace UnitTests.General
             Assert.AreEqual(activityId, result, "E2E ActivityId not propagated correctly");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_AC_Test1()
         {
             long id = GetRandomGrainId();
@@ -460,7 +461,7 @@ namespace UnitTests.General
             Assert.AreEqual(val2, result, "Delayed (ContinueWith) RequestContext echo was not correct");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_Task_Test1()
         {
             long id = GetRandomGrainId();
@@ -496,7 +497,7 @@ namespace UnitTests.General
             //Assert.AreEqual(val2, result, "Delayed (Task.Run) RequestContext echo was not correct");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_Task_TestRequestContext()
         {
             var grain = GrainClient.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
@@ -506,7 +507,7 @@ namespace UnitTests.General
             Assert.AreEqual("binks", requestContext.Item2, "Item2=" + requestContext.Item2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_RC_Set_E2E()
         {
             Guid activityId = Guid.NewGuid();
@@ -531,7 +532,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_E2E()
         {
             Guid activityId = Guid.NewGuid();
@@ -562,7 +563,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_E2E_ViaProxy()
         {
             Guid activityId = Guid.NewGuid();
@@ -593,7 +594,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_RC_None_E2E()
         {
             Guid nullActivityId = Guid.Empty;
@@ -625,7 +626,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_None_E2E()
         {
             Guid nullActivityId = Guid.Empty;
@@ -657,7 +658,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_DynamicChange_Client()
         {
             Guid activityId = Guid.NewGuid();
@@ -692,7 +693,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_DynamicChange_Server()
         {
             Guid activityId = Guid.NewGuid();
@@ -734,7 +735,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_CountCallbacks()
         {
             TestClientInvokeCallback callback = new TestClientInvokeCallback(Guid.Empty);
@@ -752,7 +753,7 @@ namespace UnitTests.General
             Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks - should be unchanged");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_SetActivityId()
         {
             Guid setActivityId = Guid.NewGuid();
@@ -777,7 +778,7 @@ namespace UnitTests.General
             Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks - should be unchanged");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_GrainObserver()
         {
             TestClientInvokeCallback callback = new TestClientInvokeCallback(Guid.Empty);
@@ -813,10 +814,9 @@ namespace UnitTests.General
         }
     }
     
-    [TestClass]
-    public class Halo_RequestContextTests
+    public class Halo_RequestContextTests : OrleansTestingBase
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_RequestContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
             int numTasks = 20;
@@ -851,11 +851,10 @@ namespace UnitTests.General
             }
         }
     }
-
-    [TestClass]
-    public class Halo_CallContextTests
+    
+    public class Halo_CallContextTests : OrleansTestingBase
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_LogicalCallContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
             int numTasks = 20;

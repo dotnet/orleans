@@ -1,6 +1,6 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -15,6 +15,8 @@ using System.Threading.Tasks;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
+using System.IO;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -25,8 +27,9 @@ namespace UnitTests.StorageTests
     /// <summary>
     /// Base_PersistenceGrainTests - a base class for testing persistence providers
     /// </summary>
-    public abstract class Base_PersistenceGrainTests_AzureStore : HostedTestClusterPerFixture
+    public abstract class Base_PersistenceGrainTests_AzureStore : OrleansTestingBase
     {
+        protected TestingSiloHost HostedCluster { get; private set; }
         private readonly double timingFactor;
 
         private const int LoopIterations_Grain = 1000;
@@ -35,8 +38,9 @@ namespace UnitTests.StorageTests
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
 
-        public Base_PersistenceGrainTests_AzureStore()
+        public Base_PersistenceGrainTests_AzureStore(BaseClusterFixture fixture)
         {
+            HostedCluster = fixture.HostedCluster;
             timingFactor = TestUtils.CalibrateTimings();
         }
 

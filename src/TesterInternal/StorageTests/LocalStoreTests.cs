@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
@@ -21,16 +22,11 @@ namespace UnitTests.StorageTests
         Sql
     }
 
-    [TestClass]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class LocalStoreTests
+    public class LocalStoreTestsFixture : IDisposable
     {
-        public TestContext TestContext { get; set; }
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        public LocalStoreTestsFixture()
         {
-            Console.WriteLine("ClassInitialize {0}", testContext.TestName);
+            Console.WriteLine("ClassInitialize {0}", "LocalStoreTests");//testContext.TestName);
 
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
 
@@ -38,29 +34,24 @@ namespace UnitTests.StorageTests
             TraceLogger.Initialize(cfg);
         }
 
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public void Dispose()
         {
             LocalDataStoreInstance.LocalDataStore = null;
         }
+    }
 
-        [TestInitialize]
-        public void TestInitialize()
+
+    public class LocalStoreTests : IClassFixture<LocalStoreTestsFixture>
+    {
+        public LocalStoreTests()
         {
             LocalDataStoreInstance.LocalDataStore = null;
         }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_Read()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -79,10 +70,10 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(state.C, data["C"], "C");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_WriteRead()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -103,10 +94,10 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(state.State.C, data["C"], "C");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_Delete()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -149,10 +140,10 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(ok, "Row deleted OK after {0}. Etag={1} Keys={2}", sw.Elapsed, eTag, StorageProviderUtils.PrintKeys(keys));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_ReadMulti()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -189,10 +180,10 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, results.Count, "Count");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void GrainState_Store_WriteRead()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 

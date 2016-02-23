@@ -4,11 +4,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using UnitTests.TesterInternal;
+using Xunit;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -33,30 +34,25 @@ namespace UnitTests.SchedulerTests
 
         #endregion
     }
-
-    [TestClass]
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [DeploymentItem("ClientConfiguration.xml")]
-    public class OrleansTaskSchedulerBasicTests 
+    
+    public class OrleansTaskSchedulerBasicTests : IDisposable
     {
         private static readonly object lockable = new object();
-
-        [TestInitialize]
-        public void MyTestInitialize()
+        
+        public OrleansTaskSchedulerBasicTests()
         {
             SynchronizationContext.SetSynchronizationContext(null);
             InitSchedulerLogging();
         }
-
-        [TestCleanup]
-        public void MyTestCleanup()
+        
+        public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(null);
             TraceLogger.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
             //TraceLogger.UnInitialize();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_Task_Start_OrleansTaskScheduler()
         {
             InitSchedulerLogging();
@@ -75,7 +71,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(expected, received, "Task did not return expected value " + expected);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_Task_Start_ActivationTaskScheduler()
         {
             InitSchedulerLogging();
@@ -95,7 +91,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(expected, received, "Task did not return expected value " + expected);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_SimpleFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
@@ -122,7 +118,7 @@ namespace UnitTests.SchedulerTests
             orleansTaskScheduler.Stop();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_Task_TplFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
@@ -151,7 +147,7 @@ namespace UnitTests.SchedulerTests
             orleansTaskScheduler.Stop();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_TplFifoTest_TaskScheduler()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
@@ -178,7 +174,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(15, n, "Work items executed out of order");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_StartTask_1()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();;
@@ -205,7 +201,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsFalse(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_StartTask_2()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
@@ -234,7 +230,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsFalse(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_StartTask_Wrapped()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
@@ -275,7 +271,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsFalse(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_StartTask_Wait_Wrapped()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
@@ -331,7 +327,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_ClosureWorkItem_Wait()
         {
             UnitTestSchedulingContext cntx = new UnitTestSchedulingContext();
@@ -381,7 +377,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_Task_TaskWorkItem_CurrentScheduler()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
@@ -428,7 +424,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(result1.Task.Result, "Task-1 completed");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_Task_ClosureWorkItem_SpecificScheduler()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
@@ -475,7 +471,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(result1.Task.Result, "Task-1 completed");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_NewTask_ContinueWith_Wrapped()
         {
             TaskScheduler scheduler = new QueuedTaskScheduler();
@@ -508,7 +504,7 @@ namespace UnitTests.SchedulerTests
             if (!finished) throw new TimeoutException();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_NewTask_ContinueWith_Wrapped_OrleansTaskScheduler()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
@@ -542,7 +538,7 @@ namespace UnitTests.SchedulerTests
             if (!finished) throw new TimeoutException();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_NewTask_ContinueWith_TaskScheduler()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
@@ -570,7 +566,7 @@ namespace UnitTests.SchedulerTests
             if (!ok) throw new TimeoutException();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_StartNew_ContinueWith_TaskScheduler()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
@@ -597,7 +593,7 @@ namespace UnitTests.SchedulerTests
             if (!ok) throw new TimeoutException();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_SubTaskExecutionSequencing()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
@@ -655,7 +651,7 @@ namespace UnitTests.SchedulerTests
             scheduler.Stop();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_RequestContext_NewTask_ContinueWith()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();
@@ -701,7 +697,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsFalse(t0.IsFaulted, "Task #0 FAULTED=" + t0.Exception);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_AC_RequestContext_StartNew_ContinueWith()
         {
             UnitTestSchedulingContext rootContext = new UnitTestSchedulingContext();

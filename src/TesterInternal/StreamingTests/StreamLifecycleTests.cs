@@ -3,20 +3,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {
-    [TestClass]
-    [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("ClientConfig_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    public class StreamLifecycleTests : HostedTestClusterPerTest
+    public class StreamLifecycleTests : HostedTestClusterPerTest, IDisposable
     {
         protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
         {
@@ -36,61 +33,57 @@ namespace UnitTests.StreamingTests
         protected string StreamNamespace;
 
         private IActivateDeactivateWatcherGrain watcher;
-
-        public TestContext TestContext { get; set; }
-
-        public static TestingSiloHost CreateSiloHost()
+        
+        public override TestingSiloHost CreateSiloHost()
         {
             return new TestingSiloHost(SiloRunOptions, ClientRunOptions);
         }
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public StreamLifecycleTests()
         {
-            logger.Info("TestInitialize - {0}", TestContext.TestName);
+            //logger.Info("TestInitialize - {0}", TestContext.TestName);
             watcher = GrainClient.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public void DIspose()
         {
-            logger.Info("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+            //logger.Info("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
             StreamId = default(Guid);
             StreamProviderName = null;
             watcher.Clear().Wait();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_UseAfter_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_UseAfter_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task Stream_Lifecycle_AddRemoveProducers()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); // TestContext.TestName;
             StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger);
 
             int numProducers = 10;
@@ -165,7 +158,7 @@ namespace UnitTests.StreamingTests
 
         private async Task DoStreamCleanupTest_Deactivate(bool uncleanShutdown, bool useStreamAfterDeactivate)
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
             StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger);
 
             var producer1 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());

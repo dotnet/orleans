@@ -1,23 +1,17 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
     public class LoadSheddingTest : HostedTestClusterPerTest
     {
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(true);
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("LoadShedding")]
+        [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public void LoadSheddingBasic()
         {
             ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
@@ -38,7 +32,7 @@ namespace UnitTests.General
             Assert.IsTrue(failed, "Message was accepted even though silo was in overload state");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("LoadShedding")]
+        [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public void LoadSheddingComplex()
         {
             ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);

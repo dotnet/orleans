@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -12,23 +12,21 @@ using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.Tester;
+using Xunit;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
 
 namespace UnitTests.TimerTests
 {
-    [TestClass]
     public class ReminderTests_Azure_Standalone
     {
-        public TestContext TestContext { get; set; }
 
         private Guid ServiceId;
 
         private TraceLogger log;
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public ReminderTests_Azure_Standalone()
         {
             log = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
 
@@ -39,10 +37,10 @@ namespace UnitTests.TimerTests
 
         #region Extra tests / experiments
 
-        [TestMethod, TestCategory("ReminderService"), TestCategory("Azure"), TestCategory("Performance")]
+        [Fact, TestCategory("ReminderService"), TestCategory("Azure"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
 
             IReminderTable table = new AzureBasedReminderTable();
             var config = new GlobalConfiguration()
@@ -57,10 +55,10 @@ namespace UnitTests.TimerTests
             await TestTableInsertRate(table, 500);
         }
 
-        [TestMethod, TestCategory("ReminderService"), TestCategory("Azure")]
+        [Fact, TestCategory("ReminderService"), TestCategory("Azure")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
 
             string deploymentId = NewDeploymentId();
             IReminderTable table = new AzureBasedReminderTable();

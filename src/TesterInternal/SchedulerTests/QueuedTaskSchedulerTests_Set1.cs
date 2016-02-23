@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Xunit;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.SchedulerTests
 {
-    [TestClass]
     public class QueuedTaskSchedulerTests_Set1
     {
         public bool Verbose { get; set; }
 
-        [TestMethod, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
+        [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_GroupedMasterTaskScheduler()
         {
             const string testNameBase = "Task_GroupedMasterTaskScheduler";

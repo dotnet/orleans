@@ -1,20 +1,20 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
 // ReSharper disable ConvertToConstant.Local
 
 namespace UnitTests.CodeGeneration
 {
-    [TestClass]
     public class CodeGeneratorTests_RequiringSilo : HostedTestClusterEnsureDefaultStarted
     {
         // These test cases create GrainReferences, to we need to be connected to silo for that to work.
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey")]
         public void CodeGen_GrainId_TypeCode()
         {
             var g1Key = GetRandomGrainId();
@@ -27,7 +27,7 @@ namespace UnitTests.CodeGeneration
             Assert.AreEqual(1146670029, k1.BaseTypeCode, "Encoded type code data should match");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey"), TestCategory("ActivationCollector")]
         public void CollectionTest_GrainId_TypeCode()
         {
             var g1Key = GetRandomGrainId();

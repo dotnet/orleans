@@ -1,9 +1,10 @@
 ﻿using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
@@ -11,10 +12,9 @@ namespace UnitTests.General
     /// <summary>
     /// Summary description for GrainReferenceTest
     /// </summary>
-    [TestClass]
     public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReferenceComparison_DifferentReference()
         {
             ISimpleGrain ref1 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), Grains.SimpleGrain.SimpleGrainNamePrefix);
@@ -27,7 +27,7 @@ namespace UnitTests.General
             Assert.IsFalse(ref2.Equals(ref1));
         }
 
-        [TestMethod,TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact,TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void TaskCompletionSource_Resolve()
         {
             string str = "Hello TaskCompletionSource";
@@ -40,7 +40,7 @@ namespace UnitTests.General
             Assert.AreEqual(str, tcs.Task.Result, "Result");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReference_Pass_this()
         {
             IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
@@ -49,28 +49,28 @@ namespace UnitTests.General
             g1.PassThis(g2).Wait();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
         public void GrainReference_DotNet_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
         public void GrainReference_DotNet_Serialization_Unresolved()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, true, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
             int id = random.Next();

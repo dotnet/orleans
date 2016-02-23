@@ -3,18 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using UnitTests.TesterInternal;
+using Xunit;
 
 namespace UnitTests.SchedulerTests
 {
-    [TestClass]
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [DeploymentItem("ClientConfiguration.xml")]
-    public class OrleansTaskSchedulerAdvancedTests : MarshalByRefObject
+    public class OrleansTaskSchedulerAdvancedTests : MarshalByRefObject, IDisposable
     {
         private OrleansTaskScheduler orleansTaskScheduler;
 
@@ -22,15 +20,13 @@ namespace UnitTests.SchedulerTests
         private static readonly TimeSpan TwoSeconds = TimeSpan.FromSeconds(2);
 
         private static readonly int waitFactor = Debugger.IsAttached ? 100 : 1;
-
-        [TestInitialize]
-        public void MyTestInitialize()
+        
+        public OrleansTaskSchedulerAdvancedTests()
         {
             OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
         }
-
-        [TestCleanup]
-        public void MyTestCleanup()
+        
+        public void Dispose()
         {
             if (orleansTaskScheduler != null)
             {
@@ -39,7 +35,7 @@ namespace UnitTests.SchedulerTests
             TraceLogger.UnInitialize();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_Test()
         {
             int n = 0;
@@ -75,7 +71,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(10, n, "Work items executed concurrently");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_AC_WaitTest()
         {
             int n = 0;
@@ -128,7 +124,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(15, n, "Work items executed out of order");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_MainTurnWait_Test()
         {
             orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext());
@@ -158,7 +154,7 @@ namespace UnitTests.SchedulerTests
             stageNum2 = n;
         }
     
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_AC_Turn_Execution_Order()
         {
             // Can we add a unit test that basicaly checks that any turn is indeed run till completion before any other turn? 
@@ -201,7 +197,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(22, stageNum2, "Work items executed out of order-2");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_Task_Turn_Execution_Order()
         {
             // A unit test that checks that any turn is indeed run till completion before any other turn? 
@@ -342,7 +338,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(22, stageNum2, "Work items executed out of order-2");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_Current_TaskScheduler()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
@@ -440,7 +436,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(3, stageNum1, "Work items executed out of order-1");
         }
         
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_ContinueWith_1_Test()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
@@ -464,7 +460,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(1, n, "Work items executed out of order");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Sched_Task_JoinAll()
         {
             var result = new TaskCompletionSource<bool>();
@@ -515,7 +511,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(4000 <= ms && ms <= 5000, "Wait time out of range, expected between 4000 and 5000 milliseconds, was " + ms);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_ContinueWith_2_OrleansSched()
         {
             orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(new UnitTestSchedulingContext());
@@ -557,7 +553,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(true, failed2, "Second ContinueWith did not fire error handler.");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_Task_SchedulingContext()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();

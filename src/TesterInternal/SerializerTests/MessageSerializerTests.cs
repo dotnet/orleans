@@ -3,20 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Xunit;
 
 namespace UnitTests.SerializerTests
 {
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [TestClass]
     public class MessageSerializerTests
     {
-        [TestInitialize]
-        public void TestInitialize()
+        public MessageSerializerTests()
         {
             MessagingStatisticsGroup.Init(false);
 
@@ -27,7 +25,7 @@ namespace UnitTests.SerializerTests
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void MessageTest_BinaryRoundTrip()
         {
             RunTest(1000);

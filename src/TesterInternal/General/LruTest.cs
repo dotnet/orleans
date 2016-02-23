@@ -1,7 +1,8 @@
 ﻿using System.Threading;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using System;
 using Orleans.Runtime;
+using Xunit;
 
 namespace UnitTests
 {
@@ -9,10 +10,9 @@ namespace UnitTests
     ///This is a test class for the LRU class and is intended
     ///to contain all LRU Unit Tests
     ///</summary>
-    [TestClass]
     public class LruTest
     {
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
         public void LruCountTest()
         {
             const int maxSize = 10;
@@ -29,7 +29,7 @@ namespace UnitTests
             Assert.AreEqual(2, target.Count, "Count wrong after adding two items");
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
         public void LruMaximumSizeTest()
         {
             const int maxSize = 10;
@@ -52,7 +52,7 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
         public void LruUsageTest()
         {
             const int maxSize = 10;

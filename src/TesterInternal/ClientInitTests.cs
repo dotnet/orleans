@@ -1,19 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests
 {
-    [TestClass]
-    public class ClientInitTests : HostedTestClusterPerFixture
+    public class ClientInitTests : HostedTestClusterEnsureDefaultStarted
     {
-        [TestInitialize]
-        public void Initialize()
+        public ClientInitTests()
         {
             if (!GrainClient.IsInitialized)
             {
@@ -21,7 +20,7 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Client")]
+        [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_IsInitialized()
         {
             // First initialize will have been done by orleans unit test base class
@@ -29,14 +28,14 @@ namespace UnitTests
             Assert.IsTrue(GrainClient.IsInitialized);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Client")]
+        [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_Uninitialize()
         {
             GrainClient.Uninitialize();
             Assert.IsFalse(GrainClient.IsInitialized);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Client")]
+        [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_UnThenReinitialize()
         {
             GrainClient.Uninitialize();
@@ -46,7 +45,7 @@ namespace UnitTests
             Assert.IsTrue(GrainClient.IsInitialized);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Client")]
+        [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_MultiInitialize()
         {
             // First initialize will have been done by orleans unit test base class
@@ -58,7 +57,7 @@ namespace UnitTests
             Assert.IsTrue(GrainClient.IsInitialized);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Client")]
+        [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_ErrorDuringInitialize()
         {
             ClientConfiguration cfg = new ClientConfiguration
@@ -101,7 +100,7 @@ namespace UnitTests
                 OutsideRuntimeClient.TestOnlyThrowExceptionDuringInit = false;
             }
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Client")]
+        [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_InitializeUnThenReInit()
         {
             GrainClient.Initialize("ClientConfigurationForTesting.xml");

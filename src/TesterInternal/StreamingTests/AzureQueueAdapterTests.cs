@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers;
 using Orleans.Providers.Streams.AzureQueue;
@@ -15,11 +15,11 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    public class AzureQueueAdapterTests
+    public class AzureQueueAdapterTests : IDisposable
     {
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
@@ -27,32 +27,20 @@ namespace UnitTests.StorageTests
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            InitializeForTesting();
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            DoTestCleanup();
-        }
-
-        public static void InitializeForTesting()
+        
+        public AzureQueueAdapterTests()
         {
             TraceLogger.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             SerializationManager.InitializeForTesting();
         }
-
-        public static void DoTestCleanup()
+        
+        public void Dispose()
         {
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, _deploymentId, StorageTestConstants.DataConnectionString).Wait();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Halo"), TestCategory("Azure"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Halo"), TestCategory("Azure"), TestCategory("Streaming")]
         public async Task SendAndReceiveFromAzureQueue()
         {
             _deploymentId = MakeDeploymentId();

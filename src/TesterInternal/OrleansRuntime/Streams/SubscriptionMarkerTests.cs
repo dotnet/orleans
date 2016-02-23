@@ -1,14 +1,14 @@
 using System;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Streams;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
     public class SubscriptionMarkerTests
     {
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
         public void MarkAsImplicitSubscriptionTest()
         {
             Guid guid = Guid.Empty;
@@ -20,7 +20,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.IsTrue(SubscriptionMarker.IsImplicitSubscription(markedGuid));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
         public void MarkAsExplicitSubscriptionTest()
         {
             byte[] guidBytes = Enumerable.Range(0, 16).Select(i => (byte)0xff).ToArray();

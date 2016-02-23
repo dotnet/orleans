@@ -2,22 +2,22 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
 
 #pragma warning disable 618
 
 namespace UnitTests
 {
-    [TestClass]
     public class ReentrancyTests : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void ReentrantGrain()
         {
             var reentrant = GrainClient.GrainFactory.GetGrain<IReentrantGrain>(GetRandomGrainId());
@@ -33,7 +33,7 @@ namespace UnitTests
             logger.Info("Reentrancy ReentrantGrain Test finished OK.");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain()
         {
             INonReentrantGrain nonreentrant = GrainClient.GrainFactory.GetGrain<INonReentrantGrain>(GetRandomGrainId());
@@ -67,7 +67,7 @@ namespace UnitTests
             logger.Info("Reentrancy NonReentrantGrain Test finished OK.");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void UnorderedNonReentrantGrain()
         {
             IUnorderedNonReentrantGrain unonreentrant = GrainClient.GrainFactory.GetGrain<IUnorderedNonReentrantGrain>(GetRandomGrainId());
@@ -102,7 +102,7 @@ namespace UnitTests
             logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task IsReentrant()
         {
             IReentrantTestSupportGrain grain = GrainClient.GrainFactory.GetGrain<IReentrantTestSupportGrain>(0);
@@ -115,7 +115,7 @@ namespace UnitTests
             Assert.IsFalse(await grain.IsReentrant(grainFullName));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {
             List<Task> done = new List<Task>();
@@ -131,9 +131,8 @@ namespace UnitTests
             logger.Info("ReentrancyTest_Deadlock_1 OK - no deadlock.");
         }
 
-        // TODO: [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [TestMethod, TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [Ignore]
+        // TODO: [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_2()
         {
             List<Task> done = new List<Task>();
@@ -152,45 +151,44 @@ namespace UnitTests
             logger.Info("ReentrancyTest_Deadlock_2 OK - no deadlock.");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_Reentrant()
         {
             await Do_FanOut_Task_Join(0, false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_NonReentrant()
         {
             await Do_FanOut_Task_Join(0, true, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_Reentrant_Chain()
         {
             await Do_FanOut_Task_Join(0, false, true);
         }
 
-        // TODO: [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [TestMethod, TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [Ignore]
+        // TODO: [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_NonReentrant_Chain()
         {
             await Do_FanOut_Task_Join(0, true, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_Reentrant()
         {
             await Do_FanOut_AC_Join(0, false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_NonReentrant()
         {
             await Do_FanOut_AC_Join(0, true, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_Reentrant_Chain()
         {
             await Do_FanOut_AC_Join(0, false, true);
@@ -198,14 +196,13 @@ namespace UnitTests
 
         [TestCategory("MultithreadingFailures")]
         // TODO: [TestCategory("Functional")]
-        [TestMethod, TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [Ignore]
+        [Fact(Skip ="Ignore"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_NonReentrant_Chain()
         {
             await Do_FanOut_AC_Join(0, true, true);
         }
 
-        [TestMethod, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void FanOut_Task_Stress_Reentrant()
         {
             const int numLoops = 5;
@@ -214,7 +211,7 @@ namespace UnitTests
             Do_FanOut_Stress(numLoops, blockSize, timeout, false, false);
         }
 
-        [TestMethod, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void FanOut_Task_Stress_NonReentrant()
         {
             const int numLoops = 5;
@@ -223,7 +220,7 @@ namespace UnitTests
             Do_FanOut_Stress(numLoops, blockSize, timeout, true, false);
         }
 
-        [TestMethod, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void FanOut_AC_Stress_Reentrant()
         {
             const int numLoops = 5;
@@ -232,7 +229,7 @@ namespace UnitTests
             Do_FanOut_Stress(numLoops, blockSize, timeout, false, true);
         }
 
-        [TestMethod, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void FanOut_AC_Stress_NonReentrant()
         {
             const int numLoops = 5;

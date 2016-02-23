@@ -5,20 +5,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Tester;
+using Xunit;
 
 namespace UnitTests.MessageCenterTests
 {
-    [TestClass]
-    public class GatewaySelectionTest
+    public class GatewaySelectionTest : IDisposable
     {
-        public TestContext TestContext { get; set; }
 
         private static readonly List<Uri> gatewayAddressUris = new[]
         {
@@ -27,29 +26,27 @@ namespace UnitTests.MessageCenterTests
             new Uri("gwy.tcp://127.0.0.1:3/0"),
             new Uri("gwy.tcp://127.0.0.1:4/0")
         }.ToList();
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public GatewaySelectionTest()
+        {
+            GrainClient.Uninitialize();
+            GrainClient.TestOnlyNoConnect = false;
+        }
+        
+        public void Dispose()
         {
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            GrainClient.Uninitialize();
-            GrainClient.TestOnlyNoConnect = false;
-        }
-
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
         public void GatewaySelection()
         {
             var listProvider = new TestListProvider(gatewayAddressUris);
             Test_GatewaySelection(listProvider);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
         public void GatewaySelection_ClientInit_EmptyList()
         {
             var cfg = new ClientConfiguration();
@@ -77,12 +74,12 @@ namespace UnitTests.MessageCenterTests
         }
 
 #if USE_SQL_SERVER || DEBUG
-        [TestMethod, TestCategory("Gateway"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Gateway"), TestCategory("SqlServer")]
         public async Task GatewaySelection_SqlServer()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
-            Console.WriteLine(TestUtils.DumpTestContext(TestContext));
+            //Console.WriteLine(TestUtils.DumpTestContext(TestContext));
 
             Guid serviceId = Guid.NewGuid();
 
@@ -90,7 +87,7 @@ namespace UnitTests.MessageCenterTests
             {
                 ServiceId = serviceId,
                 DeploymentId = testName,
-                DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(TestContext)
+                DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString()
             };
 
             var membership = new SqlMembershipTable();

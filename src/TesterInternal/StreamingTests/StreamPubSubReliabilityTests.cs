@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -11,45 +11,42 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using UnitTests.Tester;
+using Tester;
+using Xunit;
 //using UnitTests.Streaming.Reliability;
 
 namespace UnitTests.StreamingTests
 {
-    [TestClass]
-    [DeploymentItem("Config_StorageErrors.xml")]
-    [DeploymentItem("ClientConfig_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    public class StreamPubSubReliabilityTests : HostedTestClusterPerFixture
+    public class StreamPubSubReliabilityTestsFixture : BaseClusterFixture
     {
-        public TestContext TestContext { get; set; }
-        protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
+        public StreamPubSubReliabilityTestsFixture() : base(new TestingSiloHost(new TestingSiloOptions
         {
             StartFreshOrleans = true,
             SiloConfigFile = new FileInfo("Config_StorageErrors.xml"),
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        };
-
-        protected static readonly TestingClientOptions ClientRunOptions = new TestingClientOptions
+        }, new TestingClientOptions
         {
             ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
-        };
+        }))
+        {
 
+        }
+    }
+
+    public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTestsFixture>, IDisposable
+    {
         private const string PubSubStoreProviderName = "PubSubStore";
+        protected TestingSiloHost HostedCluster { get; private set; }
 
         protected Guid StreamId;
         protected string StreamProviderName;
         protected string StreamNamespace;
 
-        public static TestingSiloHost CreateSiloHost()
+        public StreamPubSubReliabilityTests(StreamPubSubReliabilityTestsFixture fixture)
         {
-            return new TestingSiloHost(SiloRunOptions, ClientRunOptions);
-        }
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            logger.Info("TestInitialize - {0}", TestContext.TestName);
+            HostedCluster = fixture.HostedCluster;
+            //logger.Info("TestInitialize - {0}", TestContext.TestName);
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
@@ -57,23 +54,21 @@ namespace UnitTests.StreamingTests
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
-            logger.Info("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+            //logger.Info("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
             StreamId = default(Guid);
             StreamProviderName = null;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_Baseline()
         {
             await Test_PubSub_Stream(StreamProviderName, StreamId);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         // TODO: [ExpectedException(typeof(StorageProviderInjectedError))]
-        [ExpectedException(typeof(OrleansException))]
         public async Task PubSub_Store_ReadError()
         {
             // Expected behaviour: Underlying error StorageProviderInjectedError returned to caller
@@ -82,44 +77,49 @@ namespace UnitTests.StreamingTests
             //                   root cause problem "Failed SetupActivationState" in message text, 
             //                   but no more details or stack trace.
 
-            try
+            await Xunit.Assert.ThrowsAsync<OrleansException>(async () =>
             {
-                SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
+                try
+                {
+                    SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
 
-                await Test_PubSub_Stream(StreamProviderName, StreamId);
-            }
-            catch (AggregateException ae)
-            {
-                Console.WriteLine("Received error = {0}", ae);
+                    await Test_PubSub_Stream(StreamProviderName, StreamId);
+                }
+                catch (AggregateException ae)
+                {
+                    Console.WriteLine("Received error = {0}", ae);
 
-                Exception exc = ae.GetBaseException();
-                if (exc.InnerException != null)
-                    exc = exc.GetBaseException();
-                Console.WriteLine("Returning error = {0}", exc);
-                throw exc;
-            }
+                    Exception exc = ae.GetBaseException();
+                    if (exc.InnerException != null)
+                        exc = exc.GetBaseException();
+                    Console.WriteLine("Returning error = {0}", exc);
+                    throw exc;
+                }
+            });
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
-        [ExpectedException(typeof(StorageProviderInjectedError))]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_WriteError()
         {
-            try
+            await Xunit.Assert.ThrowsAsync<StorageProviderInjectedError>(async () =>
             {
-                SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
+                try
+                {
+                    SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
 
-                await Test_PubSub_Stream(StreamProviderName, StreamId);
-            }
-            catch (AggregateException ae)
-            {
-                Console.WriteLine("Received error = {0}", ae);
+                    await Test_PubSub_Stream(StreamProviderName, StreamId);
+                }
+                catch (AggregateException ae)
+                {
+                    Console.WriteLine("Received error = {0}", ae);
 
-                Exception exc = ae.GetBaseException();
-                if (exc.InnerException != null)
-                    exc = exc.GetBaseException();
-                Console.WriteLine("Returning error = {0}", exc);
-                throw exc;
-            }
+                    Exception exc = ae.GetBaseException();
+                    if (exc.InnerException != null)
+                        exc = exc.GetBaseException();
+                    Console.WriteLine("Returning error = {0}", exc);
+                    throw exc;
+                }
+            });
         }
 
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
@@ -156,7 +156,7 @@ namespace UnitTests.StreamingTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider) siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
                 provider.SetErrorInjection(errorInjectionPoint);
             }
         }

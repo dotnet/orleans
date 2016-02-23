@@ -5,23 +5,23 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
+using Xunit;
+using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
 
 namespace UnitTests.TimerTests
 {
-    [TestClass]
-    public class ReminderTests_AzureTable : ReminderTests_Base
+    public class ReminderTests_AzureTableFixture : BaseClusterFixture
     {
-        private static readonly Guid serviceId = Guid.NewGuid();
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
+        public ReminderTests_AzureTableFixture() : base(new TestingSiloHost(new TestingSiloOptions
         {
             StartFreshOrleans = true,
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
@@ -29,17 +29,17 @@ namespace UnitTests.TimerTests
             LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Separate testing of Reminders storage from membership storage
             AdjustConfig = config =>
             {
-                config.Globals.ServiceId = serviceId;
+                config.Globals.ServiceId = Guid.NewGuid();
             },
-        };
-
-        public static TestingSiloHost CreateSiloHost()
+        }))
         {
-            return new TestingSiloHost(siloOptions);
-        }
 
-        [TestInitialize]
-        public void TestInitialize()
+        }
+    }
+
+    public class ReminderTests_AzureTable : ReminderTests_Base, IClassFixture<ReminderTests_AzureTableFixture>, IDisposable
+    {
+        public ReminderTests_AzureTable(ReminderTests_AzureTableFixture fixture) : base(fixture)
         {
             base.DoTestInitialize();
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
@@ -48,21 +48,20 @@ namespace UnitTests.TimerTests
             //controlProxy.EraseReminderTable().WaitWithThrow(VSOTestConstants.InitTimeout);
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             base.DoTestCleanup();
         }
 
         // Basic tests
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
         public async Task Rem_Azure_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -70,17 +69,17 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
         public async Task Rem_Azure_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
         #region Basic test
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Basic()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             // start up a test grain and get the period that it's programmed to use.
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             TimeSpan period = await grain.GetReminderPeriod(DR);
@@ -99,10 +98,10 @@ namespace UnitTests.TimerTests
             Assert.AreEqual(last, curr, Time());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Basic_Restart()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             TimeSpan period = await grain.GetReminderPeriod(DR);
             await grain.StartReminder(DR);
@@ -128,20 +127,20 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Basic single grain multi reminders test
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_MultipleReminders()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }
         #endregion
 
         #region Multiple joins ... multi grain, multi reminders
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_2J_MultiGrainMultiReminders()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g3 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -150,7 +149,7 @@ namespace UnitTests.TimerTests
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task<bool>[] tasks = 
+            Task<bool>[] tasks =
             {
                 Task.Run(() => PerGrainMultiReminderTestChurn(g1)),
                 Task.Run(() => PerGrainMultiReminderTestChurn(g2)),
@@ -173,10 +172,10 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Multi grains multi reminders/grain test
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_MultiGrainMultiReminders()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
 
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -184,7 +183,7 @@ namespace UnitTests.TimerTests
             IReminderTestGrain2 g4 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-            Task<bool>[] tasks = 
+            Task<bool>[] tasks =
             {
                 Task.Run(() => PerGrainMultiReminderTest(g1)),
                 Task.Run(() => PerGrainMultiReminderTest(g2)),
@@ -200,10 +199,10 @@ namespace UnitTests.TimerTests
 
         #region Secondary failure ... Basic test
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_1F_Basic()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
@@ -220,10 +219,10 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Multiple failures ... multiple grains
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(2);
 
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -234,7 +233,7 @@ namespace UnitTests.TimerTests
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task[] tasks = 
+            Task[] tasks =
             {
                 Task.Run(() => PerGrainFailureTest(g1)),
                 Task.Run(() => PerGrainFailureTest(g2)),
@@ -257,10 +256,10 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region 1 join 1 failure simulateneously ... multiple grains
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
@@ -272,7 +271,7 @@ namespace UnitTests.TimerTests
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task[] tasks = 
+            Task[] tasks =
             {
                 Task.Run(() => PerGrainFailureTest(g1)),
                 Task.Run(() => PerGrainFailureTest(g2)),
@@ -305,10 +304,10 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Register same reminder multiple times
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_RegisterSameReminderTwice()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             Task<IGrainReminder> promise1 = grain.StartReminder(DR);
             Task<IGrainReminder> promise2 = grain.StartReminder(DR);
@@ -320,10 +319,10 @@ namespace UnitTests.TimerTests
         #endregion
 
         #region Multiple grain types
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_GT_Basic()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestCopyGrain g2 = GrainClient.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
             TimeSpan period = await g1.GetReminderPeriod(DR); // using same period
@@ -346,10 +345,10 @@ namespace UnitTests.TimerTests
             Assert.AreEqual(4, curr2, string.Format("{0} CopyGrain fault", Time()));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
-            log.Info(TestContext.TestName);
+            //log.Info(TestContext.TestName);
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
@@ -360,7 +359,7 @@ namespace UnitTests.TimerTests
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task[] tasks = 
+            Task[] tasks =
             {
                 Task.Run(() => PerGrainFailureTest(g1)),
                 Task.Run(() => PerGrainFailureTest(g2)),
@@ -392,41 +391,45 @@ namespace UnitTests.TimerTests
         #region Testing things that should fail
 
         #region Lower than allowed reminder period
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
-        [ExpectedException(typeof(ArgumentException), "Should not be possible to register a reminder with a period of 1 second.")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
         {
-            log.Info(TestContext.TestName);
-            try
+            await Xunit.Assert.ThrowsAsync<ArgumentException>(async () =>
             {
-                IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-                await grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true);
-            }
-            catch (Exception exc)
-            {
-                log.Info("Failed to register reminder: {0}", exc.Message);
-                throw exc.GetBaseException();
-            }
+                //log.Info(TestContext.TestName);
+                try
+                {
+                    IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+                    await grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true);
+                }
+                catch (Exception exc)
+                {
+                    log.Info("Failed to register reminder: {0}", exc.Message);
+                    throw exc.GetBaseException();
+                }
+            });
         }
         #endregion
 
         #region The wrong reminder grain
-        [TestMethod, TestCategory("Functional"), TestCategory("ReminderService")]
-        [ExpectedException(typeof(InvalidOperationException), "Should not be possible to register a reminder when the grain doesn't extend IRemindable.")]
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Wrong_Grain()
         {
-            log.Info(TestContext.TestName);
-            try
+            await Xunit.Assert.ThrowsAsync<InvalidOperationException>(async () =>
             {
-                IReminderGrainWrong grain = GrainClient.GrainFactory.GetGrain<IReminderGrainWrong>(0);
-                bool success = await grain.StartReminder(DR); // should throw exception
-                Assert.IsFalse(success);
-            }
-            catch (Exception exc)
-            {
-                log.Info("Failed to register reminder: {0}", exc.Message);
-                throw exc.GetBaseException();
-            }
+                //log.Info(TestContext.TestName);
+                try
+                {
+                    IReminderGrainWrong grain = GrainClient.GrainFactory.GetGrain<IReminderGrainWrong>(0);
+                    bool success = await grain.StartReminder(DR); // should throw exception
+                    Assert.IsFalse(success);
+                }
+                catch (Exception exc)
+                {
+                    log.Info("Failed to register reminder: {0}", exc.Message);
+                    throw exc.GetBaseException();
+                }
+            });
         }
         #endregion
 

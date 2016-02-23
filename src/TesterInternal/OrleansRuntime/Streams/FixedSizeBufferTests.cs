@@ -1,11 +1,11 @@
 ﻿
 using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
     public class FixedSizeBufferTests
     {
         private const int TestBlockSize = 100;
@@ -27,7 +27,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void EmptyBlockGetSegmentTooLargeBvt()
         {
             IObjectPool<FixedSizeBuffer> pool = new MyTestPooled();
@@ -39,7 +39,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(0, segment.Count);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void EmptyBlockTryGetMaxSegmentBvt()
         {
             IObjectPool<FixedSizeBuffer> pool = new MyTestPooled();
@@ -51,7 +51,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(TestBlockSize, segment.Count);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void FillBlockTestBvt()
         {
             IObjectPool<FixedSizeBuffer> pool = new MyTestPooled();
@@ -69,7 +69,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(0, segment.Count);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void PurgeTestBvt()
         {
             var myTestPool = new MyTestPooled();

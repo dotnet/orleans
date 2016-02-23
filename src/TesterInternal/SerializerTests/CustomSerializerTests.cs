@@ -1,11 +1,12 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 
 namespace UnitTests.SerializerTests
 {
@@ -65,19 +66,17 @@ namespace UnitTests.SerializerTests
             return result;
         }
     }
-
-    [TestClass]
+    
     public class CustomSerializerTests
     {
-        [TestInitialize]
-        public void InitializeForTesting()
+        public CustomSerializerTests()
         {
             TraceLogger.Initialize(new NodeConfiguration());
 
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_CustomCopier()
         {
             var original = new ClassWithCustomCopier() {IntProperty = 5, StringProperty = "Hello"};
@@ -85,7 +84,7 @@ namespace UnitTests.SerializerTests
             Assert.AreEqual(1, ClassWithCustomCopier.CopyCounter, "Custom copier was not called");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_CustomSerializer()
         {
             var original = new ClassWithCustomSerializer() { IntProperty = -3, StringProperty = "Goodbye" };
@@ -98,43 +97,43 @@ namespace UnitTests.SerializerTests
             Assert.AreEqual(1, ClassWithCustomSerializer.DeserializeCounter, "Custom deserializer was not called");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_GrainMethodTaskReturnType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass1)), "No serializer generated for return type of Task grain method");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_GrainMethodTaskParamType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass2)), "No serializer generated for parameter type of Task grain method");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_GrainMethodTaskReturnOnlyType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass3)), "No serializer generated for return type of parameterless Task grain method");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_GrainMethodAsyncReturnType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass4)), "No serializer generated for return type of Task grain method");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_GrainMethodAsyncParamType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass5)), "No serializer generated for parameter type of Task grain method");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_GrainMethodAsyncReturnOnlyType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(SerializerTestClass6)), "No serializer generated for return type of parameterless Task grain method");
         }
         
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_AsyncObserverArgumentType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(AsyncObserverArg)), "No serializer generated for argument type of async observer");
@@ -144,19 +143,19 @@ namespace UnitTests.SerializerTests
             Assert.AreEqual(original, obj, "Objects of type AsyncObserverArg aren't equal after serialization roundtrip");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_AsyncObservableArgumentType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(AsyncObservableArg)), "No serializer generated for argument type of async observable");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_AsyncStreamArgumentType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(AsyncStreamArg)), "No serializer generated for argument type of async stream");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialize_StreamSubscriptionHandleType()
         {
             Assert.IsNotNull(SerializationManager.GetSerializer(typeof(StreamSubscriptionHandleArg)), "No serializer generated for argument type of stream subscription handle");

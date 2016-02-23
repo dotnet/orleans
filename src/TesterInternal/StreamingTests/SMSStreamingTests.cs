@@ -1,57 +1,58 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers;
 using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
+using Xunit;
+using Tester;
 
 namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("ClientConfig_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
-    public class SMSStreamingTests : HostedTestClusterPerFixture
+    public class SMSStreamingTestsFixture : BaseClusterFixture
     {
         private static Guid serviceId = Guid.NewGuid();
-        internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_StreamProviders.xml");
-        internal static readonly FileInfo ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml");
+        public static FileInfo SiloConfig = new FileInfo("Config_StreamProviders.xml");
+        public static FileInfo ClientConfig = new FileInfo("ClientConfig_StreamProviders.xml");
 
-        private static readonly TestingSiloOptions smsSiloOption = new TestingSiloOptions
-                    {
-                        StartFreshOrleans = true,
-                        SiloConfigFile = SiloConfigFile,
-                        AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
-                    };
-        private static TestingClientOptions smsClientOptions = new TestingClientOptions
-                    {
-                        ClientConfigFile = ClientConfigFile
-                    };
-        private static readonly TestingSiloOptions smsSiloOption_OnlyPrimary = new TestingSiloOptions
-                    {
-                        StartFreshOrleans = true,
-                        SiloConfigFile = SiloConfigFile,
-                        StartSecondary = false,
-                        AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
-                    };
+        public SMSStreamingTestsFixture() : base(new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = SiloConfig,
+                    AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
+                },
+                //smsSiloOption_OnlyPrimary,
+                new TestingClientOptions
+                {
+                    ClientConfigFile = ClientConfig
+                }))
+        {
+
+        }
+    }
+
+
+    public class SMSStreamingTests : OrleansTestingBase, IClassFixture<SMSStreamingTestsFixture>
+    {
+        protected TestingSiloHost HostedCluster { get; private set; }
+        
+        //private static readonly TestingSiloOptions smsSiloOption_OnlyPrimary = new TestingSiloOptions
+        //            {
+        //                StartFreshOrleans = true,
+        //                SiloConfigFile = SiloConfigFile,
+        //                StartSecondary = false, 
+        //            };
 
         private SingleStreamTestRunner runner;
         private bool fireAndForgetDeliveryProperty;
-
-        public static TestingSiloHost CreateSiloHost()
+        
+        public SMSStreamingTests(SMSStreamingTestsFixture fixture)
         {
-            return new TestingSiloHost(
-                smsSiloOption,
-                //smsSiloOption_OnlyPrimary,
-                smsClientOptions);
-        }
-
-        [TestInitialize]
-        public void Initialize()
-        {
+            HostedCluster = fixture.HostedCluster;
             runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME);
             // runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, 0, false);
             fireAndForgetDeliveryProperty = ExtractFireAndForgetDeliveryProperty();
@@ -61,25 +62,25 @@ namespace UnitTests.StreamingTests
 
         //------------------------ One to One ----------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_01_OneProducerGrainOneConsumerGrain()
         {
             await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_02_OneProducerGrainOneConsumerClient()
         {
             await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_03_OneProducerClientOneConsumerGrain()
         {
             await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_04_OneProducerClientOneConsumerClient()
         {
             await runner.StreamTest_04_OneProducerClientOneConsumerClient();
@@ -87,50 +88,50 @@ namespace UnitTests.StreamingTests
 
         //------------------------ MANY to Many different grains ----------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
         {
             await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
         {
             await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
         }
 
         //------------------------ MANY to Many Same grains ----------------------//
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_09_ManySame_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_10_ManySame_ManyConsumerGrainsManyProducerGrains()
         {
             await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_11_ManySame_ManyProducerGrainsManyConsumerClients()
         {
             await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_12_ManySame_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
@@ -138,13 +139,13 @@ namespace UnitTests.StreamingTests
 
         //------------------------ MANY to Many producer consumer same grain ----------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_13_SameGrain_ConsumerFirstProducerLater()
         {
             await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(!fireAndForgetDeliveryProperty);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_14_SameGrain_ProducerFirstConsumerLater()
         {
             await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(!fireAndForgetDeliveryProperty);
@@ -153,7 +154,7 @@ namespace UnitTests.StreamingTests
         private bool ExtractFireAndForgetDeliveryProperty()
         {
             ClusterConfiguration orleansConfig = new ClusterConfiguration();
-            orleansConfig.LoadFromFile(SiloConfigFile.FullName);
+            orleansConfig.LoadFromFile(SMSStreamingTestsFixture.SiloConfig.FullName);
             ProviderCategoryConfiguration providerConfigs = orleansConfig.Globals.ProviderConfigurations["Stream"];
             IProviderConfiguration provider = providerConfigs.Providers[SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME];
 
@@ -168,13 +169,13 @@ namespace UnitTests.StreamingTests
 
         //----------------------------------------------//
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_15_ConsumeAtProducersRequest()
         {
             await runner.StreamTest_15_ConsumeAtProducersRequest();
         }
 
-        //[TestMethod, TestCategory("Functional"), TestCategory("Streaming")]
+        //[Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMS_16_Deactivation_OneProducerGrainOneConsumerGrain()
         {
             await runner.StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain();
@@ -185,20 +186,19 @@ namespace UnitTests.StreamingTests
         //    await runner.StreamTest_17_Persistence_OneProducerGrainOneConsumerGrain();
         //}
 
-        [TestMethod, TestCategory("Streaming"), TestCategory("Functional")]
+        [Fact, TestCategory("Streaming"), TestCategory("Functional")]
         public async Task SMS_19_ConsumerImplicitlySubscribedToProducerClient()
         {
             await runner.StreamTest_19_ConsumerImplicitlySubscribedToProducerClient();
         }
 
-        [TestMethod, TestCategory("Streaming"), TestCategory("Functional")]
+        [Fact, TestCategory("Streaming"), TestCategory("Functional")]
         public async Task SMS_20_ConsumerImplicitlySubscribedToProducerGrain()
         {
             await runner.StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain();
         }
 
-        [TestMethod, TestCategory("Streaming"), TestCategory("Failures")]
-        [Ignore]
+        [Fact(Skip = "Ignore"), TestCategory("Streaming"), TestCategory("Failures")]
         public async Task SMS_21_GenericConsumerImplicitlySubscribedToProducerGrain()
         {
             await runner.StreamTest_21_GenericConsumerImplicitlySubscribedToProducerGrain();

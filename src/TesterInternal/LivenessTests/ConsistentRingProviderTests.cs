@@ -1,33 +1,32 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.LivenessTests
 {
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [TestClass]
-    public class ConsistentRingProviderTests
+    public class ConsistentRingProviderTestsFixture
     {
-        public ConsistentRingProviderTests()
+        public ConsistentRingProviderTestsFixture()
         {
             if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
+    }
 
-        [TestInitialize]
-        public void TestInitialize()
+    public class ConsistentRingProviderTests : IClassFixture<ConsistentRingProviderTestsFixture>
+    {
+        public ConsistentRingProviderTests()
         {
             if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.StandardLoad());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test1()
         {
             SiloAddress silo1 = SiloAddress.NewLocalAddress(0);
@@ -41,7 +40,7 @@ namespace UnitTests.LivenessTests
             Console.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test2()
         {
             SiloAddress silo1 = SiloAddress.NewLocalAddress(0);
@@ -57,7 +56,7 @@ namespace UnitTests.LivenessTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test3()
         {
             int NUM_SILOS = 100;

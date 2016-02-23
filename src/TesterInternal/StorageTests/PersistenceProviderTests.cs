@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -14,38 +14,31 @@ using Orleans.TestingHost;
 using Samples.StorageProviders;
 using Tester;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class PersistenceProviderTests_Local
+    public class PersistenceProviderTests_LocalFixture
     {
-        public TestContext TestContext { get; set; }
-
-        StorageProviderManager storageProviderManager;
-        readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        public PersistenceProviderTests_LocalFixture()
         {
-            Console.WriteLine("ClassInitialize {0}", testContext.TestName);
-            testContext.WriteLine("ClassInitialize");
+            //Console.WriteLine("ClassInitialize {0}", testContext.TestName);
+            //testContext.WriteLine("ClassInitialize");
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            testContext.WriteLine(cfg.ToString());
+            //testContext.WriteLine(cfg.ToString());
             TraceLogger.Initialize(cfg);
         }
+    }
 
-        [ClassCleanup]
-        public static void ClassCleanup()
+    public class PersistenceProviderTests_Local : IClassFixture<PersistenceProviderTests_LocalFixture>, IDisposable
+    {
+        StorageProviderManager storageProviderManager;
+        readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
+        
+        public PersistenceProviderTests_Local()
         {
-        }
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            TestContext.WriteLine("TestInitialize");
+            //TestContext.WriteLine("TestInitialize");
             storageProviderManager = new StorageProviderManager(new GrainFactory(), new DefaultServiceProvider());
             storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), new DefaultServiceProvider())).WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
@@ -53,17 +46,16 @@ namespace UnitTests.StorageTests
             LocalDataStoreInstance.LocalDataStore = null;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
-            TestContext.WriteLine("TestCleanup");
+            //TestContext.WriteLine("TestCleanup");
             LocalDataStoreInstance.LocalDataStore = null;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Mock_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             IStorageProvider store = new MockStorageProvider();
             var cfg = new ProviderConfiguration(providerCfgProps, null);
@@ -72,10 +64,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_FileStore_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             IStorageProvider store = new OrleansFileStorage();
             providerCfgProps.Add("RootDirectory", "Data");
@@ -85,10 +77,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Sharded_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             IStorageProvider store1 = new MockStorageProvider(2);
             IStorageProvider store2 = new MockStorageProvider(2);
@@ -99,10 +91,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, composite);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Sharded_9_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             IStorageProvider store1 = new MockStorageProvider(2);
             IStorageProvider store2 = new MockStorageProvider(2);
@@ -128,10 +120,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, composite);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_Read()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -141,10 +133,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_Read(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -154,10 +146,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_WriteRead_Json()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -168,7 +160,7 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void AzureTableStorage_ConvertToFromStorageFormat()
         {
             TestStoreGrainState initialState = new TestStoreGrainState { A = "1", B = 2, C = 3 };
@@ -185,10 +177,10 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(initialState.C, convertedState.C, "C");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task PersistenceProvider_Memory_FixedLatency_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
             TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
 
             IStorageProvider store = new MemoryStorageWithLatency();
@@ -214,7 +206,7 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(readTime >= expectedLatency, "Read: Expected minimum latency = {0} Actual = {1}", expectedLatency, readTime);
         }
 
-        [TestMethod, TestCategory("Persistence"), TestCategory("Performance"), TestCategory("JSON")]
+        [Fact, TestCategory("Persistence"), TestCategory("Performance"), TestCategory("JSON")]
         public void Json_Perf_Newtonsoft_vs_Net()
         {
             int numIterations = 10000;
@@ -245,7 +237,7 @@ namespace UnitTests.StorageTests
             Console.WriteLine("Elapsed: {0} Date: {1}", elapsed, jsonData);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void LoadClassByName()
         {
             string className = typeof(MockStorageProvider).FullName;

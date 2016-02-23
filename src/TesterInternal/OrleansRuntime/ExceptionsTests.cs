@@ -1,25 +1,24 @@
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime
 {
-    [TestClass]
     public class ExceptionsTests
     {
-        [TestInitialize]
-        public void InitializeForTesting()
+        public ExceptionsTests()
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             SerializationManager.Initialize(false, null, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_DotNet()
         {
             ActivationAddress activationAddress = ActivationAddress.NewActivationAddress(SiloAddress.NewLocalAddress(12345), GrainId.NewId());
@@ -33,7 +32,7 @@ namespace UnitTests.OrleansRuntime
             Assert.AreEqual(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_Orleans()
         {
             ActivationAddress activationAddress = ActivationAddress.NewActivationAddress(SiloAddress.NewLocalAddress(12345), GrainId.NewId());

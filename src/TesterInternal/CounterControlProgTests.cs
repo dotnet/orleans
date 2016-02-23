@@ -1,12 +1,12 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Counter.Control;
+using Xunit;
 
 namespace UnitTests
 {
-    [TestClass]
     public class CounterControlProgTests
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseArguments()
         {
             CounterControl prog = new CounterControl();
@@ -22,7 +22,7 @@ namespace UnitTests
             Assert.IsTrue(prog.Unregister);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseUsageArguments()
         {
             CounterControl prog = new CounterControl();
@@ -32,7 +32,7 @@ namespace UnitTests
             Assert.IsFalse(prog.ParseArguments(new string[] { "/r", "/u", "/?" }));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseBadArguments()
         {
             CounterControl prog = new CounterControl();
@@ -41,7 +41,7 @@ namespace UnitTests
             Assert.IsFalse(prog.ParseArguments(new string[] { "/r", "/u", "/xyz" }));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseMultipleArgs()
         {
             CounterControl prog = new CounterControl();
@@ -54,7 +54,7 @@ namespace UnitTests
             Assert.IsFalse(prog.Unregister);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseNoArgs()
         {
             CounterControl prog = new CounterControl();
@@ -62,7 +62,7 @@ namespace UnitTests
             Assert.IsFalse(prog.Unregister);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void NeedsRunAsAdminForRegisterCommand()
         {
             CounterControl prog = new CounterControl();
@@ -70,7 +70,7 @@ namespace UnitTests
             Assert.IsTrue(prog.NeedRunAsAdministrator);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void NeedsRunAsAdminForUnregisterCommand()
         {
             CounterControl prog = new CounterControl();
@@ -78,7 +78,7 @@ namespace UnitTests
             Assert.IsTrue(prog.NeedRunAsAdministrator);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void DoNotNeedsRunAsAdminForOtherCommand()
         {
             CounterControl prog = new CounterControl();
@@ -86,7 +86,7 @@ namespace UnitTests
             Assert.IsFalse(prog.NeedRunAsAdministrator);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void DoNotNeedsRunAsAdminForUnknownCommand()
         {
             CounterControl prog = new CounterControl();

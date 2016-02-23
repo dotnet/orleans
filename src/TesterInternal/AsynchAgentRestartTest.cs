@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Threading;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
+using Xunit;
 
 namespace UnitTests.MessageCenterTests
 {
-    [TestClass]
     public class AsynchAgentRestartTest
     {
         private class TestAgent : AsynchAgent
@@ -18,7 +18,7 @@ namespace UnitTests.MessageCenterTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Messaging")]
+        [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentRestart()
         {
             TestAgent t = new TestAgent();
@@ -48,7 +48,7 @@ namespace UnitTests.MessageCenterTests
             Thread.Sleep(100);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Messaging")]
+        [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentStartWhileStarted()
         {
             TestAgent t = new TestAgent();
@@ -69,7 +69,7 @@ namespace UnitTests.MessageCenterTests
             t.Stop();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Messaging")]
+        [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentStopWhileStopped()
         {
             TestAgent t = new TestAgent();

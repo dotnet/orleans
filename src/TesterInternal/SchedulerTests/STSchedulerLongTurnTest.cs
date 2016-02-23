@@ -3,18 +3,18 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.SchedulerTests
 {
-    [TestClass]
     public class STSchedulerLongTurnTest : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_LongTurnTest()
         {
             // With two silos, there should be 16 threads.

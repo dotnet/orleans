@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
@@ -17,19 +17,15 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
+using Xunit;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
 
 namespace UnitTests.Streaming.Reliability
 {
-    [TestClass]
-    [DeploymentItem("Config_AzureStreamProviders.xml")]
-    [DeploymentItem("ClientConfig_AzureStreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
     public class StreamReliabilityTests : HostedTestClusterPerTest
     {
-        public TestContext TestContext { get; set; }
         public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
@@ -55,22 +51,20 @@ namespace UnitTests.Streaming.Reliability
 
         private readonly int numExpectedSilos = siloRunOptions.StartSecondary ? 2 : 1;
 
-        public static TestingSiloHost CreateSiloHost()
+        public override TestingSiloHost CreateSiloHost()
         {
             return new TestingSiloHost(siloRunOptions, clientRunOptions);
         }
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public StreamReliabilityTests()
         {
             CheckSilosRunning("Initially", numExpectedSilos);
 #if DELETE_AFTER_TEST
             _usedGrains = new HashSet<IStreamReliabilityTestGrain>(); 
 #endif
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public override void Dispose()
         {
 #if DELETE_AFTER_TEST
             List<Task> promises = new List<Task>();
@@ -85,9 +79,10 @@ namespace UnitTests.Streaming.Reliability
             {
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
             }
+            base.Dispose();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public void Baseline_StreamRel()
         {
             // This test case is just a sanity-check that the silo test config is OK.
@@ -96,7 +91,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public void Baseline_StreamRel_RestartSilos()
         {
             // This test case is just a sanity-check that the silo test config is OK.
@@ -117,7 +112,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_Baseline_StreamRel()
         {
             // This test case is just a sanity-check that the SMS test config is OK.
@@ -137,7 +132,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure")]
         public async Task AQ_Baseline_StreamRel()
         {
             // This test case is just a sanity-check that the AzureQueue test config is OK.
@@ -155,23 +150,21 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
-        [Ignore]
+        [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AddMany_Consumers()
         {
             const string testName = "SMS_AddMany_Consumers";
             await Test_AddMany_Consumers(testName, SMS_STREAM_PROVIDER_NAME);
         }
 
-        [TestMethod, TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure")]
-        [Ignore]
+        [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure")]
         public async Task AQ_AddMany_Consumers()
         {
             const string testName = "AQ_AddMany_Consumers";
             await Test_AddMany_Consumers(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_PubSub_MultiConsumerSameGrain()
         {
             const string testName = "SMS_PubSub_MultiConsumerSameGrain";
@@ -179,7 +172,7 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_PubSub_MultiConsumerSameGrain not required - does not use PubSub
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_PubSub_MultiProducerSameGrain()
         {
             const string testName = "SMS_PubSub_MultiProducerSameGrain";
@@ -187,7 +180,7 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_PubSub_MultiProducerSameGrain not required - does not use PubSub
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_PubSub_Unsubscribe()
         {
             const string testName = "SMS_PubSub_Unsubscribe";
@@ -196,7 +189,7 @@ namespace UnitTests.Streaming.Reliability
         // AQ_PubSub_Unsubscribe not required - does not use PubSub
 
         //TODO: This test fails because the resubscribe to streams after restart creates a new subscription, losing the events on the previous subscription.  Should be fixed when 'renew' subscription feature is added. - jbragg
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Failures")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Failures")]
         public async Task SMS_StreamRel_AllSilosRestart_PubSubCounts()
         {
             const string testName = "SMS_StreamRel_AllSilosRestart_PubSubCounts";
@@ -204,14 +197,14 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_StreamRel_AllSilosRestart_PubSubCounts not required - does not use PubSub
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_StreamRel_AllSilosRestart()
         {
             const string testName = "SMS_StreamRel_AllSilosRestart";
 
             await Test_AllSilosRestart(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
         public async Task AQ_StreamRel_AllSilosRestart()
         {
             const string testName = "AQ_StreamRel_AllSilosRestart";
@@ -219,14 +212,14 @@ namespace UnitTests.Streaming.Reliability
             await Test_AllSilosRestart(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_StreamRel_SiloJoins()
         {
             const string testName = "SMS_StreamRel_SiloJoins";
 
             await Test_SiloJoins(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
         public async Task AQ_StreamRel_SiloJoins()
         {
             const string testName = "AQ_StreamRel_SiloJoins";
@@ -234,52 +227,52 @@ namespace UnitTests.Streaming.Reliability
             await Test_SiloJoins(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_StreamRel_SiloDies_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Consumer";
             await Test_SiloDies_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
         public async Task AQ_StreamRel_SiloDies_Consumer()
         {
             const string testName = "AQ_StreamRel_SiloDies_Consumer";
             await Test_SiloDies_Consumer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_StreamRel_SiloDies_Producer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Producer";
             await Test_SiloDies_Producer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
         public async Task AQ_StreamRel_SiloDies_Producer()
         {
             const string testName = "AQ_StreamRel_SiloDies_Producer";
             await Test_SiloDies_Producer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_StreamRel_SiloRestarts_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Consumer";
             await Test_SiloRestarts_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
         public async Task AQ_StreamRel_SiloRestarts_Consumer()
         {
             const string testName = "AQ_StreamRel_SiloRestarts_Consumer";
             await Test_SiloRestarts_Consumer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_StreamRel_SiloRestarts_Producer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Producer";
             await Test_SiloRestarts_Producer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
         public async Task AQ_StreamRel_SiloRestarts_Producer()
         {
             const string testName = "AQ_StreamRel_SiloRestarts_Producer";
@@ -558,7 +551,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AllSilosRestart_UnsubscribeConsumer()
         {
             const string testName = "SMS_AllSilosRestart_UnsubscribeConsumer";

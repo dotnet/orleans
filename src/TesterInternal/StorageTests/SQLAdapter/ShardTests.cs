@@ -5,15 +5,15 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.SqlDatabase.ElasticScale.ShardManagement;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.SqlUtils.StorageProvider.GrainClasses;
 using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
 using Orleans.SqlUtils.StorageProvider.Instrumentation;
+using Xunit;
 
 namespace Orleans.SqlUtils.StorageProvider.Tests
 {
-    [TestClass]
     public class ShardTests
     {
         private readonly string ConnectionString = ConfigurationManager.AppSettings["ConnectionString"];
@@ -31,9 +31,8 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
         {
             return new SampleGrainStateMapFactory().CreateGrainStateMap();
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip ="Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void Upsert10KStates()
         {
             InstrumentationContext.Reset();
@@ -68,9 +67,8 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 Console.WriteLine(" [{0}] {1} Upserts. {2} max concurrent writes. Elapsed: {3}", mapName, count, batchingOptions.MaxConcurrentWrites, stopwatch.Elapsed);
             }
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip ="Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void InsertThenUpdate10KStates()
         {
             InstrumentationContext.Reset();
@@ -98,10 +96,8 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 Console.WriteLine(" Update elapsed: {0}", stopwatch.Elapsed);
             }
         }
-
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void WriteThenRead10KStates()
         {
             InstrumentationContext.Reset();
@@ -130,9 +126,8 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 Console.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
             }
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void ReadNonExistentState()
         {
             Task.Run(async () =>
@@ -153,9 +148,8 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 }
             }).Wait();
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void OneWriteThenReadState()
         {
             Task.Run(async () =>
@@ -181,9 +175,8 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 }
             }).Wait();
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void LookupTest()
         {
             Func<Range<int>, int, bool> func = (range, key) => range.Low <= key && (key < range.High || range.HighIsMax);

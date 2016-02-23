@@ -1,23 +1,18 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
 using System;
 using System.Net;
 using Tester;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    public class AzureTableErrorCodeTests
+    public class AzureTableErrorCodeTests : IClassFixture<AzureStorageBasicTestFixture>
     {
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            TestUtils.CheckForAzureStorage();
-        }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void AzureTableErrorCode_IsRetriableHttpError()
         {
             Assert.IsTrue(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 503, null));
@@ -32,7 +27,7 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(AzureStorageUtils.IsRetriableHttpError((HttpStatusCode) 200, null));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void AzureTableErrorCode_IsContentionError()
         {
             Assert.IsTrue(AzureStorageUtils.IsContentionError(HttpStatusCode.PreconditionFailed));
@@ -49,15 +44,16 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(AzureStorageUtils.IsContentionError((HttpStatusCode) 200));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
-        [ExpectedException(typeof (ArgumentException))]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void AzureTableErrorCode_BadTableName()
         {
+            
             string tableName = "abc-123";
-            AzureStorageUtils.ValidateTableName(tableName);
+            Xunit.Assert.Throws<ArgumentException>(() => 
+            AzureStorageUtils.ValidateTableName(tableName));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
         public void AzureStorageUtils_TablePropertyShouldBeSanitized()
         {
             var tableProperty = "/A\\C#?";

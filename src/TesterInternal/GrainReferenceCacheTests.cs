@@ -1,16 +1,16 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
     public class GrainReferenceCacheTests : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain()
         {
             int size = 1;
@@ -30,7 +30,7 @@ namespace UnitTests.General
             //Assert.AreEqual(id, grain.A.Result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain2()
         {
             int size = 1;
@@ -61,7 +61,7 @@ namespace UnitTests.General
             //Assert.AreEqual(id1, grain1.A.Result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void Get2GrainsFromCache()
         {
             int size = 2;

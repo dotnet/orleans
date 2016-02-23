@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -491,7 +491,7 @@ namespace UnitTests.StreamingTests
 
 #endregion Azure QueueAction Tests
 
-//[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
 //public async Task StreamTest_2_ProducerJoinsFirstConsumerLater()
 //{
 //    logger.Info("\n\n ************************ StreamTest_2_ProducerJoinsFirstConsumerLater ********************************* \n\n");
@@ -505,7 +505,7 @@ namespace UnitTests.StreamingTests
 
 
 
-//[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
 //public async Task StreamTestProducerOnly()
 //{
 //    streamId = Guid.NewGuid();
@@ -513,7 +513,7 @@ namespace UnitTests.StreamingTests
 //    await TestGrainProducerOnlyAsync(streamId, this.streamProviderName);
 //}
 
-//[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
 //public void AQProducerOnly()
 //{
 //    streamId = Guid.NewGuid();
@@ -541,7 +541,7 @@ namespace UnitTests.StreamingTests
 
 ////------------------------ MANY to One ----------------------//
 
-//[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
 //public async Task StreamTest_Many_5_ManyProducerGrainsOneConsumerGrain()
 //{
 //    logger.Info("\n\n ************************ StreamTest_6_ManyProducerGrainsOneConsumerGrain ********************************* \n\n");
@@ -552,7 +552,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
 //public async Task StreamTest_Many6_OneProducerGrainManyConsumerGrains()
 //{
 //    logger.Info("\n\n ************************ StreamTest_7_OneProducerGrainManyConsumerGrains ********************************* \n\n");
@@ -563,7 +563,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[TestMethod, TestCategory("Streaming")]
+//[Fact, TestCategory("Streaming")]
 //public async Task StreamTest_Many_8_ManyProducerGrainsOneConsumerClient()
 //{
 //    streamId = Guid.NewGuid();
@@ -575,7 +575,7 @@ namespace UnitTests.StreamingTests
 
 //// note: this test currently fails intermittently due to synchronization issues in the StreamTest provider. it has been 
 //// removed from nightly builds until this has been addressed.
-//[TestMethod, TestCategory("Streaming")]
+//[Fact, TestCategory("Streaming")]
 //public async Task _StreamTestManyProducerClientsOneConsumerGrain()
 //{
 //    streamId = Guid.NewGuid();
@@ -587,7 +587,7 @@ namespace UnitTests.StreamingTests
 
 //// note: this test currently fails intermittently due to synchronization issues in the StreamTest provider. it has been 
 //// removed from nightly builds until this has been addressed.
-//[TestMethod, TestCategory("Streaming")]
+//[Fact, TestCategory("Streaming")]
 //public async Task _StreamTestManyProducerClientsOneConsumerClient()
 //{
 //    streamId = Guid.NewGuid();
@@ -597,7 +597,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[TestMethod, TestCategory("Streaming")]
+//[Fact, TestCategory("Streaming")]
 //public async Task _StreamTestOneProducerGrainManyConsumerClients()
 //{
 //    streamId = Guid.NewGuid();
@@ -607,7 +607,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[TestMethod, TestCategory("Streaming")]
+//[Fact, TestCategory("Streaming")]
 //public async Task _StreamTestOneProducerClientManyConsumerGrains()
 //{
 //    streamId = Guid.NewGuid();
@@ -617,7 +617,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[TestMethod, TestCategory("Streaming")]
+//[Fact, TestCategory("Streaming")]
 //public async Task _StreamTestOneProducerClientManyConsumerClients()
 //{
 //    streamId = Guid.NewGuid();
