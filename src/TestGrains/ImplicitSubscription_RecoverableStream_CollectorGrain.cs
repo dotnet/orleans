@@ -1,9 +1,8 @@
 ﻿
 using System;
-using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Placement;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
@@ -12,26 +11,19 @@ using UnitTests.Grains;
 namespace TestGrains
 {
     [ImplicitStreamSubscription(StreamNamespace)]
-    [PreferLocalPlacement]
-    public class ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain : Grain<StreamCheckpoint<int>>, IGeneratedEventCollectorGrain
+    [StorageProvider(ProviderName = StorageProviderName)]
+    public class ImplicitSubscription_RecoverableStream_CollectorGrain : Grain<StreamCheckpoint<int>>, IGeneratedEventCollectorGrain
     {
-        public const string StreamNamespace = "NonTransientError_RecoverableStream";
-     
+        public const string StreamNamespace = "RecoverableStream";
+        public const string StorageProviderName = "AzureStorage";
+        
         // grain instance state
         private Logger logger;
         private IAsyncStream<GeneratedEvent> stream;
 
-        private class FaultsState
-        {
-            public bool FaultCleared { get; set; }
-        }
-        private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new ConcurrentDictionary<Guid, FaultsState>();
-        private FaultsState myFaults;
-        private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
-
         public override async Task OnActivateAsync()
         {
-            logger = base.GetLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
+            logger = base.GetLogger("ImplicitSubscription_RecoverableStream_CollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             await ReadStateAsync();
@@ -52,7 +44,8 @@ namespace TestGrains
 
         private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken sequenceToken)
         {
-            // Ignore duplicates
+
+            // ignore duplicates
             if (State.IsDuplicate(sequenceToken))
             {
                 logger.Info("Received duplicate event.  StreamGuid: {0}, SequenceToken: {1}", State.StreamGuid, sequenceToken);
@@ -68,18 +61,12 @@ namespace TestGrains
                 await WriteStateAsync();
             }
 
-            // fault on 33rd event until fault is cleared
-            if (State.Accumulator == 32 && !Faults.FaultCleared)
-            {
-                InjectFault();
-            }
-
             State.Accumulator++;
             State.LastProcessedToken = sequenceToken;
             if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {
                 // every 10 events, checkpoint our grain state
-                if (State.Accumulator%10 != 0) return;
+                if (State.Accumulator % 10 != 0) return;
                 logger.Info("Checkpointing: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, sequenceToken, State.Accumulator);
                 await WriteStateAsync();
                 return;
@@ -93,14 +80,7 @@ namespace TestGrains
         private Task OnErrorAsync(Exception ex)
         {
             logger.Info("Received an error on stream. StreamGuid: {0}, StreamNamespace: {1}, Exception: {2}.", State.StreamGuid, State.StreamNamespace, ex);
-            Faults.FaultCleared = true;
             return TaskDone.Done;
-        }
-
-        private void InjectFault()
-        {
-            logger.Info("InjectingFault: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, State.RecoveryToken, State.Accumulator);
-            throw new ApplicationException("Injecting Fault");
         }
     }
 }

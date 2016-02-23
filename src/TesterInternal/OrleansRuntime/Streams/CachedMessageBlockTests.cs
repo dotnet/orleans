@@ -51,6 +51,8 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class TestCacheDataAdapter : ICacheDataAdapter<TestQueueMessage, TestCachedMessage>
         {
+            public Action<IDisposable> PurgeAction { private get; set; }
+
             public void QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
             {
                 cachedMessage.StreamGuid = queueMessage.StreamGuid;
@@ -82,7 +84,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 return cachedMessage.StreamGuid == streamGuid && streamNamespace == null;
             }
 
-            public bool ShouldPurge(TestCachedMessage cachedMessage, IDisposable purgeRequest)
+            public bool ShouldPurge(ref TestCachedMessage cachedMessage, IDisposable purgeRequest)
             {
                 throw new NotImplementedException();
             }

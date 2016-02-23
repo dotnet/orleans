@@ -136,6 +136,7 @@
     <Compile Include="General\JsonGrainTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="StreamingTests\EHImplicitSubscriptionStreamRecoveryTests.cs" />
+    <Compile Include="StreamingTests\EHStreamProviderCheckpointTests.cs" />
     <Compile Include="BasicActivationTests.cs" />
     <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
     <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />

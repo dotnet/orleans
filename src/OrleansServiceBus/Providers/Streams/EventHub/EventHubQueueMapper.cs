@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Linq;
 using Orleans.Streams;
 
-namespace Orleans.ServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     internal class EventHubQueueMapper : HashRingBasedStreamQueueMapper
     {

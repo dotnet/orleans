@@ -55,7 +55,7 @@ namespace Tester.TestStreamProviders.Generator.Generators
                 // If this is the last event generated, mark it as such, so test grains know to report results.
                 EventType = (sequenceId != config.EventsInStream)
                         ? GeneratedEvent.GeneratedEventType.Fill
-                        : GeneratedEvent.GeneratedEventType.End,
+                        : GeneratedEvent.GeneratedEventType.Report,
             };
             return new GeneratedBatchContainer(streamGuid, config.StreamNamespace, evt, new EventSequenceToken(sequenceId));
         }

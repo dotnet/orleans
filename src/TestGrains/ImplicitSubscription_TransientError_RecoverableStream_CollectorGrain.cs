@@ -116,7 +116,7 @@ namespace TestGrains
 
             State.Accumulator++;
             State.LastProcessedToken = sequenceToken;
-            if (evt.EventType != GeneratedEvent.GeneratedEventType.End)
+            if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {
                 Faults.onFirstMessageProcessedFault.TryFire(InjectFault);
                 Faults.on33rdMessageFault.TryFire(InjectFault);

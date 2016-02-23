@@ -6,10 +6,9 @@ using Microsoft.ServiceBus.Messaging;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.ServiceBus.Providers.Streams.EventHub;
 using Orleans.Streams;
 
-namespace OrleansServiceBusUtils.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     [Serializable]
     internal class EventHubBatchContainer : IBatchContainer

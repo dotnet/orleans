@@ -3,7 +3,7 @@ using System;
 using System.Globalization;
 using Orleans.Providers.Streams.Common;
 
-namespace Orleans.ServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
     /// Event Hub messages consist of a batch of application layer events, so EventHub tokens contain three pieces of information.

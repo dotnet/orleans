@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.ServiceBus.Messaging;
 
-namespace Orleans.ServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     internal static class EventDataExtensions
     {

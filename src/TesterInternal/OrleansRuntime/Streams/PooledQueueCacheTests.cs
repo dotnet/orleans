@@ -61,21 +61,17 @@ namespace UnitTests.OrleansRuntime.Streams
         private class TestCacheDataAdapter : ICacheDataAdapter<TestQueueMessage, TestCachedMessage>
         {
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
-            private readonly Action<IDisposable> purgeAction;
             private FixedSizeBuffer currentBuffer;
 
-            public TestCacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, Action<IDisposable> purgeAction)
+            public Action<IDisposable> PurgeAction { private get; set; }
+
+            public TestCacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool)
             {
                 if (bufferPool == null)
                 {
                     throw new ArgumentNullException("bufferPool");
                 }
-                if (purgeAction == null)
-                {
-                    throw new ArgumentNullException("purgeAction");
-                }
                 this.bufferPool = bufferPool;
-                this.purgeAction = purgeAction;
             }
 
             public void QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
@@ -95,7 +91,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 {
                     // no block or block full, get new block and try again
                     currentBuffer = bufferPool.Allocate();
-                    currentBuffer.SetPurgeAction(purgeAction);
+                    currentBuffer.SetPurgeAction(PurgeAction);
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(queueMessage.Data.Length, out segment))
                     {
@@ -137,7 +133,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 return cachedMessage.StreamGuid == streamGuid && cachedMessage.StreamNamespace == streamNamespace;
             }
 
-            public bool ShouldPurge(TestCachedMessage cachedMessage, IDisposable purgeRequest)
+            public bool ShouldPurge(ref TestCachedMessage cachedMessage, IDisposable purgeRequest)
             {
                 var purgedResource = (FixedSizeBuffer)purgeRequest;
                 // if we're purging our current buffer, don't use it any more
@@ -176,10 +172,9 @@ namespace UnitTests.OrleansRuntime.Streams
         public void GoldenPathTest()
         {
             var bufferPool = new TestBlockPool();
-            PooledQueueCache<TestQueueMessage, TestCachedMessage> cache = null;
-            ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter = new TestCacheDataAdapter(bufferPool,
-                disposable => cache.Purge(disposable));
-            cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter);
+            var dataAdapter = new TestCacheDataAdapter(bufferPool);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter);
+            dataAdapter.PurgeAction = cache.Purge;
             RunGoldenPath(cache, 111);
         }
 
@@ -191,10 +186,9 @@ namespace UnitTests.OrleansRuntime.Streams
         public void CacheDrainTest()
         {
             var bufferPool = new TestBlockPool();
-            PooledQueueCache<TestQueueMessage, TestCachedMessage> cache = null;
-            ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter = new TestCacheDataAdapter(bufferPool,
-                disposable => cache.Purge(disposable));
-            cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter);
+            var dataAdapter = new TestCacheDataAdapter(bufferPool);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter);
+            dataAdapter.PurgeAction = cache.Purge;
             int startSequenceNuber = 222;
             startSequenceNuber = RunGoldenPath(cache, startSequenceNuber);
             bufferPool.PurgeAll();
@@ -293,9 +287,9 @@ namespace UnitTests.OrleansRuntime.Streams
         public void QueueCacheMissTest()
         {
             var bufferPool = new TestBlockPool();
-            PooledQueueCache<TestQueueMessage, TestCachedMessage> cache = null;
-            ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter = new TestCacheDataAdapter(bufferPool, disposable => cache.Purge(disposable));
-            cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter);
+            var dataAdapter = new TestCacheDataAdapter(bufferPool);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter);
+            dataAdapter.PurgeAction = cache.Purge;
             int sequenceNumber = 10;
             IBatchContainer batch;
 

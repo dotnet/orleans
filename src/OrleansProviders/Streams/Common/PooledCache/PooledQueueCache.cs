@@ -33,38 +33,12 @@ namespace Orleans.Providers.Streams.Common
         private readonly CachedMessagePool<TQueueMessage, TCachedMessage> pool;
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
 
-        private enum CursorStates
-        {
-            Unset, // Not yet set, or points to some data in the future.
-            Set, // Points to a message in the cache
-            Idle, // Has iterated over all relevant events in the cache and is waiting for more data on the stream.
-        }
-
-        private class Cursor
-        {
-            public readonly Guid StreamGuid;
-            public readonly string StreamNamespace;
-
-            public Cursor(Guid streamGuid, string streamNamespace)
-            {
-                StreamGuid = streamGuid;
-                StreamNamespace = streamNamespace;
-                State = CursorStates.Unset;
-            }
-
-            public CursorStates State;
-
-            // current sequence token
-            public StreamSequenceToken SequenceToken;
-
-            // reference into cache
-            public LinkedListNode<CachedMessageBlock<TQueueMessage, TCachedMessage>> CurrentBlock;
-            public int Index;
-
-            // utilities
-            public bool IsNewestInBlock { get { return Index == CurrentBlock.Value.NewestMessageIndex; } }
-            public TCachedMessage Message { get { return CurrentBlock.Value[Index]; } }
-        }
+        /// <summary>
+        /// Called with the last item puraged after a cache purge has run.
+        /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
+        ///   of every set of events that get purged.
+        /// </summary>
+        public Action<TCachedMessage> OnPurged { get; set; }
 
         public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter)
         {
@@ -85,6 +59,7 @@ namespace Orleans.Providers.Streams.Common
                 return messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
             }
         }
+
 
         /// <summary>
         /// Acquires a cursor to enumerate through the messages in the cache at the provided sequenceToken, 
@@ -295,9 +270,15 @@ namespace Orleans.Providers.Streams.Common
 
         private void PerformBlockPurge(IDisposable purgeRequest)
         {
-            while (!IsEmpty &&
-                   cacheDataAdapter.ShouldPurge(messageBlocks.Last.Value[messageBlocks.Last.Value.OldestMessageIndex], purgeRequest)) // value has the same resource blockId as the one we are purging
+            TCachedMessage? lastMessagePurged = null;
+            while (!IsEmpty)
             {
+                var oldestMessageInCache = messageBlocks.Last.Value.OldestMessage;
+                if (!cacheDataAdapter.ShouldPurge(ref oldestMessageInCache, purgeRequest))
+                {
+                    break;
+                }
+                lastMessagePurged = oldestMessageInCache;
                 messageBlocks.Last.Value.Remove();
                 CachedMessageBlock<TQueueMessage, TCachedMessage> lastCachedMessageBlock = messageBlocks.Last.Value;
                 // if block is currently empty, but all capacity has been exausted, remove
@@ -308,7 +289,45 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
 
+            if (lastMessagePurged.HasValue && OnPurged != null)
+            {
+                OnPurged(lastMessagePurged.Value);
+            }
+
             purgeRequest.Dispose();
+        }
+
+        private enum CursorStates
+        {
+            Unset, // Not yet set, or points to some data in the future.
+            Set, // Points to a message in the cache
+            Idle, // Has iterated over all relevant events in the cache and is waiting for more data on the stream.
+        }
+
+        private class Cursor
+        {
+            public readonly Guid StreamGuid;
+            public readonly string StreamNamespace;
+
+            public Cursor(Guid streamGuid, string streamNamespace)
+            {
+                StreamGuid = streamGuid;
+                StreamNamespace = streamNamespace;
+                State = CursorStates.Unset;
+            }
+
+            public CursorStates State;
+
+            // current sequence token
+            public StreamSequenceToken SequenceToken;
+
+            // reference into cache
+            public LinkedListNode<CachedMessageBlock<TQueueMessage, TCachedMessage>> CurrentBlock;
+            public int Index;
+
+            // utilities
+            public bool IsNewestInBlock { get { return Index == CurrentBlock.Value.NewestMessageIndex; } }
+            public TCachedMessage Message { get { return CurrentBlock.Value[Index]; } }
         }
     }
 }

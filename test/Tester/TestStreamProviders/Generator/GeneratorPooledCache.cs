@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -16,7 +15,9 @@ namespace Tester.TestStreamProviders.Generator
 
         public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool)
         {
-            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(new CacheDataAdapter(bufferPool, Purge));
+            var dataAdapter = new CacheDataAdapter(bufferPool);
+            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter);
+            dataAdapter.PurgeAction = cache.Purge;
         }
 
         // For fast GC this struct should contain only value types.  I included streamNamespace because I'm lasy and this is test code, but it should not be in here.
@@ -31,21 +32,17 @@ namespace Tester.TestStreamProviders.Generator
         private class CacheDataAdapter : ICacheDataAdapter<GeneratedBatchContainer, CachedMessage>
         {
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
-            private readonly Action<IDisposable> purgeAction;
             private FixedSizeBuffer currentBuffer;
 
-            public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, Action<IDisposable> purgeAction)
+            public Action<IDisposable> PurgeAction { private get; set; }
+
+            public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool)
             {
                 if (bufferPool == null)
                 {
                     throw new ArgumentNullException("bufferPool");
                 }
-                if (purgeAction == null)
-                {
-                    throw new ArgumentNullException("purgeAction");
-                }
                 this.bufferPool = bufferPool;
-                this.purgeAction = purgeAction;
             }
 
             public void QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage)
@@ -69,7 +66,7 @@ namespace Tester.TestStreamProviders.Generator
                 {
                     // no block or block full, get new block and try again
                     currentBuffer = bufferPool.Allocate();
-                    currentBuffer.SetPurgeAction(purgeAction);
+                    currentBuffer.SetPurgeAction(PurgeAction);
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(size, out segment))
                     {
@@ -109,7 +106,7 @@ namespace Tester.TestStreamProviders.Generator
                 return cachedMessage.StreamGuid == streamGuid && cachedMessage.StreamNamespace == streamNamespace;
             }
 
-            public bool ShouldPurge(CachedMessage cachedMessage, IDisposable purgeRequest)
+            public bool ShouldPurge(ref CachedMessage cachedMessage, IDisposable purgeRequest)
             {
                 var purgedResource = (FixedSizeBuffer) purgeRequest;
                 // if we're purging our current buffer, don't use it any more
@@ -184,11 +181,6 @@ namespace Tester.TestStreamProviders.Generator
         public bool IsUnderPressure()
         {
             return false;
-        }
-
-        private void Purge(IDisposable disposable)
-        {
-            cache.Purge(disposable);
         }
     }
 }
