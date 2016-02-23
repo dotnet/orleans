@@ -511,7 +511,7 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
-                    Sock.BeginReceive(_buffer.ReceiveBuffer, SocketFlags.None, callback, this);
+                    Sock.BeginReceive(_buffer.BuildReceiveBuffer(), SocketFlags.None, callback, this);
                 }
                 catch (Exception ex)
                 {
