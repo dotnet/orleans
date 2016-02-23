@@ -509,6 +509,10 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
+                        if (consumerData.Cursor != null)
+                        {
+                            consumerData.Cursor.RecordDeliveryFailure();
+                        }
                         var message = string.Format("Exception while trying to deliver msgs to stream {0} in PersistentStreamPullingAgentGrain.RunConsumerCursor", consumerData.StreamId);
                         logger.Error((int)ErrorCode.PersistentStreamPullingAgent_14, message, exc);
                         exceptionOccured = new StreamEventDeliveryFailureException(consumerData.StreamId);
