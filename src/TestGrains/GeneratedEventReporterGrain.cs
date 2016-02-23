@@ -52,5 +52,10 @@ namespace TestGrains
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
             return TaskDone.Done;
         }
+
+        public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress)
+        {
+            return Task.FromResult(RuntimeIdentity == siloAddress.ToLongString());
+        }
     }
 }

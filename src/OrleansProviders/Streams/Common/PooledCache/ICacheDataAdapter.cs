@@ -12,6 +12,7 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     /// <typeparam name="TQueueMessage"></typeparam>
     /// <typeparam name="TCachedMessage"></typeparam>
+    ///   most recent message purged from the cache.</typeparam>
     public interface ICacheDataAdapter<in TQueueMessage, TCachedMessage>
         where TQueueMessage : class
         where TCachedMessage : struct
@@ -21,6 +22,7 @@ namespace Orleans.Providers.Streams.Common
         StreamSequenceToken GetSequenceToken(ref TCachedMessage cachedMessage);
         int CompareCachedMessageToSequenceToken(ref TCachedMessage cachedMessage, StreamSequenceToken token);
         bool IsInStream(ref TCachedMessage cachedMessage, Guid streamGuid, string streamNamespace);
-        bool ShouldPurge(TCachedMessage cachedMessage, IDisposable purgeRequest);
+        bool ShouldPurge(ref TCachedMessage cachedMessage, IDisposable purgeRequest);
+        Action<IDisposable> PurgeAction { set; }
     }
 }

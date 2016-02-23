@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Orleans.Providers;
 
-namespace OrleansServiceBusUtils.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     [Serializable]
     public class EventHubSettings : IEventHubSettings
@@ -14,10 +14,12 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
         private const string PathName = "EventHubPath";
         private const string PrefetchCountName = "EventHubPrefetchCount";
         private const int InvalidPrefetchCount = -1;
+        private const string StartFromNowName = "StartFromNow";
+        private const bool StartFromNowDefault = true;
 
-        public EventHubSettings() { }
+        public EventHubSettings(){}
 
-        public EventHubSettings(string connectionString, string consumerGroup, string path, int? prefetchCount = null)
+        public EventHubSettings(string connectionString, string consumerGroup, string path, bool startFromNow = StartFromNowDefault, int? prefetchCount = null)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
             {
@@ -35,11 +37,14 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
             ConsumerGroup = consumerGroup;
             Path = path;
             PrefetchCount = prefetchCount;
+            StartFromNow = startFromNow;
         }
+
         public string ConnectionString { get; private set; }
         public string ConsumerGroup { get; private set; }
         public string Path { get; private set; }
         public int? PrefetchCount { get; private set; }
+        public bool StartFromNow { get; private set; }
 
         /// <summary>
         /// Utility function to convert config to property bag for use in stream provider configuration
@@ -54,6 +59,7 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
             {
                 properties.Add(PrefetchCountName, PrefetchCount.Value.ToString(CultureInfo.InvariantCulture));
             }
+            properties.Add(StartFromNowName, StartFromNow.ToString());
         }
 
         /// <summary>
@@ -82,6 +88,7 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
             {
                 PrefetchCount = null;
             }
+            StartFromNow = providerConfiguration.GetBoolProperty(StartFromNowName, StartFromNowDefault);
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 
 namespace TestGrainInterfaces
 {
@@ -12,5 +13,7 @@ namespace TestGrainInterfaces
         Task<IDictionary<Guid,int>> GetReport(string streamProvider, string streamNamespace);
 
         Task Reset();
+
+        Task<bool> IsLocatedOnSilo(SiloAddress siloAddress);
     }
 }

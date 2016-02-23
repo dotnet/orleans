@@ -72,6 +72,7 @@
     <Compile Include="GeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain.cs" />
     <Compile Include="GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs" />
     <Compile Include="ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.cs" />
+    <Compile Include="ImplicitSubscription_RecoverableStream_CollectorGrain.cs" />
     <Compile Include="ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.cs" />
     <Compile Include="GeneratedEventReporterGrain.cs" />
     <Compile Include="GeneratorTestDerivedDerivedGrain.cs" />

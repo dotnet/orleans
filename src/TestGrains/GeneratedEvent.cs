@@ -8,9 +8,10 @@ namespace TestGrains
         public enum GeneratedEventType
         {
             Fill,
-            End,
+            Report,
         }
 
         public GeneratedEventType EventType { get; set; }
+        public int[] Payload { get; set; }
     }
 }
