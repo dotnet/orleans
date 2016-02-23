@@ -37,6 +37,8 @@ namespace Orleans.Runtime
     /// </summary>
     public class Silo : MarshalByRefObject // for hosting multiple silos in app domains of the same process
     {
+        public const string PrimarySiloName = "Primary";
+
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {

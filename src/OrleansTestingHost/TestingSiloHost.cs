@@ -17,6 +17,7 @@ using Orleans.TestingHost.Utils;
 namespace Orleans.TestingHost
 {
     /// <summary>
+    /// Important note: <see cref="TestingSiloHost"/> will be eventually deprectated. It is recommended that you use <see cref="TestCluster"/> instead.
     /// A host class for local testing with Orleans using in-process silos.
     /// 
     /// Runs a Primary and Secondary silo in seperate app domains, and client in the main app domain.

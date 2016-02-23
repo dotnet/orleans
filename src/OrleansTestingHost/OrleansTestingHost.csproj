@@ -58,6 +58,7 @@
     <Compile Include="Utils\StorageEmulator.cs" />
     <Compile Include="StorageTestConstants.cs" />
     <Compile Include="SiloHandle.cs" />
+    <Compile Include="TestClusterOptions.cs" />
     <Compile Include="TestingClientOptions.cs" />
     <Compile Include="TestCluster.cs" />
     <Compile Include="TestingSiloHost.cs" />
