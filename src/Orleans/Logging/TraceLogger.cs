@@ -977,6 +977,15 @@ namespace Orleans.Runtime
                     }
                     catch (Exception) { }
                 }
+
+                foreach (var consumer in TelemetryConsumers)
+                {
+                    try
+                    {
+                        consumer.Flush();
+                    }
+                    catch (Exception) { }
+                }
             }
             catch (Exception) { }
         }
@@ -988,6 +997,15 @@ namespace Orleans.Runtime
             try
             {
                 foreach (ICloseableLogConsumer consumer in LogConsumers.OfType<ICloseableLogConsumer>())
+                {
+                    try
+                    {
+                        consumer.Close();
+                    }
+                    catch (Exception) { }
+                }
+
+                foreach (var consumer in TelemetryConsumers)
                 {
                     try
                     {
