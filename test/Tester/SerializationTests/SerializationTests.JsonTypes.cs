@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Newtonsoft.Json;
@@ -17,7 +16,7 @@ namespace UnitTests.Serialization
     {
         public SerializationTestsJsonTypes()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationManager.InitializeForTesting(useJsonFallbackSerializer: true);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
@@ -34,71 +33,6 @@ namespace UnitTests.Serialization
             JObject input = JObject.Parse(json);
             JObject output = SerializationManager.RoundTripSerializationForTesting(input);
             Assert.AreEqual(input.ToString(), output.ToString());
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
-        public void SerializationTests_Json_Guid_WithoutConverter()
-        {
-            Xunit.Assert.Throws(typeof(Microsoft.VisualStudio.TestTools.UnitTesting.AssertFailedException), () =>
-            {
-                var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
-                Do_Json_Guid_Test(settings);
-            });
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
-        public void SerializationTests_Json_Guid_WithConverter()
-        {
-            var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
-            settings.Converters.Add(new GuidJsonTestConverter());
-            Do_Json_Guid_Test(settings);
-        }
-
-        private void Do_Json_Guid_Test(JsonSerializerSettings settings)
-        {
-            var dict = new Dictionary<string, object>
-                {
-                    {"key", Guid.NewGuid()},
-                };
-
-            string dictSerialized = JsonConvert.SerializeObject(dict, settings);
-            var dictDeserialized = JsonConvert.DeserializeObject<Dictionary<string, object>>(dictSerialized, settings);
-            var originalGuid = dict["key"];
-            var deserGuid = dictDeserialized["key"];
-
-            Assert.AreEqual(typeof(Guid), originalGuid.GetType());
-            Assert.AreEqual(typeof(Guid), deserGuid.GetType());
-            Assert.AreEqual(originalGuid, deserGuid);
-        }
-
-        private class GuidJsonTestConverter : JsonConverter
-        { 
-            public override bool CanRead { get { return true; } }
-            public override bool CanWrite { get { return true; } }
-
-            public override bool CanConvert(Type objectType)
-            {
-                return objectType.IsAssignableFrom(typeof(Guid)) || objectType.IsAssignableFrom(typeof(Guid?));
-            }
-
-            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-            {
-                if (value == null)
-                {
-                    writer.WriteValue(default(string));
-                }
-                else if (value is Guid)
-                {
-                    var guid = (Guid)value;
-                    writer.WriteValue(guid.ToString("N"));
-                }
-            }
-
-            public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-            {
-                var str = reader.Value as string;
-                return str != null ? Guid.Parse(str) : default(Guid);
-            }
         }
 
         [RegisterSerializerAttribute]
@@ -179,6 +113,21 @@ namespace UnitTests.Serialization
             Assert.AreEqual(typeof(JObject), orleansJsonDeser.MyDictionary["obj1"].GetType());
             // The below assert fails, but only since JObject does not correctly implement Equals.
             //Assert.AreEqual(jsonDeser, orleansJsonDeser);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        public void SerializationTests_Json_POCO()
+        {
+            var obj = new SimplePOCO();
+            var deepCopied = SerializationManager.RoundTripSerializationForTesting(obj);
+            Assert.AreEqual(typeof(SimplePOCO), deepCopied.GetType());
+        }
+
+        [Serializable]
+        public class SimplePOCO
+        {
+            public int A { get; set; }
+            public int B { get; set; }
         }
 
         /// <summary>
