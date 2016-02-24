@@ -18,27 +18,23 @@ using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    public class PersistenceProviderTests_LocalFixture
+    public class PersistenceProviderTests_Local : IClassFixture<PersistenceProviderTests_Local.Fixture>, IDisposable
     {
-        public PersistenceProviderTests_LocalFixture()
+        public class Fixture
         {
-            //Console.WriteLine("ClassInitialize {0}", testContext.TestName);
-            //testContext.WriteLine("ClassInitialize");
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            //testContext.WriteLine(cfg.ToString());
-            TraceLogger.Initialize(cfg);
+            public Fixture()
+            {
+                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
+                TraceLogger.Initialize(cfg);
+            }
         }
-    }
 
-    public class PersistenceProviderTests_Local : IClassFixture<PersistenceProviderTests_LocalFixture>, IDisposable
-    {
-        StorageProviderManager storageProviderManager;
-        readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
+        private StorageProviderManager storageProviderManager;
+        private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
         
         public PersistenceProviderTests_Local()
         {
-            //TestContext.WriteLine("TestInitialize");
             storageProviderManager = new StorageProviderManager(new GrainFactory(), new DefaultServiceProvider());
             storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), new DefaultServiceProvider())).WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
@@ -48,14 +44,13 @@ namespace UnitTests.StorageTests
 
         public void Dispose()
         {
-            //TestContext.WriteLine("TestCleanup");
             LocalDataStoreInstance.LocalDataStore = null;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Mock_WriteRead()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_Mock_WriteRead";
 
             IStorageProvider store = new MockStorageProvider();
             var cfg = new ProviderConfiguration(providerCfgProps, null);
@@ -67,7 +62,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_FileStore_WriteRead()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_FileStore_WriteRead";
 
             IStorageProvider store = new OrleansFileStorage();
             providerCfgProps.Add("RootDirectory", "Data");
@@ -80,7 +75,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Sharded_WriteRead()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_Sharded_WriteRead";
 
             IStorageProvider store1 = new MockStorageProvider(2);
             IStorageProvider store2 = new MockStorageProvider(2);
@@ -94,7 +89,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Sharded_9_WriteRead()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_Sharded_9_WriteRead";
 
             IStorageProvider store1 = new MockStorageProvider(2);
             IStorageProvider store2 = new MockStorageProvider(2);
@@ -123,7 +118,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_Read()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_Azure_Read";
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -136,7 +131,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_WriteRead()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_Azure_WriteRead";
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -149,7 +144,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_WriteRead_Json()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_Azure_WriteRead_Json";
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -180,7 +175,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task PersistenceProvider_Memory_FixedLatency_WriteRead()
         {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
+            string testName = "PersistenceProvider_Memory_FixedLatency_WriteRead";
             TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
 
             IStorageProvider store = new MemoryStorageWithLatency();

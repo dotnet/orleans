@@ -75,11 +75,11 @@ namespace UnitTests.Streaming.Reliability
             Task.WhenAll(promises).Wait();
 #endif
             var deploymentId = HostedCluster.DeploymentId;
+            base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
             }
-            base.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]

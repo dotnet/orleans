@@ -6,12 +6,11 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.TestHelper;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.AsyncPrimitivesTests
 {
-    public class AsyncPipelineTests : HostedTestClusterPerTest
+    public class AsyncPipelineTests
     {
         private const int _iterationCount = 100;
         private const int _defaultPipelineCapacity = 2;

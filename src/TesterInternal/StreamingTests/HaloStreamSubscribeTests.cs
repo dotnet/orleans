@@ -13,21 +13,20 @@ using Tester;
 
 namespace UnitTests.HaloTests.Streaming
 {
-    public class HaloStreamSubscribeTestsFixture : BaseClusterFixture
+    public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>, IDisposable
     {
-        public HaloStreamSubscribeTestsFixture() : base(new TestingSiloHost(
+        public class Fixture : BaseClusterFixture
+        {
+            public Fixture() : base(new TestingSiloHost(
                 new TestingSiloOptions
                 {
                     // StartSecondary = false,
                     SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
                 }))
-        {
-
+            {
+            }
         }
-    }
 
-    public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTestsFixture>, IDisposable
-    {
         protected TestingSiloHost HostedCluster { get; private set; }
 
         private const string SmsStreamProviderName = "SMSProvider";
@@ -37,7 +36,7 @@ namespace UnitTests.HaloTests.Streaming
         private Guid _streamId;
         private string _streamProvider;
 
-        public HaloStreamSubscribeTests(HaloStreamSubscribeTestsFixture fixture)
+        public HaloStreamSubscribeTests(Fixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
         }

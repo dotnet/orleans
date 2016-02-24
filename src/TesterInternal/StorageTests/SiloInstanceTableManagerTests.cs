@@ -25,21 +25,20 @@ namespace UnitTests.StorageTests
         internal static readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
     }
 
-    public class SiloInstanceTableManagerTestsFixture
-    {
-        public SiloInstanceTableManagerTestsFixture()
-        {
-            TraceLogger.Initialize(new NodeConfiguration());
-
-            TestUtils.CheckForAzureStorage();
-        }
-    }
-
     /// <summary>
     /// Tests for operation of Orleans SiloInstanceManager using AzureStore - Requires access to external Azure storage
     /// </summary>
-    public class SiloInstanceTableManagerTests : IClassFixture<SiloInstanceTableManagerTestsFixture>, IDisposable
+    public class SiloInstanceTableManagerTests : IClassFixture<SiloInstanceTableManagerTests.Fixture>, IDisposable
     {
+        public class Fixture
+        {
+            public Fixture()
+            {
+                TraceLogger.Initialize(new NodeConfiguration());
+                TestUtils.CheckForAzureStorage();
+            }
+        }
+
         private string deploymentId;
         private int generation;
         private SiloAddress siloAddress;

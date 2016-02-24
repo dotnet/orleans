@@ -24,30 +24,28 @@ using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    public class PersistenceGrainTests_LocalFixture : BaseClusterFixture
-    {
-        public PersistenceGrainTests_LocalFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
-                    StartFreshOrleans = true,
-                    StartPrimary = true,
-                    StartSecondary = false,
-                }))
-        {
-        }
-    }
-
     /// <summary>
     /// PersistenceGrainTests - Run with only local unit test silo -- no external dependency on Azure storage
     /// </summary>
-    public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_LocalFixture>, IDisposable
+    public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable
     {
+        public class Fixture : BaseClusterFixture
+        {
+            public Fixture()
+                : base(new TestingSiloHost(
+                    new TestingSiloOptions
+                    {
+                        SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
+                        StartSecondary = false,
+                    }))
+            {
+            }
+        }
+
         const string ErrorInjectorStorageProvider = "ErrorInjector";
         protected TestingSiloHost HostedCluster { get; private set; }
 
-        public PersistenceGrainTests_Local(PersistenceGrainTests_LocalFixture fixture)
+        public PersistenceGrainTests_Local(Fixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
             SerializationManager.InitializeForTesting();

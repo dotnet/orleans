@@ -6,28 +6,32 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    public class DeadlockDetectionTests : HostedTestClusterEnsureDefaultStarted
+    public class DeadlockDetectionTests : OrleansTestingBase, IClassFixture<DeadlockDetectionTests.Fixture>
     {
-        private const int numIterations = 30;
-
-        public static TestingSiloHost CreateSiloHost()
+        private class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    AdjustConfig = config =>
-                    {
-                        config.Globals.PerformDeadlockDetection = true;
-                    }
-                });
+            public Fixture()
+                : base(
+                    new TestingSiloHost(
+                        new TestingSiloOptions
+                        {
+                            AdjustConfig = config =>
+                            {
+                                config.Globals.PerformDeadlockDetection = true;
+                            }
+                        }))
+            {
+            }
         }
+
+        private const int numIterations = 30;
 
         // 2 silos, loop across all cases (to force all grains to be local and remote):
         //      Non Reentrant A, B

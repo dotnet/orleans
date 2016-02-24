@@ -9,6 +9,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using UnitTests.Tester;
@@ -44,13 +45,8 @@ namespace UnitTests.General
 
         public override TestingSiloHost CreateSiloHost()
         {
+            TestUtils.CheckForAzureStorage();
             return new TestingSiloHost(siloOptions, clientOptions);
-        }
-
-        public override void Dispose()
-        {
-            grains.Clear();
-            base.Dispose();
         }
 
         /// <summary>
@@ -159,16 +155,14 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
-            await Xunit.Assert.ThrowsAsync<AggregateException>(async () =>
-            {
-                var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.Silo.SiloAddress);
-                var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.Secondary.Silo.SiloAddress);
+            var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.Silo.SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.Secondary.Silo.SiloAddress);
 
-                await taintedGrainPrimary.LatchCpuUsage(110.0f);
-                await taintedGrainSecondary.LatchCpuUsage(110.0f);
+            await taintedGrainPrimary.LatchCpuUsage(110.0f);
+            await taintedGrainSecondary.LatchCpuUsage(110.0f);
 
-                AddTestGrains(1).Wait();
-            });
+            await Xunit.Assert.ThrowsAsync<OrleansException>(() => 
+                this.AddTestGrains(1));
         }
 
         /// <summary>
@@ -177,16 +171,17 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Elasticity"), TestCategory("Placement")]
         public async Task ElasticityTest_AllSilosOverloaded()
         {
-            await Xunit.Assert.ThrowsAsync<AggregateException>(async () =>
-            {
-                var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.Silo.SiloAddress);
-                var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.Secondary.Silo.SiloAddress);
+            var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.Silo.SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.Secondary.Silo.SiloAddress);
 
-                await taintedGrainPrimary.LatchCpuUsage(110.0f);
-                await taintedGrainSecondary.LatchOverloaded();
+            await taintedGrainPrimary.LatchCpuUsage(110.0f);
+            await taintedGrainSecondary.LatchOverloaded();
 
-                await AddTestGrains(1);
-            });
+            // OrleansException or GateWayTooBusyException
+            var exception = await Xunit.Assert.ThrowsAnyAsync<Exception>(() => 
+                this.AddTestGrains(1));
+
+            Assert.IsTrue(exception is OrleansException || exception is GatewayTooBusyException);
         }
 
 

@@ -5,12 +5,13 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Xunit;
+using Tester;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests
 {
-    public class ClientInitTests : HostedTestClusterEnsureDefaultStarted
+    public class ClientInitTests : OrleansTestingBase, IClassFixture<DefaultClusterFixture>
     {
         public ClientInitTests()
         {
@@ -23,7 +24,7 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_IsInitialized()
         {
-            // First initialize will have been done by orleans unit test base class
+            // First initialize will have been done by the default cluster fixture
 
             Assert.IsTrue(GrainClient.IsInitialized);
         }

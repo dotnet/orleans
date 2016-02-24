@@ -19,16 +19,17 @@ using Tester;
 
 namespace UnitTests.General
 {
-    public class RequestContextTests_Local : OrleansTestingBase, IDisposable
+    public class RequestContextTests_Local : IDisposable
     {
         private readonly Dictionary<string, object> headers = new Dictionary<string, object>();
 
         private static bool oldPropagateActivityId;
 
-        //private static readonly SafeRandom random = new SafeRandom();
-        
-        public void TestInitialize()
+        private static readonly SafeRandom random = new SafeRandom();
+
+        public RequestContextTests_Local()
         {
+            SerializationManager.InitializeForTesting();
             oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
             Trace.CorrelationManager.ActivityId = Guid.Empty;
@@ -78,7 +79,6 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportToMessage()
         {
-            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
@@ -134,7 +134,6 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportImport()
         {
-            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
@@ -395,22 +394,25 @@ namespace UnitTests.General
 
     }
 
-    public class RequestContextTests_SiloFixture : BaseClusterFixture
+    public class RequestContextTests_Silo : OrleansTestingBase, IClassFixture<RequestContextTests_Silo.Fixture>, IDisposable
     {
-        public RequestContextTests_SiloFixture() : base(new TestingSiloHost(new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            PropagateActivityId = true,
-            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-        }))
-        {
+            public Fixture()
+                : base(
+                    new TestingSiloHost(
+                        new TestingSiloOptions
+                        {
+                            StartPrimary = true,
+                            StartSecondary = false,
+                            PropagateActivityId = true,
+                            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
+                        },
+                        new TestingClientOptions() { PropagateActivityId = true }))
+            {
+            }
         }
-    }
 
-    public class RequestContextTests_Silo : OrleansTestingBase, IDisposable
-    {        
         public RequestContextTests_Silo()
         {
             RequestContext.PropagateActivityId = true; // Client-side setting
@@ -717,6 +719,7 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
+            Assert.AreNotEqual(activityId2, result, "E2E ActivityId #2 should not have been propagated");
             Assert.AreEqual(Guid.Empty, result, "E2E ActivityId #2 should not have been propagated");
             RequestContext.Clear();
 

@@ -1,5 +1,4 @@
 ﻿using Orleans.TestingHost;
-using Xunit;
 
 namespace Tester
 {
@@ -10,7 +9,4 @@ namespace Tester
         {
         }
     }
-
-    [CollectionDefinition("DefaultCluster")]
-    public class DefaultClusterTestCollection : ICollectionFixture<DefaultClusterFixture> { }
 }

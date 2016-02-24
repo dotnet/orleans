@@ -16,48 +16,48 @@ using Xunit;
 
 namespace UnitTests.SqlStatisticsTest
 {
-    public class SqlServerStatisticsPublisherTestsFixture
-    {
-        public readonly TimeSpan Timeout = TimeSpan.FromMinutes(1);
-        public string ConnectionString;
-        private const string testDatabaseName = "OrleansTest";
-        public string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
-        
-
-        public readonly TraceLogger Logger = TraceLogger.GetLogger("MySqlStatisticsPublisherTests",
-            TraceLogger.LoggerType.Application);
-
-        internal SqlStatisticsPublisher StatisticsPublisher;
-
-
-        // Use ClassInitialize to run code before running the first test in the class
-        public SqlServerStatisticsPublisherTestsFixture()
-        {
-            TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("SqlStatisticsPublisherTests", Severity.Verbose3);
-
-            ConnectionString =
-                RelationalStorageForTesting.SetupInstance(AdoInvariant, testDatabaseName)
-                    .Result.CurrentConnectionString;
-        }
-
-        public async Task Initialize()
-        {
-            StatisticsPublisher = new SqlStatisticsPublisher();
-            await StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(Logger),
-                new StatisticsPublisherProviderConfig(AdoInvariant, ConnectionString));
-        }
-    }
-
     /// <summary>
     /// Tests for operation of Orleans Statistics Publisher using SQL Server
     /// </summary>
-    public class SqlServerStatisticsPublisherTests : IClassFixture<SqlServerStatisticsPublisherTestsFixture>
+    public class SqlServerStatisticsPublisherTests : IClassFixture<SqlServerStatisticsPublisherTests.Fixture>
     {
-        private const string dbName = "SqlServer";
-        private SqlServerStatisticsPublisherTestsFixture _fixture;
+        public class Fixture
+        {
+            public readonly TimeSpan Timeout = TimeSpan.FromMinutes(1);
+            public string ConnectionString;
+            private const string testDatabaseName = "OrleansTest";
+            public string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
 
-        public SqlServerStatisticsPublisherTests(SqlServerStatisticsPublisherTestsFixture fixture)
+
+            public readonly TraceLogger Logger = TraceLogger.GetLogger("MySqlStatisticsPublisherTests",
+                TraceLogger.LoggerType.Application);
+
+            internal SqlStatisticsPublisher StatisticsPublisher;
+
+
+            // Use ClassInitialize to run code before running the first test in the class
+            public Fixture()
+            {
+                TraceLogger.Initialize(new NodeConfiguration());
+                TraceLogger.AddTraceLevelOverride("SqlStatisticsPublisherTests", Severity.Verbose3);
+
+                ConnectionString =
+                    RelationalStorageForTesting.SetupInstance(AdoInvariant, testDatabaseName)
+                        .Result.CurrentConnectionString;
+            }
+
+            public async Task Initialize()
+            {
+                StatisticsPublisher = new SqlStatisticsPublisher();
+                await StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(Logger),
+                    new StatisticsPublisherProviderConfig(AdoInvariant, ConnectionString));
+            }
+        }
+
+        private const string dbName = "SqlServer";
+        private Fixture _fixture;
+
+        public SqlServerStatisticsPublisherTests(Fixture fixture)
         {
             _fixture = fixture;
         }        

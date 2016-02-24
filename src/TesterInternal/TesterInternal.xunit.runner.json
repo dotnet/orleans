@@ -1,5 +1,5 @@
 ﻿{
-  "appDomain": "denied",
+  "appDomain": "ifAvailable",
   "diagnosticMessages": true,
   "parallelizeAssembly": false,
   "parallelizeTestCollections": false,

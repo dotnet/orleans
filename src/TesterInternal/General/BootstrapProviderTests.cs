@@ -16,30 +16,30 @@ using Tester;
 
 namespace UnitTests.General
 {
-    public class BootstrapProvidersTestsFixture : BaseClusterFixture
+    public class BootstrapProvidersTests : OrleansTestingBase, IClassFixture<BootstrapProvidersTests.Fixture>
     {
-        public BootstrapProvidersTestsFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
-                    StartFreshOrleans = true,
-                    StartPrimary = true,
-                    StartSecondary = true,
-                },
-                new TestingClientOptions()
-                {
-                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
-                }))
+        public class Fixture : BaseClusterFixture
         {
+            public Fixture()
+                : base(new TestingSiloHost(
+                    new TestingSiloOptions
+                    {
+                        SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
+                        StartFreshOrleans = true,
+                        StartPrimary = true,
+                        StartSecondary = true,
+                    },
+                    new TestingClientOptions()
+                    {
+                        ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
+                    }))
+            {
+            }
         }
-    }
 
-    public class BootstrapProvidersTests : OrleansTestingBase, IClassFixture<BootstrapProvidersTestsFixture>
-    {
         protected TestingSiloHost HostedCluster { get; private set; }
 
-        public BootstrapProvidersTests(BootstrapProvidersTestsFixture fixture)
+        public BootstrapProvidersTests(Fixture fixture)
         {
             this.HostedCluster = fixture.HostedCluster;
         }

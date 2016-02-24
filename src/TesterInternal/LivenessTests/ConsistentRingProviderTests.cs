@@ -9,21 +9,15 @@ using Xunit;
 
 namespace UnitTests.LivenessTests
 {
-    public class ConsistentRingProviderTestsFixture
+    public class ConsistentRingProviderTests : IClassFixture<ConsistentRingProviderTests.Fixture>
     {
-        public ConsistentRingProviderTestsFixture()
+        public class Fixture
         {
-            if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-        }
-    }
-
-    public class ConsistentRingProviderTests : IClassFixture<ConsistentRingProviderTestsFixture>
-    {
-        public ConsistentRingProviderTests()
-        {
-            if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.StandardLoad());
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            public Fixture()
+            {
+                if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
+                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]

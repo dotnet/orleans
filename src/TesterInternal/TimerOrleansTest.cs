@@ -15,8 +15,18 @@ using UnitTests.Tester;
 
 namespace UnitTests.TimerTests
 {
-    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
+    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
+        public TimerOrleansTest(DefaultClusterFixture fixture)
+            : base(fixture)
+        {
+        }
+
+        public void Dispose()
+        {
+            this.HostedCluster.StopAdditionalSilos();
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Basic()
         {
@@ -131,7 +141,6 @@ namespace UnitTests.TimerTests
             {
                 // Ignore
                 Console.WriteLine("Ignoring exception from StopTimer : {0}", exc);
-                TestingSiloHost.StopAllSilosIfRunning();
             }
 
             if (error != null)

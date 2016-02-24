@@ -13,27 +13,26 @@ using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    public class HierarchicalKeyStoreTestsFixture : IDisposable
+    public class HierarchicalKeyStoreTests : IClassFixture<HierarchicalKeyStoreTests.Fixture>
     {
-        public static void ClassInitialize()
+        public class Fixture : IDisposable
         {
-            //Console.WriteLine("ClassInitialize {0}", testContext.TestName);
-            //testContext.WriteLine("ClassInitialize");
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            ClientConfiguration cfg = ClientConfiguration.StandardLoad();
-            //testContext.WriteLine(cfg.ToString());
-            TraceLogger.Initialize(cfg);
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-        
-        public void Dispose()
-        {
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-    }
+            public Fixture()
+            {
+                //Console.WriteLine("ClassInitialize {0}", testContext.TestName);
+                //testContext.WriteLine("ClassInitialize");
+                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                ClientConfiguration cfg = ClientConfiguration.StandardLoad();
+                //testContext.WriteLine(cfg.ToString());
+                TraceLogger.Initialize(cfg);
+                LocalDataStoreInstance.LocalDataStore = null;
+            }
 
-    public class HierarchicalKeyStoreTests
-    {
+            public void Dispose()
+            {
+                LocalDataStoreInstance.LocalDataStore = null;
+            }
+        }
 
         private const string KeyName1 = "Key1";
         private const string KeyName2 = "Key2";

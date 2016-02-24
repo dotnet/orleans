@@ -9,29 +9,17 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime
 {
-    public class AsyncSerialExecutorTestsFixture
+    public class AsyncSerialExecutorTests
     {
-        public TraceLogger Logger;
-        
-        public int OperationsInProgress;
+        public TraceLogger logger;
+        private SafeRandom random;
+        public int operationsInProgress;
 
-        public AsyncSerialExecutorTestsFixture()
+        public AsyncSerialExecutorTests()
         {
             TraceLogger.Initialize(new NodeConfiguration());
-            Logger = TraceLogger.GetLogger("AsyncSerialExecutorTests", TraceLogger.LoggerType.Application);
+            logger = TraceLogger.GetLogger("AsyncSerialExecutorTests", TraceLogger.LoggerType.Application);
         }
-    }
-
-    public class AsyncSerialExecutorTests : ICollectionFixture<AsyncSerialExecutorTestsFixture>
-    {
-        private AsyncSerialExecutorTestsFixture _fixture;
-
-        public AsyncSerialExecutorTests(AsyncSerialExecutorTestsFixture fixture)
-        {
-            _fixture = fixture;
-        }
-
-        private SafeRandom random;
 
         [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_Small()
@@ -39,7 +27,7 @@ namespace UnitTests.OrleansRuntime
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
             List<Task> tasks = new List<Task>();
             random = new SafeRandom();
-            _fixture.OperationsInProgress = 0;
+            operationsInProgress = 0;
 
             tasks.Add(executor.AddNext(() => Operation(1)));
             tasks.Add(executor.AddNext(() => Operation(2)));
@@ -57,7 +45,7 @@ namespace UnitTests.OrleansRuntime
             for (int i = 0; i < 10; i++)
             {
                 int capture = i;
-                _fixture.Logger.Info("Submitting Task {0}.", capture);
+                logger.Info("Submitting Task {0}.", capture);
                 tasks.Add(executor.AddNext(() => Operation(capture)));
             }
             await Task.WhenAll(tasks);
@@ -76,7 +64,7 @@ namespace UnitTests.OrleansRuntime
                 enqueueTasks.Add(
                     Task.Run(() =>
                     {
-                        _fixture.Logger.Info("Submitting Task {0}.", capture);
+                        logger.Info("Submitting Task {0}.", capture);
                         tasks.Add(executor.AddNext(() => Operation(capture)));
                     }));
             }
@@ -86,20 +74,20 @@ namespace UnitTests.OrleansRuntime
 
         private async Task Operation(int opNumber)
         {
-            if (_fixture.OperationsInProgress > 0) Assert.Fail("1: Operation {0} found {1} operationsInProgress.", opNumber, _fixture.OperationsInProgress);
-            _fixture.OperationsInProgress++;
+            if (operationsInProgress > 0) Assert.Fail("1: Operation {0} found {1} operationsInProgress.", opNumber, operationsInProgress);
+            operationsInProgress++;
             var delay = random.NextTimeSpan(TimeSpan.FromSeconds(2));
 
-            _fixture.Logger.Info("Task {0} Staring", opNumber);
+            logger.Info("Task {0} Staring", opNumber);
             await Task.Delay(delay);
-            if (_fixture.OperationsInProgress != 1) Assert.Fail("2: Operation {0} found {1} operationsInProgress.", opNumber, _fixture.OperationsInProgress);
+            if (operationsInProgress != 1) Assert.Fail("2: Operation {0} found {1} operationsInProgress.", opNumber, operationsInProgress);
 
-            _fixture.Logger.Info("Task {0} after first delay", opNumber);
+            logger.Info("Task {0} after first delay", opNumber);
             await Task.Delay(delay);
-            if (_fixture.OperationsInProgress != 1) Assert.Fail("3: Operation {0} found {1} operationsInProgress.", opNumber, _fixture.OperationsInProgress);
+            if (operationsInProgress != 1) Assert.Fail("3: Operation {0} found {1} operationsInProgress.", opNumber, operationsInProgress);
 
-            _fixture.OperationsInProgress--;
-            _fixture.Logger.Info("Task {0} Done", opNumber);
+            operationsInProgress--;
+            logger.Info("Task {0} Done", opNumber);
         }
     }
 }

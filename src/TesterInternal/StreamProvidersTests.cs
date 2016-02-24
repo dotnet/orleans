@@ -13,37 +13,35 @@ using UnitTests.Tester;
 
 namespace UnitTests.Streaming
 {
-    public class StreamProvidersTests_ProviderConfigNotLoadedFixture : BaseClusterFixture
+    public class StreamProvidersTests_ProviderConfigNotLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigNotLoaded.Fixture>
     {
-        public static Guid ServiceId = Guid.NewGuid();
-        private static readonly FileInfo SiloConfig = new FileInfo("Config_DevStorage.xml");
-        public static TestingSiloOptions SiloOptions = new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            SiloConfigFile = SiloConfig,
-            AdjustConfig = config =>
+            public static Guid ServiceId = Guid.NewGuid();
+            private static readonly FileInfo SiloConfig = new FileInfo("Config_DevStorage.xml");
+            public static TestingSiloOptions SiloOptions = new TestingSiloOptions
             {
-                config.Globals.ServiceId = ServiceId;
+                SiloConfigFile = SiloConfig,
+                AdjustConfig = config =>
+                {
+                    config.Globals.ServiceId = ServiceId;
+                }
+            };
+
+            public Fixture() : base(new TestingSiloHost(SiloOptions))
+            {
             }
-        };
-
-        public StreamProvidersTests_ProviderConfigNotLoadedFixture() : base(new TestingSiloHost(SiloOptions))
-        {
-
         }
-    }
-
-    public class StreamProvidersTests_ProviderConfigNotLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigNotLoadedFixture>
-    {
         protected TestingSiloHost HostedCluster { get; private set; }
         private TestingSiloOptions SiloOptions;
         private Guid ServiceId;
         public static readonly string STREAM_PROVIDER_NAME = "SMSProvider";
 
-        public StreamProvidersTests_ProviderConfigNotLoaded(StreamProvidersTests_ProviderConfigNotLoadedFixture fixture)
+        public StreamProvidersTests_ProviderConfigNotLoaded(Fixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
-            SiloOptions = StreamProvidersTests_ProviderConfigNotLoadedFixture.SiloOptions;
-            ServiceId = StreamProvidersTests_ProviderConfigNotLoadedFixture.ServiceId;
+            SiloOptions = Fixture.SiloOptions;
+            ServiceId = Fixture.ServiceId;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Providers")]
@@ -117,19 +115,18 @@ namespace UnitTests.Streaming
         }
     }
 
-    public class StreamProvidersTests_ProviderConfigLoadedFixture : BaseClusterFixture
+    public class StreamProvidersTests_ProviderConfigLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigLoaded.Fixture>
     {
-        public StreamProvidersTests_ProviderConfigLoadedFixture() : base(new TestingSiloHost(new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            SiloConfigFile = new FileInfo("Config_StreamProviders.xml")
-        }))
-        {
-
+            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            {
+                SiloConfigFile = new FileInfo("Config_StreamProviders.xml")
+            }))
+            {
+            }
         }
-    }
 
-    public class StreamProvidersTests_ProviderConfigLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigLoaded>
-    {
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Providers")]
         public void ProvidersTests_ProviderWrongName()
         {

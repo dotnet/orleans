@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -17,6 +17,11 @@ namespace UnitTests
 {
     public class ReentrancyTests : HostedTestClusterEnsureDefaultStarted
     {
+        public ReentrancyTests(DefaultClusterFixture fixture)
+            : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void ReentrantGrain()
         {

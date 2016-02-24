@@ -13,11 +13,11 @@ namespace Tester
 {
     public class TestUtils
     {
-        protected static readonly Random random = new Random();
+        public static readonly Random Random = new Random();
 
         public static long GetRandomGrainId()
         {
-            return random.Next();
+            return Random.Next();
         }
 
         public static void CheckForAzureStorage()

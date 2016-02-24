@@ -195,56 +195,31 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
-        public void FailSideCastAfterResolve()
+        public async Task FailSideCastAfterResolve()
         {
-            Xunit.Assert.Throws<InvalidCastException>(() =>
-            {
-                // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-                // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-                try
-                {
-                    IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-                    Assert.IsTrue(grain.StringIsNullOrEmpty().Result);
-                    // Fails the next line as grain reference is already resolved
-                    IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-                    Task<string> av = cast.StringConcat("a", "b", "c");
-                    av.Wait();
-                    Assert.IsFalse(cast.StringIsNullOrEmpty().Result); // Not reached
-                }
-                catch (AggregateException ae)
-                {
-                    Exception ex = ae.InnerException;
-                    while (ex is AggregateException) ex = ex.InnerException;
-                    throw ex;
-                }
-                Assert.Fail("Exception should have been raised");
-            });
+            // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
+            // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
+            IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            Assert.IsTrue(grain.StringIsNullOrEmpty().Result);
+            // Fails the next line as grain reference is already resolved
+            IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+
+            await Xunit.Assert.ThrowsAsync<InvalidCastException>(() =>
+                cast.StringConcat("a", "b", "c"));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void FailOperationAfterSideCast()
         {
-            Xunit.Assert.Throws<InvalidCastException>(() =>
-            {
-                // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-                // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-                try
-                {
-                    IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-                    // Cast works optimistically when the grain reference is not already resolved
-                    IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-                    // Operation fails when grain reference is completely resolved
-                    Task<string> av = cast.StringConcat("a", "b", "c");
-                    string val = av.Result;
-                }
-                catch (AggregateException ae)
-                {
-                    Exception ex = ae.InnerException;
-                    while (ex is AggregateException) ex = ex.InnerException;
-                    throw ex;
-                }
-                Assert.Fail("Exception should have been raised");
-            });
+            // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
+            // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
+            IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            // Cast works optimistically when the grain reference is not already resolved
+            IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+            // Operation fails when grain reference is completely resolved
+
+            Xunit.Assert.ThrowsAsync<InvalidCastException>(() =>
+                cast.StringConcat("a", "b", "c"));
         }
 
 

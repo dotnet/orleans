@@ -15,33 +15,29 @@ using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    public class PersistenceGrainTests_AzureBlobStoreFixture : BaseClusterFixture
-    {
-        private static Guid serviceId = Guid.NewGuid();
-        public PersistenceGrainTests_AzureBlobStoreFixture() : base(new TestingSiloHost(new TestingSiloOptions
-        {
-            SiloConfigFile = new FileInfo("Config_AzureBlobStorage.xml"),
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            AdjustConfig = config =>
-            {
-                config.Globals.ServiceId = serviceId;
-            }
-        }))
-        {
-
-        }
-    }
-
     /// <summary>
     /// PersistenceGrainTests using AzureStore - Requires access to external Azure blob storage
     /// </summary>
-    public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore
+    public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureBlobStore.Fixture>
     {
-        public PersistenceGrainTests_AzureBlobStore(PersistenceGrainTests_AzureBlobStoreFixture fixture) : base(fixture)
+        public class Fixture : BaseClusterFixture
         {
+            private static Guid serviceId = Guid.NewGuid();
+            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            {
+                SiloConfigFile = new FileInfo("Config_AzureBlobStorage.xml"),
+                StartSecondary = false,
+                AdjustConfig = config =>
+                {
+                    config.Globals.ServiceId = serviceId;
+                }
+            }))
+            {
+            }
+        }
 
+        public PersistenceGrainTests_AzureBlobStore(Fixture fixture) : base(fixture)
+        {
         }
         
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]

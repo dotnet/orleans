@@ -17,32 +17,31 @@ using Tester;
 
 namespace UnitTests.StorageTests
 {
-    public class PersistenceGrainTests_AzureTableStoreFixture : BaseClusterFixture
-    {
-        public PersistenceGrainTests_AzureTableStoreFixture() : base(new TestingSiloHost(new TestingSiloOptions
-        {
-            SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            AdjustConfig = config =>
-            {
-                config.Globals.ServiceId = Guid.NewGuid();
-            }
-        }))
-        {
-
-        }
-    }
-
     /// <summary>
     /// PersistenceGrainTests using AzureTableStore - Requires access to external Azure table storage
     /// </summary>
-    public class PersistenceGrainTests_AzureTableStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableStoreFixture>
+    public class PersistenceGrainTests_AzureTableStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableStore.Fixture>
     {
-        public PersistenceGrainTests_AzureTableStore(PersistenceGrainTests_AzureTableStoreFixture fixture) : base(fixture)
+        public class Fixture : BaseClusterFixture
         {
+            private static Guid serviceId = Guid.NewGuid();
+            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            {
+                SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
+                StartFreshOrleans = true,
+                StartPrimary = true,
+                StartSecondary = false,
+                AdjustConfig = config =>
+                {
+                    config.Globals.ServiceId = serviceId;
+                }
+            }))
+            {
+            }
+        }
 
+        public PersistenceGrainTests_AzureTableStore(Fixture fixture) : base(fixture)
+        {
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]

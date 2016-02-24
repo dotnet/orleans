@@ -21,7 +21,7 @@ using Tester;
 
 namespace UnitTests.TimerTests
 {
-    public class ReminderTests_Base : OrleansTestingBase
+    public class ReminderTests_Base : OrleansTestingBase, IDisposable
     {
         protected TestingSiloHost HostedCluster { get; private set; }
         internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(100); // the experiment shouldnt be that long that the sums of leeways exceeds a period
@@ -41,10 +41,7 @@ namespace UnitTests.TimerTests
         public ReminderTests_Base(BaseClusterFixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
-        }
-        
-        public void DoTestInitialize()
-        {
+
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             TraceLogger.Initialize(cfg);
 #if DEBUG
@@ -52,14 +49,10 @@ namespace UnitTests.TimerTests
             TraceLogger.AddTraceLevelOverride("Reminder", Severity.Verbose3);
 #endif
             log = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Application);
-            Console.WriteLine("base.DoTestInitialize completed");
         }
 
-        public void DoTestCleanup()
+        public void Dispose()
         {
-            //Console.WriteLine("{0} TestCleanup {1} - Outcome = {2}",
-            //    GetType().Name, TestContext.TestName, TestContext.CurrentTestOutcome);
-
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -70,13 +63,10 @@ namespace UnitTests.TimerTests
         #region Basic test
         public async Task Test_Reminders_Basic_StopByRef()
         {
-            //Console.WriteLine(TestContext.TestName + " started");
-            //log.Info(TestContext.TestName);
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             IGrainReminder r1 = await grain.StartReminder(DR);
             IGrainReminder r2 = await grain.StartReminder(DR);
-            //Console.WriteLine(TestContext.TestName + " reminders started");
             try
             {
                 // First handle should now be out of date once the seconf handle to the same reminder was obtained
@@ -104,7 +94,6 @@ namespace UnitTests.TimerTests
 
         public async Task Test_Reminders_Basic_ListOps()
         {
-            //log.Info(TestContext.TestName);
             Guid id = Guid.NewGuid();
             log.Info("Start Grain Id = {0}", id);
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(id);
@@ -150,7 +139,6 @@ namespace UnitTests.TimerTests
         #region Single join ... multi grain, multi reminders
         public async Task Test_Reminders_1J_MultiGrainMultiReminders()
         {
-            //log.Info(TestContext.TestName);
             IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g3 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

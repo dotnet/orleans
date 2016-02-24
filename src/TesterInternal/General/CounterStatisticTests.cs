@@ -2,12 +2,11 @@
 using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.General
 {
-    public class CounterStatisticTest : HostedTestClusterPerTest
+    public class CounterStatisticTest : IDisposable
     {
         private CounterStatistic[] counters;
         
@@ -16,14 +15,12 @@ namespace UnitTests.General
             counters = new CounterStatistic[Environment.ProcessorCount];
         }
 
-        public override void Dispose()
+        public virtual void Dispose()
         {
             for (int i = 0; i < counters.Length; i++)
             {
                 CounterStatistic.Delete("test" + i);                
             }
-            counters = null;
-            base.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Statistics")]

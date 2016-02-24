@@ -11,14 +11,14 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using UnitTests.Tester;
-using Tester;
 
 namespace UnitTests.General
 {
-    public class GrainPlacementTestsFixture : BaseClusterFixture
+    public class GrainPlacementTests : HostedTestClusterPerTest
     {
-        public GrainPlacementTestsFixture()
-            : base(new TestingSiloHost(
+        public override TestingSiloHost CreateSiloHost()
+        {
+            return new TestingSiloHost(
                 new TestingSiloOptions
                 {
                     StartFreshOrleans = true,
@@ -26,26 +26,10 @@ namespace UnitTests.General
                 }, new TestingClientOptions
                 {
                     ProxiedGateway = true,
-                    Gateways = new List<IPEndPoint>(new IPEndPoint[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
+                    Gateways = new List<IPEndPoint>(new[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
                     PreferedGatewayIndex = -1,
                     ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
-                }))
-        {
-        }
-    }
-
-    public class GrainPlacementTests : OrleansTestingBase, IClassFixture<GrainPlacementTestsFixture>, IDisposable
-    {
-        protected TestingSiloHost HostedCluster { get; private set; }
-
-        public GrainPlacementTests(GrainPlacementTestsFixture fixture)
-        {
-            HostedCluster = fixture.HostedCluster;
-        }
-
-        public void Dispose()
-        {
-            this.HostedCluster.RestartDefaultSilos();
+                });
         }
         
         [Fact, TestCategory("Placement"), TestCategory("Functional")]

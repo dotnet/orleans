@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers;
 using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime.Configuration;
@@ -12,47 +11,44 @@ using Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class SMSStreamingTestsFixture : BaseClusterFixture
+    public class SMSStreamingTests : OrleansTestingBase, IClassFixture<SMSStreamingTests.Fixture>
     {
-        private static Guid serviceId = Guid.NewGuid();
-        public static FileInfo SiloConfig = new FileInfo("Config_StreamProviders.xml");
-        public static FileInfo ClientConfig = new FileInfo("ClientConfig_StreamProviders.xml");
-
-        public SMSStreamingTestsFixture() : base(new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = SiloConfig,
-                    AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
-                },
-                //smsSiloOption_OnlyPrimary,
-                new TestingClientOptions
-                {
-                    ClientConfigFile = ClientConfig
-                }))
+        public class Fixture : BaseClusterFixture
         {
+            private static Guid serviceId = Guid.NewGuid();
+            public static FileInfo SiloConfig = new FileInfo("Config_StreamProviders.xml");
+            public static FileInfo ClientConfig = new FileInfo("ClientConfig_StreamProviders.xml");
 
+            //private static readonly TestingSiloOptions smsSiloOption_OnlyPrimary = new TestingSiloOptions
+            //            {
+            //                StartFreshOrleans = true,
+            //                SiloConfigFile = SiloConfigFile,
+            //                StartSecondary = false,
+            //                AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
+            //            };
+
+            public Fixture() : base(new TestingSiloHost(
+                    new TestingSiloOptions
+                    {
+                        StartFreshOrleans = true,
+                        SiloConfigFile = SiloConfig,
+                        AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
+                    },
+                    //smsSiloOption_OnlyPrimary,
+                    new TestingClientOptions
+                    {
+                        ClientConfigFile = ClientConfig
+                    }))
+            {
+
+            }
         }
-    }
-
-
-    public class SMSStreamingTests : OrleansTestingBase, IClassFixture<SMSStreamingTestsFixture>
-    {
-        protected TestingSiloHost HostedCluster { get; private set; }
-        
-        //private static readonly TestingSiloOptions smsSiloOption_OnlyPrimary = new TestingSiloOptions
-        //            {
-        //                StartFreshOrleans = true,
-        //                SiloConfigFile = SiloConfigFile,
-        //                StartSecondary = false, 
-        //            };
 
         private SingleStreamTestRunner runner;
         private bool fireAndForgetDeliveryProperty;
         
-        public SMSStreamingTests(SMSStreamingTestsFixture fixture)
+        public SMSStreamingTests(Fixture fixture)
         {
-            HostedCluster = fixture.HostedCluster;
             runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME);
             // runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, 0, false);
             fireAndForgetDeliveryProperty = ExtractFireAndForgetDeliveryProperty();
@@ -154,7 +150,7 @@ namespace UnitTests.StreamingTests
         private bool ExtractFireAndForgetDeliveryProperty()
         {
             ClusterConfiguration orleansConfig = new ClusterConfiguration();
-            orleansConfig.LoadFromFile(SMSStreamingTestsFixture.SiloConfig.FullName);
+            orleansConfig.LoadFromFile(Fixture.SiloConfig.FullName);
             ProviderCategoryConfiguration providerConfigs = orleansConfig.Globals.ProviderConfigurations["Stream"];
             IProviderConfiguration provider = providerConfigs.Providers[SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME];
 

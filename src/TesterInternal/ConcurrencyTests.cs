@@ -1,32 +1,35 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.ConcurrencyTests
 {
     /// <summary>
     /// Summary description for PersistenceTest
     /// </summary>
-    public class ConcurrencyTests : HostedTestClusterEnsureDefaultStarted
+    public class ConcurrencyTests : OrleansTestingBase, IClassFixture<ConcurrencyTests.Fixture>
     {
-        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
-
-        public static TestingSiloHost CreateSiloHost()
+        private class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartSecondary = false,
-                    AdjustConfig = config => {
-                        config.Overrides["Primary"].MaxActiveThreads = 2;
-                    },
-                });
+            public Fixture()
+                : base(
+                    new TestingSiloHost(
+                        new TestingSiloOptions
+                        {
+                            StartSecondary = false,
+                            AdjustConfig = config =>
+                            {
+                                config.Overrides["Primary"].MaxActiveThreads = 2;
+                            }
+                        }))
+            {
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]

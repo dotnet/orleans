@@ -7,7 +7,6 @@ using System.Text;
 using System.Threading;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
-
 using Orleans.Runtime;
 using Tester;
 using Xunit;
@@ -19,7 +18,7 @@ namespace UnitTests
     ///This is a test class for LoggerTest and is intended
     ///to contain all LoggerTest Unit Tests
     ///</summary>
-    public class LoggerTest : OrleansTestingBase, IDisposable
+    public class LoggerTest : OrleansTestingBase, IClassFixture<DefaultClusterFixture>, IDisposable
     {
         private double timingFactor;
                 
@@ -35,7 +34,7 @@ namespace UnitTests
             TraceLogger.SetTraceLevelOverrides(overrides.ToList());
             timingFactor = TestUtils.CalibrateTimings();
         }
-        
+
         public void Dispose()
         {
             TraceLogger.Flush();
@@ -246,7 +245,7 @@ namespace UnitTests
             int n = 10000;
             TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
 
-            int mainLogCode = random.Next(100000);
+            int mainLogCode = TestUtils.Random.Next();
             int finalLogCode = mainLogCode + 10;
             int expectedMainLogMessages = TraceLogger.BulkMessageLimit;
             int expectedFinalLogMessages = 1;
@@ -262,7 +261,7 @@ namespace UnitTests
             int n = 10000;
             TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
 
-            int mainLogCode = random.Next(100000);
+            int mainLogCode = TestUtils.Random.Next(100000);
             int finalLogCode = mainLogCode; // Same as main code
             int expectedMainLogMessages = TraceLogger.BulkMessageLimit + 1; // == Loop + 1 final
             int expectedFinalLogMessages = expectedMainLogMessages;
@@ -355,7 +354,7 @@ namespace UnitTests
             const string testName = "Logger_Perf_FileLogWriter";
             TimeSpan target = TimeSpan.FromMilliseconds(1000);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             var logFile = new FileInfo("log-" + testName + ".txt");
             ITraceTelemetryConsumer log = new FileTelemetryConsumer(logFile);
@@ -368,7 +367,7 @@ namespace UnitTests
             const string testName = "Logger_Perf_TraceLogWriter";
             TimeSpan target = TimeSpan.FromMilliseconds(360);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             ITraceTelemetryConsumer log = new TraceTelemetryConsumer();
             RunLogWriterPerfTest(testName, n, logCode, target, log);
@@ -380,7 +379,7 @@ namespace UnitTests
             const string testName = "Logger_Perf_ConsoleLogWriter";
             TimeSpan target = TimeSpan.FromMilliseconds(100);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             ITraceTelemetryConsumer log = new ConsoleTelemetryConsumer();
             RunLogWriterPerfTest(testName, n, logCode, target, log);
@@ -403,7 +402,7 @@ namespace UnitTests
             const string testName = "Logger_Perf_Logger_Console";
             TimeSpan target = TimeSpan.FromMilliseconds(50);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             ITraceTelemetryConsumer logConsumer = new ConsoleTelemetryConsumer();
             TraceLogger.TelemetryConsumers.Add(logConsumer);
@@ -419,7 +418,7 @@ namespace UnitTests
             const string testName = "Logger_Perf_Logger_Dummy";
             TimeSpan target = TimeSpan.FromMilliseconds(30);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             ILogConsumer logConsumer = new TestLogConsumer();
             TraceLogger.LogConsumers.Add(logConsumer);
@@ -431,11 +430,17 @@ namespace UnitTests
 
         private void RunLogWriterPerfTest(string testName, int n, int logCode, TimeSpan target, ITraceTelemetryConsumer log)
         {
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
-            for (int i = 0; i < n; i++)
+            // warm up
+            log.TrackTrace(string.Format( "{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg warm up", logCode), Severity.Info);
+
+            var messages = Enumerable.Range(0, n)
+                .Select(i => string.Format("{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg " + i, logCode))
+                .ToList();
+
+            var stopwatch = Stopwatch.StartNew();
+            foreach (string message in messages)
             {
-                log.TrackTrace(string.Format( "{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg " + i, logCode), Severity.Info);
+                log.TrackTrace(message, Severity.Info);
             }
             stopwatch.Stop();
             var elapsed = stopwatch.Elapsed;

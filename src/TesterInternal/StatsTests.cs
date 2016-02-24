@@ -15,29 +15,28 @@ using UnitTests.Tester;
 
 namespace UnitTests.Stats
 {
-    public class StatsInitTestsFixture : BaseClusterFixture
+    public class StatsInitTests : OrleansTestingBase, IClassFixture<StatsInitTests.Fixture>
     {
-        public StatsInitTestsFixture() : base(new TestingSiloHost(new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            SiloConfigFile = new FileInfo("MockStats_ServerConfiguration.xml"),
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        }, new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
-        }))
-        {
-
+            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            {
+                StartFreshOrleans = true,
+                StartPrimary = true,
+                StartSecondary = false,
+                SiloConfigFile = new FileInfo("MockStats_ServerConfiguration.xml"),
+                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+            }, new TestingClientOptions
+            {
+                ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
+            }))
+            {
+            }
         }
-    }
 
-    public class StatsInitTests : OrleansTestingBase, IClassFixture<StatsInitTestsFixture>
-    {
         protected TestingSiloHost HostedCluster { get; private set; }
 
-        public StatsInitTests(StatsInitTestsFixture fixture)
+        public StatsInitTests(Fixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
         }
@@ -129,29 +128,29 @@ namespace UnitTests.Stats
 
 #if DEBUG || USE_SQL_SERVER
 
-    public class SqlClientInitTestsFixture : BaseClusterFixture
+    public class SqlClientInitTests : OrleansTestingBase, IClassFixture<SqlClientInitTests.Fixture>, IDisposable
     {
-        public SqlClientInitTestsFixture() : base(new TestingSiloHost(new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            SiloConfigFile = new FileInfo("DevTestServerConfiguration.xml"),
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        }, new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
-        }))
-        {
+            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            {
+                StartFreshOrleans = true,
+                StartPrimary = true,
+                StartSecondary = false,
+                SiloConfigFile = new FileInfo("DevTestServerConfiguration.xml"),
+                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+            }, new TestingClientOptions
+            {
+                ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
+            }))
+            {
 
+            }
         }
-    }
 
-    public class SqlClientInitTests : OrleansTestingBase, IClassFixture<SqlClientInitTestsFixture>, IDisposable
-    {
         protected TestingSiloHost HostedCluster { get; private set; }
 
-        public SqlClientInitTests(SqlClientInitTestsFixture fixture)
+        public SqlClientInitTests(Fixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
         }

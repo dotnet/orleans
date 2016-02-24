@@ -103,6 +103,7 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CollectionFixtures.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="StorageTests\AzureStorageBasicTestFixture.cs" />
     <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
@@ -225,7 +226,6 @@
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
-    <Compile Include="TestAssemblyCleanup.cs" />
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />
@@ -318,9 +318,9 @@
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="ReadMe.md" />
-    <None Include="TesterInternal.xunit.runner.json">
+    <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\src\Build\Version.txt">

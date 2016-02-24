@@ -12,14 +12,7 @@ using Xunit;
 
 namespace UnitTests.SchedulerTests
 {
-    public class OrleansTaskSchedulerAdvancedTests_Set2Fixture : IDisposable
-    {
-        public void Dispose()
-        {
-            TraceLogger.UnInitialize();
-        }
-    }
-    public class OrleansTaskSchedulerAdvancedTests_Set2 : IClassFixture<OrleansTaskSchedulerAdvancedTests_Set2Fixture>, IDisposable
+    public class OrleansTaskSchedulerAdvancedTests_Set2 : IDisposable
     {
         private static readonly object lockable = new object();
         private static readonly int waitFactor = Debugger.IsAttached ? 100 : 1;
@@ -37,6 +30,7 @@ namespace UnitTests.SchedulerTests
         public void Dispose()
         {
             masterScheduler.Stop();
+            TraceLogger.UnInitialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]

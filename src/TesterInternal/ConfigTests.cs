@@ -773,68 +773,34 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ClientConfig_AzureInit_FileNotFound()
         {
-            Xunit.Assert.Throws<FileNotFoundException>(() =>
+            const string filename = "ClientConfig_NotFound.xml";
+            GrainClient.TestOnlyNoConnect = true;
+            try
             {
-                const string filename = "ClientConfig_NotFound.xml";
-
-                try
-                {
-                    GrainClient.TestOnlyNoConnect = true;
-
-                    GrainClient.Initialize(filename);
-
-                    Assert.Fail("Should have been FileNotFoundException");
-                }
-                catch (AggregateException ae)
-                {
-                    throw ae.Flatten().GetBaseException();
-                }
-                finally
-                {
-                    GrainClient.TestOnlyNoConnect = false;
-                }
-            });
+                Xunit.Assert.Throws<FileNotFoundException>(() =>
+                    GrainClient.Initialize(filename));
+            }
+            finally
+            {
+                GrainClient.TestOnlyNoConnect = false;
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ClientConfig_FromFile_FileNotFound()
         {
-            Xunit.Assert.Throws<FileNotFoundException>(() =>
-            {
-                const string filename = "ClientConfig_NotFound.xml";
-
-                try
-                {
-                    ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
-                }
-                catch (AggregateException ae)
-                {
-                    throw ae.Flatten().GetBaseException();
-                }
-
-                Assert.Fail("Should have been FileNotFoundException");
-            });
+            const string filename = "ClientConfig_NotFound.xml";
+            Xunit.Assert.Throws<FileNotFoundException>(() => 
+            ClientConfiguration.LoadFromFile(filename));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ServerConfig_FromFile_FileNotFound()
         {
-            Xunit.Assert.Throws<FileNotFoundException>(() =>
-            {
-                const string filename = "SiloConfig_NotFound.xml";
-
-                try
-                {
-                    var config = new ClusterConfiguration();
-                    config.LoadFromFile(filename);
-                }
-                catch (AggregateException ae)
-                {
-                    throw ae.Flatten().GetBaseException();
-                }
-
-                Assert.Fail("Should have got FileNotFoundException");
-            });
+            const string filename = "SiloConfig_NotFound.xml";
+            var config = new ClusterConfiguration();
+            Xunit.Assert.Throws<FileNotFoundException>(() => 
+                config.LoadFromFile(filename));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]

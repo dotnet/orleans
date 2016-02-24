@@ -17,25 +17,23 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
-    public class StreamPubSubReliabilityTestsFixture : BaseClusterFixture
+    public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTests.Fixture>
     {
-        public StreamPubSubReliabilityTestsFixture() : base(new TestingSiloHost(new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            StartFreshOrleans = true,
-            SiloConfigFile = new FileInfo("Config_StorageErrors.xml"),
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        }, new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
-        }))
-        {
-
+            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            {
+                SiloConfigFile = new FileInfo("Config_StorageErrors.xml"),
+                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
+                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+            }, new TestingClientOptions
+            {
+                ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
+            }))
+            {
+            }
         }
-    }
 
-    public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTestsFixture>, IDisposable
-    {
         private const string PubSubStoreProviderName = "PubSubStore";
         protected TestingSiloHost HostedCluster { get; private set; }
 
@@ -43,22 +41,14 @@ namespace UnitTests.StreamingTests
         protected string StreamProviderName;
         protected string StreamNamespace;
 
-        public StreamPubSubReliabilityTests(StreamPubSubReliabilityTestsFixture fixture)
+        public StreamPubSubReliabilityTests(Fixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
-            //logger.Info("TestInitialize - {0}", TestContext.TestName);
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
 
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
-        }
-
-        public void Dispose()
-        {
-            //logger.Info("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-            StreamId = default(Guid);
-            StreamProviderName = null;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
@@ -77,12 +67,12 @@ namespace UnitTests.StreamingTests
             //                   root cause problem "Failed SetupActivationState" in message text, 
             //                   but no more details or stack trace.
 
+            SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
+
             await Xunit.Assert.ThrowsAsync<OrleansException>(async () =>
             {
                 try
                 {
-                    SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
-
                     await Test_PubSub_Stream(StreamProviderName, StreamId);
                 }
                 catch (AggregateException ae)
@@ -101,12 +91,12 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_WriteError()
         {
+            SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
+
             await Xunit.Assert.ThrowsAsync<StorageProviderInjectedError>(async () =>
             {
                 try
                 {
-                    SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
-
                     await Test_PubSub_Stream(StreamProviderName, StreamId);
                 }
                 catch (AggregateException ae)

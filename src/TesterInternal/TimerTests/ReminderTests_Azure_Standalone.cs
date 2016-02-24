@@ -11,7 +11,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
 using Tester;
-using UnitTests.Tester;
 using Xunit;
 
 // ReSharper disable InconsistentNaming
@@ -40,8 +39,6 @@ namespace UnitTests.TimerTests
         [Fact, TestCategory("ReminderService"), TestCategory("Azure"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            //log.Info(TestContext.TestName);
-
             IReminderTable table = new AzureBasedReminderTable();
             var config = new GlobalConfiguration()
             {
@@ -58,8 +55,6 @@ namespace UnitTests.TimerTests
         [Fact, TestCategory("ReminderService"), TestCategory("Azure")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
-            //log.Info(TestContext.TestName);
-
             string deploymentId = NewDeploymentId();
             IReminderTable table = new AzureBasedReminderTable();
             var config = new GlobalConfiguration()

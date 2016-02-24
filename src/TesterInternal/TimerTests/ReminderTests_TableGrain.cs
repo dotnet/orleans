@@ -2,7 +2,6 @@
 
 using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -15,34 +14,26 @@ using Xunit;
 
 namespace UnitTests.TimerTests
 {
-    public class ReminderTests_TableGrainFixture : BaseClusterFixture
+    public class ReminderTests_TableGrain : ReminderTests_Base, IClassFixture<ReminderTests_TableGrain.Fixture>
     {
-        public ReminderTests_TableGrainFixture() : base(new TestingSiloHost(new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            StartFreshOrleans = true,
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-        }))
-        {
-
+            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            {
+                StartFreshOrleans = true,
+                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
+                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
+            }))
+            {
+            }
         }
-    }
 
-    public class ReminderTests_TableGrain : ReminderTests_Base, IClassFixture<ReminderTests_TableGrainFixture>, IDisposable
-    {
-        public ReminderTests_TableGrain(ReminderTests_TableGrainFixture fixture) : base(fixture)
+        public ReminderTests_TableGrain(Fixture fixture) : base(fixture)
         {
-            DoTestInitialize();
-
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
-        }
-        
-        public void Dispose()
-        {
-            DoTestCleanup();
         }
 
         // Basic tests

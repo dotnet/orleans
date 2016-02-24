@@ -10,7 +10,7 @@ using UnitTests.Tester;
 
 namespace UnitTests
 {
-    public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted, IDisposable
+    public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
         private object anchor;
 
@@ -68,11 +68,6 @@ namespace UnitTests
             }
         }
 
-        public void Dispose()
-        {
-            this.anchor = null;
-        }
-
         [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
         public async Task TestClientAddressableHappyPath()
         {
@@ -91,35 +86,19 @@ namespace UnitTests
         [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
         public async Task TestClientAddressableSadPath()
         {
-            await Xunit.Assert.ThrowsAsync<ApplicationException>(async () =>
-            {
-                const string message = "o hai!";
-                try
-                {
-                    var myOb = new MyPseudoGrain();
-                    this.anchor = myOb;
-                    var myRef = await ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
-                    var proxy = GrainClient.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
-                    await proxy.SetTarget(myRef);
-                    await proxy.SadPath(message);
+            const string message = "o hai!";
 
-                    await GrainReference.DeleteObjectReference(myRef);
-                }
-                catch (AggregateException e)
-                {
-                    var ef = e.Flatten();
-                    if (ef.InnerExceptions.Count == 1 &&
-                        ef.InnerExceptions[0] is ApplicationException
-                        && ef.InnerExceptions[0].Message == message)
-                    {
-                        throw (ApplicationException)ef.InnerExceptions[0];
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-            });
+            var myOb = new MyPseudoGrain();
+            this.anchor = myOb;
+            var myRef = await ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var proxy = GrainClient.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
+            await proxy.SetTarget(myRef);
+
+            await Xunit.Assert.ThrowsAsync<ApplicationException>(() =>
+                proxy.SadPath(message)
+            );
+
+            await GrainReference.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
