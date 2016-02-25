@@ -44,7 +44,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <!-- This target is run just before Clean for any Orleans project -->
   <Target Name="OrleansCodeGenerationClean"
           BeforeTargets="Clean"
-          Condition="'$(OrleansProjectType)'!='' And '$(OrleansCodeGenPrecompile)'!='true'"
+          Condition="'$(OrleansCodeGenPrecompile)'!='true'"
           Inputs="$(ProjectDir)Properties\orleans.codegen.cs"
           Outputs="AlwaysRun">
     <Delete Files="$(ProjectDir)Properties\orleans.codegen.cs" ContinueOnError="true" />
@@ -54,7 +54,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
   <Target Name="OrleansCodeGeneration"
           AfterTargets="BeforeCompile;ResolveReferences"
           BeforeTargets="CoreCompile"
-          Condition="'$(OrleansProjectType)'!='' And '$(OrleansCodeGenPrecompile)'!='true'"
+          Condition="'$(OrleansCodeGenPrecompile)'!='true'"
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
     <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
