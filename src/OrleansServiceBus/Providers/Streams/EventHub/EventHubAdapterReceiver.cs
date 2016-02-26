@@ -196,6 +196,10 @@ namespace Orleans.ServiceBus.Providers
             public void Refresh()
             {
             }
+
+            public void RecordDeliveryFailure()
+            {
+            }
         }
     }
 }

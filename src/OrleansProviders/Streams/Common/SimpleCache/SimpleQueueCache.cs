@@ -26,9 +26,10 @@ namespace Orleans.Providers.Streams.Common
         }
     }
 
-    internal struct SimpleQueueCacheItem
+    internal class SimpleQueueCacheItem
     {
         internal IBatchContainer Batch;
+        internal bool DeliveryFailure;
         internal StreamSequenceToken SequenceToken;
         internal CacheBucket CacheBucket;
     }
@@ -102,7 +103,10 @@ namespace Orleans.Providers.Streams.Common
                 SimpleQueueCacheItem item = cachedMessages.Last.Value;
                 if (item.CacheBucket.Equals(bucket))
                 {
-                    itemsToRelease.Add(item.Batch);
+                    if (!item.DeliveryFailure)
+                    {
+                        itemsToRelease.Add(item.Batch);
+                    }
                     bucket.UpdateNumItems(-1);
                     cachedMessages.RemoveLast();
                 }

@@ -82,6 +82,14 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
+        public void RecordDeliveryFailure()
+        {
+            if (IsSet && current != null)
+            {
+                Element.Value.DeliveryFailure = true;
+            }
+        }
+
         private bool IsInStream(IBatchContainer batchContainer)
         {
             return batchContainer != null &&

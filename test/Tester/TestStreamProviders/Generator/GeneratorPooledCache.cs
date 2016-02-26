@@ -155,6 +155,10 @@ namespace Tester.TestStreamProviders.Generator
             public void Refresh()
             {
             }
+
+            public void RecordDeliveryFailure()
+            {
+            }
         }
 
         public int MaxAddCount { get { return 100; } }
