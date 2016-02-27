@@ -46,6 +46,7 @@ if "%BuildOrleansChocolatey%" == "" (
 copy /y "%SolutionDir%NuGet\*.props" "%TargetDir%"
 copy /y "%SolutionDir%NuGet\EmptyFile.cs" "%TargetDir%"
 copy /y "%SolutionDir%NuGet\*Install.ps1" "%TargetDir%"
+copy /y "%SolutionDir%NuGet\*Readme.txt" "%TargetDir%"
 
 if not "%BuildingInsideVisualStudio%" == "true" (
     if "%BuildOrleansNuGet%" == "true" (
