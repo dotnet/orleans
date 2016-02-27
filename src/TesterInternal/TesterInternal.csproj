@@ -96,6 +96,7 @@
     <Compile Include="..\..\test\Tester\TestUtils.cs">
       <Link>Tester\TestUtils.cs</Link>
     </Compile>
+    <Compile Include="RemindersTest\AzureRemindersTableTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
@@ -129,7 +130,6 @@
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="General\TestingBootstrapProviders.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
-    <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
     <Compile Include="OrleansRuntime\Streams\CachedMessageBlockTests.cs" />
     <Compile Include="OrleansRuntime\Streams\FixedSizeBufferTests.cs" />
     <Compile Include="OrleansRuntime\Streams\FixedSizeObjectPoolTests.cs" />
@@ -181,7 +181,7 @@
     <Compile Include="MembershipTests\SqlServerMembershipTableTests.cs" />
     <Compile Include="QueuedTaskScheduler.cs" />
     <Compile Include="RemindersTest\MySqlRemindersTableTests.cs" />
-    <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
+    <Compile Include="RemindersTest\ReminderTableTestsBase.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="General\InternalSerializationTests.cs" />
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
@@ -189,7 +189,7 @@
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
-    <Compile Include="MembershipTests\MembershipTablePluginTests.cs" />
+    <Compile Include="MembershipTests\MembershipTableTestsBase.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureStore.cs" />
     <Compile Include="StorageTests\PersistenceProviderTests.cs" />
@@ -349,6 +349,9 @@
     </Content>
     <Content Include="Config_DevStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_Different_Membership_Reminders.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_LogConsumers-ClientConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
