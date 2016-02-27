@@ -13,7 +13,6 @@ namespace Orleans.CodeGenerator
     using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
-    using Orleans.Serialization;
 
     using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -307,7 +306,7 @@ namespace Orleans.CodeGenerator
                     .ToSet();
             if (knownAssemblies.Count > 0)
             {
-                knownAssemblies.IntersectWith(assemblies);
+                knownAssemblies.UnionWith(assemblies);
                 assemblies = knownAssemblies.ToList();
             }
 
@@ -427,7 +426,7 @@ namespace Orleans.CodeGenerator
             ISet<Type> includedTypes)
         {
             // The module containing the serializer.
-            var module = runtime ? null : type.Module;
+            var module = runtime || type.Assembly != targetAssembly ? null : type.Module;
             var typeInfo = type.GetTypeInfo();
 
             // If a type was encountered which can be accessed and is marked as [Serializable], process it for serialization.
