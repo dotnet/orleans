@@ -117,8 +117,12 @@ namespace Orleans.CodeGenerator
                                         .Select(_ => SF.OmittedTypeArgument())
                                         .Cast<TypeSyntax>()
                                         .ToArray()));
+                var registererClassName = className + "_" +
+                                          string.Join("_",
+                                              type.GetTypeInfo().GenericTypeParameters.Select(_ => _.Name)) + "_" +
+                                          RegistererClassSuffix;
                 classes.Add(
-                    SF.ClassDeclaration(className + RegistererClassSuffix)
+                    SF.ClassDeclaration(registererClassName)
                         .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
                         .AddAttributeLists(
                             SF.AttributeList()
@@ -128,7 +132,7 @@ namespace Orleans.CodeGenerator
                                     SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax())))
                         .AddMembers(
                             GenerateMasterRegisterMethod(type, serializerType),
-                            GenerateConstructor(className + RegistererClassSuffix)));
+                            GenerateConstructor(registererClassName)));
             }
 
             return classes;
