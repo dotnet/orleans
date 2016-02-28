@@ -17,18 +17,31 @@ namespace UnitTests.General
                 {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)}
             };
 
-        private readonly IRelationalStorage storage;
+        public IRelationalStorage Storage { get; private set; }
 
         public string CurrentConnectionString
         {
-            get { return storage.ConnectionString; }
+            get { return Storage.ConnectionString; }
         }
 
         /// <summary>
         /// Default connection string for testing
         /// </summary>
         public abstract string DefaultConnectionString { get; }
-        
+
+        /// <summary>
+        /// A delayed query that is then cancelled in a test to see if cancellation works.
+        /// </summary>
+        public abstract string CancellationTestQuery { get; }
+
+        public abstract string CreateStreamTestTable { get; }
+
+        public virtual string DeleteStreamTestTable { get { return "DELETE StreamingTest;"; } }
+
+        public virtual string StreamTestSelect { get { return "SELECT Id, StreamData FROM StreamingTest WHERE Id = @streamId;"; } }
+
+        public virtual string StreamTestInsert { get { return "INSERT INTO StreamingTest(Id, StreamData) VALUES(@id, @streamData);"; } }
+
         /// <summary>
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql
         /// </summary>
@@ -86,7 +99,7 @@ namespace UnitTests.General
             Console.WriteLine("Creating database tables...");
 
             var setupScript = File.ReadAllText(testStorage.SetupSqlScriptFileName);
-            await testStorage.ExecuteSetupScript(setupScript, testDatabaseName);
+            await testStorage.ExecuteSetupScript(setupScript, testDatabaseName);            
             Console.WriteLine("Initializing relational databases done.");
 
             return testStorage;
@@ -110,7 +123,7 @@ namespace UnitTests.General
         /// <param name="connectionString"></param>
         protected RelationalStorageForTesting(string invariantName, string connectionString)
         {
-            storage = RelationalStorage.CreateInstance(invariantName, connectionString);
+            Storage = RelationalStorage.CreateInstance(invariantName, connectionString);
         }
 
         /// <summary>
@@ -124,7 +137,7 @@ namespace UnitTests.General
             var splitScripts = ConvertToExecutableBatches(setupScript, dataBaseName);
             foreach (var script in splitScripts)
             {
-                var res1 = await storage.ExecuteAsync(script);
+                var res1 = await Storage.ExecuteAsync(script);
             }
         }
 
@@ -135,8 +148,8 @@ namespace UnitTests.General
         /// <returns><em>TRUE</em> if the given database exists. <em>FALSE</em> otherwise.</returns>
         private async Task<bool> ExistsDatabaseAsync(string databaseName)
         {
-            var ret = await storage.ReadAsync(string.Format(ExistsDatabaseTemplate, databaseName), command =>
-            { }, (selector, resultSetCount) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
+            var ret = await Storage.ReadAsync(string.Format(ExistsDatabaseTemplate, databaseName), command =>
+            { }, (selector, resultSetCount, cancellationToken) => { return Task.FromResult(selector.GetBoolean(0)); }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.First();
         }
@@ -148,7 +161,7 @@ namespace UnitTests.General
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
         private async Task CreateDatabaseAsync(string databaseName)
         {
-            await storage.ExecuteAsync(string.Format(CreateDatabaseTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
+            await Storage.ExecuteAsync(string.Format(CreateDatabaseTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
         }
 
 
@@ -159,7 +172,7 @@ namespace UnitTests.General
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
         private Task DropDatabaseAsync(string databaseName)
         {
-            return storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
+            return Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
         }
         
         /// <summary>
@@ -170,9 +183,9 @@ namespace UnitTests.General
         private RelationalStorageForTesting CopyInstance(string newDatabaseName)
         {
             var csb = new DbConnectionStringBuilder();
-            csb.ConnectionString = storage.ConnectionString;
+            csb.ConnectionString = Storage.ConnectionString;
             csb["Database"] = newDatabaseName;
-            return CreateTestInstance(storage.InvariantName, csb.ConnectionString);
+            return CreateTestInstance(Storage.InvariantName, csb.ConnectionString);
         }
         
     }
