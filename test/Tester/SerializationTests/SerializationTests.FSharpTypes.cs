@@ -26,7 +26,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_Some()
         {
-            RoundtripSerializationTest(FSharpOption<int>.Some(0));
+            RoundtripSerializationTest(FSharpOption<int>.Some(10));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
