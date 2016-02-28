@@ -206,6 +206,18 @@ namespace Orleans.Serialization
         {
             var typeInfo = type.GetTypeInfo();
 
+            if (typeInfo.IsGenericTypeDefinition)
+            {
+                // Guard against invalid type constraints, which appear when generating code for some languages.
+                foreach (var parameter in typeInfo.GenericTypeParameters)
+                {
+                    if (parameter.GetGenericParameterConstraints().Any(IsSpecialClass))
+                    {
+                        return true;
+                    }
+                }
+            }
+
             if (!typeInfo.IsVisible && typeInfo.IsConstructedGenericType)
             {
                 foreach (var inner in typeInfo.GetGenericArguments())
@@ -278,6 +290,12 @@ namespace Orleans.Serialization
             var serializationAssemblyName = toAssembly.GetName().FullName;
             var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
             return internalsVisibleTo.Any(_ => _.AssemblyName == serializationAssemblyName);
+        }
+
+        private static bool IsSpecialClass(Type type)
+        {
+            return type == typeof (object) || type == typeof (Array) || type == typeof (Delegate) ||
+                   type == typeof (Enum) || type == typeof (ValueType);
         }
     }
 }

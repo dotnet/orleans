@@ -76,8 +76,9 @@ namespace Orleans.CodeGenerator
             var typeInfo = t.GetTypeInfo();
 
             if (typeInfo.IsGenericParameter || ProcessedTypes.Contains(t) || TypesToProcess.Contains(t)
-                || typeof(Exception).GetTypeInfo().IsAssignableFrom(t)
-                || typeof(Delegate).GetTypeInfo().IsAssignableFrom(t)) return false;
+                || typeof (Exception).GetTypeInfo().IsAssignableFrom(t)
+                || typeof (Delegate).GetTypeInfo().IsAssignableFrom(t)
+                || typeof (Task<>).GetTypeInfo().IsAssignableFrom(t)) return false;
 
             if (typeInfo.IsArray)
             {
@@ -93,7 +94,7 @@ namespace Orleans.CodeGenerator
                     t.Name);
             }
 
-            if (typeInfo.IsGenericType)
+            if (typeInfo.IsConstructedGenericType)
             {
                 var args = t.GetGenericArguments();
                 foreach (var arg in args)
@@ -105,20 +106,9 @@ namespace Orleans.CodeGenerator
             if (typeInfo.IsInterface || typeInfo.IsAbstract || t == typeof (object) || t == typeof (void)
                 || GrainInterfaceData.IsTaskType(t)) return false;
 
-            if (typeInfo.IsGenericType)
+            if (typeInfo.IsConstructedGenericType)
             {
-                var def = typeInfo.GetGenericTypeDefinition();
-                if (def == typeof (Task<>) || (SerializationManager.GetSerializer(def) != null) ||
-                    ProcessedTypes.Contains(def) || typeof(IAddressable).IsAssignableFrom(def)) return false;
-
-                if (def.Namespace != null && (def.Namespace.Equals("System") || def.Namespace.StartsWith("System.")))
-                    Log.Warn(
-                        ErrorCode.CodeGenSystemTypeRequiresSerializer,
-                        "System type " + def.Name + " requires a serializer.");
-                else
-                    TypesToProcess.Add(def);
-
-                return false;
+                return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, targetAssembly);
             }
 
             if (typeInfo.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
@@ -143,7 +133,9 @@ namespace Orleans.CodeGenerator
                             module,
                             targetAssembly));
             if (skipSerialzerGeneration)
-                return true;
+            {
+                return false;
+            }
 
             TypesToProcess.Add(t);
             return true;

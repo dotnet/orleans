@@ -78,7 +78,7 @@ namespace Orleans.CodeGenerator
                 onEncounteredType(fieldType);
             }
 
-            var members = new List<MemberDeclarationSyntax>(GetStaticFields(fields))
+            var members = new List<MemberDeclarationSyntax>(GenerateStaticFields(fields))
             {
                 GenerateDeepCopierMethod(type, fields),
                 GenerateSerializerMethod(type, fields),
@@ -117,8 +117,12 @@ namespace Orleans.CodeGenerator
                                         .Select(_ => SF.OmittedTypeArgument())
                                         .Cast<TypeSyntax>()
                                         .ToArray()));
+                var registererClassName = className + "_" +
+                                          string.Join("_",
+                                              type.GetTypeInfo().GenericTypeParameters.Select(_ => _.Name)) + "_" +
+                                          RegistererClassSuffix;
                 classes.Add(
-                    SF.ClassDeclaration(className + RegistererClassSuffix)
+                    SF.ClassDeclaration(registererClassName)
                         .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
                         .AddAttributeLists(
                             SF.AttributeList()
@@ -128,7 +132,7 @@ namespace Orleans.CodeGenerator
                                     SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax())))
                         .AddMembers(
                             GenerateMasterRegisterMethod(type, serializerType),
-                            GenerateConstructor(className + RegistererClassSuffix)));
+                            GenerateConstructor(registererClassName)));
             }
 
             return classes;
@@ -321,7 +325,7 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="fields">The fields.</param>
         /// <returns>Syntax for the static fields of the serializer class.</returns>
-        private static MemberDeclarationSyntax[] GetStaticFields(List<FieldInfoMember> fields)
+        private static MemberDeclarationSyntax[] GenerateStaticFields(List<FieldInfoMember> fields)
         {
             var result = new List<MemberDeclarationSyntax>();
 
