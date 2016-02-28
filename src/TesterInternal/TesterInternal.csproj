@@ -104,6 +104,7 @@
     <Compile Include="RemindersTest\AzureRemindersTableTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
+    <Compile Include="StorageTests\RelationalStoreTests.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="AssemblyLoaderTests.cs" />
     <Compile Include="AsynchAgentRestartTest.cs" />

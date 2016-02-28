@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.SqlUtils;
+using System.Linq;
 
 namespace UnitTests.General
 {
@@ -9,6 +10,11 @@ namespace UnitTests.General
         public MySqlStorageForTesting(string connectionString) : base(AdoNetInvariants.InvariantNameMySql, connectionString)
         {
         }
+
+        public override string CancellationTestQuery { get { return "DO SLEEP(10); SELECT 1;"; } }
+
+        public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData LONGBLOB NOT NULL);"; } }
+        
 
         public IEnumerable<string> SplitScript(string setupScript)
         {
@@ -43,8 +49,10 @@ namespace UnitTests.General
 
         protected override IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName)
         {
-            return setupScript.Replace("END$$", "END;")
-                .Split(new[] { "DELIMITER $$", "DELIMITER ;" }, StringSplitOptions.RemoveEmptyEntries);
+            var batches = setupScript.Replace("END$$", "END;").Split(new[] { "DELIMITER $$", "DELIMITER ;" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            batches.Add(CreateStreamTestTable);
+
+            return batches;
         }
     }
 }

@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.SqlUtils
@@ -20,7 +23,7 @@ namespace Orleans.SqlUtils
         /// This is a template to produce query parameters that are indexed.
         /// </summary>
         private static readonly string indexedParameterTemplate = "@p{0}";
-
+                    
         /// <summary>
         /// Executes a multi-record insert query clause with <em>SELECT UNION ALL</em>.
         /// </summary>
@@ -28,11 +31,12 @@ namespace Orleans.SqlUtils
         /// <param name="storage">The storage to use.</param>
         /// <param name="tableName">The table name to against which to execute the query.</param>
         /// <param name="parameters">The parameters to insert.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <param name="nameMap">If provided, maps property names from <typeparamref name="T"/> to ones provided in the map.</param>
         /// <param name="onlyOnceColumns">If given, SQL parameter values for the given <typeparamref name="T"/> property types are generated only once. Effective only when <paramref name="useSqlParams"/> is <em>TRUE</em>.</param>
         /// <param name="useSqlParams"><em>TRUE</em> if the query should be in parameterized form. <em>FALSE</em> otherwise.</param>
         /// <returns>The rows affected.</returns>
-        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true)
+        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, CancellationToken cancellationToken = default(CancellationToken), IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true)
         {
             if(string.IsNullOrWhiteSpace(tableName))
             {
@@ -126,7 +130,7 @@ namespace Orleans.SqlUtils
                         command.Parameters.Add(p);
                     }
                 }
-            });
+            }, cancellationToken);
         }
 
 
@@ -137,6 +141,7 @@ namespace Orleans.SqlUtils
         /// <param name="storage">The storage to use.</param>
         /// <param name="query">Executes a given statement. Especially intended to use with <em>SELECT</em> statement, but works with other queries too.</param>
         /// <param name="parameters">Adds parameters to the query. Parameter names must match those defined in the query.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>A list of objects as a result of the <see paramref="query"/>.</returns>
         /// <example>This uses reflection to read results and match the parameters.
         /// <code>
@@ -153,15 +158,15 @@ namespace Orleans.SqlUtils
         /// IEnumerable&lt;Information&gt; informationData = await db.ReadAsync&lt;Information&gt;(query, new { tname = 200000 });
         /// </code>
         /// </example>
-        public static async Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, object parameters)
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await storage.ReadAsync(query, command =>
+            return storage.ReadAsync(query, command =>
             {
                 if(parameters != null)
                 {
                     command.ReflectionParameterProvider(parameters);
                 }
-            }, (selector, resultSetCount) => selector.ReflectionSelector<TResult>()).ConfigureAwait(continueOnCapturedContext: false);
+            }, (selector, resultSetCount, token) => Task.FromResult(selector.ReflectionSelector<TResult>()), cancellationToken);
         }
 
 
@@ -170,11 +175,12 @@ namespace Orleans.SqlUtils
         /// </summary>
         /// <typeparam name="TResult">The type of the result.</typeparam>
         /// <param name="storage">The storage to use.</param>
-        /// <param name="query">Executes a given statement. Especially intended to use with <em>SELECT</em> statement, but works with other queries too.</param>        
+        /// <param name="query">Executes a given statement. Especially intended to use with <em>SELECT</em> statement, but works with other queries too.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>A list of objects as a result of the <see paramref="query"/>.</returns>
-        public static async Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query)
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await ReadAsync<TResult>(storage, query, null).ConfigureAwait(continueOnCapturedContext: false);
+            return ReadAsync<TResult>(storage, query, null, cancellationToken);
         }
 
 
@@ -184,6 +190,7 @@ namespace Orleans.SqlUtils
         /// <param name="storage">The storage to use.</param>
         /// <param name="query">Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.</param>
         /// <param name="parameters">Adds parameters to the query. Parameter names must match those defined in the query.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>Affected rows count.</returns>
         /// <example>This uses reflection to provide parameters to an execute
         /// query that reads only affected rows count if available.
@@ -194,15 +201,15 @@ namespace Orleans.SqlUtils
         /// await db.ExecuteAsync(query, new { tname = "test_table" });
         /// </code>
         /// </example>
-        public static async Task<int> ExecuteAsync(this IRelationalStorage storage, string query, object parameters)
+        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await storage.ExecuteAsync(query, command =>
+            return storage.ExecuteAsync(query, command =>
             {
                 if(parameters != null)
                 {
                     command.ReflectionParameterProvider(parameters);
                 }
-            }).ConfigureAwait(continueOnCapturedContext: false);
+            }, cancellationToken);
         }
 
 
@@ -211,10 +218,30 @@ namespace Orleans.SqlUtils
         /// </summary>
         /// <param name="storage">The storage to use.</param>
         /// <param name="query">Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.</param>        
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>Affected rows count.</returns>
-        public static async Task<int> ExecuteAsync(this IRelationalStorage storage, string query)
+        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await ExecuteAsync(storage, query, null).ConfigureAwait(continueOnCapturedContext: false);
-        }        
+            return ExecuteAsync(storage, query, null, cancellationToken);
+        }
+
+
+        /// <summary>
+        /// Returns a native implementation of <see cref="DbDataReader.GetStream(int)"/> for those providers
+        /// which support it. Otherwise returns a chuncked read using <see cref="DbDataReader.GetBytes(int, long, byte[], int, int)"/>.
+        /// </summary>
+        /// <param name="reader">The reader from which to return the stream.</param>
+        /// <param name="ordinal">The ordinal column for which to return the stream.</param>
+        /// <param name="storage">The storage that gives the invariant.</param>
+        /// <returns></returns>
+        public static Stream GetStream(this DbDataReader reader, int ordinal, IRelationalStorage storage)
+        {
+            if(storage.SupportsStreamNatively())
+            {
+                return reader.GetStream(ordinal);
+            }
+
+            return new OrleansRelationalDownloadStream(reader, ordinal);
+        }
     }
 }
