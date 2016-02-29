@@ -11,6 +11,7 @@ using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using System.Collections.Generic;
 using Orleans.Runtime.Configuration;
+using Orleans.AzureUtils;
 
 namespace Orleans.Storage
 {
@@ -65,7 +66,7 @@ namespace Orleans.Storage
             try
             {
                 this.Name = name;
-                ConfigureJsonSerializerSettings(config);
+                this.settings = AzureStorageUtils.ConfigureJsonSerializerSettings(config);
 
                 if (!config.Properties.ContainsKey("DataConnectionString")) throw new BadProviderConfigException("The DataConnectionString setting has not been configured in the cloud role. Please add a DataConnectionString setting with a valid Azure Storage connection string.");
 
@@ -94,61 +95,6 @@ namespace Orleans.Storage
             }
         }
 
-
-        private void ConfigureJsonSerializerSettings(IProviderConfiguration config)
-        {
-            // By default, use automatic type name handling, simple assembly names, and no JSON formatting
-            settings = new JsonSerializerSettings
-            {
-                TypeNameHandling = TypeNameHandling.Auto,
-                TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
-                Formatting = Formatting.None
-            };
-
-            if (config.Properties.ContainsKey("SerializeTypeNames"))
-            {
-                bool serializeTypeNames = false;
-                var serializeTypeNamesValue = config.Properties["SerializeTypeNames"];
-                bool.TryParse(serializeTypeNamesValue, out serializeTypeNames);
-                if (serializeTypeNames)
-                {
-                    settings.TypeNameHandling = TypeNameHandling.All;
-                }
-            }
-
-            if (config.Properties.ContainsKey("PreserveReferencesHandling"))
-            {
-                bool preserveReferencesHandling;
-                var preserveReferencesHandlingValue = config.Properties["PreserveReferencesHandling"];
-                bool.TryParse(preserveReferencesHandlingValue, out preserveReferencesHandling);
-                if (preserveReferencesHandling)
-                {
-                    settings.PreserveReferencesHandling = PreserveReferencesHandling.Objects;
-                }
-            }
-
-            if (config.Properties.ContainsKey("UseFullAssemblyNames"))
-            {
-                bool useFullAssemblyNames = false;
-                var UseFullAssemblyNamesValue = config.Properties["UseFullAssemblyNames"];
-                bool.TryParse(UseFullAssemblyNamesValue, out useFullAssemblyNames);
-                if (useFullAssemblyNames)
-                {
-                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
-                }
-            }
-
-            if (config.Properties.ContainsKey("IndentJSON"))
-            {
-                bool indentJSON = false;
-                var indentJSONValue = config.Properties["IndentJSON"];
-                bool.TryParse(indentJSONValue, out indentJSON);
-                if (indentJSON)
-                {
-                    settings.Formatting = Formatting.Indented;
-                }
-            }
-        }
 
         /// <summary> Shutdown this storage provider. </summary>
         /// <see cref="IProvider.Close"/>
