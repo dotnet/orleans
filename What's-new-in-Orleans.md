@@ -4,9 +4,12 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+## Community Virtual Meetup #9
+[Nehme Bilal](https://github.com/nehmebilal) and [Reuben Bond](https://github.com/ReubenBond) [talk about deploying Orleans](https://youtu.be/w__D7gnqeZ0) with [YAMS](https://github.com/Microsoft/Yams) and [Service Fabric](https://azure.microsoft.com/en-gb/documentation/articles/service-fabric-overview/) 
+Fabruary 26st 2016
 
 ## Community Virtual Meetup #8.5
-[Networking discussion hosted by @Jason-Bragg](https://youtu.be/F1Yoe88HEvg) 
+[Networking discussion](https://youtu.be/F1Yoe88HEvg) hosted by [Jason Bragg](https://github.com/jason-bragg)
 February 11th 2016
 
 ## Community Virtual Meetup #8
