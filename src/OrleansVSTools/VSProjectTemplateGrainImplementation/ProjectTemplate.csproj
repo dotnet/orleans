@@ -34,9 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    $if$ ($targetframeworkversion$ >= 4.0)
     <Reference Include="Microsoft.CSharp"/>
-    $endif$
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
