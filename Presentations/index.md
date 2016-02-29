@@ -26,4 +26,8 @@ title: Orleans Presentations
 
 * [Orleans Networking discussion- Virtual Meetup #8.5 - February 2016](http://dotnet.github.io/orleans/Presentations/VM-8.5 - Orleans Networking.pptx)
 
+* [Orleans on Service Fabric - Virtual Meetup #9 Part 1 - February 2016](http://dotnet.github.io/orleans/Presentations/VM-9 - Part.1 Orleans-on-Service-Fabric.pptx)
+
+* [Orleans with YAMS - Virtual Meetup #9 Part 2 - February 2016](http://dotnet.github.io/orleans/Presentations/VM-9 - Part.2 Orleans-with-YAMS.pptx)
+
 * [Walk In Distributed Systems Park With Orleans](http://dotnet.github.io/orleans/Presentations/(FWDAYSKIEV2016) Walk.In.Distributed.Systems.Park.With.Orleans.pptx)
