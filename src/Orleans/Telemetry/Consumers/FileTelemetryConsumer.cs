@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Orleans.Runtime
@@ -7,6 +8,7 @@ namespace Orleans.Runtime
     {
         private StreamWriter _logOutput;
         private readonly object _lockObj = new object();
+        private string _logFileName;
 
         public FileTelemetryConsumer(string fileName) : this(new FileInfo(fileName))
         {
@@ -14,7 +16,8 @@ namespace Orleans.Runtime
 
         public FileTelemetryConsumer(FileInfo file)
         {
-            var fileExists = File.Exists(file.FullName);
+            _logFileName = file.FullName;
+            var fileExists = File.Exists(_logFileName);
             _logOutput = fileExists ? file.AppendText() : file.CreateText();
             file.Refresh();
         }
@@ -24,8 +27,8 @@ namespace Orleans.Runtime
             lock (_lockObj)
             {
                 if (_logOutput == null) return;
+
                 _logOutput.WriteLine(message);
-                _logOutput.Flush(); 
             }
         }
 
@@ -42,6 +45,45 @@ namespace Orleans.Runtime
         public void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
         {
             TrackTrace(message, properties);
+        }
+
+        public void Flush()
+        {
+            lock (_lockObj)
+            {
+                if (_logOutput == null) return;
+
+                _logOutput.Flush();
+            }
+        }
+
+        public void Close()
+        {
+            if (_logOutput == null) return; // was already closed.
+
+            try
+            {
+                lock (_lockObj)
+                {
+                    if (_logOutput == null) // was already closed.
+                    {
+                        return;
+                    }
+                    _logOutput.Flush();
+                    _logOutput.Close();
+                }
+            }
+            catch (Exception exc)
+            {
+                var msg = string.Format("Ignoring error closing log file {0} - {1}", _logFileName,
+                    TraceLogger.PrintException(exc));
+                Console.WriteLine(msg);
+            }
+            finally
+            {
+                _logOutput = null;
+                _logFileName = null;
+            }
         }
     }
 }

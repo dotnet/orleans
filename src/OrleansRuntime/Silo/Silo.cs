@@ -748,8 +748,8 @@ namespace Orleans.Runtime
             finally
             {
                 // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
-                FastKill();
                 logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
+                FastKill();                
             }
         }
 
@@ -781,14 +781,14 @@ namespace Orleans.Runtime
             SafeExecute(activationDirectory.PrintActivationDirectory);
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
-            SafeExecute(TraceLogger.Close);
-
             SafeExecute(GrainTypeManager.Stop);
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
             SystemStatus.Current = SystemStatus.Terminated;
             siloTerminatedEvent.Set();
+
+            SafeExecute(TraceLogger.Close);
         }
 
         private void SafeExecute(Action action)
