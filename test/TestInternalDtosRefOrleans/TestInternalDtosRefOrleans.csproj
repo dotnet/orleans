@@ -4,13 +4,14 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{AEFF3B6C-7986-4BF9-85F5-2571DECF8959}</ProjectGuid>
+    <ProjectGuid>{B99C744A-7F62-430C-9255-E64875D39486}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>UnitTests.Interfaces</RootNamespace>
-    <AssemblyName>TestInterfaces</AssemblyName>
+    <RootNamespace>UnitTests.DtosRefOrleans</RootNamespace>
+    <AssemblyName>TestInternalDtosRefOrleans</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -40,12 +41,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
-      <Link>GlobalAssemblyInfo.cs</Link>
-    </Compile>
-    <Compile Include="ClassNotReferencingOrleansTypeDto.cs" />
-    <Compile Include="ICSharpBaseInterface.cs" />
+    <Compile Include="ClassReferencingOrleansTypeDto.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
+      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
