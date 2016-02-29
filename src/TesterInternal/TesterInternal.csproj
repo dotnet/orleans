@@ -100,6 +100,7 @@
     <Compile Include="..\..\test\Tester\TestUtils.cs">
       <Link>Tester\TestUtils.cs</Link>
     </Compile>
+    <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />
     <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
     <Compile Include="RemindersTest\AzureRemindersTableTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
@@ -291,6 +292,14 @@
     <ProjectReference Include="..\TestGrains\TestGrains.csproj">
       <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
       <Name>TestGrains</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj">
+      <Project>{b99c744a-7f62-430c-9255-e64875d39486}</Project>
+      <Name>TestInternalDtosRefOrleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalDtos\TestInternalDtos.csproj">
+      <Project>{d2c5f0e3-e9c3-46f5-82e3-26d221246f59}</Project>
+      <Name>TestInternalDtos</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
       <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>

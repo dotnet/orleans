@@ -188,6 +188,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInterfaces", "TestInter
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestFSharpInterfaces", "TestFSharpInterfaces\TestFSharpInterfaces.fsproj", "{2375D7D5-9B30-493F-9C2E-A6B2811A3C5A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalDtos", "TestInternalDtos\TestInternalDtos.csproj", "{D2C5F0E3-E9C3-46F5-82E3-26D221246F59}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalDtosRefOrleans", "TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj", "{B99C744A-7F62-430C-9255-E64875D39486}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -314,6 +318,14 @@ Global
 		{2375D7D5-9B30-493F-9C2E-A6B2811A3C5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2375D7D5-9B30-493F-9C2E-A6B2811A3C5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2375D7D5-9B30-493F-9C2E-A6B2811A3C5A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D2C5F0E3-E9C3-46F5-82E3-26D221246F59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D2C5F0E3-E9C3-46F5-82E3-26D221246F59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D2C5F0E3-E9C3-46F5-82E3-26D221246F59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D2C5F0E3-E9C3-46F5-82E3-26D221246F59}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
