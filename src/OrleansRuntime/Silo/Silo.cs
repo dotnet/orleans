@@ -785,10 +785,12 @@ namespace Orleans.Runtime
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
-            SystemStatus.Current = SystemStatus.Terminated;
-            siloTerminatedEvent.Set();
-
+            SafeExecute(() => SystemStatus.Current = SystemStatus.Terminated);
             SafeExecute(TraceLogger.Close);
+
+            // Setting the event should be the last thing we do.
+            // Do nothijng after that!
+            siloTerminatedEvent.Set();  
         }
 
         private void SafeExecute(Action action)
