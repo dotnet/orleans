@@ -11,11 +11,13 @@ namespace Orleans.Serialization
         private static JsonSerializerSettings settings;
         private TraceLogger logger;
 
-        internal static JsonSerializerSettings SerializerSettings { get { return settings; } }
-
-        static OrleansJsonSerializer()
+        /// <summary>
+        /// Returns a configured <see cref="JsonSerializerSettings"/> 
+        /// </summary>
+        /// <returns></returns>
+        public static JsonSerializerSettings GetSerializerSettings()
         {
-            settings = new JsonSerializerSettings
+            var settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.All,
                 PreserveReferencesHandling = PreserveReferencesHandling.Objects,
@@ -31,8 +33,15 @@ namespace Orleans.Serialization
             settings.Converters.Add(new GrainIdConverter());
             settings.Converters.Add(new SiloAddressConverter());
             settings.Converters.Add(new UniqueKeyConverter());
+
+            return settings;
         }
-        
+
+        static OrleansJsonSerializer()
+        {
+            settings = GetSerializerSettings();
+        }
+
         /// <summary>
         /// Initializes the serializer
         /// </summary>

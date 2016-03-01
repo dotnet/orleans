@@ -390,10 +390,17 @@ namespace Orleans.AzureUtils
                             String.Format(", ExtendedErrorInformation.AdditionalDetails = {0}", Utils.DictionaryToString(extendedError.AdditionalDetails)) : String.Empty);
         }
 
-        internal static JsonSerializerSettings ConfigureJsonSerializerSettings(IProviderConfiguration config)
+        /// <summary>
+        /// Customises the serializer settings returned by <see cref="OrleansJsonSerializer"/>
+        /// using provider configuration.
+        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
+        /// </summary>
+        /// <param name="config"></param>
+        /// <returns><see cref="JsonSerializerSettings" /></returns>
+        public static JsonSerializerSettings ConfigureJsonSerializerSettings(IProviderConfiguration config)
         {
             // By default, use the standard Orleans serializer settings
-            var settings = OrleansJsonSerializer.SerializerSettings;
+            var settings = OrleansJsonSerializer.GetSerializerSettings();
 
             settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple;
             settings.Formatting = Formatting.None;
