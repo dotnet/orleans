@@ -246,10 +246,14 @@ namespace Orleans
                 }
             }
             long numRemoved = numEntries - internCache.Count;
-            if (numRemoved>0)
+            if (numRemoved > 0)
+            {
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
+            }
             else
+            {
                 if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
+            }
         }
 
         private string PrintInternerContent()

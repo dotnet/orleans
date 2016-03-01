@@ -187,8 +187,8 @@ namespace UnitTests.TimerTests
         }
         public Task StopTimer(string timerName)
         {
-            if (persistant) return persistantGrain.StartTimer(timerName);
-            else return grain.StartTimer(timerName);
+            if (persistant) return persistantGrain.StopTimer(timerName);
+            else return grain.StopTimer(timerName);
         }
     }
 }

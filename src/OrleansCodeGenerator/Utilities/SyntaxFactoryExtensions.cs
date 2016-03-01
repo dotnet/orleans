@@ -11,7 +11,8 @@ namespace Orleans.CodeGenerator.Utilities
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
     using Orleans.Runtime;
-
+    using System.Globalization;
+	
     /// <summary>
     /// The syntax factory extensions.
     /// </summary>
@@ -249,6 +250,30 @@ namespace Orleans.CodeGenerator.Utilities
         }
 
         /// <summary>
+        /// Returns the name of the provided parameter.
+        /// If the parameter has no name (possible in F#),
+        /// it returns a name computed by suffixing "arg" with the parameter's index
+        /// </summary>
+        /// <param name="arg">
+        /// The parameter.
+        /// </param>
+        /// <param name="argIndex">
+        /// The parameter index in the list of parameters.
+        /// </param>
+        /// <returns>
+        /// The parameter name.
+        /// </returns>
+        public static string GetOrCreateName(this ParameterInfo parameter, int parameterIndex)
+        {
+            var argName = parameter.Name;
+            if (String.IsNullOrWhiteSpace(argName))
+            {
+                argName = String.Format(CultureInfo.InvariantCulture, "arg{0:G}", parameterIndex);
+            }
+            return argName;
+        }
+
+        /// <summary>
         /// Returns the parameter list syntax for the provided method.
         /// </summary>
         /// <param name="method">
@@ -262,8 +287,8 @@ namespace Orleans.CodeGenerator.Utilities
             return
                 method.GetParameters()
                     .Select(
-                        parameter =>
-                        SyntaxFactory.Parameter(parameter.Name.ToIdentifier())
+                        (parameter, parameterIndex) =>
+                        SyntaxFactory.Parameter(parameter.GetOrCreateName(parameterIndex).ToIdentifier())
                             .WithType(parameter.ParameterType.GetTypeSyntax()))
                     .ToArray();
         }

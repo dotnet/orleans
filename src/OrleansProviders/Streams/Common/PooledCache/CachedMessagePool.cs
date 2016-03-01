@@ -21,7 +21,8 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cacheDataAdapter"></param>
         public CachedMessagePool(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter)
         {
-            cachedMessagePool = new ObjectPool<CachedMessageBlock<TQueueMessage, TCachedMessage>>(pool => new CachedMessageBlock<TQueueMessage, TCachedMessage>(pool, cacheDataAdapter));
+            cachedMessagePool = new ObjectPool<CachedMessageBlock<TQueueMessage, TCachedMessage>>(
+                pool => new CachedMessageBlock<TQueueMessage, TCachedMessage>(pool, cacheDataAdapter));
         }
 
         /// <summary>

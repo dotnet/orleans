@@ -1,5 +1,5 @@
 @Echo OFF
-@setlocal
+@setlocal EnableExtensions EnableDelayedExpansion
 
 IF %1.==. GOTO Usage
 
@@ -44,13 +44,21 @@ if not "%VERSION_BETA%" == "" ( set VERSION=%VERSION%-%VERSION_BETA% )
 @echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH% -- SRC_DIR=%SRC_DIR%
 
 @set NUGET_PACK_OPTS= -Version %VERSION%
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis -Symbols
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
 @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -Properties SRC_DIR=%SRC_DIR%
-@REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
+REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
-  "%NUGET_EXE%" pack "%%G" %NUGET_PACK_OPTS%
+  "%NUGET_EXE%" pack "%%G" %NUGET_PACK_OPTS% -Symbols
   if ERRORLEVEL 1 EXIT /B 1
+)
+
+FOR %%G IN ("%~dp0*.nuspec-NoSymbols") DO (
+  REM %%~dpnG gets the full filename path but without the extension
+  move "%%G" "%%~dpnG.nuspec"
+  "%NUGET_EXE%" pack "%%~dpnG.nuspec" %NUGET_PACK_OPTS%
+  if ERRORLEVEL 1 EXIT /B 1
+  move "%%~dpnG.nuspec" "%%G"
 )
 
 GOTO EOF

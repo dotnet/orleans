@@ -23,7 +23,8 @@
       <xs:enumeration value="None" />
       <xs:enumeration value="SqlServer" />
       <xs:enumeration value="AzureTable" />
-	  <xs:enumeration value="ZooKeeper" />
+      <xs:enumeration value="ZooKeeper" />
+      <xs:enumeration value="Custom" />
     </xs:restriction>
   </xs:simpleType>
   <xs:simpleType name="LivenessType">
@@ -351,6 +352,20 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="MembershipTableAssembly" type="xs:string" use="optional">
+    <xs:annotation>
+      <xs:documentation>
+        Fully qualified assembly to use for custom MembershipTable implementation. SystemStoreType must be 'Custom'.
+      </xs:documentation>
+    </xs:annotation>
+  </xs:attribute>
+    <xs:attribute name="ReminderTableAssembly" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Fully qualified assembly to use for custom RemindersTable implementation. SystemStoreType must be 'Custom'.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
     <xs:attribute name="DataConnectionString" type="xs:string" use="optional">
       <xs:annotation>
         <xs:documentation>
@@ -595,16 +610,6 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
-    <xs:attribute name="WriteMessagingTraces" type="xs:boolean" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The WriteMessagingTraces attribute specifies whether or not message traces will be collected and reported.
-          Message traces are written when the message is completed (that is, when the response promise is resolved).
-          Traces are written at Verbose level.
-          The default is to not collect and write message traces, as trace collection is moderately expensive.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
     <xs:attribute name="LargeMessageWarningThreshold" type="xs:int" use="optional">
       <xs:annotation>
         <xs:documentation>
@@ -785,6 +790,7 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="StreamProviders" minOccurs="0" maxOccurs="1" type="tns:StreamProvidersConfig" />
       <xs:element name="Application" minOccurs="0" maxOccurs="1">
         <xs:complexType>
           <xs:annotation>
@@ -1088,7 +1094,7 @@
         <xs:element name="Statistics" minOccurs="0" type="tns:StatisticsConfiguration" />
         <xs:element name="Limits" minOccurs="0" type="tns:LimitsConfiguration" />
         <xs:element name="Messaging" minOccurs="0" type="tns:MessagingConfiguration" />
-        
+        <xs:element name="StreamProviders" minOccurs="0" maxOccurs="1" type="tns:StreamProvidersConfig" />
         <xs:element name="LocalAddress" minOccurs="0">
           <xs:complexType>
             <xs:annotation>
@@ -1149,5 +1155,15 @@
         </xs:documentation>
       </xs:annotation>
     </xs:anyAttribute>
+  </xs:complexType>
+  <xs:complexType name="StreamProvidersConfig">
+    <xs:annotation>
+      <xs:documentation>
+        The optional StreamProviders element contains information relating to stream provider instances used for streaming.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Provider" type="tns:ProviderInstanceConfig" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
   </xs:complexType>
 </xs:schema>

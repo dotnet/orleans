@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.CodeGeneration;
+using Orleans.GrainDirectory;
 
 // ReSharper disable NotAccessedVariable
 
@@ -36,17 +37,19 @@ namespace UnitTests.Serialization
         {
             SerializationManager.UseStandardSerializer = false;
             var grain = GrainId.NewId();
-            var addr = ActivationAddress.GetAddress(null, grain, null);
+            var addr = ActivationAddress.GetAddress(null, grain, null, MultiClusterStatus.Doubtful);
             var deserialized = OrleansSerializationLoop(addr, false);
             Assert.IsInstanceOfType(deserialized, typeof(ActivationAddress), "ActivationAddress copied as wrong type");
             Assert.IsNull(((ActivationAddress)deserialized).Activation, "Activation no longer null after copy");
             Assert.IsNull(((ActivationAddress)deserialized).Silo, "Silo no longer null after copy");
             Assert.AreEqual(grain, ((ActivationAddress)deserialized).Grain, "Grain different after copy");
+            Assert.AreEqual(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status, "MultiClusterStatus different after copy");
             deserialized = OrleansSerializationLoop(addr);
             Assert.IsInstanceOfType(deserialized, typeof(ActivationAddress), "ActivationAddress full serialization loop as wrong type");
             Assert.IsNull(((ActivationAddress)deserialized).Activation, "Activation no longer null after full serialization loop");
             Assert.IsNull(((ActivationAddress)deserialized).Silo, "Silo no longer null after full serialization loop");
             Assert.AreEqual(grain, ((ActivationAddress)deserialized).Grain, "Grain different after copy");
+            Assert.AreEqual(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status, "MultiClusterStatus different after copy");
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]

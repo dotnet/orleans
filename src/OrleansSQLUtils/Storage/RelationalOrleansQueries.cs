@@ -67,12 +67,12 @@ namespace Orleans.SqlUtils
             const string orleansQueriesSelectTemplate = "SELECT QueryKey, QueryText FROM OrleansQuery;";
             var orleansQueries = new OrleansQueries();
             var propertiesDictionary = typeof(OrleansQueries).GetFields().ToDictionary(p => p.Name, p => p);
-            var populatedKeys = await storage.ReadAsync(orleansQueriesSelectTemplate, _ => { }, (selector, _) =>
+            var populatedKeys = await storage.ReadAsync(orleansQueriesSelectTemplate, _ => { }, (selector, resultSetCount, cancellationToken) =>
             {
                 var queryKey = selector.GetValue<string>("QueryKey");
                 var queryText = selector.GetValue<string>("QueryText");
                 propertiesDictionary[queryKey].SetValue(orleansQueries, queryText);
-                return queryKey;
+                return Task.FromResult(queryKey);
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             //Check that all the required keys are loaded and throw an exception giving the keys expected but not loaded.
@@ -307,9 +307,9 @@ namespace Orleans.SqlUtils
 
                 var grainIdParameter = CreateGrainIdParameter(command, grainRef.ToKeyString());
                 command.Parameters.Add(grainIdParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
-                return CreateReminderEntry(selector);
+                return Task.FromResult(CreateReminderEntry(selector));
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             return new ReminderTableData(ret.Where(i => i != null).ToList());
@@ -325,7 +325,7 @@ namespace Orleans.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal async Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
         {
-            var query = beginHash < endHash ? orleansQueries.ReadRangeRows1Key : orleansQueries.ReadRangeRows2Key;
+            var query = (int)beginHash < (int)endHash ? orleansQueries.ReadRangeRows1Key : orleansQueries.ReadRangeRows2Key;
             var ret = await storage.ReadAsync(query, command =>
             {                
                 var serviceIdParameter = CreateServiceIdParameter(command, serviceId);
@@ -336,9 +336,9 @@ namespace Orleans.SqlUtils
 
                 var endHashParameter = CreateEndHashParameter(command, endHash);
                 command.Parameters.Add(endHashParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
-                return CreateReminderEntry(selector);
+                return Task.FromResult(CreateReminderEntry(selector));
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             return new ReminderTableData(ret.Where(i => i != null).ToList());
@@ -364,9 +364,9 @@ namespace Orleans.SqlUtils
 
                 var reminderNameParameter = CreateReminderName(command, reminderName);
                 command.Parameters.Add(reminderNameParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
-                return CreateReminderEntry(selector);
+                return Task.FromResult(CreateReminderEntry(selector));
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret != null ? ret.FirstOrDefault() : null;
@@ -403,9 +403,9 @@ namespace Orleans.SqlUtils
 
                 var grainIdConsistentHashParameter = CreateGrainIdConsistentHashParameter(command, grainRef.GetUniformHashCode());
                 command.Parameters.Add(grainIdConsistentHashParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
-                return Convert.ToBase64String(selector.GetValue<byte[]>("ETag"));
+                return Task.FromResult(Convert.ToBase64String(selector.GetValue<byte[]>("ETag")));
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret != null ? ret.FirstOrDefault() : null;
@@ -435,9 +435,9 @@ namespace Orleans.SqlUtils
 
                 var etagParameter = CreateEtagParameter(command, etag);
                 command.Parameters.Add(etagParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
-                return selector.GetBoolean(0);
+                return Task.FromResult(selector.GetBoolean(0));
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.First();
@@ -474,13 +474,13 @@ namespace Orleans.SqlUtils
 
                 var statusParameter = CreateStatusParameter(command, SiloStatus.Active);
                 command.Parameters.Add(statusParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
                 var ip = selector.GetValue<string>("Address");
                 var port = selector.GetValue<int>("ProxyPort");
                 var gen = selector.GetValue<int>("Generation");
 
-                return SiloAddress.New(new IPEndPoint(IPAddress.Parse(ip), port), gen).ToGatewayUri();
+                return Task.FromResult(SiloAddress.New(new IPEndPoint(IPAddress.Parse(ip), port), gen).ToGatewayUri());
 
             }).ConfigureAwait(continueOnCapturedContext: false);
 
@@ -509,9 +509,9 @@ namespace Orleans.SqlUtils
 
                 var generationParameter = CreateGenerationParameter(command, key.Generation);
                 command.Parameters.Add(generationParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
-                return CreateMembershipEntry(selector);
+                return Task.FromResult(CreateMembershipEntry(selector));
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             //All the rows have the same Version (.Item3) and VersionETag (.Item4) information.
@@ -533,9 +533,9 @@ namespace Orleans.SqlUtils
             {
                 var deploymentIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(deploymentIdParameter);
-            }, (selector, _) =>
+            }, (selector, resultSetCount, cancellationToken) =>
             {
-                return CreateMembershipEntry(selector);
+                return Task.FromResult(CreateMembershipEntry(selector));
             }).ConfigureAwait(continueOnCapturedContext: false);
 
             //All the rows have the same Version (.Item3) and VersionETag (.Item4) information.
@@ -602,9 +602,7 @@ namespace Orleans.SqlUtils
                 var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version);
-                command.Parameters.Add(versionParameter);
-            }, (selector, _) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
+            }, (selector, resultSetCount, cancellationToken) => { return Task.FromResult(selector.GetBoolean(0)); }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.First();
         }
@@ -624,8 +622,6 @@ namespace Orleans.SqlUtils
                 var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version.Version);
-                command.Parameters.Add(versionParameter);
 
                 var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag);
                 command.Parameters.Add(versionEtagParameter);
@@ -673,7 +669,7 @@ namespace Orleans.SqlUtils
                 var suspectingTimesParameter = CreateSuspectingTimesParameter(command, membershipEntry);
                 command.Parameters.Add(suspectingTimesParameter);
 
-            }, (selector, _) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
+            }, (selector, resultSetCount, cancellationToken) => { return Task.FromResult(selector.GetBoolean(0)); }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.First();
         }
@@ -694,8 +690,6 @@ namespace Orleans.SqlUtils
                 var siloIdParameter = CreateDeploymentIdParameter(command, deploymentId);
                 command.Parameters.Add(siloIdParameter);
 
-                var versionParameter = CreateVersionParameter(command, version.Version);
-                command.Parameters.Add(versionParameter);
 
                 var versionEtagParameter = CreateVersionEtagParameter(command, version.VersionEtag);
                 command.Parameters.Add(versionEtagParameter);
@@ -746,7 +740,7 @@ namespace Orleans.SqlUtils
                 var suspectingTimesParameter = CreateSuspectingTimesParameter(command, membershipEntry);
                 command.Parameters.Add(suspectingTimesParameter);
 
-            }, (selector, _) => { return selector.GetBoolean(0); }).ConfigureAwait(continueOnCapturedContext: false);
+            }, (selector, resultSetCount, cancellationToken) => { return Task.FromResult(selector.GetBoolean(0)); }).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.First();
         }
@@ -832,9 +826,8 @@ namespace Orleans.SqlUtils
             }
 
             int tableVersion = (int)record.GetValueOrDefault<long>("Version");
-            string versionETag = Convert.ToBase64String(record.GetValue<byte[]>("VersionETag"));
 
-            return Tuple.Create(entry, etag, tableVersion, versionETag);
+            return Tuple.Create(entry, etag, tableVersion, tableVersion.ToString());
         }
 
 
@@ -934,12 +927,6 @@ namespace Orleans.SqlUtils
         }
 
 
-        private static IDbDataParameter CreateVersionParameter(IDbCommand command, long version)
-        {            
-            return command.CreateParameter(ParameterDirection.Input, "version", version);
-        }
-
-
         private IDbDataParameter CreateEtagParameter(IDbCommand command, string etag)
         {
             var etagBytes = Convert.FromBase64String(etag);
@@ -949,8 +936,8 @@ namespace Orleans.SqlUtils
 
         private IDbDataParameter CreateVersionEtagParameter(IDbCommand command, string versionEtag)
         {
-            var etagBytes = Convert.FromBase64String(versionEtag);
-            return command.CreateParameter(ParameterDirection.Input, "versionEtag", etagBytes, etagBytes.Length);
+            long version = int.Parse(versionEtag);
+            return command.CreateParameter(ParameterDirection.Input, "versionEtag", version);
         }
 
 

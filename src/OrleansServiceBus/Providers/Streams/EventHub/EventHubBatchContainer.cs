@@ -6,10 +6,9 @@ using Microsoft.ServiceBus.Messaging;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.ServiceBus.Providers.Streams.EventHub;
 using Orleans.Streams;
 
-namespace OrleansServiceBusUtils.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     [Serializable]
     internal class EventHubBatchContainer : IBatchContainer
@@ -39,15 +38,7 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
             public Dictionary<string, object> RequestContext { get; set; }
         }
 
-        public EventHubBatchContainer(Guid streamGuid, string streamNamespace, byte[] data)
-        {
-            StreamGuid = streamGuid;
-            StreamNamespace = streamNamespace;
-            payloadBytes = data;
-        }
-
         public EventHubBatchContainer(Guid streamGuid, string streamNamespace, string offset, long sequenceNumber, byte[] data)
-            : this(streamGuid, streamNamespace, data)
         {
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;
@@ -89,14 +80,6 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
                 eventData.SetStreamNamespaceProperty(streamNamespace);
             }
             return eventData;
-        }
-
-        internal static IBatchContainer FromEventData(EventData eventData)
-        {
-            Guid streamGuid = Guid.Parse(eventData.PartitionKey);
-            string streamNamespace = eventData.GetStreamNamespaceProperty();
-            byte[] bytes = eventData.GetBytes();
-            return new EventHubBatchContainer(streamGuid, streamNamespace, eventData.Offset, eventData.SequenceNumber, bytes);
         }
     }
 }

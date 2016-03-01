@@ -4,11 +4,16 @@
 @ECHO off
 
 SET CMDHOME=%~dp0.
-if "%FrameworkDir%" == "" set FrameworkDir=%WINDIR%\Microsoft.NET\Framework
-if "%FrameworkVersion%" == "" set FrameworkVersion=v4.0.30319
+if "%VisualStudioVersion%" == "" call "%VS140COMNTOOLS%VsDevCmd.bat"
+if "%VisualStudioVersion%" == "" (
+echo Could not find Visual Studio 14.0 in the system. Cannot continue.
+exit /b 1)
 
-SET MSBUILDEXEDIR=%FrameworkDir%\%FrameworkVersion%
+rem Get path to MSBuild Binaries
+if exist "%ProgramFiles%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles%\MSBuild\14.0\bin
+if exist "%ProgramFiles(x86)%\MSBuild\14.0\bin" SET MSBUILDEXEDIR=%ProgramFiles(x86)%\MSBuild\14.0\bin
 SET MSBUILDEXE=%MSBUILDEXEDIR%\MSBuild.exe
+
 SET VERSION_FILE=%CMDHOME%\Build\Version.txt
 
 if EXIST "%VERSION_FILE%" (
@@ -44,19 +49,18 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
-@echo Build Release Installers =================
-
-SET CONFIGURATION=Release
-
 set STEP=VSIX
-@REM
-@REM Install Visual Studio SDK and uncomment the following lines 
-@REM to build Visual Studio project templates.
-@REM
-@REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%CMDHOME%\OrleansVSTools\OrleansVSTools.sln"
-@REM xcopy /s /y %CMDHOME%\SDK\VSIX %OutDir%\VSIX\
-@REM @if ERRORLEVEL 1 GOTO :ErrorStop
-@REM @echo BUILD ok for VSIX package for %PROJ%
+
+if "%BuildOrleansNuGet%" == "false" (
+    @echo Skipping building VSIX
+	@GOTO :EOF
+)
+
+set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
+SET OutDir=%OutDir%\VSIX
+"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+@if ERRORLEVEL 1 GOTO :ErrorStop
+@echo BUILD ok for VSIX package for %PROJ%
 
 @echo ===== Build succeeded for %PROJ% =====
 @GOTO :EOF

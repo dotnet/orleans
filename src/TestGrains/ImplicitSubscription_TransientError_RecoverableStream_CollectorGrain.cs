@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
@@ -11,6 +12,7 @@ using UnitTests.Grains;
 namespace TestGrains
 {
     [ImplicitStreamSubscription(StreamNamespace)]
+    [PreferLocalPlacement]
     public class ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain : Grain<StreamCheckpoint<int>>, IGeneratedEventCollectorGrain
     {
         public const string StreamNamespace = "TransientError_RecoverableStream";
@@ -114,7 +116,7 @@ namespace TestGrains
 
             State.Accumulator++;
             State.LastProcessedToken = sequenceToken;
-            if (evt.EventType != GeneratedEvent.GeneratedEventType.End)
+            if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {
                 Faults.onFirstMessageProcessedFault.TryFire(InjectFault);
                 Faults.on33rdMessageFault.TryFire(InjectFault);

@@ -1,107 +1,68 @@
-using UnitTests.General;
-using UnitTests.StorageTests;
-
-namespace UnitTests.RemindersTest
-{
-
-using System;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.AzureUtils;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.SqlUtils;
+using UnitTests.General;
 
 namespace UnitTests.RemindersTest
 {
     /// <summary>
     /// Tests for operation of Orleans Reminders Table using MySQL
     /// </summary>
-    [TestClass]    
-    public class MySqlRemindersTableTests
+    [TestClass]
+    public class MySqlRemindersTableTests:ReminderTableTestsBase
     {
-        public TestContext TestContext { get; set; }
-
-        private string deploymentId;
-        private static string connectionString;
         private const string testDatabaseName = "OrleansTest";
-        private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
-
-        private readonly TraceLogger logger = TraceLogger.GetLogger("MySqlRemindersTableTests",
-            TraceLogger.LoggerType.Application);
-
-        private SqlReminderTable reminder;
 
         // Use ClassInitialize to run code before running the first test in the class
         [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        public new static void ClassInitialize(TestContext testContext)
         {
-            TraceLogger.Initialize(new NodeConfiguration());
-            TraceLogger.AddTraceLevelOverride("MySqlRemindersTableTests", Severity.Verbose3);
-
-            // Set shorter init timeout for these tests
-            OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
-            connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, testDatabaseName).Result.CurrentConnectionString;
+            ReminderTableTestsBase.ClassInitialize();
+            TraceLogger.AddTraceLevelOverride(typeof(MySqlRemindersTableTests).Name, Severity.Verbose3);
         }
 
-
-        private async Task Initialize()
+        protected override IReminderTable CreateRemindersTable()
         {
-            deploymentId = "test-" + Guid.NewGuid();
-            int generation = SiloAddress.AllocateNewGeneration();
-
-            logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
-
-            GlobalConfiguration config = new GlobalConfiguration
-                                         {
-                                             DeploymentId = deploymentId,
-                                             DataConnectionStringForReminders = connectionString,
-                                             AdoInvariantForReminders = AdoNetInvariants.InvariantNameMySql
-                                         };
-
-            var rmndr = new SqlReminderTable();
-            await rmndr.Init(config, logger).WithTimeout(timeout);
-            reminder = rmndr;
+            return new SqlReminderTable();
         }
 
-
-        // Use TestCleanup to run code after each test has run
-        [TestCleanup]
-        public void TestCleanup()
+        protected override string GetAdoInvariant()
         {
-            if (reminder != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
-            {
-                reminder.TestOnlyClearTable().Wait();
-                reminder = null;
-            }
-            logger.Info("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+            return AdoNetInvariants.InvariantNameMySql;
         }
 
-
-        [ClassCleanup]
-        public static void ClassCleanup()
+        protected override string GetConnectionString()
         {
-            // Reset init timeout after tests
-            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+            return RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName)
+                    .Result.CurrentConnectionString;
         }
 
 
         [TestMethod, TestCategory("Reminders"), TestCategory("MySql")]
-        public async Task RemindersTable_MySql_Init()
+        public void RemindersTable_MySql_Init()
         {
-            await Initialize();
-            Assert.IsNotNull(reminder, "Reminder Table handler created");
         }
 
 
         [TestMethod, TestCategory("Reminders"), TestCategory("MySql")]
-        public async Task RemindersTable_MySql_UpsertReminderParallel()
+        public async Task RemindersTable_MySql_RemindersRange()
         {
-            await Initialize();
-            await ReminderTablePluginTests.ReminderTableUpsertParallel(reminder);
+            await RemindersRange();
+        }
+
+        [TestMethod, TestCategory("Reminders"), TestCategory("MySql")]
+        public async Task RemindersTable_MySql_RemindersParallelUpsert()
+        {
+            await RemindersParallelUpsert();
+        }
+
+        [TestMethod, TestCategory("Reminders"), TestCategory("MySql")]
+        public async Task RemindersTable_MySql_ReminderSimple()
+        {
+            await ReminderSimple();
         }
     }
-}
 }

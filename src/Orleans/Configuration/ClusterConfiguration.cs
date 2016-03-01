@@ -205,19 +205,38 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Returns the configuration for a given silo.
+        /// Obtains the configuration for a given silo.
         /// </summary>
-        /// <param name="name">Silo name.</param>
-        /// <returns>NodeConfiguration associated with the specified silo.</returns>
-        public NodeConfiguration GetOrAddConfigurationForNode(string name)
+        /// <param name="siloName">Silo name.</param>
+        /// <param name="siloNode">NodeConfiguration associated with the specified silo.</param>
+        /// <returns>true if node was found</returns>
+        public bool TryGetNodeConfigurationForSilo(string siloName, out NodeConfiguration siloNode)
         {
-            NodeConfiguration n;
-            if (Overrides.TryGetValue(name, out n)) return n;
+            return Overrides.TryGetValue(siloName, out siloNode);
+        }
 
-            n = new NodeConfiguration(Defaults) {SiloName = name};
-            InitNodeSettingsFromGlobals(n);
-            Overrides[name] = n;
-            return n;
+        /// <summary>
+        /// Creates a configuration node for a given silo.
+        /// </summary>
+        /// <param name="siloName">Silo name.</param>
+        /// <returns>NodeConfiguration associated with the specified silo.</returns>
+        public NodeConfiguration CreateNodeConfigurationForSilo(string siloName)
+        {
+            var siloNode = new NodeConfiguration(Defaults) { SiloName = siloName };
+            InitNodeSettingsFromGlobals(siloNode);
+            Overrides[siloName] = siloNode;
+            return siloNode;
+        }
+
+        /// <summary>
+        /// Creates a node config for the specified silo if one does not exist.  Returns existing node if one already exists
+        /// </summary>
+        /// <param name="siloName">Silo name.</param>
+        /// <returns>NodeConfiguration associated with the specified silo.</returns>
+        public NodeConfiguration GetOrCreateNodeConfigurationForSilo(string siloName)
+        {
+            NodeConfiguration siloNode;
+            return !TryGetNodeConfigurationForSilo(siloName, out siloNode) ? CreateNodeConfigurationForSilo(siloName) : siloNode;
         }
 
         private void SetPrimaryNode(IPEndPoint primary)
@@ -386,8 +405,11 @@ namespace Orleans.Runtime.Configuration
             sb.Append("Primary node: ").AppendLine(PrimaryNode == null ? "null" : PrimaryNode.ToString());
             sb.AppendLine("Platform version info:").Append(ConfigUtilities.RuntimeVersionInfo());
             sb.AppendLine("Global configuration:").Append(Globals.ToString());
-            NodeConfiguration nc = GetOrAddConfigurationForNode(siloName);
-            sb.AppendLine("Silo configuration:").Append(nc.ToString());
+            NodeConfiguration nc;
+            if (TryGetNodeConfigurationForSilo(siloName, out nc))
+            {
+                sb.AppendLine("Silo configuration:").Append(nc);
+            }
             sb.AppendLine();
             return sb.ToString();
         }
@@ -539,6 +561,29 @@ namespace Orleans.Runtime.Configuration
             var xmlReader = XmlReader.Create(input);
             doc.Load(xmlReader);
             return doc.DocumentElement;
+        }
+
+        /// <summary>
+        /// Returns a prepopulated ClusterConfiguration object for a primary local silo (for testing)
+        /// </summary>
+        /// <param name="siloPort">TCP port for silo to silo communication</param>
+        /// <param name="gatewayPort">Client gateway TCP port</param>
+        /// <returns>ClusterConfiguration object that can be passed to Silo or SiloHost classes for initialization</returns>
+        public static ClusterConfiguration LocalhostPrimarySilo(int siloPort = 22222, int gatewayPort = 40000)
+        {
+            var config = new ClusterConfiguration();
+            var siloAddress = new IPEndPoint(IPAddress.Loopback, siloPort);
+            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
+            config.Globals.SeedNodes.Add(siloAddress);
+            config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+
+            config.Defaults.HostNameOrIPAddress = "localhost";
+            config.Defaults.Port = siloPort;
+            config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
+            
+            config.PrimaryNode = siloAddress;
+
+            return config;
         }
     }
 }

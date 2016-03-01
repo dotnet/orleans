@@ -37,6 +37,10 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Core, Version=4.4.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.Azure.KeyVault.Core">
       <HintPath>$(SolutionDir)packages\Microsoft.Azure.KeyVault.Core.1.0.0\lib\net40\Microsoft.Azure.KeyVault.Core.dll</HintPath>
       <Private>True</Private>
@@ -84,13 +88,29 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\test\Tester\RelationalUtilities\MySqlStorageForTesting.cs">
+      <Link>Tester\RelationalUtilities\MySqlStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\test\Tester\RelationalUtilities\RelationalStorageForTesting.cs">
+      <Link>Tester\RelationalUtilities\RelationalStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\test\Tester\RelationalUtilities\SqlServerStorageForTesting.cs">
+      <Link>Tester\RelationalUtilities\SqlServerStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\test\Tester\TestUtils.cs">
+      <Link>Tester\TestUtils.cs</Link>
+    </Compile>
+    <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
+    <Compile Include="RemindersTest\AzureRemindersTableTests.cs" />
+    <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
+    <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
+    <Compile Include="StorageTests\RelationalStoreTests.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="AssemblyLoaderTests.cs" />
     <Compile Include="AsynchAgentRestartTest.cs" />
     <Compile Include="AsyncPipelineTests.cs" />
     <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
     <Compile Include="Async_TimingTests.cs" />
-    <Compile Include="BootstrapProviderTests.cs" />
     <Compile Include="ClientAddressableTests.cs" />
     <Compile Include="ClientInitTests.cs" />
     <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
@@ -106,6 +126,7 @@
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="General\RingTests_Standalone.cs" />
     <Compile Include="General\ConsistentRingProviderTests_Silo.cs" />
+    <Compile Include="General\BootstrapProviderTests.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="General\ElasticPlacementTest.cs" />
     <Compile Include="General\GrainPlacementTests.cs" />
@@ -113,8 +134,8 @@
     <Compile Include="General\LoggerTest.cs" />
     <Compile Include="General\LruTest.cs" />
     <Compile Include="General\RequestContextTest.cs" />
+    <Compile Include="General\TestingBootstrapProviders.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
-    <Compile Include="LivenessTests\MembershipTablePluginTests.cs" />
     <Compile Include="OrleansRuntime\Streams\CachedMessageBlockTests.cs" />
     <Compile Include="OrleansRuntime\Streams\FixedSizeBufferTests.cs" />
     <Compile Include="OrleansRuntime\Streams\FixedSizeObjectPoolTests.cs" />
@@ -166,7 +187,7 @@
     <Compile Include="MembershipTests\SqlServerMembershipTableTests.cs" />
     <Compile Include="QueuedTaskScheduler.cs" />
     <Compile Include="RemindersTest\MySqlRemindersTableTests.cs" />
-    <Compile Include="RemindersTest\ReminderTablePluginTests.cs" />
+    <Compile Include="RemindersTest\ReminderTableTestsBase.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="General\InternalSerializationTests.cs" />
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
@@ -174,7 +195,7 @@
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
     <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
-    <Compile Include="MembershipTests\MembershipTablePluginTests.cs" />
+    <Compile Include="MembershipTests\MembershipTableTestsBase.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureStore.cs" />
     <Compile Include="StorageTests\PersistenceProviderTests.cs" />
@@ -202,6 +223,8 @@
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestAssemblyCleanup.cs" />
     <Compile Include="TestConstants.cs" />
+    <Compile Include="Tester\HostedTestClusterBase.cs" />
+    <Compile Include="Tester\OrleansTestingBase.cs" />
     <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
@@ -257,9 +280,9 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Tester\Tester.csproj">
-      <Project>{591ef75b-d3b0-403d-830c-39d032a73404}</Project>
-      <Name>Tester</Name>
+    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
+      <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
+      <Name>TestFSharp</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
@@ -287,6 +310,10 @@
     <None Include="ReadMe.md" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\Build\Version.txt">
+      <Link>Version.txt</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
       <Link>CreateOrleansTables_MySql.sql</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -318,6 +345,9 @@
     <Content Include="Config_ActivationCollectorTests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Config_AzureBlobStorage.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -329,6 +359,9 @@
     </Content>
     <Content Include="Config_DevStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_Different_Membership_Reminders.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_LogConsumers-ClientConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

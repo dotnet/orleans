@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 using Orleans.Runtime.MembershipService;
+using Orleans.MultiCluster;
 
 
 namespace Orleans.Runtime.Management
@@ -12,6 +13,7 @@ namespace Orleans.Runtime.Management
     /// <summary>
     /// Implementation class for the Orleans management grain.
     /// </summary>
+    [OneInstancePerCluster]
     internal class ManagementGrain : Grain, IManagementGrain
     {
         private Logger logger;

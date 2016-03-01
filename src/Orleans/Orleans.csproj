@@ -34,7 +34,7 @@
     <DocumentationFile>obj\Debug\Orleans.XML</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
-    <CodeAnalysisIgnoreGeneratedCode>false</CodeAnalysisIgnoreGeneratedCode>
+    <CodeAnalysisIgnoreGeneratedCode>true</CodeAnalysisIgnoreGeneratedCode>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <OutputPath>bin\Release\</OutputPath>
@@ -91,8 +91,11 @@
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\IGrainState.cs" />
     <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
+    <Compile Include="Core\IGrainInvokeInterceptor.cs" />
+    <Compile Include="Core\InvocationMethodInfoMap.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="Providers\DefaultServiceProvider.cs" />
+    <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
@@ -101,6 +104,10 @@
     <Compile Include="Core\IGrainIdentity.cs" />
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistrationStrategy.cs" />
+    <Compile Include="GrainDirectory\IGrainDirectory.cs" />
+    <Compile Include="GrainDirectory\IGrainRegistrar.cs" />
+    <Compile Include="GrainDirectory\ClusterLocalRegistration.cs" />
     <Compile Include="IDs\GuidId.cs" />
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\IncomingMessageBuffer.cs" />
@@ -360,14 +367,6 @@
       <Link>Orleans.SDK.targets</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <SubType>Designer</SubType>
-    </Content>
-    <Content Include="..\NuGet\Orleans.Grains.props">
-      <Link>Orleans.Grains.props</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\NuGet\Orleans.Interfaces.props">
-      <Link>Orleans.Interfaces.props</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Configuration\OrleansConfiguration.xsd">
       <SubType>Designer</SubType>

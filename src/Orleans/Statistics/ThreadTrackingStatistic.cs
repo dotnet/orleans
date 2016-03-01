@@ -112,14 +112,14 @@ namespace Orleans.Runtime
         {
             float allThreads = allthreasCounters.Select(cs => cs.GetCurrentValue()).Sum();
             float numRequests = allNumRequestsCounter.GetCurrentValue();
-            if (numRequests == 0) return 0;
-            return allThreads/numRequests;
+            if (numRequests > 0) return allThreads / numRequests;
+            return 0;
         }
 
         public static void FirstClientConnectedStartTracking()
         {
             ClientConnected = true;
-            }
+        }
 
         /// <summary>
         /// Call once when the thread is started, must be called from the thread being tracked

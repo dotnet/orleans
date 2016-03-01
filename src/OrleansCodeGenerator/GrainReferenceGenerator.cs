@@ -255,9 +255,9 @@ namespace Orleans.CodeGenerator
             return SF.Argument(SF.NameColon("options"), SF.Token(SyntaxKind.None), allOptions);
         }
 
-        private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg)
+         private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg, int argIndex)
         {
-            var argIdentifier = arg.Name.ToIdentifierName();
+            var argIdentifier = arg.GetOrCreateName(argIndex).ToIdentifierName();
 
             // Addressable arguments must be converted to references before passing.
             if (typeof(IAddressable).IsAssignableFrom(arg.ParameterType)

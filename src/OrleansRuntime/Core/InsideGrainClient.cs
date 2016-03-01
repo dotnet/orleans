@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -32,6 +32,8 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory directory;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
+        
+        private readonly InvocationMethodInfoMap invocationMethodInfoMap = new InvocationMethodInfoMap();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
         private GrainInterfaceMap grainInterfaceMap;
@@ -167,9 +169,6 @@ namespace Orleans.Runtime
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             if (context == null && !oneWay)
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, new StackTrace());
-
-            if (Message.WriteMessagingTraces)
-                message.AddTimestamp(Message.LifecycleTag.Create);
 
             if (message.IsExpirableMessage(Config.Globals))
                 message.Expiration = DateTime.UtcNow + ResponseTimeout + Constants.MAXIMUM_CLOCK_SKEW;
@@ -323,10 +322,6 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                //MessagingProcessingStatisticsGroup.OnRequestProcessed(message, "Invoked");
-                if (Message.WriteMessagingTraces)
-                    message.AddTimestamp(Message.LifecycleTag.InvokeIncoming);
-
                 RequestContext.Import(message.RequestContextData);
                 if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
@@ -361,7 +356,18 @@ namespace Orleans.Runtime
 
                         throw exc;
                     }
-                    resultObject = await invoker.Invoke(target, request.InterfaceId, request.MethodId, request.Arguments);
+
+                    // If the target has an interceptor, invoke that instead.
+                    var intercepted = target as IGrainInvokeInterceptor;
+                    if (intercepted != null)
+                    {
+                        var methodInfo = this.invocationMethodInfoMap.GetMethodInfo(target.GetType(), request);
+                        resultObject = await intercepted.Invoke(methodInfo, request, invoker);
+                    }
+                    else
+                    {
+                        resultObject = await invoker.Invoke(target, request);
+                    }
                 }
                 catch (Exception exc1)
                 {

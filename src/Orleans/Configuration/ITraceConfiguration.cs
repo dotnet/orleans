@@ -37,11 +37,6 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         bool TraceToConsole { get; set; }
         /// <summary>
-        /// The WriteMessagingTraces attribute specifies whether to write details message traces.
-        /// This should be used only in development mode and never in production.
-        /// </summary>
-        bool WriteMessagingTraces { get; set; }
-        /// <summary>
         /// The LargeMessageWarningThreshold attribute specifies when to generate a warning trace message for large messages.
         /// </summary>
         int LargeMessageWarningThreshold { get; set; }

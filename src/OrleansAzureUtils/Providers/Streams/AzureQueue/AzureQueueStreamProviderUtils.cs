@@ -30,11 +30,14 @@ namespace Orleans.Providers.Streams.AzureQueue
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 if (logger != null) logger.Info("About to delete all {0} Stream Queues\n", allQueues.Count);
+                var deleteTasks = new List<Task>();
                 foreach (var queueId in allQueues)
                 {
                     var manager = new AzureQueueDataManager(queueId.ToString(), deploymentId, storageConnectionString);
-                    await manager.DeleteQueue();
+                    deleteTasks.Add(manager.DeleteQueue());
                 }
+
+                await Task.WhenAll(deleteTasks);
             }
         }
     }

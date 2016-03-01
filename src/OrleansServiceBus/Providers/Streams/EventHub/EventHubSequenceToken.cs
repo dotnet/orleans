@@ -3,7 +3,7 @@ using System;
 using System.Globalization;
 using Orleans.Providers.Streams.Common;
 
-namespace Orleans.ServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
     /// Event Hub messages consist of a batch of application layer events, so EventHub tokens contain three pieces of information.
@@ -22,12 +22,12 @@ namespace Orleans.ServiceBus.Providers.Streams.EventHub
         public EventHubSequenceToken(string eventHubOffset, long sequenceNumber, int eventIndex)
             : base(sequenceNumber, eventIndex)
         {
-            this.EventHubOffset = eventHubOffset;
+            EventHubOffset = eventHubOffset;
         }
 
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "EventHubSequenceToken(EventHubOffset: {0}, SequenceNumber: {1}, EventIndex: {2})", this.EventHubOffset, this.SequenceNumber, this.EventIndex);
+            return string.Format(CultureInfo.InvariantCulture, "EventHubSequenceToken(EventHubOffset: {0}, SequenceNumber: {1}, EventIndex: {2})", EventHubOffset, SequenceNumber, EventIndex);
         }
     }
 }

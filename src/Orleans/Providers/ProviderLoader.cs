@@ -44,11 +44,10 @@ namespace Orleans.Providers
 
         public void LoadProviders(IDictionary<string, IProviderConfiguration> configs, IProviderManager providerManager)
         {
-
             providerConfigs = configs ?? new Dictionary<string, IProviderConfiguration>();
 
-            foreach (var provider in providerConfigs.Values)
-                ((ProviderConfiguration)provider).SetProviderManager(providerManager);
+            foreach (IProviderConfiguration providerConfig in providerConfigs.Values)
+                ((ProviderConfiguration)providerConfig).SetProviderManager(providerManager);
 
             // Load providers
             ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType);
@@ -58,14 +57,21 @@ namespace Orleans.Providers
 
         private void ValidateProviders()
         {
-            foreach (var providerConfig in providerConfigs.Values)
+            foreach (IProviderConfiguration providerConfig in providerConfigs.Values)
             {
                 TProvider provider;
-                var fullConfig = (ProviderConfiguration) providerConfig;
-                if (providers.TryGetValue(fullConfig.Name, out provider)) continue;
+                ProviderConfiguration fullConfig = (ProviderConfiguration) providerConfig;
+                if (providers.TryGetValue(providerConfig.Name, out provider))
+                {
+                    logger.Verbose(ErrorCode.Provider_ProviderLoadedOk, 
+                        "Provider of type {0} name {1} located ok.", 
+                        fullConfig.Type, fullConfig.Name);
+                    continue;
+                }
 
-                var msg = String.Format("Provider of type {0} name {1} was not loaded." +
-                    "Please check that you deployed the assembly in which the provider class is defined to the execution folder.", fullConfig.Type, fullConfig.Name);
+                string msg = string.Format("Provider of type {0} name {1} was not loaded." +
+                    "Please check that you deployed the assembly in which the provider class is defined to the execution folder.", 
+                    fullConfig.Type, fullConfig.Name);
                 logger.Error(ErrorCode.Provider_ConfiguredProviderNotLoaded, msg);
                 throw new OrleansException(msg);
             }

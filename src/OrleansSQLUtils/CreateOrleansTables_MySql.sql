@@ -201,7 +201,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (		
 	'InsertMembershipKey','call InsertMembershipKey(@deploymentId, @address, @port, @generation, @versionEtag, 
-    @version, @hostName, @status, @proxyPort, @roleName, @instanceName, @updateZone, @faultZone, @suspectingSilos, 
+    @hostName, @status, @proxyPort, @roleName, @instanceName, @updateZone, @faultZone, @suspectingSilos, 
     @suspectingTimes, @startTime, @iAmAliveTime);'
 );
 
@@ -213,7 +213,6 @@ CREATE PROCEDURE InsertMembershipKey(
 	in	_port INT,
 	in	_generation INT,
     in  _versionEtag BIGINT,
-    in  _version BIGINT,
 	in	_hostName NVARCHAR(150),
 	in	_status INT,
 	in	_proxyPort INT,
@@ -312,7 +311,7 @@ VALUES
 (
 	'UpdateMembershipKey','call UpdateMembershipKey(@deploymentId, @address, @port, @generation, @hostName,
 	@status, @proxyPort, @roleName, @instanceName, @updateZone, @faultZone, @suspectingSilos, @suspectingTimes, 
-    @startTime, @iAmAliveTime, @etag, @versionEtag, @version);'
+    @startTime, @iAmAliveTime, @etag, @versionEtag);'
 );
 
 DELIMITER $$
@@ -334,8 +333,7 @@ CREATE PROCEDURE UpdateMembershipKey(
 	in	_startTime DATETIME,
 	in	_iAmAliveTime DATETIME,
     in	_eTag BIGINT,
-    in _versionEtag BIGINT,
-    in _version BIGINT
+    in _versionEtag BIGINT
 )
 BEGIN
 		DECLARE _ROWCOUNT INT;
@@ -574,8 +572,7 @@ VALUES
 		m.StartTime,
 		m.IAmAliveTime,
 		CONVERT(m.ETag, BINARY) AS ETag,
-		v.Version,
-		CONVERT(v.Version, BINARY) AS VersionETag
+		v.Version
 	FROM
 		OrleansMembershipVersionTable v
 		-- This ensures the version table will returned even if there is no matching membership row.
@@ -609,8 +606,7 @@ VALUES
 		m.StartTime,
 		m.IAmAliveTime,
 		CONVERT(m.ETag, BINARY) AS ETag,
-		v.Version,
-		CONVERT(v.Version, BINARY) AS VersionETag
+		v.Version
 	FROM
 		OrleansMembershipVersionTable v
 		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId

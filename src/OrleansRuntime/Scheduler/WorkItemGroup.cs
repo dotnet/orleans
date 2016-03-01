@@ -423,7 +423,7 @@ namespace Orleans.Runtime.Scheduler
                 sb.AppendFormat(". Currently QueuedWorkItems={0}; Total EnQueued={1}; Total processed={2}; Quantum expirations={3}; ",
                     WorkItemCount, totalItemsEnQueued, totalItemsProcessed, quantumExpirations);
          
-                if (AverageQueueLenght != 0)
+                if (AverageQueueLenght > 0)
                 {
                     sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
                     if (!totalQueuingDelay.Equals(TimeSpan.Zero) && totalItemsProcessed > 0)

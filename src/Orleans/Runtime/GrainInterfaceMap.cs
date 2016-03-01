@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -47,7 +48,7 @@ namespace Orleans.Runtime
         }
 
         internal void AddEntry(int interfaceId, Type iface, int grainTypeCode, string grainInterface, string grainClass, string assembly, 
-                                bool isGenericGrainClass, PlacementStrategy placement, bool primaryImplementation = false)
+                                bool isGenericGrainClass, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy, bool primaryImplementation = false)
         {
             lock (this)
             {
@@ -66,7 +67,7 @@ namespace Orleans.Runtime
                     typeToInterfaceData[interfaceTypeKey] = grainInterfaceData;
                 }
 
-                var implementation = new GrainClassData(grainTypeCode, grainClass, isGenericGrainClass, grainInterfaceData, placement);
+                var implementation = new GrainClassData(grainTypeCode, grainClass, isGenericGrainClass, grainInterfaceData, placement, registrationStrategy);
                 if (!implementationIndex.ContainsKey(grainTypeCode))
                     implementationIndex.Add(grainTypeCode, implementation);
 
@@ -128,19 +129,20 @@ namespace Orleans.Runtime
             }
         }
 
-        internal bool TryGetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, string genericArguments = null)
+        internal bool TryGetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy registrationStrategy, string genericArguments = null)
         {
             lock (this)
             {
                 grainClass = null;
                 placement = null;
-
+                registrationStrategy = null;
                 if (!implementationIndex.ContainsKey(typeCode))
                     return false;
 
                 var implementation = implementationIndex[typeCode];
                 grainClass = implementation.GetClassName(genericArguments);
                 placement = implementation.PlacementStrategy;
+                registrationStrategy = implementation.RegistrationStrategy;
                 return true;
             }
         }
@@ -357,6 +359,7 @@ namespace Orleans.Runtime
         private readonly Dictionary<string, string> genericClassNames;
         
         private readonly PlacementStrategy placementStrategy;
+        private readonly MultiClusterRegistrationStrategy registrationStrategy;
         private readonly bool isGeneric;
 
         internal int GrainTypeCode { get; private set; }
@@ -364,8 +367,9 @@ namespace Orleans.Runtime
         internal PlacementStrategy PlacementStrategy { get { return placementStrategy; } }
         internal GrainInterfaceData InterfaceData { get { return interfaceData; } }
         internal bool IsGeneric { get { return isGeneric; } }
+        public MultiClusterRegistrationStrategy RegistrationStrategy { get { return registrationStrategy; } }
 
-        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, GrainInterfaceData interfaceData, PlacementStrategy placement)
+        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, GrainInterfaceData interfaceData, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy)
         {
             GrainTypeCode = grainTypeCode;
             GrainClass = grainClass;
@@ -373,6 +377,7 @@ namespace Orleans.Runtime
             this.interfaceData = interfaceData;
             genericClassNames = new Dictionary<string, string>(); // TODO: initialize only for generic classes
             placementStrategy = placement ?? PlacementStrategy.GetDefault();
+            this.registrationStrategy = registrationStrategy ?? MultiClusterRegistrationStrategy.GetDefault();
         }
 
         internal string GetClassName(string typeArguments)

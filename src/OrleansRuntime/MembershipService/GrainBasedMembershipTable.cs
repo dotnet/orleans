@@ -1,11 +1,13 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
     [Reentrant]
+    [OneInstancePerCluster]
     internal class GrainBasedMembershipTable : Grain, IMembershipTableGrain
     {
         private InMemoryMembershipTable table;

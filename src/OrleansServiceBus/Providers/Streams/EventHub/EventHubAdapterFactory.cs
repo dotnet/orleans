@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 using Microsoft.ServiceBus;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.ServiceBus.Providers.Streams.EventHub;
 using Orleans.Streams;
-using OrleansServiceBusUtils.Providers.Streams.EventHub;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -19,11 +18,13 @@ namespace Orleans.ServiceBus.Providers
         private IServiceProvider serviceProvider;
         private EventHubStreamProviderConfig adapterConfig;
         private IEventHubSettings hubSettings;
+        private ICheckpointSettings checkpointSettings;
         private EventHubQueueMapper streamQueueMapper;
         private IStreamFailureHandler streamFailureHandler;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
+        private IObjectPool<FixedSizeBuffer> bufferPool;
 
         public string Name { get { return adapterConfig.StreamProviderName; } }
         public bool IsRewindable { get { return true; } }
@@ -50,27 +51,12 @@ namespace Orleans.ServiceBus.Providers
             adapterConfig = new EventHubStreamProviderConfig(providerName);
             adapterConfig.PopulateFromProviderConfig(providerConfig);
 
-            // if no event hub settings type is provided, use EventHubSettings and get populate settings from providerConfig
-            if (adapterConfig.EventHubSettingsType == null)
-            {
-                adapterConfig.EventHubSettingsType = typeof (EventHubSettings);
-            }
-
-            hubSettings = serviceProvider.GetService(adapterConfig.EventHubSettingsType) as IEventHubSettings;
-            if (hubSettings == null)
-            {
-                throw new ArgumentOutOfRangeException("providerConfig", "EventHubSettingsType not valid.");
-            }
-
-            // if settings is an EventHubSettings class, populate settings from providerConfig
-            var settings = hubSettings as EventHubSettings;
-            if (settings != null)
-            {
-                settings.PopulateFromProviderConfig(providerConfig);
-            }
+            hubSettings = adapterConfig.GetEventHubSettings(providerConfig, serviceProvider);
+            checkpointSettings = adapterConfig.GetCheckpointSettings(providerConfig, serviceProvider);
 
             receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
             client = EventHubClient.CreateFromConnectionString(hubSettings.ConnectionString, hubSettings.Path);
+            bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, pool => new FixedSizeBuffer(1 << 20, pool));
         }
 
         public async Task<IQueueAdapter> CreateAdapter()
@@ -132,10 +118,11 @@ namespace Orleans.ServiceBus.Providers
             var config = new EventHubPartitionConfig
             {
                 Hub = hubSettings,
+                CheckpointSettings = checkpointSettings,
+                StreamProviderName = adapterConfig.StreamProviderName,
                 Partition = streamQueueMapper.QueueToPartition(queueId),
-                CacheSize = adapterConfig.CacheSize,
             };
-            return new EventHubAdapterReceiver(config, logger);
+            return new EventHubAdapterReceiver(config, bufferPool, logger);
         }
 
         public async Task<string[]> GetPartitionIdsAsync()

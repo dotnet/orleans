@@ -56,6 +56,8 @@
   <ItemGroup>
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Counters\PerfCounterConfigData.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />
     <Compile Include="MembershipService\ISiloStatusListener.cs" />
     <Compile Include="MembershipService\ISiloStatusOracle.cs" />

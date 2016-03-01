@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
@@ -11,6 +12,7 @@ using UnitTests.Grains;
 namespace TestGrains
 {
     [ImplicitStreamSubscription(StreamNamespace)]
+    [PreferLocalPlacement]
     public class ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain : Grain<StreamCheckpoint<int>>, IGeneratedEventCollectorGrain
     {
         public const string StreamNamespace = "NonTransientError_RecoverableStream";
@@ -74,7 +76,7 @@ namespace TestGrains
 
             State.Accumulator++;
             State.LastProcessedToken = sequenceToken;
-            if (evt.EventType != GeneratedEvent.GeneratedEventType.End)
+            if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {
                 // every 10 events, checkpoint our grain state
                 if (State.Accumulator%10 != 0) return;

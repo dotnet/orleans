@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-
+using System.Threading;
 
 namespace Orleans.TestingHost
 {
@@ -19,13 +19,19 @@ namespace Orleans.TestingHost
         /// Get-Process | Format-Table Id, ProcessName -autosize. If there were multiple storage emulator
         /// processes running, they would named WASTOR~1, WASTOR~2, ... WASTOR~n.
         /// </summary>
-        private const string storageEmulatorProcessName27OlderThan = "WAStorageEmulator";
-        private const string storageEmulatorProcessName27OrNewer = "Windows Azure Storage Emulator Service";
-        private const string storageEmulatorProcessNameAlt = "AzureStorageEmulator";
+        private static readonly string[] storageEmulatorProcessNames = new[]
+        {
+            "AzureStorageEmulator", // newest
+            "Windows Azure Storage Emulator Service", // >= 2.7
+            "WAStorageEmulator", // < 2.7
+        };
 
         //The file names aren't the same as process names.
-        private const string storageEmulatorFilename27OlderThan = "WAStorageEmulator.exe";
-        private const string storageEmulatorFilename27OrNewer = "AzureStorageEmulator.exe";
+        private static readonly string[] storageEmulatorFilenames = new[]
+        {
+            "AzureStorageEmulator.exe", // >= 2.7
+            "WAStorageEmulator.exe", // < 2.7
+        };
         
         /// <summary>
         /// Is the storage emulator already started.
@@ -44,10 +50,9 @@ namespace Orleans.TestingHost
         {
             get
             {
-                return File.Exists(GetStorageEmulatorPath());
+                return GetStorageEmulatorPath() != null;
             }
         }
-
 
         /// <summary>
         /// Storage Emulator help.
@@ -78,7 +83,6 @@ namespace Orleans.TestingHost
             }
         }
 
-
         /// <summary>
         /// Tries to start the storage emulator.
         /// </summary>
@@ -90,7 +94,6 @@ namespace Orleans.TestingHost
 
             return Start();
         }
-
 
         /// <summary>
         /// Starts the storage emulator if not already started.
@@ -105,6 +108,7 @@ namespace Orleans.TestingHost
                 //This process handle returns immediately.
                 using(var process = Process.Start(CreateProcessArguments("start")))
                 {
+                    if (process == null) return false;
                     process.WaitForExit();
                     return process.ExitCode == 0;
                 }
@@ -114,7 +118,6 @@ namespace Orleans.TestingHost
                 return false;
             }
         }
-
 
         /// <summary>
         /// Stops the storage emulator if started.
@@ -139,7 +142,6 @@ namespace Orleans.TestingHost
             }
         }
 
-
         /// <summary>
         /// Creates a new <see cref="ProcessStartInfo">ProcessStartInfo</see> to be used as an argument
         /// to other operations in this class.
@@ -161,37 +163,31 @@ namespace Orleans.TestingHost
             };
         }
 
-
         /// <summary>
         /// Queries the storage emulator process from the system.
         /// </summary>
         /// <returns></returns>
         private static Process GetStorageEmulatorProcess()
         {
-            var a = Process.GetProcessesByName(storageEmulatorProcessName27OrNewer);
-            var b = Process.GetProcessesByName(storageEmulatorProcessName27OlderThan);
-            var c = Process.GetProcessesByName(storageEmulatorProcessNameAlt);
-
-            return a.Concat(b).Concat(c).FirstOrDefault(p => p != null);
+            return (storageEmulatorProcessNames
+                .Select(Process.GetProcessesByName)
+                .Where(processes => processes.Length > 0)
+                .Select(processes => processes[0])).FirstOrDefault();
         }
-        
-                
+
         /// <summary>
         /// Returns a full path to the storage emulator executable, including the executable name and file extension.
         /// </summary>
-        /// <returns>A full path to the storage emulator executable.</returns>
+        /// <returns>A full path to the storage emulator executable, or null if not found.</returns>
         private static string GetStorageEmulatorPath()
         {
             //Try to take the newest known emulator path. If it does not exist, try an older one.
-            //If neither exist, it doesn't matter which path is returned.
-            string exePathFileTemplate = Path.Combine(GetProgramFilesBasePath(), @"Microsoft SDKs\Azure\Storage Emulator\{0}");
-            var exePathAndFile = string.Format(exePathFileTemplate, storageEmulatorFilename27OrNewer);
-            if (!File.Exists(exePathAndFile))
-            {
-                exePathAndFile = string.Format(exePathFileTemplate, storageEmulatorFilename27OlderThan);
-            }
+            string exeBasePath = Path.Combine(GetProgramFilesBasePath(), @"Microsoft SDKs\Azure\Storage Emulator\");
 
-            return exePathAndFile;
+            return storageEmulatorFilenames
+                .Select(filename => Path.Combine(exeBasePath, filename))
+                .Where(File.Exists)
+                .FirstOrDefault();
         }
 
 
@@ -202,12 +198,6 @@ namespace Orleans.TestingHost
         private static string GetProgramFilesBasePath()
         {
             return Environment.Is64BitOperatingSystem ? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        }
-
-
-        private static string EmulatorProcessName()
-        {
-            return Path.GetFileName(GetStorageEmulatorPath());
         }
     }
 }

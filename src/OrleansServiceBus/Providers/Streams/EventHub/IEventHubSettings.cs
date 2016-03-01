@@ -1,5 +1,6 @@
 ﻿
-namespace OrleansServiceBusUtils.Providers.Streams.EventHub
+
+namespace Orleans.ServiceBus.Providers
 {
     public interface IEventHubSettings
     {
@@ -7,5 +8,6 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
         string ConsumerGroup { get; }
         string Path { get; }
         int? PrefetchCount { get; }
+        bool StartFromNow { get; }
     }
 }

@@ -77,15 +77,12 @@ namespace Orleans.CodeGenerator
                 source = GenerateSourceCode(code);
 
                 // Compile the code and load the generated assembly.
-                if (logger.IsVerbose3)
-                {
-                    logger.LogWithoutBulkingAndTruncating(
-                        Severity.Verbose3,
-                        ErrorCode.CodeGenSourceGenerated,
-                        "Generating assembly {0} with source:\n{1}",
-                        assemblyName,
-                        source);
-                }
+                logger.LogWithoutBulkingAndTruncating(
+                    Severity.Verbose3,
+                    ErrorCode.CodeGenSourceGenerated,
+                    "Generating assembly {0} with source:\n{1}",
+                    assemblyName,
+                    source);
             }
             
             var compilation =
@@ -153,36 +150,6 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Get types which have corresponding generated classes marked with the provided marker attributes.
-        /// </summary>
-        /// <returns>Types which have corresponding generated classes marked with any of the provided marker attributes.</returns>
-        internal static HashSet<Type> GetTypesWithImplementations(params Type[] markerAttributes)
-        {
-            // Get assemblies which contain generated code.
-            var all =
-                AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(_ => _.GetCustomAttribute<GeneratedCodeAttribute>() != null)
-                    .SelectMany(_ => _.DefinedTypes);
-
-            // Get all generated types in each assembly.
-            var attributes = all.SelectMany(_ => _.GetCustomAttributes()).OfType<GeneratedAttribute>();
-            var results = new HashSet<Type>();
-            foreach (var attribute in attributes)
-            {
-                if (attribute.GrainType != null)
-                {
-                    results.Add(attribute.GrainType);
-                }
-                else if (!string.IsNullOrWhiteSpace(attribute.ForGrainType))
-                {
-                    results.Add(Type.GetType(attribute.ForGrainType));
-                }
-            }
-
-            return results;
-        }
-
-        /// <summary>
         /// Generates switch cases for the provided grain type.
         /// </summary>
         /// <param name="grainType">
@@ -199,7 +166,7 @@ namespace Orleans.CodeGenerator
         /// </returns>
         public static SwitchSectionSyntax[] GenerateGrainInterfaceAndMethodSwitch(
             Type grainType,
-            IdentifierNameSyntax methodIdArgument,
+            ExpressionSyntax methodIdArgument,
             Func<MethodInfo, StatementSyntax[]> generateMethodHandler)
         {
             var interfaces = GrainInterfaceData.GetRemoteInterfaces(grainType);
