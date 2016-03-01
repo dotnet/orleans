@@ -574,6 +574,7 @@ namespace Orleans.Serialization
                             {
                                 try
                                 {
+                                    if (register.ContainsGenericParameters) throw new OrleansException("Type serializer '" + register.GetType().FullName + "' contains generic parameters and can not be registered. Did you mean to provide a split your type serializer into a combination of nongeneric RegisterSerializerAttribute and generic SerializableAttribute classes?");
                                     register.Invoke(null, Type.EmptyTypes);
                                 }
                                 catch (OrleansException ex)
