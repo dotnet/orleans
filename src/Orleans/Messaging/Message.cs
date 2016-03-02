@@ -446,7 +446,10 @@ namespace Orleans.Runtime
 
         public Message()
         {
-            headers = new Dictionary<Header, object>();
+            // average headers items count is 14 items, and while the Header enum contains 18 entries
+            // the closest prime number is 17; assuming that possibility of all 18 headers being at the same time is low enough to
+            // choose 17 in order to avoid allocations of two additional items on each call, and allocate 37 instead of 19 in rare cases
+            headers = new Dictionary<Header, object>(17);
             metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
