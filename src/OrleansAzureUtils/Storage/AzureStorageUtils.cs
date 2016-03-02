@@ -6,7 +6,10 @@ using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans.Runtime;
-
+using Newtonsoft.Json;
+using Orleans.Providers;
+using System.Runtime.Serialization.Formatters;
+using Orleans.Serialization;
 
 namespace Orleans.AzureUtils
 {
@@ -385,6 +388,46 @@ namespace Orleans.AzureUtils
                         extendedError.ErrorMessage,
                         (extendedError.AdditionalDetails != null && extendedError.AdditionalDetails.Count > 0) ?
                             String.Format(", ExtendedErrorInformation.AdditionalDetails = {0}", Utils.DictionaryToString(extendedError.AdditionalDetails)) : String.Empty);
+        }
+
+        /// <summary>
+        /// Customises the serializer settings returned by <see cref="OrleansJsonSerializer"/>
+        /// using provider configuration.
+        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
+        /// </summary>
+        /// <param name="config"></param>
+        /// <returns><see cref="JsonSerializerSettings" /></returns>
+        public static JsonSerializerSettings ConfigureJsonSerializerSettings(IProviderConfiguration config)
+        {
+            // By default, use the standard Orleans serializer settings
+            var settings = OrleansJsonSerializer.GetSerializerSettings();
+
+            settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple;
+            settings.Formatting = Formatting.None;
+
+            if (config.Properties.ContainsKey("UseFullAssemblyNames"))
+            {
+                bool useFullAssemblyNames = false;
+                var UseFullAssemblyNamesValue = config.Properties["UseFullAssemblyNames"];
+                bool.TryParse(UseFullAssemblyNamesValue, out useFullAssemblyNames);
+                if (useFullAssemblyNames)
+                {
+                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
+                }
+            }
+
+            if (config.Properties.ContainsKey("IndentJSON"))
+            {
+                bool indentJSON = false;
+                var indentJSONValue = config.Properties["IndentJSON"];
+                bool.TryParse(indentJSONValue, out indentJSON);
+                if (indentJSON)
+                {
+                    settings.Formatting = Formatting.Indented;
+                }
+            }
+
+            return settings;
         }
     }
 }
