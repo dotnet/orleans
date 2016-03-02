@@ -41,7 +41,12 @@ namespace Orleans.Runtime
 
         public List<ArraySegment<byte>> BuildReceiveBuffer()
         {
-            AdjustBuffer();
+            // Opportunistic reset to start of buffer
+            if (decodeOffset == receiveOffset)
+            {
+                decodeOffset = 0;
+                receiveOffset = 0;
+            }
             return ByteArrayBuilder.BuildSegmentList(readBuffer, receiveOffset);
         }
 
@@ -61,12 +66,6 @@ namespace Orleans.Runtime
         public bool TryDecodeMessage(out Message msg)
         {
             msg = null;
-
-            // if we read the entire buffer, assume we could have read more if buffer was bigger, and increase buffer size.
-            if (receiveOffset == currentBufferSize && currentBufferSize < maxSustainedBufferSize)
-            {
-                GrowBuffer();
-            }
 
             // Is there enough read into the buffer to continue (at least read the lengths?)
             if (receiveOffset - decodeOffset < CalculateKnownMessageSize())
@@ -131,28 +130,19 @@ namespace Orleans.Runtime
             headerLength = 0;
             bodyLength = 0;
 
+            AdjustBuffer();
+
             return true;
         }
 
         /// <summary>
         /// This call cleans up the buffer state to make it optimal for next read.
-        /// If all the messages were read from the buffer, the decode and receive offsets are moved to the start of the buffer.
-        /// If there is a partial message left, the leading chunks, used by any processed messages, are removed, from the front
+        /// The leading chunks, used by any processed messages, are removed from the front
         ///   of the buffer and added to the back.   Decode and receiver offsets are adjusted accordingly.
-        /// In either case, if the buffer was grown over the max sustained buffer size (to read a large message) it is shrunken.
+        /// If the buffer was grown over the max sustained buffer size (to read a large message) it is shrunken.
         /// </summary>
         private void AdjustBuffer()
         {
-            // Opportunistic reset to start of buffer, this should be the most common call path.
-            // If decodeoffset matches receiveoffset, we've processed all the messages in buffer, so we can reset both offsets to start of buffer,
-            //   Unless the current buffer size is over the max sustain size, in which we want to adjust buffers to shrink it.
-            if (decodeOffset == receiveOffset && currentBufferSize <= maxSustainedBufferSize)
-            {
-                decodeOffset = 0;
-                receiveOffset = 0;
-                return;
-            }
-
             // drop buffers consumed by messages and adjust offsets
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
