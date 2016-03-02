@@ -2,12 +2,17 @@
 @prompt $G$S
 @set CMDHOME=%~dp0.
 
-@if NOT "%VS120COMNTOOLS%"=="" (
-  @set VSTOOLSDIR="%VS120COMNTOOLS%"
-  @set VSVER=Visual Studio 2013
+@if NOT "%VS140COMNTOOLS%"=="" (
+  @set VSTOOLSDIR="%VS140COMNTOOLS%"
+  @set VSVER=Visual Studio 2015
 ) else (
-  @set VSTOOLSDIR="%VS110COMNTOOLS%"
-  @set VSVER=Visual Studio 2012
+  @if NOT "%VS120COMNTOOLS%"=="" (
+    @set VSTOOLSDIR="%VS120COMNTOOLS%"
+    @set VSVER=Visual Studio 2013
+  ) else (
+    @set VSTOOLSDIR="%VS110COMNTOOLS%"
+    @set VSVER=Visual Studio 2012
+  )
 )
 
 @set PKG=Orleans Tools for %VSVER%

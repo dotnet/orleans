@@ -255,6 +255,10 @@
       <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
     <None Include="OrleansVSTools.snk" />
     <None Include="packages.config" />
     <None Include="source.extension.vsixmanifest">
