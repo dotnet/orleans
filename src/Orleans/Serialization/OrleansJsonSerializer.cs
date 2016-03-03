@@ -1,21 +1,23 @@
 ﻿using System;
 using System.Net;
+using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
+using Orleans.Providers;
 
 namespace Orleans.Serialization
 {
-    internal class OrleansJsonSerializer : IExternalSerializer
+    public class OrleansJsonSerializer : IExternalSerializer
     {
-        private static JsonSerializerSettings settings;
+        private static JsonSerializerSettings defaultSettings;
         private TraceLogger logger;
 
         /// <summary>
         /// Returns a configured <see cref="JsonSerializerSettings"/> 
         /// </summary>
         /// <returns></returns>
-        public static JsonSerializerSettings GetSerializerSettings()
+        public static JsonSerializerSettings GetDefaultSerializerSettings()
         {
             var settings = new JsonSerializerSettings
             {
@@ -25,7 +27,9 @@ namespace Orleans.Serialization
                 DefaultValueHandling = DefaultValueHandling.Ignore,
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
-                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+                Formatting = Formatting.None
             };
 
             settings.Converters.Add(new IPAddressConverter());
@@ -37,9 +41,44 @@ namespace Orleans.Serialization
             return settings;
         }
 
+        /// <summary>
+        /// Customises the given serializer settings
+        /// using provider configuration.
+        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
+        /// </summary>
+        /// <param name="set"></param>
+        /// <param name="config"></param>
+        /// <returns><see cref="JsonSerializerSettings" /></returns>
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings set, IProviderConfiguration config)
+        {
+            if (config.Properties.ContainsKey("UseFullAssemblyNames"))
+            {
+                bool useFullAssemblyNames = false;
+                var UseFullAssemblyNamesValue = config.Properties["UseFullAssemblyNames"];
+                bool.TryParse(UseFullAssemblyNamesValue, out useFullAssemblyNames);
+                if (useFullAssemblyNames)
+                {
+                    set.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
+                }
+            }
+
+            if (config.Properties.ContainsKey("IndentJSON"))
+            {
+                bool indentJSON = false;
+                var indentJSONValue = config.Properties["IndentJSON"];
+                bool.TryParse(indentJSONValue, out indentJSON);
+                if (indentJSON)
+                {
+                    set.Formatting = Formatting.Indented;
+                }
+            }
+
+            return set;
+        }
+
         static OrleansJsonSerializer()
         {
-            settings = GetSerializerSettings();
+            defaultSettings = GetDefaultSerializerSettings();
         }
 
         /// <summary>
@@ -93,7 +132,7 @@ namespace Orleans.Serialization
             }
 
             var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, settings);
+            return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
         }
 
         /// <summary>
@@ -115,7 +154,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var str = JsonConvert.SerializeObject(item, expectedType, settings);
+            var str = JsonConvert.SerializeObject(item, expectedType, defaultSettings);
             writer.Write(str);
         }
     }
