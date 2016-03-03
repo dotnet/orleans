@@ -4,11 +4,10 @@ using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
-using Orleans.Providers;
 
 namespace Orleans.Serialization
 {
-    public class OrleansJsonSerializer : IExternalSerializer
+    internal class OrleansJsonSerializer : IExternalSerializer
     {
         private static JsonSerializerSettings defaultSettings;
         private TraceLogger logger;
@@ -17,7 +16,7 @@ namespace Orleans.Serialization
         /// Returns a configured <see cref="JsonSerializerSettings"/> 
         /// </summary>
         /// <returns></returns>
-        public static JsonSerializerSettings GetDefaultSerializerSettings()
+        internal static JsonSerializerSettings GetDefaultSerializerSettings()
         {
             var settings = new JsonSerializerSettings
             {
@@ -39,41 +38,6 @@ namespace Orleans.Serialization
             settings.Converters.Add(new UniqueKeyConverter());
 
             return settings;
-        }
-
-        /// <summary>
-        /// Customises the given serializer settings
-        /// using provider configuration.
-        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
-        /// </summary>
-        /// <param name="set"></param>
-        /// <param name="config"></param>
-        /// <returns><see cref="JsonSerializerSettings" /></returns>
-        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings set, IProviderConfiguration config)
-        {
-            if (config.Properties.ContainsKey("UseFullAssemblyNames"))
-            {
-                bool useFullAssemblyNames = false;
-                var UseFullAssemblyNamesValue = config.Properties["UseFullAssemblyNames"];
-                bool.TryParse(UseFullAssemblyNamesValue, out useFullAssemblyNames);
-                if (useFullAssemblyNames)
-                {
-                    set.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
-                }
-            }
-
-            if (config.Properties.ContainsKey("IndentJSON"))
-            {
-                bool indentJSON = false;
-                var indentJSONValue = config.Properties["IndentJSON"];
-                bool.TryParse(indentJSONValue, out indentJSON);
-                if (indentJSON)
-                {
-                    set.Formatting = Formatting.Indented;
-                }
-            }
-
-            return set;
         }
 
         static OrleansJsonSerializer()
@@ -161,7 +125,7 @@ namespace Orleans.Serialization
 
     #region JsonConverters
 
-    class IPAddressConverter : JsonConverter
+    internal class IPAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -181,7 +145,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class GrainIdConverter : JsonConverter
+    internal class GrainIdConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -205,7 +169,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class SiloAddressConverter : JsonConverter
+    internal class SiloAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -229,7 +193,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class UniqueKeyConverter : JsonConverter
+    internal class UniqueKeyConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -252,8 +216,8 @@ namespace Orleans.Serialization
             return addr;
         }
     }
- 
-    class IPEndPointConverter : JsonConverter
+
+    internal class IPEndPointConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
