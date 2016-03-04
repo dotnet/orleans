@@ -101,7 +101,7 @@ namespace Orleans.Storage
             
             if (useJsonFormat)
             {
-                this.jsonSettings = AzureStorageUtils.ConfigureJsonSerializerSettings(config);
+                this.jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
             }
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
