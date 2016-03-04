@@ -339,8 +339,7 @@ namespace Orleans.Runtime
                 newChain.AddRange(prevChain.Cast<RequestInvocationHistory>());
                 newChain.Add(new RequestInvocationHistory(message));
                 
-                throw new DeadlockException(newChain.Select(req =>
-                    new Tuple<GrainId, int, int>(req.GrainId, req.InterfaceId, req.MethodId)).ToList());
+                throw new DeadlockException(newChain);
             }
         }
 

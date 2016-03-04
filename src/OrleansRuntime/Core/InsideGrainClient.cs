@@ -330,12 +330,12 @@ namespace Orleans.Runtime
                     // in RuntimeClient.CreateMessage -> RequestContext.ExportToMessage(message);
                 }
 
-                var invoker = invokable.GetInvoker(message.InterfaceId, message.GenericGrainType);
-
                 object resultObject;
                 try
                 {
                     var request = (InvokeMethodRequest) message.BodyObject;
+
+                    var invoker = invokable.GetInvoker(request.InterfaceId, message.GenericGrainType);
 
                     if (invoker is IGrainExtensionMethodInvoker
                         && !(target is IGrainExtension))
