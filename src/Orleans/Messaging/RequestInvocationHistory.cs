@@ -8,20 +8,18 @@ namespace Orleans.Runtime
     {
         public GrainId GrainId { get; private set; }
         public ActivationId ActivationId { get; private set; }
-        public int InterfaceId { get; private set; }
-        public int MethodId { get; private set; }
+        public string DebugContext { get; private set; }
 
         internal RequestInvocationHistory(Message message)
         {
             GrainId = message.TargetGrain;
             ActivationId = message.TargetActivation;
-            InterfaceId = message.InterfaceId;
-            MethodId = message.MethodId;
+            DebugContext = message.DebugContext;
         }
 
         public override string ToString()
         {
-            return String.Format("RequestInvocationHistory {0}:{1}:{2}:{3}", GrainId, ActivationId, InterfaceId, MethodId);
+            return String.Format("RequestInvocationHistory {0}:{1}:{2}", GrainId, ActivationId, DebugContext);
         }
     }
 }

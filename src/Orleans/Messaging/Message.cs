@@ -23,8 +23,8 @@ namespace Orleans.Runtime
             DIRECTION,
             EXPIRATION,
             FORWARD_COUNT,
-            INTERFACE_ID,
-            METHOD_ID,
+            INTERFACE_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
+            METHOD_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
             NEW_GRAIN_TYPE,
             GENERIC_GRAIN_TYPE,
             RESULT,
@@ -341,18 +341,6 @@ namespace Orleans.Runtime
             return ForwardCount < config.MaxForwardCount;
         }
 
-        public int MethodId
-        {
-            get { return GetScalarHeader<int>(Header.METHOD_ID); }
-            set { SetHeader(Header.METHOD_ID, value); }
-        }
-
-        public int InterfaceId
-        {
-            get { return GetScalarHeader<int>(Header.INTERFACE_ID); }
-            set { SetHeader(Header.INTERFACE_ID, value); }
-        }
-
         /// <summary>
         /// Set by sender's placement logic when NewPlacementRequested is true
         /// so that receiver knows desired grain type
@@ -466,8 +454,6 @@ namespace Orleans.Runtime
                 (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request)
             {
                 Id = CorrelationId.GetNext(),
-                InterfaceId = request.InterfaceId,
-                MethodId = request.MethodId,
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 BodyObject = request
