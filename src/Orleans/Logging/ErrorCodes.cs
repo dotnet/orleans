@@ -938,6 +938,8 @@ namespace Orleans
         RS_RangeChanged                         = ReminderServiceBase + 34,
         RS_LocalStop                            = ReminderServiceBase + 35,
         RS_Started                              = ReminderServiceBase + 36,
+        RS_ServiceInitialLoadFailing            = ReminderServiceBase + 37,
+        RS_ServiceInitialLoadFailed             = ReminderServiceBase + 38,
 
         
         // Codes for the Consistent Ring Provider
