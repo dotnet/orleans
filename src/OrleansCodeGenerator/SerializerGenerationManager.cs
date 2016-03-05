@@ -126,7 +126,7 @@ namespace Orleans.CodeGenerator
             if (typeInfo.Namespace != null && (typeInfo.Namespace.Equals("System") || typeInfo.Namespace.StartsWith("System.")))
             {
                 var message = "System type " + t.Name + " may require a custom serializer for optimal performance. "
-                              + "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.";
+                              + "If you use arguments of this type a lot, consider submitting a pull request to https://github.com/dotnet/orleans/ to add a custom serializer for it.";
                 Log.Warn(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
                 return false;
             }
