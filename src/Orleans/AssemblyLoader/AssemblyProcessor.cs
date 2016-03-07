@@ -145,17 +145,24 @@ namespace Orleans.Runtime
             // Process each type in the assembly.
             foreach (TypeInfo type in assemblyTypes)
             {
-                string typeName = type.FullName;
-                if (Logger.IsVerbose3)
+                try
                 {
-                    Logger.Verbose3("Processing type {0}", typeName);
+                    string typeName = type.FullName;
+                    if (Logger.IsVerbose3)
+                    {
+                        Logger.Verbose3("Processing type {0}", typeName);
+                    }
+                    if (shouldProcessSerialization)
+                    {
+                        SerializationManager.FindSerializationInfo(type);
+                    }
+    
+                    GrainFactory.FindSupportClasses(type);
                 }
-                if (shouldProcessSerialization)
+                catch (Exception exception)
                 {
-                    SerializationManager.FindSerializationInfo(type);
+                    Logger.Error(ErrorCode.SerMgr_TypeRegistrationFailure, "Failed to load type " + type.FullName + " in assembly " + assembly.FullName + ".", exception);
                 }
-
-                GrainFactory.FindSupportClasses(type);
             }
         }
     }
