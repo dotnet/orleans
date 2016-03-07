@@ -482,7 +482,22 @@ namespace Orleans.Runtime
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc)
         {
-            return assembly.IsDynamic ? Enumerable.Empty<Type>() : assembly.DefinedTypes.Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
+            if (assembly.IsDynamic)
+            {
+                return Enumerable.Empty<Type>();
+            }
+
+            IEnumerable<TypeInfo> definedTypes;
+            try
+            {
+                definedTypes = assembly.DefinedTypes;
+            }
+            catch (ReflectionTypeLoadException)
+            {
+                return Enumerable.Empty<Type>();
+            }
+
+            return definedTypes.Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
         }
 
         public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc)
