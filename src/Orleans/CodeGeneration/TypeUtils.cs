@@ -447,32 +447,54 @@ namespace Orleans.Runtime
             return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
         }
 
-        public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc)
+        public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc, TraceLogger logger)
         {
-            return assembly.IsDynamic ? Enumerable.Empty<Type>() : assembly.DefinedTypes.Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
+            return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc)
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, TraceLogger logger)
+        {
+            try
+            {
+                return assembly.DefinedTypes;
+            }
+            catch (Exception exception)
+            {
+                if (logger.IsWarning)
+                {
+                    var message =
+                        string.Format(
+                            "AssemblyLoader encountered an exception loading types from assembly '{0}': {1}",
+                            assembly.FullName,
+                            exception);
+                    logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
+                }
+
+                return Enumerable.Empty<TypeInfo>();
+            }
+        }
+
+        public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc, TraceLogger logger)
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();
             foreach (var assembly in assemblies)
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
-                var types = GetTypes(assembly, whereFunc);
+                var types = GetTypes(assembly, whereFunc, logger);
                 result.AddRange(types);
             }
             return result;
         }
 
-        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc)
+        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc, TraceLogger logger)
         {
             var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();
             foreach (var assembly in currentAssemblies.Where(loaded => !loaded.IsDynamic && assemblies.Contains(loaded.Location)))
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
-                var types = GetTypes(assembly, whereFunc);
+                var types = GetTypes(assembly, whereFunc, logger);
                 result.AddRange(types);
             }
             return result;

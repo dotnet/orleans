@@ -60,8 +60,8 @@ namespace Orleans.Runtime
         {
             var result = new Dictionary<string, GrainTypeData>();
             Type[] grainTypes = strict
-                ? TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass).ToArray()
-                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsConcreteGrainClass).ToArray();
+                ? TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass, logger).ToArray()
+                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsConcreteGrainClass, logger).ToArray();
 
             foreach (var grainType in grainTypes)
             {
@@ -106,8 +106,8 @@ namespace Orleans.Runtime
         {
             var result = new Dictionary<int, Type>();
             Type[] types = strict
-                ? TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType).ToArray()
-                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainMethodInvokerType).ToArray();
+                ? TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType, logger).ToArray()
+                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainMethodInvokerType, logger).ToArray();
 
             foreach (var type in types)
             {
