@@ -12,6 +12,7 @@ using Orleans.Runtime.Host;
 using Orleans.TestingHost;
 using UnitTests.StorageTests;
 using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable CheckNamespace
@@ -21,8 +22,11 @@ namespace UnitTests
 {
     public class ConfigTests : IDisposable
     {
-        public ConfigTests()
+        private readonly ITestOutputHelper output;
+
+        public ConfigTests(ITestOutputHelper output)
         {
+            this.output = output;
             TraceLogger.UnInitialize();
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
@@ -116,7 +120,6 @@ namespace UnitTests
             oc.StandardLoad();
             NodeConfiguration n = oc.CreateNodeConfigurationForSilo("Node1");
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
             Assert.IsNotNull(fname);
             Assert.IsFalse(fname.Contains(":"), "Log file name should not contain colons.");
 
@@ -142,7 +145,6 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
 
             Assert.AreEqual(baseLogFileName, fname);
 
@@ -171,7 +173,6 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
 
             Assert.AreEqual(baseLogFileName, fname);
 
@@ -200,7 +201,6 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
 
             Assert.AreEqual(logFileName, fname);
 
@@ -241,7 +241,6 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
 
             Assert.AreEqual(logFileName, fname);
 
@@ -292,7 +291,7 @@ namespace UnitTests
             var cfg = new ClientConfiguration();
             var str = cfg.ToString();
             Assert.IsNotNull(str, "ClientConfiguration.ToString");
-            Console.WriteLine(str);
+            output.WriteLine(str);
             Assert.IsNull(cfg.SourceFile, "SourceFile");
             //Assert.IsNull(cfg.TraceFileName, "TraceFileName");
         }
@@ -302,10 +301,10 @@ namespace UnitTests
         {
             var cfg = new ClientConfiguration();
             cfg.TraceFileName = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
 
             cfg.TraceFileName = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -313,11 +312,11 @@ namespace UnitTests
         {
             var cfg = new ClientConfiguration();
             cfg.TraceFilePattern = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
 
             cfg.TraceFilePattern = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
         }
 
@@ -326,10 +325,10 @@ namespace UnitTests
         {
             var cfg = new NodeConfiguration();
             cfg.TraceFileName = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
 
             cfg.TraceFileName = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -337,11 +336,11 @@ namespace UnitTests
         {
             var cfg = new NodeConfiguration();
             cfg.TraceFilePattern = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
 
             cfg.TraceFilePattern = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
         }
 
@@ -614,9 +613,9 @@ namespace UnitTests
         {
             string azureConnectionStringInput =
                 @"DefaultEndpointsProtocol=https;AccountName=test;AccountKey=q-SOMEKEY-==";
-            Console.WriteLine("Input = " + azureConnectionStringInput);
+            output.WriteLine("Input = " + azureConnectionStringInput);
             string azureConnectionString = ConfigUtilities.PrintDataConnectionInfo(azureConnectionStringInput);
-            Console.WriteLine("Output = " + azureConnectionString);
+            output.WriteLine("Output = " + azureConnectionString);
             Assert.IsTrue(azureConnectionString.EndsWith("AccountKey=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed account key info from Azure connection string " + azureConnectionString);
         }
@@ -626,9 +625,9 @@ namespace UnitTests
         {
             string sqlConnectionStringInput =
                 @"Server=myServerName\myInstanceName;Database=myDataBase;User Id=myUsername;Password=myPassword";
-            Console.WriteLine("Input = " + sqlConnectionStringInput);
+            output.WriteLine("Input = " + sqlConnectionStringInput);
             string sqlConnectionString = ConfigUtilities.PrintSqlConnectionString(sqlConnectionStringInput);
-            Console.WriteLine("Output = " + sqlConnectionString);
+            output.WriteLine("Output = " + sqlConnectionString);
             Assert.IsTrue(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed password info from SqlServer connection string " + sqlConnectionString);
         }
@@ -725,7 +724,7 @@ namespace UnitTests
             var config = new ClusterConfiguration();
             config.LoadFromFile(filename);
 
-            Console.WriteLine(config.Globals);
+            output.WriteLine(config.Globals.ToString());
 
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, config.Globals.LivenessType, "LivenessType");
             Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, config.Globals.ReminderServiceType, "ReminderServiceType");
@@ -738,7 +737,7 @@ namespace UnitTests
 
             ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(ClientConfiguration.GatewayProviderType.Config, config.GatewayProvider, "GatewayProviderType");
         }
@@ -756,7 +755,7 @@ namespace UnitTests
 
                 ClientConfiguration config = GrainClient.CurrentConfig;
 
-                Console.WriteLine(config);
+                output.WriteLine(config);
 
                 Assert.IsNotNull(config, "Client.CurrentConfig");
 
@@ -836,7 +835,7 @@ namespace UnitTests
 
             ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider, "GatewayProviderType");
             Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProviderToUse, "GatewayProviderToUse");
@@ -855,7 +854,7 @@ namespace UnitTests
 
             ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(1, config.ProviderConfigurations.Count, "Number of Providers Types");
             Assert.AreEqual("Statistics", config.ProviderConfigurations.Keys.First(), "Client Stats Providers");
@@ -878,7 +877,7 @@ namespace UnitTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
 
-            Console.WriteLine(orleansConfig.Globals);
+            output.WriteLine(orleansConfig.Globals);
 
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.SqlServer, orleansConfig.Globals.LivenessType, "LivenessType");
             Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.SqlServer, orleansConfig.Globals.ReminderServiceType, "ReminderServiceType");
@@ -900,7 +899,7 @@ namespace UnitTests
             var config = new ClusterConfiguration();
             config.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(2, config.Globals.ProviderConfigurations.Count, "Number of Providers Types");
             Assert.IsTrue(config.Globals.ProviderConfigurations.Keys.Contains("Statistics"), "Stats Providers");
@@ -923,7 +922,7 @@ namespace UnitTests
             var initialConfig = new ClusterConfiguration();
             initialConfig.LoadFromFile(filename);
 
-            Console.WriteLine(initialConfig.Globals);
+            output.WriteLine(initialConfig.Globals);
 
             // Do same code that AzureSilo does for configuring silo host
 
@@ -958,7 +957,7 @@ namespace UnitTests
 
             ClusterConfiguration siloConfig = host.Config;
 
-            Console.WriteLine(siloConfig.Globals);
+            output.WriteLine(siloConfig.Globals);
 
             Assert.AreEqual("", siloConfig.SourceFile, "SourceFile should be blank for programmatic config");
             Assert.AreEqual(11, siloConfig.Globals.CacheSize, "CacheSize picked up from config object");
@@ -977,7 +976,7 @@ namespace UnitTests
 
             config.PreferedGatewayIndex = 11;
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(null, config.SourceFile, "SourceFile should be blank for programmatic config");
             Assert.AreEqual(11, config.PreferedGatewayIndex, "PreferedGatewayIndex picked up from config object");
@@ -1010,7 +1009,7 @@ namespace UnitTests
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 
-            Console.WriteLine(siloConfig.Globals);
+            output.WriteLine(siloConfig.Globals);
 
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType, "LivenessType");
             Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType, "ReminderServiceType");

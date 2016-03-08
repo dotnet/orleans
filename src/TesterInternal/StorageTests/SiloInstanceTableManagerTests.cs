@@ -11,6 +11,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
@@ -45,9 +46,11 @@ namespace UnitTests.StorageTests
         private SiloInstanceTableEntry myEntry;
         private OrleansSiloInstanceManager manager;
         private readonly TraceLogger logger;
+        private readonly ITestOutputHelper output;
 
-        public SiloInstanceTableManagerTests()
+        public SiloInstanceTableManagerTests(ITestOutputHelper output)
         {
+            this.output = output;
             logger = TraceLogger.GetLogger("SiloInstanceTableManagerTests", TraceLogger.LoggerType.Application);
 
             deploymentId = "test-" + Guid.NewGuid();
@@ -200,11 +203,11 @@ namespace UnitTests.StorageTests
 
             string MembershipRowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
-            Console.WriteLine("SiloAddress = {0} Row Key string = {1}", siloAddress, MembershipRowKey);
+            output.WriteLine("SiloAddress = {0} Row Key string = {1}", siloAddress, MembershipRowKey);
 
             SiloAddress fromRowKey = SiloInstanceTableEntry.UnpackRowKey(MembershipRowKey);
 
-            Console.WriteLine("SiloAddress result = {0} From Row Key string = {1}", fromRowKey, MembershipRowKey);
+            output.WriteLine("SiloAddress result = {0} From Row Key string = {1}", fromRowKey, MembershipRowKey);
 
             Assert.AreEqual(siloAddress, fromRowKey, "Compare SiloAddress");
             Assert.AreEqual(SiloInstanceTableEntry.ConstructRowKey(siloAddress), SiloInstanceTableEntry.ConstructRowKey(fromRowKey), "SiloInstanceTableEntry.ConstructRowKey");

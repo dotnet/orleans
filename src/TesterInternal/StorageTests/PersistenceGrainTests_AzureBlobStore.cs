@@ -8,6 +8,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -36,7 +37,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        public PersistenceGrainTests_AzureBlobStore(Fixture fixture) : base(fixture)
+        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
         }
         

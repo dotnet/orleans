@@ -8,13 +8,17 @@ using Orleans.Runtime.Configuration;
 using Tester;
 using UnitTests.Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests
 {
     public class ClientInitTests : OrleansTestingBase, IClassFixture<DefaultClusterFixture>
     {
-        public ClientInitTests()
+        private readonly ITestOutputHelper output;
+
+        public ClientInitTests(ITestOutputHelper output)
         {
+            this.output = output;
             if (!GrainClient.IsInitialized)
             {
                 GrainClient.Initialize("ClientConfigurationForTesting.xml");
@@ -85,7 +89,7 @@ namespace UnitTests
                 }
                 catch (Exception exc)
                 {
-                    Console.WriteLine("Expected to get exception during GrainClient.Initialize: {0}", exc);
+                    output.WriteLine("Expected to get exception during GrainClient.Initialize: {0}", exc);
                 }
                 Assert.IsFalse(GrainClient.IsInitialized, "GrainClient.IsInitialized");
                 Assert.IsFalse(TraceLogger.IsInitialized, "Logger.IsInitialized");

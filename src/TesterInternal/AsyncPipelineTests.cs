@@ -7,14 +7,21 @@ using Orleans;
 using Orleans.Runtime;
 using UnitTests.TestHelper;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.AsyncPrimitivesTests
 {
     public class AsyncPipelineTests
     {
+        private readonly ITestOutputHelper output;
         private const int _iterationCount = 100;
         private const int _defaultPipelineCapacity = 2;
-        
+
+        public AsyncPipelineTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void AsyncPipelineSimpleTest()
         {
@@ -133,7 +140,7 @@ namespace UnitTests.AsyncPrimitivesTests
                     var delay = TimeSpan.FromSeconds(5);
                     while (tasksCompleted < expectedTasksCompleted)
                     {
-                        Console.WriteLine("test in progress: tasksCompleted = {0}.", tasksCompleted);
+                        output.WriteLine("test in progress: tasksCompleted = {0}.", tasksCompleted);
                         await Task.Delay(delay);
                     }
                 };
@@ -152,7 +159,7 @@ namespace UnitTests.AsyncPrimitivesTests
             var minTimeSec = (1.0 - variance) * targetTimeSec;
             var maxTimeSec = (1.0 + variance) * targetTimeSec;
             var actualSec = stopwatch.Elapsed.TotalSeconds;
-            Console.WriteLine(
+            output.WriteLine(
                 "Test finished in {0} sec, {1}% of target time {2} sec. Permitted variance is +/-{3}%",
                 actualSec,
                 actualSec / targetTimeSec * 100,

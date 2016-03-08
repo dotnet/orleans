@@ -7,6 +7,7 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable ConvertToLambdaExpression
 
@@ -17,19 +18,11 @@ namespace UnitTests
     /// </summary>
     public class Async_AsyncExecutorWithRetriesTests
     {
-        internal static void CheckUnobservedPromises(List<string> unobservedPromises)
+        private readonly ITestOutputHelper output;
+
+        public Async_AsyncExecutorWithRetriesTests(ITestOutputHelper output)
         {
-            if (unobservedPromises.Count > 0)
-            {
-                for (int i = 0; i < unobservedPromises.Count; i++)
-                {
-                    string promise = unobservedPromises[i];
-                    Console.WriteLine("Unobserved promise {0}: {1}", i, promise);
-                }
-                Assert.Fail("Found {0} unobserved promise(s) : [ {1} ]",
-                                          unobservedPromises.Count,
-                                          string.Join(" , \n", unobservedPromises));
-            }
+            this.output = output;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -40,7 +33,7 @@ namespace UnitTests
             {
                 // ReSharper disable AccessToModifiedClosure
                 Assert.AreEqual(counter, funcCounter);
-                Console.WriteLine("Running for {0} time.", counter);
+                output.WriteLine("Running for {0} time.", counter);
                 counter++;
                 if (counter == 5)
                     return Task.FromResult(28);
@@ -55,13 +48,13 @@ namespace UnitTests
 
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 10, 10, null, errorFilter);
             int value = promise.Result;
-            Console.WriteLine("Value is {0}.", value);
+            output.WriteLine("Value is {0}.", value);
             counter = 0;
             try
             {
                 promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 3, 3, null, errorFilter);
                 value = promise.Result;
-                Console.WriteLine("Value is {0}.", value);
+                output.WriteLine("Value is {0}.", value);
             }
             catch (Exception)
             {
@@ -79,7 +72,7 @@ namespace UnitTests
             {
 // ReSharper disable AccessToModifiedClosure
                 Assert.AreEqual(counter, funcCounter);
-                Console.WriteLine("Running for {0} time.", counter);
+                output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
 // ReSharper restore AccessToModifiedClosure
             });
@@ -89,7 +82,7 @@ namespace UnitTests
             int expectedRetries = countLimit;
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null, Constants.INFINITE_TIMESPAN);
             int value = promise.Result;
-            Console.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
+            output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.AreEqual(expectedRetries, value, "Returned value");
             Assert.AreEqual(counter, value, "Counter == Returned value");
 
@@ -98,7 +91,7 @@ namespace UnitTests
             expectedRetries = maxRetries;
             promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null);
             value = promise.Result;
-            Console.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
+            output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.AreEqual(expectedRetries, value, "Returned value");
             Assert.AreEqual(counter, value, "Counter == Returned value");
         }
@@ -112,7 +105,7 @@ namespace UnitTests
             {
                 lastIteration = funcCounter;
                 Assert.AreEqual(counter, funcCounter);
-                Console.WriteLine("Running for {0} time.", counter);
+                output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
             });
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
@@ -131,7 +124,7 @@ namespace UnitTests
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
 
             int value = promise.Result;
-            Console.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
+            output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
             Assert.AreEqual(counter, value, "Counter == Returned value");
             Assert.AreEqual(counter, 1, "Counter == Returned value");
         }
@@ -145,13 +138,13 @@ namespace UnitTests
             {
                 lastIteration = funcCounter;
                 Assert.AreEqual(counter, funcCounter);
-                Console.WriteLine("Running FUNC for {0} time.", counter);
+                output.WriteLine("Running FUNC for {0} time.", counter);
                 ++counter;
                 throw new ArgumentException(counter.ToString(CultureInfo.InvariantCulture));
             });
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
             {
-                Console.WriteLine("Running ERROR FILTER for {0} time.", i);
+                output.WriteLine("Running ERROR FILTER for {0} time.", i);
                 Assert.AreEqual(lastIteration, i);
                 if (i==0 || i==1)
                     return true;
@@ -177,7 +170,7 @@ namespace UnitTests
             {
                 Exception baseExc = exc.GetBaseException();
                 Assert.AreEqual(baseExc.GetType(), typeof(ArgumentException));
-                Console.WriteLine("baseExc.GetType()={0} Counter={1}", baseExc.GetType(), counter);
+                output.WriteLine("baseExc.GetType()={0} Counter={1}", baseExc.GetType(), counter);
                 Assert.AreEqual(counter, 3, "Counter == Returned value");
             }
         }

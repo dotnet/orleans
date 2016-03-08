@@ -8,19 +8,22 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests
 {
     // if we paralellize tests, this should run in isolation
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
+        private readonly ITestOutputHelper output;
         private TimeSpan originalTimeout;
         
-        public TimeoutTests()
+        public TimeoutTests(ITestOutputHelper output)
         {
+            this.output = output;
             originalTimeout = RuntimeClient.Current.GetResponseTimeout();
         }
-        
+
         public void Dispose()
         {
             RuntimeClient.Current.SetResponseTimeout(originalTimeout);
@@ -55,7 +58,7 @@ namespace UnitTests
                     Assert.Fail("Should not have got here " + exc);
                 }
             }
-            Console.WriteLine("Waited for " + stopwatch.Elapsed);
+            output.WriteLine("Waited for " + stopwatch.Elapsed);
             Assert.IsTrue(!finished);
             Assert.IsTrue(stopwatch.Elapsed >= timeout.Multiply(0.9), "Waited less than " + timeout.Multiply(0.9) + ". Waited " + stopwatch.Elapsed);
             Assert.IsTrue(stopwatch.Elapsed <= timeout.Multiply(2), "Waited longer than " + timeout.Multiply(2) + ". Waited " + stopwatch.Elapsed);

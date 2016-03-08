@@ -3,15 +3,18 @@ using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
     public class CounterStatisticTest : IDisposable
     {
+        private readonly ITestOutputHelper output;
         private CounterStatistic[] counters;
         
-        public CounterStatisticTest()
+        public CounterStatisticTest(ITestOutputHelper output)
         {
+            this.output = output;
             counters = new CounterStatistic[Environment.ProcessorCount];
         }
 
@@ -46,7 +49,7 @@ namespace UnitTests.General
             for (int i = 0; i < counters.Length; i++)
             {
                 var counter = CounterStatistic.FindOrCreate(new StatisticName("test" + i));
-                Console.WriteLine(""+ counter.GetCurrentValue());
+                output.WriteLine(""+ counter.GetCurrentValue());
                 
                 Assert.AreEqual(i*Environment.ProcessorCount*numOfIterations, counter.GetCurrentValue());
             }

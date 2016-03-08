@@ -26,7 +26,7 @@
   <Defaults>
     <Networking Address="localhost" Port="0" />
     <Scheduler MaxActiveThreads="0" />
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false">
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false">
       <!--
       <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
       <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose2" />

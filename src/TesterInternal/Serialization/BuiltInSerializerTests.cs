@@ -15,9 +15,10 @@ using Orleans.Serialization;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.GrainDirectory;
-using Xunit;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable NotAccessedVariable
 
@@ -28,6 +29,8 @@ namespace UnitTests.Serialization
     /// </summary>
     public class BuiltInSerializerTests
     {
+        private readonly ITestOutputHelper output;
+
         public enum SerializerToUse
         {
             Default,
@@ -58,8 +61,9 @@ namespace UnitTests.Serialization
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
-        public BuiltInSerializerTests()
+        public BuiltInSerializerTests(ITestOutputHelper output)
         {
+            this.output = output;
             TraceLogger.Initialize(new NodeConfiguration());
         }
 
@@ -122,7 +126,7 @@ namespace UnitTests.Serialization
             deserialized = OrleansSerializationLoop(source2);
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
         }
-
+        
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.Default)]
         [InlineData(SerializerToUse.Fallback)]
@@ -796,7 +800,7 @@ namespace UnitTests.Serialization
             }
             catch (SerializationException exc)
             {
-                Console.WriteLine(exc);
+                output.WriteLine(exc);
             }
             try
             {
@@ -804,7 +808,7 @@ namespace UnitTests.Serialization
             }
             catch (SerializationException exc)
             {
-                Console.WriteLine(exc);
+                output.WriteLine(exc);
             }
         }
 
@@ -829,7 +833,7 @@ namespace UnitTests.Serialization
             }
             catch (SerializationException exc)
             {
-                Console.WriteLine(exc);
+                output.WriteLine(exc);
             }
         }
 
@@ -877,7 +881,7 @@ namespace UnitTests.Serialization
 
         //    foreach (int val in new[] { staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4 })
         //    {
-        //        Console.WriteLine("{0} -- Compare value={1}", what, val);
+        //        output.WriteLine("{0} -- Compare value={1}", what, val);
         //        Assert.AreEqual(Expression..ev expr1(), expr1(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val);
         //    }
         //}
@@ -889,7 +893,7 @@ namespace UnitTests.Serialization
 
             foreach (int val in new[] {staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4})
             {
-                Console.WriteLine("{0} -- Compare value={1}", what, val);
+                output.WriteLine("{0} -- Compare value={1}", what, val);
                 Assert.AreEqual(func1(val), func2(val), "{0} -- Wrong function after round-trip of {1} with value={2}", what, func1, val);
             }
         }
@@ -901,7 +905,7 @@ namespace UnitTests.Serialization
 
             foreach (int val in new[] { staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4 })
             {
-                Console.WriteLine("{0} -- Compare value={1}", what, val);
+                output.WriteLine("{0} -- Compare value={1}", what, val);
                 Assert.AreEqual(pred1(val), pred2(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val);
             }
         }

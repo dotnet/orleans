@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Tester;
+using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -40,7 +41,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        public PersistenceGrainTests_AzureTableStore(Fixture fixture) : base(fixture)
+        public PersistenceGrainTests_AzureTableStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
         }
 

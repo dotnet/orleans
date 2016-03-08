@@ -23,7 +23,7 @@
   </Globals>
   <Defaults>
     <Networking Address="localhost" Port="0" />
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
       <TraceLevelOverride LogPrefix="AssemblyLoader.Silo" TraceLevel="Warning" />
 <!--
       <TraceLevelOverride LogPrefix="InsideGrainClient.InvokeException" TraceLevel="Verbose" />

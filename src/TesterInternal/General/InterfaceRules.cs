@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using UnitTests.Grains;
 using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
@@ -120,6 +121,12 @@ namespace UnitTests.General
     /// </summary>
     public class InterfaceRulesTests
     {
+        private readonly ITestOutputHelper output;
+
+        public InterfaceRulesTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
 
         [Fact, TestCategory("BVT"), TestCategory("JSON")]
         public void JSON_JsonEchoGrain_IsConcreteGrainClass()
@@ -132,7 +139,7 @@ namespace UnitTests.General
             {
                 foreach (string problem in complaints)
                 {
-                    Console.WriteLine(problem);
+                    output.WriteLine(problem);
                 }
             }
 

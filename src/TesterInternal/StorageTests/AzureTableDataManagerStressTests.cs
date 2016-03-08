@@ -9,17 +9,19 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
-
     public class AzureTableDataManagerStressTests : IClassFixture<AzureStorageBasicTestFixture>
     {
+        private readonly ITestOutputHelper output;
         private string PartitionKey;
         private UnitTestAzureTableDataManager manager;
         
-        public AzureTableDataManagerStressTests()
+        public AzureTableDataManagerStressTests(ITestOutputHelper output)
         {
+            this.output = output;
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
             // Pre-create table, if required
@@ -68,14 +70,14 @@ namespace UnitTests.StorageTests
 
             sw.Stop();
             int count = data.Count();
-            Console.WriteLine("AzureTable_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
+            output.WriteLine("AzureTable_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
 
             Assert.IsTrue(count >= iterations, "ReadAllshould return some data: Found={0}", count);
         }
 
         private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
         {
-            Console.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
+            output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
             List<Task> promises = new List<Task>();
             Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < iterations; i++)
@@ -94,13 +96,13 @@ namespace UnitTests.StorageTests
                 {
                     Task.WhenAll(promises).WaitWithThrow(AzureTableDefaultPolicies.TableCreationTimeout);
                     promises.Clear();
-                    Console.WriteLine("{0} has written {1} rows in {2} at {3} RPS",
+                    output.WriteLine("{0} has written {1} rows in {2} at {3} RPS",
                         testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
                 }
             }
             Task.WhenAll(promises).WaitWithThrow(AzureTableDefaultPolicies.TableCreationTimeout);
             sw.Stop();
-            Console.WriteLine("{0} completed. Wrote {1} entries to {2} partition(s) in {3} at {4} RPS",
+            output.WriteLine("{0} completed. Wrote {1} entries to {2} partition(s) in {3} at {4} RPS",
                 testName, iterations, numPartitions, sw.Elapsed, iterations / sw.Elapsed.TotalSeconds);
         }
     }

@@ -10,6 +10,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 #pragma warning disable 618
 
@@ -17,9 +18,12 @@ namespace UnitTests
 {
     public class ReentrancyTests : HostedTestClusterEnsureDefaultStarted
     {
-        public ReentrancyTests(DefaultClusterFixture fixture)
+        private readonly ITestOutputHelper output;
+
+        public ReentrancyTests(ITestOutputHelper output, DefaultClusterFixture fixture)
             : base(fixture)
         {
+            this.output = output;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -314,12 +318,12 @@ namespace UnitTests
             List<Task> promises = new List<Task>();
             for (int i = 0; i < numLoops; i++)
             {
-                Console.WriteLine("Start loop {0}", i);
+                output.WriteLine("Start loop {0}", i);
                 Stopwatch loopClock = Stopwatch.StartNew();
                 for (int j = 0; j < blockSize; j++)
                 {
                     int offset = j;
-                    Console.WriteLine("Start inner loop {0}", j);
+                    output.WriteLine("Start inner loop {0}", j);
                     Stopwatch innerClock = Stopwatch.StartNew();
                     Task promise = Task.Run(() =>
                     {
@@ -327,13 +331,13 @@ namespace UnitTests
                                     : Do_FanOut_Task_Join(offset, doNonReentrant, false);
                     });
                     promises.Add(promise);
-                    Console.WriteLine("Inner loop {0} - Created Tasks. Elapsed={1}", j, innerClock.Elapsed);
+                    output.WriteLine("Inner loop {0} - Created Tasks. Elapsed={1}", j, innerClock.Elapsed);
                     bool ok = Task.WhenAll(promises).Wait(timeout);
                     if (!ok) throw new TimeoutException();
-                    Console.WriteLine("Inner loop {0} - Finished Join. Elapsed={1}", j, innerClock.Elapsed);
+                    output.WriteLine("Inner loop {0} - Finished Join. Elapsed={1}", j, innerClock.Elapsed);
                     promises.Clear();
                 }
-                Console.WriteLine("End loop {0} Elapsed={1}", i, loopClock.Elapsed);
+                output.WriteLine("End loop {0} Elapsed={1}", i, loopClock.Elapsed);
             }
             TimeSpan elapsed = totalTime.Elapsed;
             Assert.IsTrue(elapsed < MaxStressExecutionTime, "Stress test execution took too long: {0}", elapsed);

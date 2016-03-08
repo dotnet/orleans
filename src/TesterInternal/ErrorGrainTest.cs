@@ -9,6 +9,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests
 {
@@ -19,6 +20,12 @@ namespace UnitTests
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
         private readonly TraceLogger Logger = TraceLogger.GetLogger("AssemblyLoaderTests", TraceLogger.LoggerType.Application);
+        private readonly ITestOutputHelper output;
+
+        public ErrorGrainTest(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
 
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
         public async Task ErrorGrain_GetGrain()
@@ -236,7 +243,7 @@ namespace UnitTests
             }
             IEchoGrain grain = GrainClient.GrainFactory.GetGrain<IEchoGrain>(guid);
             GrainId grainId = ((GrainReference)grain.AsReference<IEchoGrain>()).GrainId;
-            Console.WriteLine("Guid = {0}, Guid.HashCode = x{1:X8}, GrainId.HashCode = x{2:X8}, GrainId.UniformHashCode = x{3:X8}", guid, guid.GetHashCode(), grainId.GetHashCode(), grainId.GetUniformHashCode());
+            output.WriteLine("Guid = {0}, Guid.HashCode = x{1:X8}, GrainId.HashCode = x{2:X8}, GrainId.UniformHashCode = x{3:X8}", guid, guid.GetHashCode(), grainId.GetHashCode(), grainId.GetUniformHashCode());
         }
 
         [Fact, TestCategory("Revisit"), TestCategory("Observers")]
@@ -262,7 +269,7 @@ namespace UnitTests
             //var callback = new SimpleGrainObserver((a, b, r) =>
             //{
             //    r.Done = (a == 10);
-            //    Console.WriteLine("Received observer callback: A={0} B={1} Done={2}", a, b, r.Done);
+            //    output.WriteLine("Received observer callback: A={0} B={1} Done={2}", a, b, r.Done);
             //}, result);
             //var observer = SimpleGrainObserverFactory.CreateObjectReference(callback);
             //if (observeTwice)

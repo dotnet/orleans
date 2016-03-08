@@ -12,6 +12,7 @@ using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
 using Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -20,13 +21,15 @@ namespace UnitTests.TimerTests
 {
     public class ReminderTests_Azure_Standalone
     {
+        private readonly ITestOutputHelper output;
 
         private Guid ServiceId;
 
         private TraceLogger log;
         
-        public ReminderTests_Azure_Standalone()
+        public ReminderTests_Azure_Standalone(ITestOutputHelper output)
         {
+            this.output = output;
             log = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
 
             ServiceId = Guid.NewGuid();
@@ -107,7 +110,7 @@ namespace UnitTests.TimerTests
                     Task<bool> promise = Task.Run(async () =>
                     {
                         await reminderTable.UpsertRow(e);
-                        Console.WriteLine("Done " + capture);
+                        output.WriteLine("Done " + capture);
                         return true;
                     });
                     promises.Add(promise);

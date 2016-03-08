@@ -12,11 +12,14 @@ using Orleans.TestingHost;
 using Xunit;
 using Tester;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.Stats
 {
     public class StatsInitTests : OrleansTestingBase, IClassFixture<StatsInitTests.Fixture>
     {
+        private readonly ITestOutputHelper output;
+
         public class Fixture : BaseClusterFixture
         {
             public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
@@ -36,11 +39,12 @@ namespace UnitTests.Stats
 
         protected TestingSiloHost HostedCluster { get; private set; }
 
-        public StatsInitTests(Fixture fixture)
+        public StatsInitTests(ITestOutputHelper output, Fixture fixture)
         {
+            this.output = output;
             HostedCluster = fixture.HostedCluster;
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
         public void Stats_Init_Mock()
         {
@@ -67,9 +71,9 @@ namespace UnitTests.Stats
             long numClientMetricsCalls = clientMetricsCollector.NumMetricsCalls;
             long numSiloStatsCalls = siloStatsCollector.NumStatsCalls;
             long numSiloMetricsCalls = siloStatsCollector.NumMetricsCalls;
-            Console.WriteLine("Client - Metrics calls = {0} Stats calls = {1}", numClientMetricsCalls,
+            output.WriteLine("Client - Metrics calls = {0} Stats calls = {1}", numClientMetricsCalls,
                 numSiloMetricsCalls);
-            Console.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numClientStatsCalls, numSiloStatsCalls);
+            output.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numClientStatsCalls, numSiloStatsCalls);
 
             Assert.IsTrue(numClientMetricsCalls > 0, "Some client metrics calls = {0}", numClientMetricsCalls);
             Assert.IsTrue(numSiloMetricsCalls > 0, "Some silo metrics calls = {0}", numSiloMetricsCalls);
@@ -80,6 +84,13 @@ namespace UnitTests.Stats
     
     public class StatsTestsNoSilo
     {
+        private readonly ITestOutputHelper output;
+
+        public StatsTestsNoSilo(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         [Fact, TestCategory("Manual"), TestCategory("Stats")]
         public void ApplicationRequestsStatisticsGroup_Perf()
         {
@@ -113,7 +124,7 @@ namespace UnitTests.Stats
                     {
                         ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(times[i % nValues]);
                         //if (i % tenPercent == 0)
-                        //    Console.WriteLine("Thread {0}: {1}% done", capture, i * 100 / nIterations);
+                        //    output.WriteLine("Thread {0}: {1}% done", capture, i * 100 / nIterations);
                     }
                 }));
             }
@@ -121,8 +132,7 @@ namespace UnitTests.Stats
             Task.WhenAll(tasks).Wait();
             
             sw.Stop();
-            Console.WriteLine("Done.");
-            Console.WriteLine(sw.ElapsedMilliseconds);
+            output.WriteLine("Done. "+ sw.ElapsedMilliseconds);
         }
     }
 
@@ -157,7 +167,7 @@ namespace UnitTests.Stats
         
         public void Dispose()
         {
-            //Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+            //output.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
             // ResetAllAdditionalRuntimes();
             HostedCluster.StopAdditionalSilos();
         }

@@ -8,13 +8,17 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.SerializerTests
 {
     public class MessageSerializerTests
     {
-        public MessageSerializerTests()
+        private readonly ITestOutputHelper output;
+
+        public MessageSerializerTests(ITestOutputHelper output)
         {
+            this.output = output;
             MessagingStatisticsGroup.Init(false);
 
             var orleansConfig = new ClusterConfiguration();
@@ -30,7 +34,7 @@ namespace UnitTests.SerializerTests
             RunTest(1000);
         }
 
-        private static void RunTest(int numItems)
+        private void RunTest(int numItems)
         {
             InvokeMethodRequest request = new InvokeMethodRequest(0, 0, null);
             Message resp = Message.CreateMessage(request, InvokeMethodOptions.None);
@@ -52,7 +56,7 @@ namespace UnitTests.SerializerTests
             resp.BodyObject = requestBody;
 
             string s = resp.ToString();
-            Console.WriteLine(s);
+            output.WriteLine(s);
 
             int dummy = 0;
             var serialized = resp.Serialize(out dummy);

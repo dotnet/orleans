@@ -45,15 +45,12 @@ namespace UnitTests.ConcurrencyTests
                 promises.Add(p);
             }
             await Task.WhenAll(promises);
-            Console.WriteLine("\n\nENDED TEST\n\n");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public void ConcurrencyTest_ModifyReturnList()
         {
             IConcurrentGrain grain = GrainClient.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
-
-            Console.WriteLine("\n\nStarting TEST\n\n");
 
             Task<List<int>>[] ll = new Task<List<int>>[20];
             for (int i = 0; i < 2000; i++)
@@ -62,9 +59,7 @@ namespace UnitTests.ConcurrencyTests
                     ll[j] = grain.ModifyReturnList_Test();
 
                 Task.WhenAll(ll).Wait();
-                Console.Write(".");
             }
-            Console.WriteLine("\n\nENDED TEST\n\n");
         }
     }
 }

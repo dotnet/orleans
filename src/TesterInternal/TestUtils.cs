@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using Orleans.Runtime.Configuration;
 
 namespace UnitTests.TestHelper
 {
@@ -12,7 +11,7 @@ namespace UnitTests.TestHelper
 
             string dbDirPath = dbDir.FullName;
             FileInfo dbFile = new FileInfo(Path.Combine(dbDirPath, "TestDb.mdf"));
-            Console.WriteLine("DB file location = {0}", dbFile.FullName);
+            //Console.WriteLine("DB file location = {0}", dbFile.FullName);
 
             // Make sure we can write to local copy of the DB file.
             MakeDbFileWriteable(dbFile);
@@ -30,8 +29,8 @@ namespace UnitTests.TestHelper
         {
             FileInfo dbFile = GetDbFileLocation(dbDir, dbFileName);
 
-            Console.WriteLine("DB directory = {0}", dbDir.FullName);
-            Console.WriteLine("DB file = {0}", dbFile.FullName);
+            //Console.WriteLine("DB directory = {0}", dbDir.FullName);
+            //Console.WriteLine("DB file = {0}", dbFile.FullName);
 
             string connectionString = string.Format(
                 @"Data Source=(LocalDB)\v11.0;"
@@ -40,7 +39,7 @@ namespace UnitTests.TestHelper
                 + @"Connect Timeout=30",
                 dbFile.FullName);
 
-            Console.WriteLine("SQL Connection String = {0}", ConfigUtilities.RedactConnectionStringInfo(connectionString));
+            //Console.WriteLine("SQL Connection String = {0}", ConfigUtilities.RedactConnectionStringInfo(connectionString));
             return connectionString;
         }
 
@@ -50,23 +49,23 @@ namespace UnitTests.TestHelper
             FileInfo dbDirFile = new FileInfo(dbFile.Directory.FullName);
             if (dbDirFile.IsReadOnly)
             {
-                Console.WriteLine("Making writeable directory containing DB file {0}", dbDirFile.FullName);
+                //Console.WriteLine("Making writeable directory containing DB file {0}", dbDirFile.FullName);
                 dbDirFile.IsReadOnly = false;
             }
             else
             {
-                Console.WriteLine("Directory containing DB file is writeable {0}", dbDirFile.FullName);
+                //Console.WriteLine("Directory containing DB file is writeable {0}", dbDirFile.FullName);
             }
 
             // Make sure we can write to local copy of the DB file.
             if (dbFile.IsReadOnly)
             {
-                Console.WriteLine("Making writeable DB file {0}", dbFile.FullName);
+                //Console.WriteLine("Making writeable DB file {0}", dbFile.FullName);
                 dbFile.IsReadOnly = false;
             }
             else
             {
-                Console.WriteLine("DB file is writeable {0}", dbFile.FullName);
+                //Console.WriteLine("DB file is writeable {0}", dbFile.FullName);
             }
         }
     }

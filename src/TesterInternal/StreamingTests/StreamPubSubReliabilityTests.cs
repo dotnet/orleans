@@ -13,6 +13,8 @@ using UnitTests.StorageTests;
 using UnitTests.Tester;
 using Tester;
 using Xunit;
+using Xunit.Abstractions;
+
 //using UnitTests.Streaming.Reliability;
 
 namespace UnitTests.StreamingTests
@@ -40,9 +42,11 @@ namespace UnitTests.StreamingTests
         protected Guid StreamId;
         protected string StreamProviderName;
         protected string StreamNamespace;
+        private readonly ITestOutputHelper output;
 
-        public StreamPubSubReliabilityTests(Fixture fixture)
+        public StreamPubSubReliabilityTests(ITestOutputHelper output, Fixture fixture)
         {
+            this.output = output;
             HostedCluster = fixture.HostedCluster;
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
@@ -77,12 +81,12 @@ namespace UnitTests.StreamingTests
                 }
                 catch (AggregateException ae)
                 {
-                    Console.WriteLine("Received error = {0}", ae);
+                    output.WriteLine("Received error = {0}", ae);
 
                     Exception exc = ae.GetBaseException();
                     if (exc.InnerException != null)
                         exc = exc.GetBaseException();
-                    Console.WriteLine("Returning error = {0}", exc);
+                    output.WriteLine("Returning error = {0}", exc);
                     throw exc;
                 }
             });
@@ -101,12 +105,12 @@ namespace UnitTests.StreamingTests
                 }
                 catch (AggregateException ae)
                 {
-                    Console.WriteLine("Received error = {0}", ae);
+                    output.WriteLine("Received error = {0}", ae);
 
                     Exception exc = ae.GetBaseException();
                     if (exc.InnerException != null)
                         exc = exc.GetBaseException();
-                    Console.WriteLine("Returning error = {0}", exc);
+                    output.WriteLine("Returning error = {0}", exc);
                     throw exc;
                 }
             });

@@ -8,6 +8,7 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using UnitTests.TesterInternal;
 using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -15,21 +16,22 @@ namespace UnitTests.SchedulerTests
 {
     public class QueuedTaskSchedulerTests_Set2 : IDisposable
     {
+        private readonly ITestOutputHelper output;
         public static bool Verbose { get; set; }
 
         private const int numTasks = 1000000;
         
-        public QueuedTaskSchedulerTests_Set2()
+        public QueuedTaskSchedulerTests_Set2(ITestOutputHelper output)
         {
+            this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
         }
-        
+
         public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(null);
             TraceLogger.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
         }
-
 
         [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Task_Basic()
@@ -50,10 +52,10 @@ namespace UnitTests.SchedulerTests
             SynchronizationContext[] syncContexts = new SynchronizationContext[numTasks];
             for (int i = 0; i < numTasks; i++)
             {
-                syncContexts[i] = new AsyncTestContext();
+                syncContexts[i] = new AsyncTestContext(output);
             }
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -81,12 +83,12 @@ namespace UnitTests.SchedulerTests
 
             var baseline = DoBaseTestRun(testName + "-Baseline", numTasks);
 
-            var syncContext = new AsyncTestContext();
+            var syncContext = new AsyncTestContext(output);
             SynchronizationContext.SetSynchronizationContext(syncContext);
 
             var tasks = new List<Task>(numTasks);
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -115,7 +117,7 @@ namespace UnitTests.SchedulerTests
 
             var tasks = new List<Task>(numTasks);
 
-            var syncContext = new AsyncTestContext();
+            var syncContext = new AsyncTestContext(output);
             SynchronizationContext.SetSynchronizationContext(syncContext);
 
             TaskScheduler[] schedulers = new TaskScheduler[numTasks];
@@ -124,7 +126,7 @@ namespace UnitTests.SchedulerTests
                 schedulers[i] = GetTaskScheduler();
             }
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -153,12 +155,12 @@ namespace UnitTests.SchedulerTests
 
             var tasks = new List<Task>(numTasks);
 
-            var syncContext = new AsyncTestContext();
+            var syncContext = new AsyncTestContext(output);
             SynchronizationContext.SetSynchronizationContext(syncContext);
 
             var taskScheduler = GetTaskScheduler();
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -193,7 +195,7 @@ namespace UnitTests.SchedulerTests
                 schedulers[i] = GetTaskScheduler();
             }
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -224,7 +226,7 @@ namespace UnitTests.SchedulerTests
 
             var taskScheduler = GetTaskScheduler();
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -260,7 +262,7 @@ namespace UnitTests.SchedulerTests
                 schedulers[i] = new TaskSchedulerWrapper(masterScheduler);
             }
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -294,10 +296,10 @@ namespace UnitTests.SchedulerTests
             SynchronizationContext[] syncContexts = new SynchronizationContext[numTasks];
             for (int i = 0; i < numTasks; i++)
             {
-                syncContexts[i] = new AsyncTestContext();
+                syncContexts[i] = new AsyncTestContext(output);
             }
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -330,7 +332,7 @@ namespace UnitTests.SchedulerTests
             SynchronizationContext[] syncContexts = new SynchronizationContext[numTasks];
             for (int i = 0; i < numTasks; i++)
             {
-                syncContexts[i] = new AsyncTestContext();
+                syncContexts[i] = new AsyncTestContext(output);
             }
             TaskScheduler[] schedulers = new TaskScheduler[numTasks];
             for (int i = 0; i < numTasks; i++)
@@ -338,7 +340,7 @@ namespace UnitTests.SchedulerTests
                 schedulers[i] = GetTaskScheduler();
             }
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -372,7 +374,7 @@ namespace UnitTests.SchedulerTests
 
             TaskScheduler taskScheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext);
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
@@ -396,12 +398,12 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
         public void Sched_Task_OnCompletion()
         {
-            var asyncContext = new AsyncTestContext();
+            var asyncContext = new AsyncTestContext(output);
             int numActions = 0;
 
             Action action = () =>
             {
-                Console.WriteLine("Action");
+                output.WriteLine("Action");
                 numActions++;
             };
 
@@ -429,14 +431,14 @@ namespace UnitTests.SchedulerTests
 
             var tasks = new List<Task>(numTasks);
 
-            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, () =>
+            QueuedTaskSchedulerTests_Set1.TimeRun(1, baseline, testName, output, () =>
             {
                 for (int i = 0; i < numTasks; i++)
                 {
                     int id = i;
                     Task t = new Task(() =>
                     {
-                        if (Verbose) Console.WriteLine("Task: " + id);
+                        if (Verbose) output.WriteLine("Task: " + id);
                         Assert.AreEqual(val, CallContext.LogicalGetData(name), "LogicalGetData inside Task " + id);
                     });
                     t.Start();
@@ -454,7 +456,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        private static Task CreateTask(int taskId, object state = null)
+        private Task CreateTask(int taskId, object state = null)
         {
             Task t;
             if (state != null)
@@ -462,7 +464,7 @@ namespace UnitTests.SchedulerTests
                 t = new Task(o =>
                 {
                     int id = taskId;
-                    if (Verbose) Console.WriteLine("Task: " + id);
+                    if (Verbose) output.WriteLine("Task: " + id);
                 }, state);
             }
             else
@@ -470,7 +472,7 @@ namespace UnitTests.SchedulerTests
                 t = new Task(() =>
                 {
                     int id = taskId;
-                    if (Verbose) Console.WriteLine("Task: " + id);
+                    if (Verbose) output.WriteLine("Task: " + id);
                 });
             }
             return t;
@@ -486,11 +488,11 @@ namespace UnitTests.SchedulerTests
             return new QueuedTaskScheduler();
         }
 
-        private static TimeSpan DoBaseTestRun(string runName, int numberOfTasks, TaskScheduler taskScheduler = null)
+        private TimeSpan DoBaseTestRun(string runName, int numberOfTasks, TaskScheduler taskScheduler = null)
         {
-            Console.WriteLine("NumTasks=" + numberOfTasks);
+            output.WriteLine("NumTasks=" + numberOfTasks);
 
-            var baseline = QueuedTaskSchedulerTests_Set1.TimeRun(1, TimeSpan.Zero, runName, () =>
+            var baseline = QueuedTaskSchedulerTests_Set1.TimeRun(1, TimeSpan.Zero, runName, output, () =>
             {
                 var taskList = new List<Task>(numberOfTasks);
 
@@ -517,40 +519,42 @@ namespace UnitTests.SchedulerTests
 
     internal class AsyncTestContext : SynchronizationContext
     {
+        private readonly ITestOutputHelper output;
         private static long idCounter;
         private readonly long myId;
 
         internal int NumOperationsStarted;
         internal int NumOperationsCompleted;
 
-        public AsyncTestContext()
+        public AsyncTestContext(ITestOutputHelper output)
         {
+            this.output = output;
             myId = Interlocked.Increment(ref idCounter);
         }
 
         public override SynchronizationContext CreateCopy()
         {
-            Console.WriteLine(OpName("CreateCopy"));
+            output.WriteLine(OpName("CreateCopy"));
             return base.CreateCopy();
         }
 
         public override void OperationStarted()
         {
-            Console.WriteLine(OpName("OperationStarted"));
+            output.WriteLine(OpName("OperationStarted"));
             Interlocked.Increment(ref NumOperationsStarted);
             base.OperationStarted();
         }
 
         public override void OperationCompleted()
         {
-            Console.WriteLine(OpName("OperationCompleted"));
+            output.WriteLine(OpName("OperationCompleted"));
             Interlocked.Increment(ref NumOperationsCompleted);
             base.OperationCompleted();
         }
 
         public override void Post(SendOrPostCallback d, object state)
         {
-            Console.WriteLine(OpName("Post") + " " + string.Format("state={0} delegate={1}", state, d));
+            output.WriteLine(OpName("Post") + " " + string.Format("state={0} delegate={1}", state, d));
             OperationStarted();
             base.Post(d, state);
             OperationCompleted();
@@ -558,7 +562,7 @@ namespace UnitTests.SchedulerTests
 
         public override void Send(SendOrPostCallback d, object state)
         {
-            Console.WriteLine(OpName("Send") + " " + string.Format("state={0} delegate={1}", state, d));
+            output.WriteLine(OpName("Send") + " " + string.Format("state={0} delegate={1}", state, d));
             OperationStarted();
             base.Send(d, state);
             OperationCompleted();
@@ -567,7 +571,7 @@ namespace UnitTests.SchedulerTests
         public override int Wait(IntPtr[] waitHandles, bool waitAll, int millisecondsTimeout)
         {
             string opName = waitAll ? "WaitAll" : "WaitAny";
-            Console.WriteLine(OpName(opName)
+            output.WriteLine(OpName(opName)
                 + string.Format("[{0}] timeout={1}ms", waitHandles.Length, millisecondsTimeout));
 
             return base.Wait(waitHandles, waitAll, millisecondsTimeout);

@@ -13,11 +13,14 @@ using UnitTests.Grains;
 using Xunit;
 using UnitTests.Tester;
 using Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
     public class BootstrapProvidersTests : OrleansTestingBase, IClassFixture<BootstrapProvidersTests.Fixture>
     {
+        private readonly ITestOutputHelper output;
+
         public class Fixture : BaseClusterFixture
         {
             public Fixture()
@@ -39,8 +42,9 @@ namespace UnitTests.General
 
         protected TestingSiloHost HostedCluster { get; private set; }
 
-        public BootstrapProvidersTests(Fixture fixture)
+        public BootstrapProvidersTests(ITestOutputHelper output, Fixture fixture)
         {
+            this.output = output;
             this.HostedCluster = fixture.HostedCluster;
         }
 
@@ -97,7 +101,7 @@ namespace UnitTests.General
             foreach (SiloHandle silo in silos)
             {
                 IList<IBootstrapProvider> providers = silo.Silo.BootstrapProviders;
-                Console.WriteLine("Found {0} bootstrap providers in silo {1}: {2}", 
+                output.WriteLine("Found {0} bootstrap providers in silo {1}: {2}", 
                     providers.Count, silo.Name, Utils.EnumerableToString(
                         providers.Select(pr => pr.Name + "=" + pr.GetType().FullName)));
 
@@ -111,14 +115,14 @@ namespace UnitTests.General
 
             object[] replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
-            Console.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
+            output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
             Assert.AreEqual(numSilos, replies.Length, "Expected to get {0} replies to command {1}", numSilos, command);
             Assert.IsTrue(replies.All(reply => reply.ToString().Equals(command.ToString())), "Got command {0}", command);
 
             command += 1;
             replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
-            Console.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
+            output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
             Assert.AreEqual(numSilos, replies.Length, "Expected to get {0} replies to command {1}", numSilos, command);
             Assert.IsTrue(replies.All(reply => reply.ToString().Equals(command.ToString())), "Got command {0}", command);
         }

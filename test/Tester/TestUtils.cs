@@ -26,8 +26,7 @@ namespace Tester
 
             if (!usingLocalWAS)
             {
-                string msg = "Tests are using Azure Cloud Storage, not local WAS emulator.";
-                Console.WriteLine(msg);
+                // Tests are using Azure Cloud Storage, not local WAS emulator.
                 return;
             }
 

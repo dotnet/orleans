@@ -17,6 +17,7 @@ using UnitTests.Grains;
 using UnitTests.Tester;
 using Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -29,6 +30,7 @@ namespace UnitTests.StorageTests
     /// </summary>
     public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable
     {
+
         public class Fixture : BaseClusterFixture
         {
             public Fixture()
@@ -43,10 +45,12 @@ namespace UnitTests.StorageTests
         }
 
         const string ErrorInjectorStorageProvider = "ErrorInjector";
+        private readonly ITestOutputHelper output;
         protected TestingSiloHost HostedCluster { get; private set; }
 
-        public PersistenceGrainTests_Local(Fixture fixture)
+        public PersistenceGrainTests_Local(ITestOutputHelper output, Fixture fixture)
         {
+            this.output = output;
             HostedCluster = fixture.HostedCluster;
             SerializationManager.InitializeForTesting();
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
@@ -307,7 +311,7 @@ namespace UnitTests.StorageTests
 
             TimeSpan elapsed = sw.Elapsed;
             double tps = (numIterations * 2) / elapsed.TotalSeconds; // One Read and one Write per iteration
-            //Console.WriteLine("{0} Completed {1} Read-Write operations in {2} at {3} TPS", TestContext.TestName, numIterations, elapsed, tps);
+            output.WriteLine("{0} Completed Read-Write operations in {1} at {2} TPS",  numIterations, elapsed, tps);
 
             for (int i = 0; i < numIterations; i++)
             {
@@ -939,19 +943,19 @@ namespace UnitTests.StorageTests
                 await grain.DoSomething();
 
                 string msg = "BadProviderConfigException exception should have been thrown";
-                Console.WriteLine("Test failed: {0}", msg);
+                output.WriteLine("Test failed: {0}", msg);
                 Assert.Fail(msg);
             }
 
             catch (Exception e)
             {
-                Console.WriteLine("Exception caught: {0}", e);
+                output.WriteLine("Exception caught: {0}", e);
                 var exc = e.GetBaseException();
                 while (exc is OrleansException && exc.InnerException != null)
                 {
                     exc = exc.InnerException;
                 }
-                Console.WriteLine("Checking exception type: {0} Inner type: {1} Details: {2}",
+                output.WriteLine("Checking exception type: {0} Inner type: {1} Details: {2}",
                     exc.GetType().FullName, exc.InnerException != null ? exc.InnerException.GetType().FullName : "Null", exc);
                 Assert.IsTrue(exc.Message.Contains(typeof(BadProviderConfigException).Name), "Expected BadProviderConfigException, Got: " + exc);
                 // TODO: Currently can't work out why this doesn't work
@@ -1211,7 +1215,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        private static void CheckStorageProviderErrors(
+        private void CheckStorageProviderErrors(
             Func<Task> taskFunc)
         {
             StackTrace at = new StackTrace();
@@ -1224,7 +1228,7 @@ namespace UnitTests.StorageTests
                 if (ErrorInjectionStorageProvider.DoInjectErrors)
                 {
                     string msg = "StorageProviderInjectedError exception should have been thrown " + at;
-                    Console.WriteLine("Assertion failed: {0}", msg);
+                    output.WriteLine("Assertion failed: {0}", msg);
                     Assert.Fail(msg);
                 }
             }
@@ -1234,7 +1238,7 @@ namespace UnitTests.StorageTests
             }
             catch (Exception e)
             {
-                Console.WriteLine("Exception caught: {0}", e);
+                output.WriteLine("Exception caught: {0}", e);
                 var exc = e.GetBaseException();
                 if (exc is OrleansException)
                 {
@@ -1247,7 +1251,7 @@ namespace UnitTests.StorageTests
                 //}
                 //else
                 //{
-                //    Console.WriteLine("Unexpected exception: {0}", exc);
+                //    output.WriteLine("Unexpected exception: {0}", exc);
                 //    Assert.Fail(exc.ToString());
                 //}
             }

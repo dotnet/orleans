@@ -12,14 +12,18 @@ using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.TimerTests
 {
     public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
-        public TimerOrleansTest(DefaultClusterFixture fixture)
+        private readonly ITestOutputHelper output;
+
+        public TimerOrleansTest(ITestOutputHelper output, DefaultClusterFixture fixture)
             : base(fixture)
         {
+            this.output = output;
         }
 
         public void Dispose()
@@ -36,7 +40,7 @@ namespace UnitTests.TimerTests
                 TimeSpan period = grain.GetTimerPeriod().Result;
                 Thread.Sleep(period.Multiply(10));
                 int last = grain.GetCounter().Result;
-                Console.WriteLine("value = " + last);
+                output.WriteLine("value = " + last);
                 //Assert.IsTrue(10 == last || 9 == last, last.ToString());
 
                 grain.StopDefaultTimer().Wait();
@@ -63,7 +67,7 @@ namespace UnitTests.TimerTests
             {
                 ITimerGrain grain = grains[i];
                 int last = grain.GetCounter().Result;
-                Console.WriteLine("value = " + last);
+                output.WriteLine("value = " + last);
                 //Assert.AreEqual(10, last);
             }
             for (int i = 0; i < grains.Count; i++)
@@ -83,7 +87,7 @@ namespace UnitTests.TimerTests
             TimeSpan period = grain.GetTimerPeriod().Result;
             Thread.Sleep(period.Multiply(10));
             int last = grain.GetCounter().Result;
-            Console.WriteLine("value = " + last);
+            output.WriteLine("value = " + last);
             Assert.IsTrue(last >= 10 && last <= 11, "last = " + last.ToString(CultureInfo.InvariantCulture));
 
             this.HostedCluster.StartAdditionalSilo();
@@ -100,7 +104,7 @@ namespace UnitTests.TimerTests
             double maximalNumTicks = stopwatch.Elapsed.Divide(grain.GetTimerPeriod().Result);
             Assert.IsTrue(last <= maximalNumTicks);
             //mgmtGrain.ResumeHost(Orleans.SiloAddress).Wait();
-            Console.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
+            output.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timers")]
@@ -129,7 +133,7 @@ namespace UnitTests.TimerTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc);
+                output.WriteLine(exc);
                 error = exc;
             }
 
@@ -140,7 +144,7 @@ namespace UnitTests.TimerTests
             catch (Exception exc)
             {
                 // Ignore
-                Console.WriteLine("Ignoring exception from StopTimer : {0}", exc);
+                output.WriteLine("Ignoring exception from StopTimer : {0}", exc);
             }
 
             if (error != null)

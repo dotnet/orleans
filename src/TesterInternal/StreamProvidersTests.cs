@@ -10,6 +10,7 @@ using UnitTests.Grains;
 using Xunit;
 using Tester;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.Streaming
 {
@@ -36,9 +37,11 @@ namespace UnitTests.Streaming
         private TestingSiloOptions SiloOptions;
         private Guid ServiceId;
         public static readonly string STREAM_PROVIDER_NAME = "SMSProvider";
+        private readonly ITestOutputHelper output;
 
-        public StreamProvidersTests_ProviderConfigNotLoaded(Fixture fixture)
+        public StreamProvidersTests_ProviderConfigNotLoaded(ITestOutputHelper output, Fixture fixture)
         {
+            this.output = output;
             HostedCluster = fixture.HostedCluster;
             SiloOptions = Fixture.SiloOptions;
             ServiceId = Fixture.ServiceId;
@@ -87,18 +90,18 @@ namespace UnitTests.Streaming
             Guid configServiceId = this.HostedCluster.Globals.ServiceId;
 
             var initialDeploymentId = this.HostedCluster.DeploymentId;
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, ServiceId);
+            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, ServiceId);
 
             Assert.AreEqual(ServiceId, configServiceId, "ServiceId in test config");
 
-            Console.WriteLine("About to reset Silos .....");
-            Console.WriteLine("Stopping Silos ...");
+            output.WriteLine("About to reset Silos .....");
+            output.WriteLine("Stopping Silos ...");
             this.HostedCluster.StopDefaultSilos();
-            Console.WriteLine("Starting Silos ...");
+            output.WriteLine("Starting Silos ...");
             this.HostedCluster.RedeployTestingSiloHost(SiloOptions);
-            Console.WriteLine("..... Silos restarted");
+            output.WriteLine("..... Silos restarted");
 
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
+            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
             Assert.AreEqual(ServiceId, this.HostedCluster.Globals.ServiceId, "ServiceId same after restart.");
             Assert.AreNotEqual(initialDeploymentId, this.HostedCluster.DeploymentId, "DeploymentId different after restart.");

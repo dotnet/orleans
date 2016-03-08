@@ -15,6 +15,7 @@ using Samples.StorageProviders;
 using Tester;
 using UnitTests.Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
@@ -32,9 +33,11 @@ namespace UnitTests.StorageTests
 
         private StorageProviderManager storageProviderManager;
         private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
-        
-        public PersistenceProviderTests_Local()
+        private readonly ITestOutputHelper output;
+
+        public PersistenceProviderTests_Local(ITestOutputHelper output)
         {
+            this.output = output;
             storageProviderManager = new StorageProviderManager(new GrainFactory(), new DefaultServiceProvider());
             storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), new DefaultServiceProvider())).WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
@@ -190,14 +193,14 @@ namespace UnitTests.StorageTests
             sw.Start();
             await store.WriteStateAsync(testName, reference, state);
             TimeSpan writeTime = sw.Elapsed;
-            Console.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
+            output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
             Assert.IsTrue(writeTime >= expectedLatency, "Write: Expected minimum latency = {0} Actual = {1}", expectedLatency, writeTime);
 
             sw.Restart();
             var storedState = new GrainState<TestStoreGrainState>();
             await store.ReadStateAsync(testName, reference, storedState);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             Assert.IsTrue(readTime >= expectedLatency, "Read: Expected minimum latency = {0} Actual = {1}", expectedLatency, readTime);
         }
 
@@ -229,7 +232,7 @@ namespace UnitTests.StorageTests
                 dataValues.Add("C", idx[0]++);
                 jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(dataValues);
             });
-            Console.WriteLine("Elapsed: {0} Date: {1}", elapsed, jsonData);
+            output.WriteLine("Elapsed: {0} Date: {1}", elapsed, jsonData);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -243,7 +246,7 @@ namespace UnitTests.StorageTests
 
         #region Utility functions
 
-        private static async Task Test_PersistenceProvider_Read(string grainTypeName, IStorageProvider store)
+        private async Task Test_PersistenceProvider_Read(string grainTypeName, IStorageProvider store)
         {
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
             TestStoreGrainState state = new TestStoreGrainState();
@@ -255,14 +258,14 @@ namespace UnitTests.StorageTests
             sw.Start();
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             var storedState = storedGrainState.State;
             Assert.AreEqual(state.A, storedState.A, "A");
             Assert.AreEqual(state.B, storedState.B, "B");
             Assert.AreEqual(state.C, storedState.C, "C");
         }
 
-        private static async Task Test_PersistenceProvider_WriteRead(string grainTypeName, IStorageProvider store)
+        private async Task Test_PersistenceProvider_WriteRead(string grainTypeName, IStorageProvider store)
         {
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
@@ -277,7 +280,7 @@ namespace UnitTests.StorageTests
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             var storedState = storedGrainState.State;
             Assert.AreEqual(state.State.A, storedState.A, "A");
             Assert.AreEqual(state.State.B, storedState.B, "B");

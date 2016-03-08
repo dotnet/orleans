@@ -8,18 +8,21 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
     public class Identifiertests
     {
+        private readonly ITestOutputHelper output;
         private static readonly Random random = new Random();
 
         class A { }
         class B : A { }
         
-        public Identifiertests()
+        public Identifiertests(ITestOutputHelper output)
         {
+            this.output = output;
             SerializationManager.InitializeForTesting();
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
@@ -28,17 +31,17 @@ namespace UnitTests.General
         public void ID_IsSystem()
         {
             GrainId testGrain = Constants.DirectoryServiceId;
-            Console.WriteLine("Testing GrainID " + testGrain);
+            output.WriteLine("Testing GrainID " + testGrain);
             Assert.IsTrue(testGrain.IsSystemTarget, "System grain ID is not flagged as a system ID");
 
             GrainId sGrain = (GrainId)SerializationManager.DeepCopy(testGrain);
-            Console.WriteLine("Testing GrainID " + sGrain);
+            output.WriteLine("Testing GrainID " + sGrain);
             Assert.IsTrue(sGrain.IsSystemTarget, "String round-trip grain ID is not flagged as a system ID");
             Assert.AreEqual(testGrain, sGrain, "Should be equivalent GrainId object");
             Assert.AreSame(testGrain, sGrain, "Should be same / intern'ed GrainId object");
 
             ActivationId testActivation = ActivationId.GetSystemActivation(testGrain, SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2456), 0));
-            Console.WriteLine("Testing ActivationID " + testActivation);
+            output.WriteLine("Testing ActivationID " + testActivation);
             Assert.IsTrue(testActivation.IsSystem, "System activation ID is not flagged as a system ID");
         }
 
@@ -418,12 +421,12 @@ namespace UnitTests.General
             string grainIdToGuidString = GrainIdToGuidString(grainId);
             string grainIdKeyString = grainId.Key.ToString();
 
-            Console.WriteLine("Guid={0}", grainIdGuid);
-            Console.WriteLine("GrainId={0}", grainId);
-            //Console.WriteLine("GrainId.ToKeyString={0}", grainIdToKeyString);
-            Console.WriteLine("GrainId.Key.ToString={0}", grainIdKeyString);
-            Console.WriteLine("GrainIdToGuidString={0}", grainIdToGuidString);
-            Console.WriteLine("GrainId.ToFullString={0}", grainIdToFullString);
+            output.WriteLine("Guid={0}", grainIdGuid);
+            output.WriteLine("GrainId={0}", grainId);
+            //output.WriteLine("GrainId.ToKeyString={0}", grainIdToKeyString);
+            output.WriteLine("GrainId.Key.ToString={0}", grainIdKeyString);
+            output.WriteLine("GrainIdToGuidString={0}", grainIdToGuidString);
+            output.WriteLine("GrainId.ToFullString={0}", grainIdToFullString);
 
             // Equal: Public APIs
             //Assert.AreEqual(guidString, grainIdToKeyString, "GrainId.ToKeyString");
@@ -442,7 +445,7 @@ namespace UnitTests.General
             string addressStr1 = address1.ToParsableString();
             SiloAddress addressObj1 = SiloAddress.FromParsableString(addressStr1);
 
-            Console.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
+            output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
                 address1, addressStr1, addressObj1);
 
             Assert.AreEqual(address1, addressObj1, "SiloAddress equal after To-From-ParsableString");
@@ -452,7 +455,7 @@ namespace UnitTests.General
             SiloAddress addressObj2 = SiloAddress.FromParsableString(addressStr2);
             string addressStr2Out = addressObj2.ToParsableString();
 
-            Console.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
+            output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
                 addressStr2, addressStr2Out, addressObj2);
 
             Assert.AreEqual(addressStr2, addressStr2Out, "SiloAddress equal after From-To-ParsableString");

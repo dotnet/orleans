@@ -16,11 +16,13 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
     public class AzureQueueAdapterTests : IDisposable
     {
+        private readonly ITestOutputHelper output;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
         private static string _deploymentId;
@@ -28,8 +30,9 @@ namespace UnitTests.StorageTests
 
         private static readonly SafeRandom Random = new SafeRandom();
         
-        public AzureQueueAdapterTests()
+        public AzureQueueAdapterTests(ITestOutputHelper output)
         {
+            this.output = output;
             TraceLogger.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             SerializationManager.InitializeForTesting();
@@ -101,7 +104,7 @@ namespace UnitTests.StorageTests
                                     set.Add(message.StreamGuid);
                                     return set;
                                 });
-                            Console.WriteLine("Queue {0} received message on stream {1}", queueId,
+                            output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamGuid);
                             Assert.AreEqual(NumMessagesPerBatch / 2, message.GetEvents<int>().Count(),
                                 "Half the events were ints");
@@ -147,7 +150,7 @@ namespace UnitTests.StorageTests
                         Exception ex;
                         messageCount++;
                         IBatchContainer batch = cursor.GetCurrent(out ex);
-                        Console.WriteLine("Token: {0}", batch.SequenceToken);
+                        output.WriteLine("Token: {0}", batch.SequenceToken);
                         Assert.IsTrue(batch.SequenceToken.CompareTo(lastToken) >= 0, "order check for event {0}", messageCount);
                         lastToken = batch.SequenceToken;
                         if (messageCount == 10)
@@ -155,7 +158,7 @@ namespace UnitTests.StorageTests
                             tenthInCache = batch.SequenceToken;
                         }
                     }
-                    Console.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     Assert.AreEqual(NumBatches / 2, messageCount);
                     Assert.IsNotNull(tenthInCache);
 
@@ -166,7 +169,7 @@ namespace UnitTests.StorageTests
                     {
                         messageCount++;
                     }
-                    Console.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
                     Assert.AreEqual(expected, messageCount);
                 }

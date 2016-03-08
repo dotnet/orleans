@@ -16,6 +16,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using UnitTests.Tester;
 using Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
@@ -396,6 +397,8 @@ namespace UnitTests.General
 
     public class RequestContextTests_Silo : OrleansTestingBase, IClassFixture<RequestContextTests_Silo.Fixture>, IDisposable
     {
+        private readonly ITestOutputHelper output;
+
         public class Fixture : BaseClusterFixture
         {
             public Fixture()
@@ -413,8 +416,9 @@ namespace UnitTests.General
             }
         }
 
-        public RequestContextTests_Silo()
+        public RequestContextTests_Silo(ITestOutputHelper output)
         {
+            this.output = output;
             RequestContext.PropagateActivityId = true; // Client-side setting
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
@@ -674,7 +678,7 @@ namespace UnitTests.General
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = false;
-            Console.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
+            output.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
@@ -682,7 +686,7 @@ namespace UnitTests.General
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = true;
-            Console.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
+            output.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
@@ -714,7 +718,7 @@ namespace UnitTests.General
             RequestContext.Clear();
 
             changeConfig[PropagateActivityIdConfigKey] = Boolean.FalseString;
-            Console.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
+            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
             await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
 
             Trace.CorrelationManager.ActivityId = activityId2;
@@ -724,7 +728,7 @@ namespace UnitTests.General
             RequestContext.Clear();
 
             changeConfig[PropagateActivityIdConfigKey] = Boolean.TrueString;
-            Console.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
+            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
             await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
 
             Trace.CorrelationManager.ActivityId = activityId2;
@@ -741,7 +745,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_CountCallbacks()
         {
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(Guid.Empty);
+            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
@@ -764,7 +768,7 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId2; // Set up initial value that will be overridden by the callback function
 
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(setActivityId);
+            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, setActivityId);
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
@@ -784,9 +788,9 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_GrainObserver()
         {
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(Guid.Empty);
+            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
-            RequestContextGrainObserver observer = new RequestContextGrainObserver(null, null);
+            RequestContextGrainObserver observer = new RequestContextGrainObserver(output, null, null);
             // CreateObjectReference will result in system target call to IClientObserverRegistrar.
             // We want to make sure this does not invoke ClientInvokeCallback.
             ISimpleGrainObserver reference = await GrainClient.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
@@ -798,18 +802,20 @@ namespace UnitTests.General
 
     internal class RequestContextGrainObserver : ISimpleGrainObserver
     {
+        private readonly ITestOutputHelper output;
         readonly Action<int, int, object> action;
         readonly object result;
 
-        public RequestContextGrainObserver(Action<int, int, object> action, object result)
+        public RequestContextGrainObserver(ITestOutputHelper output, Action<int, int, object> action, object result)
         {
+            this.output = output;
             this.action = action;
             this.result = result;
         }
 
         public void StateChanged(int a, int b)
         {
-            Console.WriteLine("RequestContextGrainObserver.StateChanged a={0} b={1}", a, b);
+            output.WriteLine("RequestContextGrainObserver.StateChanged a={0} b={1}", a, b);
             if (action != null)
             {
                 action(a, b, result);
@@ -819,6 +825,13 @@ namespace UnitTests.General
     
     public class Halo_RequestContextTests : OrleansTestingBase
     {
+        private readonly ITestOutputHelper output;
+
+        public Halo_RequestContextTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_RequestContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
@@ -839,7 +852,7 @@ namespace UnitTests.General
         {
             RequestContext.Set("threadId", i);
             int contextId = (int)(RequestContext.Get("threadId") ?? -1);
-            Console.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
+            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
@@ -849,7 +862,7 @@ namespace UnitTests.General
             {
                 await Task.Delay(10);
                 int contextId = (int)(RequestContext.Get("threadId") ?? -1);
-                Console.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
+                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.AreEqual(id, contextId);
             }
         }
@@ -857,6 +870,13 @@ namespace UnitTests.General
     
     public class Halo_CallContextTests : OrleansTestingBase
     {
+        private readonly ITestOutputHelper output;
+
+        public Halo_CallContextTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_LogicalCallContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
@@ -877,7 +897,7 @@ namespace UnitTests.General
         {
             CallContext.LogicalSetData("threadId", i);
             int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
-            Console.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
+            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
@@ -887,7 +907,7 @@ namespace UnitTests.General
             {
                 await Task.Delay(10);
                 int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
-                Console.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
+                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.AreEqual(id, contextId);
             }
         }
@@ -897,10 +917,12 @@ namespace UnitTests.General
     {
         public int TotalCalls;
 
+        private readonly ITestOutputHelper output;
         private readonly Guid setActivityId;
 
-        public TestClientInvokeCallback(Guid setActivityId)
+        public TestClientInvokeCallback(ITestOutputHelper output, Guid setActivityId)
         {
+            this.output = output;
             this.setActivityId = setActivityId;
         }
 
@@ -914,11 +936,11 @@ namespace UnitTests.General
 
             TotalCalls++;
 
-            Console.WriteLine("OnInvoke TotalCalls={0}", TotalCalls);
+            output.WriteLine("OnInvoke TotalCalls={0}", TotalCalls);
 
             try
             {
-                Console.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} GrainId={2} with {3} arguments",
+                output.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} GrainId={2} with {3} arguments",
                     grain.GetType().FullName,
                     ((GrainReference) grain).GrainId.GetPrimaryKeyLong(),
                     ((GrainReference) grain).GrainId,
@@ -926,7 +948,7 @@ namespace UnitTests.General
             }
             catch (Exception exc)
             {
-                Console.WriteLine("**** Error OnInvoke for Grain={0} GrainId={1} with {2} arguments. Exception = {3}",
+                output.WriteLine("**** Error OnInvoke for Grain={0} GrainId={1} with {2} arguments. Exception = {3}",
                     grain.GetType().FullName,
                     ((GrainReference)grain).GrainId,
                     request.Arguments != null ? request.Arguments.Length : 0,
@@ -936,9 +958,9 @@ namespace UnitTests.General
             if (setActivityId != Guid.Empty)
             {
                 Trace.CorrelationManager.ActivityId = setActivityId;
-                Console.WriteLine("OnInvoke Set ActivityId={0}", setActivityId);
+                output.WriteLine("OnInvoke Set ActivityId={0}", setActivityId);
             }
-            Console.WriteLine("OnInvoke Current ActivityId={0}", Trace.CorrelationManager.ActivityId);
+            output.WriteLine("OnInvoke Current ActivityId={0}", Trace.CorrelationManager.ActivityId);
         }
     }
 }

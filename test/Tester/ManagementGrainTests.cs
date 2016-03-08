@@ -8,6 +8,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
 using Xunit;
+using Xunit.Abstractions;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 // ReSharper disable ConvertToConstant.Local
@@ -16,10 +17,12 @@ namespace UnitTests.Management
 {
     public class ManagementGrainTests : HostedTestClusterEnsureDefaultStarted
     {
+        private readonly ITestOutputHelper output;
         private IManagementGrain mgmtGrain;
         
-        public ManagementGrainTests()
+        public ManagementGrainTests(ITestOutputHelper output)
         {
+            this.output = output;
             mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
         }
 
@@ -80,7 +83,7 @@ namespace UnitTests.Management
             StringBuilder sb = new StringBuilder();
             foreach (var s in stats) sb.AppendLine().Append(s);
             sb.AppendLine();
-            Console.WriteLine("Grain statistics returned by Orleans Management Grain - " + when + " : " + sb);
+            output.WriteLine("Grain statistics returned by Orleans Management Grain - " + when + " : " + sb);
             return stats;
         }
     }

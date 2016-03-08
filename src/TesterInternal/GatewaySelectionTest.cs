@@ -13,11 +13,13 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.MessageCenterTests
 {
     public class GatewaySelectionTest : IDisposable
     {
+        private readonly ITestOutputHelper output;
 
         private static readonly List<Uri> gatewayAddressUris = new[]
         {
@@ -27,8 +29,9 @@ namespace UnitTests.MessageCenterTests
             new Uri("gwy.tcp://127.0.0.1:4/0")
         }.ToList();
         
-        public GatewaySelectionTest()
+        public GatewaySelectionTest(ITestOutputHelper output)
         {
+            this.output = output;
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
         }
@@ -58,7 +61,7 @@ namespace UnitTests.MessageCenterTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc);
+                output.WriteLine(exc.ToString());
                 failed = true;
             }
             Assert.IsTrue(failed, "GatewaySelection_EmptyList failed as GatewayManager did not throw on empty Gateway list.");
@@ -79,8 +82,6 @@ namespace UnitTests.MessageCenterTests
         {
             string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
-            //Console.WriteLine(TestUtils.DumpTestContext(TestContext));
-
             Guid serviceId = Guid.NewGuid();
 
             GlobalConfiguration cfg = new GlobalConfiguration
@@ -100,7 +101,7 @@ namespace UnitTests.MessageCenterTests
             int count = 1;
             foreach (Uri gateway in gatewayAddressUris)
             {
-                Console.WriteLine("Adding gataway data for {0}", gateway);
+                output.WriteLine("Adding gataway data for {0}", gateway);
 
                 SiloAddress siloAddress = gateway.ToSiloAddress();
                 Assert.IsNotNull(siloAddress, "Unable to get SiloAddress from Uri {0}", gateway);
@@ -116,13 +117,13 @@ namespace UnitTests.MessageCenterTests
 
                 var tableVersion = new TableVersion(count, Guid.NewGuid().ToString());
 
-                Console.WriteLine("Inserting gataway data for {0} with TableVersion={1}", MembershipEntry, tableVersion);
+                output.WriteLine("Inserting gataway data for {0} with TableVersion={1}", MembershipEntry, tableVersion);
 
                 bool ok = await membershipTable.InsertRow(MembershipEntry, tableVersion);
                 count++;
                 Assert.IsTrue(ok, "Membership record should have been written OK but were not: {0}", MembershipEntry);
 
-                Console.WriteLine("Successfully inserted Membership row {0}", MembershipEntry);
+                output.WriteLine("Successfully inserted Membership row {0}", MembershipEntry);
             }
 
             MembershipTableData data = await membershipTable.ReadAll();

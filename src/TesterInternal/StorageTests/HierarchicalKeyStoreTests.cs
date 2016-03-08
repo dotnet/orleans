@@ -19,11 +19,8 @@ namespace UnitTests.StorageTests
         {
             public Fixture()
             {
-                //Console.WriteLine("ClassInitialize {0}", testContext.TestName);
-                //testContext.WriteLine("ClassInitialize");
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 ClientConfiguration cfg = ClientConfiguration.StandardLoad();
-                //testContext.WriteLine(cfg.ToString());
                 TraceLogger.Initialize(cfg);
                 LocalDataStoreInstance.LocalDataStore = null;
             }

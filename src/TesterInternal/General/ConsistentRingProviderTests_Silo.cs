@@ -34,10 +34,7 @@ namespace UnitTests.General
 
         public override TestingSiloHost CreateSiloHost()
         {
-            var host = new TestingSiloHost(siloOptions);
-            string config = host.Primary.Silo.TestHook.PrintSiloConfig();
-            Console.WriteLine("Running with Silo Config = " + config);
-            return host;
+            return new TestingSiloHost(siloOptions);
         }
 
         #region Tests

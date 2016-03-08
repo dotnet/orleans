@@ -4,11 +4,19 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.SchedulerTests
 {
     public class QueuedTaskSchedulerTests_Set1
     {
+        private readonly ITestOutputHelper output;
+
+        public QueuedTaskSchedulerTests_Set1(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         public bool Verbose { get; set; }
 
         [Fact, TestCategory("Scheduler"), TestCategory("Tasks"), TestCategory("TaskScheduler")]
@@ -40,10 +48,10 @@ namespace UnitTests.SchedulerTests
 
                 int numTasks = numSchedulers * 10;
                 
-                Console.WriteLine(testName + " NumTasks=" + numTasks + " NumSchedulers=" + numSchedulers);
+                output.WriteLine(testName + " NumTasks=" + numTasks + " NumSchedulers=" + numSchedulers);
 
                 // Run baseline test with single, Default scheduler
-                var baseline = TimeRun(1, TimeSpan.Zero, testName + "-Baseline", () => RunTestLoop(numTasks, null));
+                var baseline = TimeRun(1, TimeSpan.Zero, testName + "-Baseline", output, () => RunTestLoop(numTasks, null));
 
                 // Run test with many schedulers...
 
@@ -55,7 +63,7 @@ namespace UnitTests.SchedulerTests
                     schedulers[i] = new TaskSchedulerWrapper(masterScheduler);
                 }
 
-                TimeRun(1, baseline, testName, () => RunTestLoop(numTasks, schedulers));
+                TimeRun(1, baseline, testName, output, () => RunTestLoop(numTasks, schedulers));
             }
         }
 
@@ -68,7 +76,7 @@ namespace UnitTests.SchedulerTests
                 int id = i; // capture
                 Task t = new Task(() =>
                 {
-                    if (Verbose) Console.WriteLine("Task: " + id);
+                    if (Verbose) output.WriteLine("Task: " + id);
                 });
 
                 if (schedulers == null || schedulers.Length == 0)
@@ -87,7 +95,7 @@ namespace UnitTests.SchedulerTests
             Task.WaitAll(taskList.ToArray());
         }
 
-        public static TimeSpan TimeRun(int numIterations, TimeSpan baseline, string what, Action action)
+        public static TimeSpan TimeRun(int numIterations, TimeSpan baseline, string what, ITestOutputHelper output, Action action)
         {
             var stopwatch = new Stopwatch();
 
@@ -109,7 +117,7 @@ namespace UnitTests.SchedulerTests
                 double delta = (duration - baseline).TotalMilliseconds / baseline.TotalMilliseconds;
                 timeDeltaStr = String.Format("-- Duration change from baseline = {0:+0.0#;-0.0#}%", 100.0 * delta);
             }
-            Console.WriteLine("Time for {0} doing {1} Duration = {2} {3} Memory used = {4:+#,##0;-#,##0}", Pluralizer(numIterations, "loop"), what, duration, timeDeltaStr, memUsed);
+            output.WriteLine("Time for {0} doing {1} Duration = {2} {3} Memory used = {4:+#,##0;-#,##0}", Pluralizer(numIterations, "loop"), what, duration, timeDeltaStr, memUsed);
             return duration;
         }
         private static string Pluralizer(int num, string unit)
