@@ -1,6 +1,9 @@
 using System;
 using System.Threading.Tasks;
 
+using Orleans;
+using Orleans.Runtime.Configuration;
+
 namespace $safeprojectname$
 {
     /// <summary>
@@ -19,8 +22,9 @@ namespace $safeprojectname$
                 AppDomainInitializerArguments = args,
             });
 
-            Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
-
+            var config = ClientConfiguration.LocalhostSilo();
+            GrainClient.Initialize(config);
+        
             // TODO: once the previous call returns, the silo is up and running.
             //       This is the place your custom logic, for example calling client logic
             //       or initializing an HTTP front end for accepting incoming requests.
