@@ -137,25 +137,7 @@ namespace Orleans.Runtime
 
             // Process each type in the assembly.
             var shouldProcessSerialization = SerializationManager.ShouldFindSerializationInfo(assembly);
-            TypeInfo[] assemblyTypes;
-            try
-            {
-                assemblyTypes = assembly.DefinedTypes.ToArray();
-            }
-            catch (Exception exception)
-            {
-                if (Logger.IsWarning)
-                {
-                    var message =
-                        string.Format(
-                            "AssemblyLoader encountered an exception loading types from assembly '{0}': {1}",
-                            assembly.FullName,
-                            exception);
-                    Logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
-                }
-
-                return;
-            }
+            var assemblyTypes = TypeUtils.GetDefinedTypes(assembly, Logger).ToArray();
 
             // Process each type in the assembly.
             foreach (var type in assemblyTypes)

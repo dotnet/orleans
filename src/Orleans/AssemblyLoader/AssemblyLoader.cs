@@ -112,7 +112,7 @@ namespace Orleans.Runtime
                         assembly,
                         type =>
                         typeof(T).GetTypeInfo().IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
-                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null).FirstOrDefault();
+                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
                 if (foundType == null)
                 {
                     return null;
@@ -137,7 +137,7 @@ namespace Orleans.Runtime
             try
             {
                 var assembly = Assembly.Load(new AssemblyName(assemblyName));
-                var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type)).First();
+                var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), logger).First();
 
                 return (T)Activator.CreateInstance(foundType, true);
             }
