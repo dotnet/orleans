@@ -54,7 +54,7 @@ If you don't care about fine granularity of the NuGet packages, the Client and S
 PM> Install-Package Microsoft.Orleans.Server
 ```
 
-Includes everything you need to host a silo, in a process or in Azure Worker Role.
+Includes everything you need to host a silo.
 
 
 
@@ -64,7 +64,7 @@ Includes everything you need to host a silo, in a process or in Azure Worker Rol
 PM> Install-Package Microsoft.Orleans.Client
 ```
 
-Includes everything you need for an Orleans client (frontend), in a process or in Azure Web Role.
+Includes everything you need for an Orleans client (frontend).
 
 ---
 
@@ -84,7 +84,7 @@ Includes the default silo host - OrleansHost.exe. Can be used for on-premises de
 ```
 PM> Install-Package Microsoft.Orleans.OrleansAzureUtils
 ```
-Contains Orleans dependecies on Azure SDK libraries, such as Azure Storage. Included in Microsoft.Orleans.OrleansProviders, Microsoft.Orleans.Client, and Microsoft.Orleans.Server.
+Contains a wrapper class that simplifies instantiation of silos and clients in Azure Worker/Web roles, Azure Table based membership provider, and persistence and stream providers for Azure Storage.
 
 
 ### Microsoft.Orleans.OrleansProviders <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/)</small>
