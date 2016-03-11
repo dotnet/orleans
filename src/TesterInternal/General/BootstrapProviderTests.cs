@@ -23,20 +23,19 @@ namespace UnitTests.General
 
         public class Fixture : BaseClusterFixture
         {
-            public Fixture()
-                : base(new TestingSiloHost(
-                    new TestingSiloOptions
-                    {
-                        SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
-                        StartFreshOrleans = true,
-                        StartPrimary = true,
-                        StartSecondary = true,
-                    },
-                    new TestingClientOptions()
-                    {
-                        ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
-                    }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
+                    StartFreshOrleans = true,
+                    StartPrimary = true,
+                    StartSecondary = true,
+                },
+                new TestingClientOptions()
+                {
+                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
+                });
             }
         }
 

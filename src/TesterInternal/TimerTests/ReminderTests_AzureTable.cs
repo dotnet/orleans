@@ -22,20 +22,20 @@ namespace UnitTests.TimerTests
     {
         public class Fixture : BaseClusterFixture
         {
-            private static readonly Guid serviceId = Guid.NewGuid();
-
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                StartFreshOrleans = true,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
-                DataConnectionString = StorageTestConstants.DataConnectionString,
-                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Separate testing of Reminders storage from membership storage
-                AdjustConfig = config =>
+                Guid serviceId = Guid.NewGuid();
+                return new TestingSiloHost(new TestingSiloOptions
                 {
-                    config.Globals.ServiceId = serviceId;
-                },
-            }))
-            {
+                    StartFreshOrleans = true,
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
+                    DataConnectionString = StorageTestConstants.DataConnectionString,
+                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Separate testing of Reminders storage from membership storage
+                    AdjustConfig = config =>
+                    {
+                        config.Globals.ServiceId = serviceId;
+                    },
+                });
             }
         }
 

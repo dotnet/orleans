@@ -27,20 +27,19 @@ namespace UnitTests.StreamingTests
             //                AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
             //            };
 
-            public Fixture() : base(new TestingSiloHost(
-                    new TestingSiloOptions
-                    {
-                        StartFreshOrleans = true,
-                        SiloConfigFile = SiloConfig,
-                        AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
-                    },
-                    //smsSiloOption_OnlyPrimary,
-                    new TestingClientOptions
-                    {
-                        ClientConfigFile = ClientConfig
-                    }))
+            protected override TestingSiloHost CreateClusterHost()
             {
-
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = SiloConfig,
+                    AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
+                },
+                //smsSiloOption_OnlyPrimary,
+                new TestingClientOptions
+                {
+                    ClientConfigFile = ClientConfig
+                });
             }
         }
 

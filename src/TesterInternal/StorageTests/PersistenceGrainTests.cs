@@ -30,17 +30,15 @@ namespace UnitTests.StorageTests
     /// </summary>
     public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable
     {
-
         public class Fixture : BaseClusterFixture
         {
-            public Fixture()
-                : base(new TestingSiloHost(
-                    new TestingSiloOptions
-                    {
-                        SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
-                        StartSecondary = false,
-                    }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
+                    StartSecondary = false,
+                });
             }
         }
 

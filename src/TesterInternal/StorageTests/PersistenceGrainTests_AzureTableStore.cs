@@ -25,19 +25,19 @@ namespace UnitTests.StorageTests
     {
         public class Fixture : BaseClusterFixture
         {
-            private static Guid serviceId = Guid.NewGuid();
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = false,
-                AdjustConfig = config =>
+                Guid serviceId = Guid.NewGuid();
+                return new TestingSiloHost(new TestingSiloOptions
                 {
-                    config.Globals.ServiceId = serviceId;
-                }
-            }))
-            {
+                    SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    AdjustConfig = config =>
+                    {
+                        config.Globals.ServiceId = serviceId;
+                    }
+                });
             }
         }
 

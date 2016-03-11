@@ -18,13 +18,13 @@ namespace UnitTests.TimerTests
     {
         public class Fixture : BaseClusterFixture
         {
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                StartFreshOrleans = true,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
-                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-            }))
-            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
+                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
+                });
             }
         }
 

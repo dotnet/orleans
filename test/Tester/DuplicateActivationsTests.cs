@@ -9,25 +9,24 @@ using Xunit;
 
 namespace UnitTests.CatalogTests
 {
-    public class DuplicateActivationsTestsFixture : BaseClusterFixture
+    public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTests.Fixture>
     {
-        public DuplicateActivationsTestsFixture()
-        : base(new TestingSiloHost(new TestingSiloOptions
-            {
-                AdjustConfig = config =>
-                {
-                    foreach (var nodeConfig in config.Overrides.Values)
-                    {
-                        nodeConfig.MaxActiveThreads = 1;
-                    }
-                },
-            }))
+        private class Fixture : BaseClusterFixture
         {
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    AdjustConfig = config =>
+                    {
+                        foreach (var nodeConfig in config.Overrides.Values)
+                        {
+                            nodeConfig.MaxActiveThreads = 1;
+                        }
+                    },
+                });
+            }
         }
-    }
-
-    public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTestsFixture>
-    {
 
         [Fact, TestCategory("Catalog"), TestCategory("Functional")]
         public void DuplicateActivations()

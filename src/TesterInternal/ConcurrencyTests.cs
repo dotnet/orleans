@@ -17,18 +17,16 @@ namespace UnitTests.ConcurrencyTests
     {
         private class Fixture : BaseClusterFixture
         {
-            public Fixture()
-                : base(
-                    new TestingSiloHost(
-                        new TestingSiloOptions
-                        {
-                            StartSecondary = false,
-                            AdjustConfig = config =>
-                            {
-                                config.Overrides["Primary"].MaxActiveThreads = 2;
-                            }
-                        }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartSecondary = false,
+                    AdjustConfig = config =>
+                    {
+                        config.Overrides["Primary"].MaxActiveThreads = 2;
+                    }
+                });
             }
         }
 

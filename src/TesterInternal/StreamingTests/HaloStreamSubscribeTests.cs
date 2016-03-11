@@ -17,13 +17,13 @@ namespace UnitTests.HaloTests.Streaming
     {
         public class Fixture : BaseClusterFixture
         {
-            public Fixture() : base(new TestingSiloHost(
-                new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
                 {
                     // StartSecondary = false,
                     SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-                }))
-            {
+                });
             }
         }
 

@@ -4,9 +4,9 @@ namespace Tester
 {
     public class DefaultClusterFixture : BaseClusterFixture
     {
-        public DefaultClusterFixture()
-            : base(new TestingSiloHost(true))
+        protected override TestingSiloHost CreateClusterHost()
         {
+            return new TestingSiloHost(true);
         }
     }
 }

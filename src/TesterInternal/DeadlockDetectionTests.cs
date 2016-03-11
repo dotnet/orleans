@@ -17,17 +17,15 @@ namespace UnitTests.General
     {
         private class Fixture : BaseClusterFixture
         {
-            public Fixture()
-                : base(
-                    new TestingSiloHost(
-                        new TestingSiloOptions
-                        {
-                            AdjustConfig = config =>
-                            {
-                                config.Globals.PerformDeadlockDetection = true;
-                            }
-                        }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    AdjustConfig = config =>
+                    {
+                        config.Globals.PerformDeadlockDetection = true;
+                    }
+                });
             }
         }
 

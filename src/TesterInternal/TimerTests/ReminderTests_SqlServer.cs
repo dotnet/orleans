@@ -22,14 +22,14 @@ namespace UnitTests.TimerTests
     {
         public class Fixture : BaseClusterFixture
         {
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                StartFreshOrleans = true,
-                DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(),
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer,
-                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-            }))
-            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(),
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer,
+                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
+                });
             }
         }
 

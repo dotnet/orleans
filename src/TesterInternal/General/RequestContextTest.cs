@@ -401,18 +401,16 @@ namespace UnitTests.General
 
         public class Fixture : BaseClusterFixture
         {
-            public Fixture()
-                : base(
-                    new TestingSiloHost(
-                        new TestingSiloOptions
-                        {
-                            StartPrimary = true,
-                            StartSecondary = false,
-                            PropagateActivityId = true,
-                            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-                        },
-                        new TestingClientOptions() { PropagateActivityId = true }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    PropagateActivityId = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
+                },
+                new TestingClientOptions { PropagateActivityId = true });
             }
         }
 

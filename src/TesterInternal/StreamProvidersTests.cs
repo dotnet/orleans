@@ -29,10 +29,12 @@ namespace UnitTests.Streaming
                 }
             };
 
-            public Fixture() : base(new TestingSiloHost(SiloOptions))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(SiloOptions);
             }
         }
+
         protected TestingSiloHost HostedCluster { get; private set; }
         private TestingSiloOptions SiloOptions;
         private Guid ServiceId;
@@ -122,11 +124,12 @@ namespace UnitTests.Streaming
     {
         public class Fixture : BaseClusterFixture
         {
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                SiloConfigFile = new FileInfo("Config_StreamProviders.xml")
-            }))
-            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml")
+                });
             }
         }
 

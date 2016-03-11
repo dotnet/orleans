@@ -22,18 +22,18 @@ namespace UnitTests.Stats
 
         public class Fixture : BaseClusterFixture
         {
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = false,
-                SiloConfigFile = new FileInfo("MockStats_ServerConfiguration.xml"),
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            }, new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
-            }))
-            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    SiloConfigFile = new FileInfo("MockStats_ServerConfiguration.xml"),
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+                }, new TestingClientOptions
+                {
+                    ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
+                });
             }
         }
 
@@ -142,19 +142,18 @@ namespace UnitTests.Stats
     {
         public class Fixture : BaseClusterFixture
         {
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = false,
-                SiloConfigFile = new FileInfo("DevTestServerConfiguration.xml"),
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            }, new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
-            }))
-            {
-
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    SiloConfigFile = new FileInfo("DevTestServerConfiguration.xml"),
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+                }, new TestingClientOptions
+                {
+                    ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
+                });
             }
         }
 

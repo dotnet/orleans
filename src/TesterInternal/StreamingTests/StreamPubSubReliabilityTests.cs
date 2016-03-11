@@ -23,16 +23,17 @@ namespace UnitTests.StreamingTests
     {
         public class Fixture : BaseClusterFixture
         {
-            public Fixture() : base(new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                SiloConfigFile = new FileInfo("Config_StorageErrors.xml"),
-                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            }, new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
-            }))
-            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_StorageErrors.xml"),
+                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+                }, new TestingClientOptions
+                {
+                    ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
+                });
             }
         }
 

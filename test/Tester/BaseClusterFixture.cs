@@ -1,4 +1,5 @@
 ﻿using System;
+using Orleans;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 
@@ -6,15 +7,15 @@ namespace Tester
 {
     public abstract class BaseClusterFixture : IDisposable
     {
-        static BaseClusterFixture()
+        protected BaseClusterFixture()
         {
+            GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();
-        }
-
-        protected BaseClusterFixture(TestingSiloHost hostedCluster)
-        {
+            var hostedCluster = CreateClusterHost();
             this.HostedCluster = hostedCluster;
         }
+
+        protected abstract TestingSiloHost CreateClusterHost();
 
         public TestingSiloHost HostedCluster { get; private set; }        
 

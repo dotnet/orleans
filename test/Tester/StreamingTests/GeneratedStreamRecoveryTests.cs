@@ -30,35 +30,33 @@ namespace UnitTests.StreamingTests
                 TotalQueueCount = 4,
             };
 
-            public Fixture()
-                : base(
-                    new TestingSiloHost(
-                        new TestingSiloOptions
-                        {
-                            StartFreshOrleans = true,
-                            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                            AdjustConfig = config =>
-                            {
-                                var settings = new Dictionary<string, string>();
-                                // get initial settings from configs
-                                AdapterConfig.WriteProperties(settings);
-
-                                // add queue balancer setting
-                                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
-
-                                // add pub/sub settting
-                                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-                                // register stream provider
-                                config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-                                // Make sure a node config exist for each silo in the cluster.
-                                // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                                config.GetOrCreateNodeConfigurationForSilo("Primary");
-                                config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-                            }
-                        }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                    AdjustConfig = config =>
+                    {
+                        var settings = new Dictionary<string, string>();
+                        // get initial settings from configs
+                        AdapterConfig.WriteProperties(settings);
+
+                        // add queue balancer setting
+                        settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+
+                        // add pub/sub settting
+                        settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+
+                        // register stream provider
+                        config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+
+                        // Make sure a node config exist for each silo in the cluster.
+                        // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
+                        config.GetOrCreateNodeConfigurationForSilo("Primary");
+                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
+                    }
+                });
             }
         }
 
