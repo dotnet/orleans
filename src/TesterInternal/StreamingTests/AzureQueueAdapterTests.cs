@@ -49,7 +49,7 @@ namespace UnitTests.StorageTests
 
         public static void DoTestCleanup()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, _deploymentId, StorageTestConstants.DataConnectionString, null).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, _deploymentId, StorageTestConstants.DataConnectionString).Wait();
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("Halo"), TestCategory("Azure"), TestCategory("Streaming")]

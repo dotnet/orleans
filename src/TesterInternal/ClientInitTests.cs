@@ -12,6 +12,15 @@ namespace UnitTests
     [TestClass]
     public class ClientInitTests : HostedTestClusterPerFixture
     {
+        [TestInitialize]
+        public void Initialize()
+        {
+            if (!GrainClient.IsInitialized)
+            {
+                GrainClient.Initialize("ClientConfigurationForTesting.xml");
+            }
+        }
+
         [TestMethod, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_IsInitialized()
         {

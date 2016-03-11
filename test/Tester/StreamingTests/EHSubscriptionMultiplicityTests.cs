@@ -53,10 +53,10 @@ namespace UnitTests.StreamingTests
 
             public override void Dispose()
             {
+                base.Dispose();
                 var dataManager = new AzureTableDataManager<TableEntity>(CheckpointSettings.TableName, CheckpointSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
                 dataManager.DeleteTableAsync().Wait();
-                base.Dispose();
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)

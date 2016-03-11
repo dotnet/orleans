@@ -155,7 +155,7 @@ namespace UnitTests.Stats
         {
             //Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
             // ResetAllAdditionalRuntimes();
-            TestingSiloHost.Instance.StopAdditionalSilos();
+            HostedCluster.StopAdditionalSilos();
         }
 
         [TestMethod, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]

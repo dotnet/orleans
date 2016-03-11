@@ -54,7 +54,8 @@ namespace UnitTests.Streaming
         [TestCleanup]
         public void TestCleanup()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            var deploymentId = HostedCluster.DeploymentId;
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, deploymentId, StorageTestConstants.DataConnectionString).Wait();
         }
 
         ////------------------------ One to One ----------------------//

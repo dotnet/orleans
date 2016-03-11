@@ -41,8 +41,7 @@ namespace Tester.StreamingTests
                     AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(
                         streamProviderName,
                         TestingSiloHost.Instance.DeploymentId,
-                        StorageTestConstants.DataConnectionString,
-                        logger).Wait();
+                        StorageTestConstants.DataConnectionString).Wait();
                 }
                 catch (Exception exc)
                 {

@@ -20,16 +20,14 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="providerName"></param>
         /// <param name="deploymentId"></param>
         /// <param name="storageConnectionString"></param>
-        /// <param name="logger"></param>
         /// <returns></returns>
-        public static async Task DeleteAllUsedAzureQueues(string providerName, string deploymentId, string storageConnectionString, Logger logger)
+        public static async Task DeleteAllUsedAzureQueues(string providerName, string deploymentId, string storageConnectionString)
         {
             if (deploymentId != null)
             {
                 var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
-                if (logger != null) logger.Info("About to delete all {0} Stream Queues\n", allQueues.Count);
                 var deleteTasks = new List<Task>();
                 foreach (var queueId in allQueues)
                 {
