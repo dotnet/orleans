@@ -57,7 +57,8 @@ namespace UnitTests.SerializerTests
             string s = resp.ToString();
             Console.WriteLine(s);
 
-            var serialized = resp.Serialize();
+            int dummy = 0;
+            var serialized = resp.Serialize(out dummy);
             int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
             byte[] data = new byte[length];
             int n = 0;
