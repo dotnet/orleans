@@ -4,6 +4,26 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+## [v1.1.3](https://github.com/dotnet/orleans/releases/tag/v1.1.3) March 9th 2016
+
+### Release notes
+
+A patch release with a set of bug fixes.
+
+* [Initialize SerializationManager before CodeGeneratorManager](https://github.com/dotnet/orleans/pull/1345)
+* [Avoid unnecessary table scan when finding reminder entries to delete](https://github.com/dotnet/orleans/pull/1348)
+* [Stop a stuck BlockingCollection.Take operation that caused thread leak on the client.](https://github.com/dotnet/orleans/pull/1351)
+* [Fixed Azure table property being not sanitized.](https://github.com/dotnet/orleans/pull/1381)
+* [Fixed String.Format arguments in DetailedGrainReport.ToString()](https://github.com/dotnet/orleans/pull/1384)
+* [Increment and DecrementMetric methods in Orleans.TraceLogger had same body](https://github.com/dotnet/orleans/pull/1405)
+* [Update the custom serializer warning message to adequately reflect the OSS status of Orleans](https://github.com/dotnet/orleans/pull/1414)
+* [Fix retry timeout when running under debugger](https://github.com/dotnet/orleans/pull/1503)
+* [Networking bug fix: Reset receive buffer on error.](https://github.com/dotnet/orleans/pull/1478)
+* [Fixed performance regression in networking](https://github.com/dotnet/orleans/pull/1518)
+* [Start ReminderService initial load in the background](https://github.com/dotnet/orleans/pull/1520)
+* [Safe load of types from failing assemblies in TypeUtils.GetTypes](https://github.com/dotnet/orleans/pull/1534)
+
+
 ## Community Virtual Meetup #9
 [Nehme Bilal](https://github.com/nehmebilal) and [Reuben Bond](https://github.com/ReubenBond) [talk about deploying Orleans](https://youtu.be/w__D7gnqeZ0) with [YAMS](https://github.com/Microsoft/Yams) and [Service Fabric](https://azure.microsoft.com/en-gb/documentation/articles/service-fabric-overview/) 
 Fabruary 26st 2016
