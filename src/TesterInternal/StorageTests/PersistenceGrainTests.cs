@@ -1090,7 +1090,7 @@ namespace UnitTests.StorageTests
             Assert.AreNotSame(initialState.GrainList, copy.GrainList, "List");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization"), TestCategory("CorePerf")]
+        [TestMethod, TestCategory("Persistence"), TestCategory("Serialization"), TestCategory("CorePerf"), TestCategory("Stress")]
         public async Task Serialize_GrainState_DeepCopy_Stress()
         {
             int num = 100;

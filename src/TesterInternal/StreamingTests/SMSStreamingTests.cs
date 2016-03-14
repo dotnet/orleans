@@ -16,13 +16,15 @@ namespace UnitTests.StreamingTests
     [TestClass]
     public class SMSStreamingTests : HostedTestClusterPerFixture
     {
+        private static Guid serviceId = Guid.NewGuid();
         internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_StreamProviders.xml");
         internal static readonly FileInfo ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml");
 
         private static readonly TestingSiloOptions smsSiloOption = new TestingSiloOptions
                     {
                         StartFreshOrleans = true,
-                        SiloConfigFile = SiloConfigFile
+                        SiloConfigFile = SiloConfigFile,
+                        AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
                     };
         private static TestingClientOptions smsClientOptions = new TestingClientOptions
                     {
@@ -32,7 +34,8 @@ namespace UnitTests.StreamingTests
                     {
                         StartFreshOrleans = true,
                         SiloConfigFile = SiloConfigFile,
-                        StartSecondary = false, 
+                        StartSecondary = false,
+                        AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
                     };
 
         private SingleStreamTestRunner runner;

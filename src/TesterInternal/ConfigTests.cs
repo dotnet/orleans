@@ -233,6 +233,7 @@ namespace UnitTests
             TraceLogger myLogger = TraceLogger.GetLogger("MyLogger", TraceLogger.LoggerType.Application);
 
             myLogger.Info("Write something");
+            TraceLogger.Flush();
 
             fileInfo.Refresh(); // Need to refresh cached view of FileInfo
 
@@ -273,6 +274,7 @@ namespace UnitTests
             TraceLogger myLogger = TraceLogger.GetLogger("MyLogger", TraceLogger.LoggerType.Application);
 
             myLogger.Info("Write something");
+            TraceLogger.Flush();
 
             fileInfo.Refresh(); // Need to refresh cached view of FileInfo
 

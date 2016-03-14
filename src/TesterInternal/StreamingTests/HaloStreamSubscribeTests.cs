@@ -38,7 +38,7 @@ namespace UnitTests.HaloTests.Streaming
         {
             if (_streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProvider, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProvider, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString).Wait();
             }
         }
 

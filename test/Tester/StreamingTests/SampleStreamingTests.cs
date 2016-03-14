@@ -97,8 +97,9 @@ namespace UnitTests.StreamingTests
 
         public override void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, fixture.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            var deploymentId = HostedCluster.DeploymentId;
             fixture.Dispose();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, StorageTestConstants.DataConnectionString).Wait();
         }
 
         [Fact, TestCategory("Functional")]

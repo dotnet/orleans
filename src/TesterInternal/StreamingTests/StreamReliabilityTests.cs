@@ -39,11 +39,13 @@ namespace UnitTests.Streaming.Reliability
         private HashSet<IStreamReliabilityTestGrain> _usedGrains; 
 #endif
 
+        private static readonly Guid serviceId = Guid.NewGuid();
         private static readonly TestingSiloOptions siloRunOptions = new TestingSiloOptions
         {
             SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml"),
             LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
             DataConnectionString = StorageTestConstants.DataConnectionString,
+            AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
         };
 
         private static readonly TestingClientOptions clientRunOptions = new TestingClientOptions
@@ -70,12 +72,6 @@ namespace UnitTests.Streaming.Reliability
         [TestCleanup]
         public void TestCleanup()
         {
-            logger.Info("TestCleanup - Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-
-            if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
-            {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, this.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
-            }
 #if DELETE_AFTER_TEST
             List<Task> promises = new List<Task>();
             foreach (var g in _usedGrains)
@@ -84,12 +80,12 @@ namespace UnitTests.Streaming.Reliability
             }
             Task.WhenAll(promises).Wait();
 #endif
-            _streamId = default(Guid);
-
-            //ResetAllAdditionalRuntimes();
-            this.HostedCluster.StopAdditionalSilos();
+            var deploymentId = HostedCluster.DeploymentId;
+            if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+            }
         }
-
 
         [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
         public void Baseline_StreamRel()
