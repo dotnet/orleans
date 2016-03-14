@@ -101,6 +101,10 @@ namespace Orleans.Runtime
                 }
                 else // Request or OneWay
                 {
+                    if (target.State == ActivationState.Valid)
+                    {
+                        catalog.ActivationCollector.TryRescheduleCollection(target);
+                    }
                     // Silo is always capable to accept a new request. It's up to the activation to handle its internal state.
                     // If activation is shutting down, it will queue and later forward this request.
                     ReceiveRequest(message, target);
