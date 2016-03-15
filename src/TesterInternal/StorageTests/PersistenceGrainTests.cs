@@ -165,34 +165,8 @@ namespace UnitTests.StorageTests
 
             SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
 
-            bool exceptionThrown = false;
-            try
-            {
-                int readValue = await grain.GetValue();
-            }
-            catch (ApplicationException)
-            {
-                exceptionThrown = true;
-                // Expected error
-            }
-            catch (AggregateException ae)
-            {
-                exceptionThrown = true;
-                Exception e = ae.GetBaseException();
-                if (e is Exception)
-                {
-                    // Expected error
-                }
-                else
-                {
-                    throw e;
-                }
-            }
-            SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            if (!exceptionThrown)
-            {
-                Assert.Fail("Exception should have been thrown during Activate");
-            }
+            await Xunit.Assert.ThrowsAsync<OrleansException>(() =>
+                grain.GetValue());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
