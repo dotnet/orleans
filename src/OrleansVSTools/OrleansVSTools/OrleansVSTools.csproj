@@ -216,16 +216,16 @@
       <Link>Packages\Microsoft.Orleans.Server.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.0.0\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg">
-      <Link>Packages\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg</Link>
+    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.1.0\Microsoft.CodeAnalysis.Analyzers.1.1.0.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.Analyzers.1.1.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Common.1.0.0\Microsoft.CodeAnalysis.Common.1.0.0.nupkg">
-      <Link>Packages\Microsoft.CodeAnalysis.Common.1.0.0.nupkg</Link>
+    <Content Include="..\..\packages\Microsoft.CodeAnalysis.Common.1.1.0\Microsoft.CodeAnalysis.Common.1.1.0.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.Common.1.1.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\Microsoft.CodeAnalysis.CSharp.1.0.0\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg">
-      <Link>Packages\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg</Link>
+    <Content Include="..\..\packages\Microsoft.CodeAnalysis.CSharp.1.1.0\Microsoft.CodeAnalysis.CSharp.1.1.0.nupkg">
+      <Link>Packages\Microsoft.CodeAnalysis.CSharp.1.1.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="..\..\packages\Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final\Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final.nupkg">
@@ -240,12 +240,12 @@
       <Link>Packages\Newtonsoft.Json.7.0.1.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\System.Collections.Immutable.1.1.36\System.Collections.Immutable.1.1.36.nupkg">
-      <Link>Packages\System.Collections.Immutable.1.1.36.nupkg</Link>
+    <Content Include="..\..\packages\System.Collections.Immutable.1.1.37\System.Collections.Immutable.1.1.37.nupkg">
+      <Link>Packages\System.Collections.Immutable.1.1.37.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\packages\System.Reflection.Metadata.1.0.21\System.Reflection.Metadata.1.0.21.nupkg">
-      <Link>Packages\System.Reflection.Metadata.1.0.21.nupkg</Link>
+    <Content Include="..\..\packages\System.Reflection.Metadata.1.1.0\System.Reflection.Metadata.1.1.0.nupkg">
+      <Link>Packages\System.Reflection.Metadata.1.1.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg">
