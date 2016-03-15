@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The assembly name of the core Orleans assembly.
         /// </summary>
-        private static readonly string OrleansCoreAssembly = typeof(IGrain).Assembly.GetName().FullName;
+        private static readonly AssemblyName OrleansCoreAssembly = typeof(IGrain).Assembly.GetName();
 
         private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
 
@@ -938,8 +938,11 @@ namespace Orleans.Runtime
         /// <returns>A value indicating whether or not the provided assembly is the Orleans assembly or references it.</returns>
         internal static bool IsOrleansOrReferencesOrleans(Assembly assembly)
         {
+            // We want to be loosely coupled to the assembly version if an assembly depends on an older Orleans,
+            // but we want a strong assembly match for the Orleans binary itself 
+            // (so we don't load 2 different versions of Orleans by mistake)
             return DoReferencesContain(assembly.GetReferencedAssemblies(), OrleansCoreAssembly)
-                   || string.Equals(assembly.FullName, OrleansCoreAssembly, StringComparison.Ordinal);
+                   || string.Equals(assembly.GetName().FullName, OrleansCoreAssembly.FullName, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -948,14 +951,14 @@ namespace Orleans.Runtime
         /// <param name="references">The references.</param>
         /// <param name="assemblyName">The assembly name.</param>
         /// <returns>A value indicating whether or not the specified references contain the provided assembly name.</returns>
-        private static bool DoReferencesContain(IReadOnlyCollection<AssemblyName> references, string assemblyName)
+        private static bool DoReferencesContain(IReadOnlyCollection<AssemblyName> references, AssemblyName assemblyName)
         {
             if (references.Count == 0)
             {
                 return false;
             }
 
-            return references.Any(asm => string.Equals(asm.FullName, assemblyName, StringComparison.InvariantCulture));
+            return references.Any(asm => string.Equals(asm.Name, assemblyName.Name, StringComparison.Ordinal));
         }
 
         /// <summary>
