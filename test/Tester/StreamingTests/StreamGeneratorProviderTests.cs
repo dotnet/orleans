@@ -35,32 +35,32 @@ namespace UnitTests.StreamingTests
             GeneratorConfigType = GeneratorConfig.GetType()
         };
 
-        public StreamGeneratorProviderTestsFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config => {
-                        var settings = new Dictionary<string, string>();
-                        // get initial settings from configs
-                        AdapterConfig.WriteProperties(settings);
-                        GeneratorConfig.WriteProperties(settings);
-
-                        // add queue balancer setting
-                        settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
-
-                        // add pub/sub settting
-                        settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-                        // register stream provider
-                        config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-                        // make sure all node configs exist, for dynamic cluster queue balancer
-                        config.GetOrCreateNodeConfigurationForSilo("Primary");
-                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-                    }
-                }))
+        protected override TestingSiloHost CreateClusterHost()
         {
+            return new TestingSiloHost(new TestingSiloOptions
+            {
+                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                AdjustConfig = config =>
+                {
+                    var settings = new Dictionary<string, string>();
+                    // get initial settings from configs
+                    AdapterConfig.WriteProperties(settings);
+                    GeneratorConfig.WriteProperties(settings);
+
+                    // add queue balancer setting
+                    settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+
+                    // add pub/sub settting
+                    settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+
+                    // register stream provider
+                    config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+
+                    // make sure all node configs exist, for dynamic cluster queue balancer
+                    config.GetOrCreateNodeConfigurationForSilo("Primary");
+                    config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
+                }
+            });
         }
     }
 

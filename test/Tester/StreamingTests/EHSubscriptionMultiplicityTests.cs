@@ -40,15 +40,14 @@ namespace UnitTests.StreamingTests
 
         private class Fixture : BaseClusterFixture
         {
-            public Fixture()
-                : base(new TestingSiloHost(
-                    new TestingSiloOptions
-                    {
-                        StartFreshOrleans = true,
-                        SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                        AdjustConfig = AdjustClusterConfiguration
-                    }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                    AdjustConfig = AdjustClusterConfiguration
+                });
             }
 
             public override void Dispose()

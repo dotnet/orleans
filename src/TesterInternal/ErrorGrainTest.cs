@@ -2,25 +2,32 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests
 {
     /// <summary>
     /// Summary description for ErrorHandlingGrainTest
     /// </summary>
-    [TestClass]
     public class ErrorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
         private readonly TraceLogger Logger = TraceLogger.GetLogger("AssemblyLoaderTests", TraceLogger.LoggerType.Application);
+        private readonly ITestOutputHelper output;
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling")]
+        public ErrorGrainTest(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
         public async Task ErrorGrain_GetGrain()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -28,7 +35,7 @@ namespace UnitTests
             int ignored = await grain.GetA();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingLocalError()
         {
             LocalErrorGrain localGrain = new LocalErrorGrain();
@@ -47,7 +54,7 @@ namespace UnitTests
             Assert.IsTrue(intPromise.Status == TaskStatus.Faulted);                
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
         // check that grain that throws an error breaks its promise and later Wait and GetValue on it will throw
         public void ErrorHandlingGrainError1()
         {
@@ -80,7 +87,7 @@ namespace UnitTests
         }
 
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
         // check that premature wait finishes on time with false.
         public void ErrorHandlingTimedMethod()
         {
@@ -105,7 +112,7 @@ namespace UnitTests
             Assert.IsTrue(promise.Status == TaskStatus.RanToCompletion);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
         // check that premature wait finishes on time but does not throw with false and later wait throws.
         public void ErrorHandlingTimedMethodWithError()
         {
@@ -136,7 +143,7 @@ namespace UnitTests
             Assert.IsTrue(promise.Status == TaskStatus.Faulted);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
         public void StressHandlingMultipleDelayedRequests()
         {
             IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId());
@@ -157,7 +164,7 @@ namespace UnitTests
             Logger.Info(1, "DONE.");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
         public void ArgumentTypes_ListOfGrainReferences()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -169,7 +176,7 @@ namespace UnitTests
             if (!ok) throw new TimeoutException();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives"), TestCategory("ErrorHandling")]
         public async Task AC_DelayedExecutor_2()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -179,7 +186,7 @@ namespace UnitTests
             Assert.AreEqual(true, result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("SimpleGrain")]
+        [Fact, TestCategory("Functional"), TestCategory("SimpleGrain")]
         public void SimpleGrain_AsyncMethods()
         {
             ISimpleGrainWithAsyncMethods grain = GrainClient.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(GetRandomGrainId());
@@ -193,7 +200,7 @@ namespace UnitTests
             Assert.AreEqual(300, intPromise.Result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("SimpleGrain")]
+        [Fact, TestCategory("Functional"), TestCategory("SimpleGrain")]
         public void SimpleGrain_PromiseForward()
         {
             ISimpleGrain forwardGrain = GrainClient.GrainFactory.GetGrain<IPromiseForwardGrain>(GetRandomGrainId());
@@ -202,7 +209,7 @@ namespace UnitTests
             Assert.AreEqual(30, result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("SimpleGrain")]
+        [Fact, TestCategory("Functional"), TestCategory("SimpleGrain")]
         public void SimpleGrain_GuidDistribution()
         {
             int n = 0x1111;
@@ -236,16 +243,16 @@ namespace UnitTests
             }
             IEchoGrain grain = GrainClient.GrainFactory.GetGrain<IEchoGrain>(guid);
             GrainId grainId = ((GrainReference)grain.AsReference<IEchoGrain>()).GrainId;
-            Console.WriteLine("Guid = {0}, Guid.HashCode = x{1:X8}, GrainId.HashCode = x{2:X8}, GrainId.UniformHashCode = x{3:X8}", guid, guid.GetHashCode(), grainId.GetHashCode(), grainId.GetUniformHashCode());
+            output.WriteLine("Guid = {0}, Guid.HashCode = x{1:X8}, GrainId.HashCode = x{2:X8}, GrainId.UniformHashCode = x{3:X8}", guid, guid.GetHashCode(), grainId.GetHashCode(), grainId.GetUniformHashCode());
         }
 
-        [TestMethod, TestCategory("Revisit"), TestCategory("Observers")]
+        [Fact, TestCategory("Revisit"), TestCategory("Observers")]
         public void ObserverTest_Disconnect()
         {
             ObserverTest_Disconnect(false);
         }
 
-        [TestMethod, TestCategory("Revisit"), TestCategory("Observers")]
+        [Fact, TestCategory("Revisit"), TestCategory("Observers")]
         public void ObserverTest_Disconnect2()
         {
             ObserverTest_Disconnect(true);
@@ -262,7 +269,7 @@ namespace UnitTests
             //var callback = new SimpleGrainObserver((a, b, r) =>
             //{
             //    r.Done = (a == 10);
-            //    Console.WriteLine("Received observer callback: A={0} B={1} Done={2}", a, b, r.Done);
+            //    output.WriteLine("Received observer callback: A={0} B={1} Done={2}", a, b, r.Done);
             //}, result);
             //var observer = SimpleGrainObserverFactory.CreateObjectReference(callback);
             //if (observeTwice)

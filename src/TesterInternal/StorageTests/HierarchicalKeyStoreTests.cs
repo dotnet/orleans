@@ -4,20 +4,32 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [DeploymentItem("ClientConfiguration.xml")]
-    public class HierarchicalKeyStoreTests
+    public class HierarchicalKeyStoreTests : IClassFixture<HierarchicalKeyStoreTests.Fixture>
     {
-        public TestContext TestContext { get; set; }
+        public class Fixture : IDisposable
+        {
+            public Fixture()
+            {
+                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                ClientConfiguration cfg = ClientConfiguration.StandardLoad();
+                TraceLogger.Initialize(cfg);
+                LocalDataStoreInstance.LocalDataStore = null;
+            }
+
+            public void Dispose()
+            {
+                LocalDataStoreInstance.LocalDataStore = null;
+            }
+        }
 
         private const string KeyName1 = "Key1";
         private const string KeyName2 = "Key2";
@@ -28,28 +40,10 @@ namespace UnitTests.StorageTests
 
         private static int _keyCounter = 1;
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            Console.WriteLine("ClassInitialize {0}", testContext.TestName);
-            testContext.WriteLine("ClassInitialize");
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            ClientConfiguration cfg = ClientConfiguration.StandardLoad();
-            testContext.WriteLine(cfg.ToString());
-            TraceLogger.Initialize(cfg);
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void Comparer_InsideRange()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             string rangeParamName = "Column1";
             string fromValue = "Rem10";
@@ -75,10 +69,10 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void Comparer_OutsideRange()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             string rangeParamName = "Column1";
             string toValue = "Rem10";
@@ -104,10 +98,10 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void Comparer_SameRange()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             string rangeParamName = "Column1";
             string fromValue = "Rem11";
@@ -133,10 +127,10 @@ namespace UnitTests.StorageTests
             Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_MakeKey()
         {
-            string testName = TestContext.TestName;
+            //string testName = TestContext.TestName;
 
             var keys = new[]
             {
@@ -148,10 +142,10 @@ namespace UnitTests.StorageTests
             Assert.AreEqual("One=1+Two=2", keyStr, "Output from MakeStoreKey");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_1Key_Read_Write()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
 
@@ -176,10 +170,10 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_2Key_Read_Write()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
             int key2 = _keyCounter++;
@@ -206,10 +200,10 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_3Key_Read_Write()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
             int key2 = _keyCounter++;
@@ -240,10 +234,10 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_Write2()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
             int key2 = _keyCounter++;
@@ -274,10 +268,10 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_DeleteRow()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
             int key2 = _keyCounter++;
@@ -318,10 +312,10 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_Read_PartialKey()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
             int key2 = _keyCounter++;
@@ -354,10 +348,10 @@ namespace UnitTests.StorageTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_KeyNotFound()
         {
-            string testName = TestContext.TestName;
+            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
             int key2 = _keyCounter++;

@@ -3,40 +3,51 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
+using Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    [DeploymentItem("Config_BootstrapProviders.xml")]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [TestClass]
-    public class BootstrapProvidersTests : HostedTestClusterPerFixture
+    public class BootstrapProvidersTests : OrleansTestingBase, IClassFixture<BootstrapProvidersTests.Fixture>
     {
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
-        {
-            SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = true,
-        };
-        private static readonly TestingClientOptions clientOptions = new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
-        };
+        private readonly ITestOutputHelper output;
 
-        public static TestingSiloHost CreateSiloHost()
+        public class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(siloOptions, clientOptions);
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
+                    StartFreshOrleans = true,
+                    StartPrimary = true,
+                    StartSecondary = true,
+                },
+                new TestingClientOptions()
+                {
+                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
+                });
+            }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Providers"), TestCategory("Bootstrap")]
+        protected TestingSiloHost HostedCluster { get; private set; }
+
+        public BootstrapProvidersTests(ITestOutputHelper output, Fixture fixture)
+        {
+            this.output = output;
+            this.HostedCluster = fixture.HostedCluster;
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Providers"), TestCategory("Bootstrap")]
         public void BootstrapProvider_SiloStartsOk()
         {
             string providerName = "bootstrap1";
@@ -45,7 +56,7 @@ namespace UnitTests.General
             Assert.AreEqual(1, bootstrapProvider.InitCount, "Init count");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Providers"), TestCategory("Bootstrap")]
+        [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("Bootstrap")]
         public async Task BootstrapProvider_GrainCall()
         {
             string providerName = "bootstrap2";
@@ -61,7 +72,7 @@ namespace UnitTests.General
             Assert.AreEqual((a * b), axb, "Returned value from {0}", grainId);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Providers"), TestCategory("Bootstrap")]
+        [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("Bootstrap")]
         public async Task BootstrapProvider_LocalGrainInit()
         {
             for (int i = 0; i < 20; i++ )
@@ -74,7 +85,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Providers"), TestCategory("Bootstrap")]
+        [Fact, TestCategory("BVT"), TestCategory("Providers"), TestCategory("Bootstrap")]
         public async Task BootstrapProvider_Controllable()
         {
             SiloHandle[] silos = TestingSiloHost.Instance.GetActiveSilos().ToArray();
@@ -89,7 +100,7 @@ namespace UnitTests.General
             foreach (SiloHandle silo in silos)
             {
                 IList<IBootstrapProvider> providers = silo.Silo.BootstrapProviders;
-                Console.WriteLine("Found {0} bootstrap providers in silo {1}: {2}", 
+                output.WriteLine("Found {0} bootstrap providers in silo {1}: {2}", 
                     providers.Count, silo.Name, Utils.EnumerableToString(
                         providers.Select(pr => pr.Name + "=" + pr.GetType().FullName)));
 
@@ -103,14 +114,14 @@ namespace UnitTests.General
 
             object[] replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
-            Console.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
+            output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
             Assert.AreEqual(numSilos, replies.Length, "Expected to get {0} replies to command {1}", numSilos, command);
             Assert.IsTrue(replies.All(reply => reply.ToString().Equals(command.ToString())), "Got command {0}", command);
 
             command += 1;
             replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
-            Console.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
+            output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
             Assert.AreEqual(numSilos, replies.Length, "Expected to get {0} replies to command {1}", numSilos, command);
             Assert.IsTrue(replies.All(reply => reply.ToString().Equals(command.ToString())), "Got command {0}", command);
         }

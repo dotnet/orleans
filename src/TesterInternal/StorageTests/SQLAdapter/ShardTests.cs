@@ -5,17 +5,19 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.SqlDatabase.ElasticScale.ShardManagement;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.SqlUtils.StorageProvider.GrainClasses;
 using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
 using Orleans.SqlUtils.StorageProvider.Instrumentation;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.SqlUtils.StorageProvider.Tests
 {
-    [TestClass]
     public class ShardTests
     {
+        private readonly ITestOutputHelper output;
         private readonly string ConnectionString = ConfigurationManager.AppSettings["ConnectionString"];
         private readonly string ShardCredentials = ConfigurationManager.AppSettings["ShardCredentials"];
 
@@ -27,13 +29,17 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
         private const string ShardMapDefault = ShardMap1;
         private Logger logger = TraceLogger.GetLogger("SqlDataManager");
 
+        public ShardTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         private GrainStateMap CreateGrainStateMap()
         {
             return new SampleGrainStateMapFactory().CreateGrainStateMap();
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip ="Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void Upsert10KStates()
         {
             InstrumentationContext.Reset();
@@ -65,12 +71,11 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 Task.WaitAll(tasks.ToArray());
                 stopwatch.Stop();
 
-                Console.WriteLine(" [{0}] {1} Upserts. {2} max concurrent writes. Elapsed: {3}", mapName, count, batchingOptions.MaxConcurrentWrites, stopwatch.Elapsed);
+                output.WriteLine(" [{0}] {1} Upserts. {2} max concurrent writes. Elapsed: {3}", mapName, count, batchingOptions.MaxConcurrentWrites, stopwatch.Elapsed);
             }
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip ="Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void InsertThenUpdate10KStates()
         {
             InstrumentationContext.Reset();
@@ -89,19 +94,17 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 var tasks = grains.Select(grain => dataManager.UpsertStateAsync(grain.Item1, grain.Item2)).ToArray();
                 Task.WaitAll(tasks);
                 stopwatch.Stop();
-                Console.WriteLine(" Insert elapsed: {0}", stopwatch.Elapsed);
+                output.WriteLine(" Insert elapsed: {0}", stopwatch.Elapsed);
 
                 stopwatch = Stopwatch.StartNew();
                 tasks = grains.Select(grain => dataManager.UpsertStateAsync(grain.Item1, grain.Item2)).ToArray();
                 Task.WaitAll(tasks);
                 stopwatch.Stop();
-                Console.WriteLine(" Update elapsed: {0}", stopwatch.Elapsed);
+                output.WriteLine(" Update elapsed: {0}", stopwatch.Elapsed);
             }
         }
-
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void WriteThenRead10KStates()
         {
             InstrumentationContext.Reset();
@@ -120,19 +123,18 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                 var tasks = grains.Select(grain => dataManager.UpsertStateAsync(grain.Item1, grain.Item2)).ToArray();
                 Task.WaitAll(tasks);
                 stopwatch.Stop();
-                Console.WriteLine(" Insert elapsed: {0}", stopwatch.Elapsed);
+                output.WriteLine(" Insert elapsed: {0}", stopwatch.Elapsed);
 
                 // now read
                 stopwatch = Stopwatch.StartNew();
                 var rtasks = grains.Select(grain => dataManager.ReadStateAsync(grain.Item1)).ToList();
                 Task.WaitAll(rtasks.Cast<Task>().ToArray());
                 stopwatch.Stop();
-                Console.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
+                output.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
             }
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void ReadNonExistentState()
         {
             Task.Run(async () =>
@@ -147,15 +149,14 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                     var stopwatch = Stopwatch.StartNew();
                     var state = await dataManager.ReadStateAsync(grainIdentity);
                     stopwatch.Stop();
-                    Console.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
+                    output.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
 
                     Assert.IsNull(state); 
                 }
             }).Wait();
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void OneWriteThenReadState()
         {
             Task.Run(async () =>
@@ -170,20 +171,19 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                     var stopwatch = Stopwatch.StartNew();
                     await dataManager.UpsertStateAsync(grainIdentity, state);
                     stopwatch.Stop();
-                    Console.WriteLine(" Insert elapsed: {0}", stopwatch.Elapsed);
+                    output.WriteLine(" Insert elapsed: {0}", stopwatch.Elapsed);
 
                     // now read
                     stopwatch = Stopwatch.StartNew();
                     var state2 = await dataManager.ReadStateAsync(grainIdentity);
                     stopwatch.Stop();
-                    Console.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
+                    output.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
                     Assert.AreEqual(state, state2);
                 }
             }).Wait();
         }
-
-        [Ignore]
-        [TestMethod, TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
+        
+        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("SQLAdapter"), TestCategory("Storage")]
         public void LookupTest()
         {
             Func<Range<int>, int, bool> func = (range, key) => range.Low <= key && (key < range.High || range.HighIsMax);

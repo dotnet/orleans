@@ -2,32 +2,27 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.TestHelper;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.AsyncPrimitivesTests
 {
-
-    [TestClass]
     public class AsyncPipelineTests
     {
+        private readonly ITestOutputHelper output;
         private const int _iterationCount = 100;
         private const int _defaultPipelineCapacity = 2;
 
-        public AsyncPipelineTests()
-        {}
+        public AsyncPipelineTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
 
-        [TestInitialize]
-        public void TestInitialize()
-        { }
-
-        [TestCleanup]
-        public void TestCleanup()
-        { }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void AsyncPipelineSimpleTest()
         {
             int step = 1000;
@@ -50,7 +45,7 @@ namespace UnitTests.AsyncPrimitivesTests
             Assert.IsTrue(3 * step - epsilon <= watch.ElapsedMilliseconds && watch.ElapsedMilliseconds <= 3 * step + epsilon);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void AsyncPipelineWaitTest()
         {
             Random rand = new Random(222);
@@ -96,7 +91,7 @@ namespace UnitTests.AsyncPrimitivesTests
             return result;
         }
         
-        [TestMethod, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task AsyncPipelineSingleThreadedBlackBoxConsistencyTest()
         {
             await AsyncPipelineBlackBoxConsistencyTest(1);
@@ -145,7 +140,7 @@ namespace UnitTests.AsyncPrimitivesTests
                     var delay = TimeSpan.FromSeconds(5);
                     while (tasksCompleted < expectedTasksCompleted)
                     {
-                        Console.WriteLine("test in progress: tasksCompleted = {0}.", tasksCompleted);
+                        output.WriteLine("test in progress: tasksCompleted = {0}.", tasksCompleted);
                         await Task.Delay(delay);
                     }
                 };
@@ -164,7 +159,7 @@ namespace UnitTests.AsyncPrimitivesTests
             var minTimeSec = (1.0 - variance) * targetTimeSec;
             var maxTimeSec = (1.0 + variance) * targetTimeSec;
             var actualSec = stopwatch.Elapsed.TotalSeconds;
-            Console.WriteLine(
+            output.WriteLine(
                 "Test finished in {0} sec, {1}% of target time {2} sec. Permitted variance is +/-{3}%",
                 actualSec,
                 actualSec / targetTimeSec * 100,

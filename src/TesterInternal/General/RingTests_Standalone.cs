@@ -1,17 +1,17 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
+using Xunit;
 
 namespace UnitTests.General
 {
-    [TestClass]
     public class RingTests_Standalone
     {
         private const int count = 5;
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Basic()
         {
             Dictionary<SiloAddress, ConsistentRingProvider> rings = CreateServers(count);
@@ -19,7 +19,7 @@ namespace UnitTests.General
             VerifyRing(rings);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Failures()
         {
             TestChurn(new int[] { 0 }, new int[] { });    // 1 failure in the beginning
@@ -35,7 +35,7 @@ namespace UnitTests.General
             TestChurn(new int[] { 0, count - 1 }, new int[] { }); // 2 failures at some distance
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Joins()
         {
             TestChurn(new int[] { }, new int[] { 0 });     // 1 join in the beginning
@@ -51,7 +51,7 @@ namespace UnitTests.General
             TestChurn(new int[] { }, new int[] { 0, count - 1 });  // 2 joins at some distance
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Mixed()
         {
             TestChurn(new int[] { 0 }, new int[] { 1 });     // FJ in the beginning

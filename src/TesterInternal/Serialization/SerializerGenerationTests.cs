@@ -1,6 +1,7 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Serialization;
 using Orleans.UnitTest.GrainInterfaces;
+using Xunit;
 
 // ReSharper disable NotAccessedVariable
 
@@ -9,16 +10,14 @@ namespace UnitTests.Serialization
     /// <summary>
     /// Test the built-in serializers
     /// </summary>
-    [TestClass]
     public class SerializerGenerationTests
     {
-        [TestInitialize]
-        public void InitializeForTesting()
+        public SerializerGenerationTests()
         {
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_TypeWithInternalNestedClass()
         {
             var v = new MyTypeWithAnInternalTypeField();

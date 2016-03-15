@@ -15,14 +15,16 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class ControllableStreamProviderTestsFixture : BaseClusterFixture
+    public class ControllableStreamProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamProviderTests.Fixture>
     {
-        public const string StreamProviderName = "ControllableTestStreamProvider";
-        public readonly string StreamProviderTypeName = typeof(ControllableTestStreamProvider).FullName;
+        public class Fixture : BaseClusterFixture
+        {
+            public const string StreamProviderName = "ControllableTestStreamProvider";
+            public readonly string StreamProviderTypeName = typeof(ControllableTestStreamProvider).FullName;
 
-        public ControllableStreamProviderTestsFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
                 {
                     StartFreshOrleans = true,
                     SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
@@ -39,18 +41,13 @@ namespace UnitTests.StreamingTests
                         config.GetOrCreateNodeConfigurationForSilo("Primary");
                         config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
                     }
-                }))
-        {
+                });
+            }
         }
-
-    }
-
-    public class ControllableStreamProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamProviderTestsFixture>
-    {
-        private ControllableStreamProviderTestsFixture fixture;
+        private Fixture fixture;
         private TestingSiloHost HostedCluster;
 
-        public ControllableStreamProviderTests(ControllableStreamProviderTestsFixture fixture)
+        public ControllableStreamProviderTests(Fixture fixture)
         {
             this.fixture = fixture;
             this.HostedCluster = fixture.HostedCluster;
@@ -77,7 +74,7 @@ namespace UnitTests.StreamingTests
             logger.Info("************************ ControllableAdapterEchoTest *********************************");
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, ControllableStreamProviderTestsFixture.StreamProviderName, (int)command, echoArg);
+            object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
             Assert.AreEqual(2, results.Length, "expected responses");
             Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)

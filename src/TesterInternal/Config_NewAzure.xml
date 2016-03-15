@@ -5,7 +5,7 @@
       DataConnectionString="DefaultEndpointsProtocol=https;AccountName=orleansdata1;AccountKey=SOMETHING1"/>
   </Globals>
   <Defaults>
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
     </Tracing>
   </Defaults>
   <Override Node="Primary">

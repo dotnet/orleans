@@ -1,12 +1,12 @@
 ﻿
 using System;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
     public class ObjectPoolTests
     {
         private class Accumulator
@@ -32,7 +32,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Alloc1Free1Test()
         {
             var accumulator = new Accumulator();
@@ -47,7 +47,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(1, accumulator.MaxAllocated);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Alloc10Free1Test()
         {
             var accumulator = new Accumulator();

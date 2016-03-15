@@ -251,12 +251,7 @@ namespace Tester.StreamingTests
 
     public class StreamFilteringTestsSMSFixture : BaseClusterFixture
     {
-        public StreamFilteringTestsSMSFixture() 
-            : base(CreateCluster())
-        {
-        }
-
-        private static TestingSiloHost CreateCluster()
+        protected override TestingSiloHost CreateClusterHost()
         {
             var siloOptions = new TestingSiloOptions
             {
@@ -277,12 +272,7 @@ namespace Tester.StreamingTests
 
     public class StreamFilteringTestsAQFixture : BaseClusterFixture
     {
-        public StreamFilteringTestsAQFixture() 
-            : base(CreateCluster())
-        {
-        }
-
-        private static TestingSiloHost CreateCluster()
+        protected override TestingSiloHost CreateClusterHost()
         {
             var siloOptions = new TestingSiloOptions
             {

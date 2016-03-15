@@ -4,7 +4,7 @@
   <Gateway Address="localhost" Port="40001" Proxied="true" />
   <!-- To turn tracing off, set DefaultTraceLevel="Off" and have no overrides.
     For the trace log file name, {0} is replaced by "Client" and {1} is the current time. -->
-  <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" BulkMessageLimit="1000">
+  <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" BulkMessageLimit="1000">
     <TraceLevelOverride LogPrefix="Runtime" TraceLevel="Info" />
     <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
     <TraceLevelOverride LogPrefix="Tetris" TraceLevel="Info" />

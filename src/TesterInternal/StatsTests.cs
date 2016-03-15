@@ -4,40 +4,48 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Xunit;
+using Tester;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.Stats
 {
-    [TestClass]
-    [DeploymentItem("MockStats_ClientConfiguration.xml")]
-    [DeploymentItem("MockStats_ServerConfiguration.xml")]
-    public class StatsInitTests : HostedTestClusterPerFixture
+    public class StatsInitTests : OrleansTestingBase, IClassFixture<StatsInitTests.Fixture>
     {
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
-        {
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            SiloConfigFile = new FileInfo("MockStats_ServerConfiguration.xml"),
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        };
+        private readonly ITestOutputHelper output;
 
-        private static readonly TestingClientOptions clientOptions = new TestingClientOptions
+        public class Fixture : BaseClusterFixture
         {
-            ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
-        };
-
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(siloOptions, clientOptions);
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    SiloConfigFile = new FileInfo("MockStats_ServerConfiguration.xml"),
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+                }, new TestingClientOptions
+                {
+                    ClientConfigFile = new FileInfo("MockStats_ClientConfiguration.xml")
+                });
+            }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
+        protected TestingSiloHost HostedCluster { get; private set; }
+
+        public StatsInitTests(ITestOutputHelper output, Fixture fixture)
+        {
+            this.output = output;
+            HostedCluster = fixture.HostedCluster;
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
         public void Stats_Init_Mock()
         {
             ClientConfiguration config = this.HostedCluster.ClientConfig;
@@ -63,9 +71,9 @@ namespace UnitTests.Stats
             long numClientMetricsCalls = clientMetricsCollector.NumMetricsCalls;
             long numSiloStatsCalls = siloStatsCollector.NumStatsCalls;
             long numSiloMetricsCalls = siloStatsCollector.NumMetricsCalls;
-            Console.WriteLine("Client - Metrics calls = {0} Stats calls = {1}", numClientMetricsCalls,
+            output.WriteLine("Client - Metrics calls = {0} Stats calls = {1}", numClientMetricsCalls,
                 numSiloMetricsCalls);
-            Console.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numClientStatsCalls, numSiloStatsCalls);
+            output.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numClientStatsCalls, numSiloStatsCalls);
 
             Assert.IsTrue(numClientMetricsCalls > 0, "Some client metrics calls = {0}", numClientMetricsCalls);
             Assert.IsTrue(numSiloMetricsCalls > 0, "Some silo metrics calls = {0}", numSiloMetricsCalls);
@@ -73,11 +81,17 @@ namespace UnitTests.Stats
             Assert.IsTrue(numSiloStatsCalls > 0, "Some silo stats calls = {0}", numSiloStatsCalls);
         }
     }
-
-    [TestClass]
+    
     public class StatsTestsNoSilo
     {
-        [TestMethod, TestCategory("Manual"), TestCategory("Stats")]
+        private readonly ITestOutputHelper output;
+
+        public StatsTestsNoSilo(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        [Fact, TestCategory("Manual"), TestCategory("Stats")]
         public void ApplicationRequestsStatisticsGroup_Perf()
         {
             var config = new NodeConfiguration();
@@ -110,7 +124,7 @@ namespace UnitTests.Stats
                     {
                         ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(times[i % nValues]);
                         //if (i % tenPercent == 0)
-                        //    Console.WriteLine("Thread {0}: {1}% done", capture, i * 100 / nIterations);
+                        //    output.WriteLine("Thread {0}: {1}% done", capture, i * 100 / nIterations);
                     }
                 }));
             }
@@ -118,47 +132,46 @@ namespace UnitTests.Stats
             Task.WhenAll(tasks).Wait();
             
             sw.Stop();
-            Console.WriteLine("Done.");
-            Console.WriteLine(sw.ElapsedMilliseconds);
+            output.WriteLine("Done. "+ sw.ElapsedMilliseconds);
         }
     }
 
 #if DEBUG || USE_SQL_SERVER
 
-    [TestClass]
-    [DeploymentItem("DevTestClientConfiguration.xml")]
-    [DeploymentItem("DevTestServerConfiguration.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    public class SqlClientInitTests : HostedTestClusterPerFixture
+    public class SqlClientInitTests : OrleansTestingBase, IClassFixture<SqlClientInitTests.Fixture>, IDisposable
     {
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            SiloConfigFile = new FileInfo("DevTestServerConfiguration.xml"),
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        };
-
-        private static readonly TestingClientOptions clientOptions = new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
-        };
-
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(siloOptions, clientOptions);
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    SiloConfigFile = new FileInfo("DevTestServerConfiguration.xml"),
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
+                }, new TestingClientOptions
+                {
+                    ClientConfigFile = new FileInfo("DevTestClientConfiguration.xml")
+                });
+            }
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        protected TestingSiloHost HostedCluster { get; private set; }
+
+        public SqlClientInitTests(Fixture fixture)
         {
-            //Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
+            HostedCluster = fixture.HostedCluster;
+        }
+        
+        public void Dispose()
+        {
+            //output.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
             // ResetAllAdditionalRuntimes();
             HostedCluster.StopAdditionalSilos();
         }
 
-        [TestMethod, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
         public void ClientInit_SqlServer_WithStats()
         {
             Assert.IsTrue(GrainClient.IsInitialized);

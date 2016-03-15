@@ -4,20 +4,19 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
-namespace UnitTests
+namespace UnitTests.General
 {
-    [TestClass]
-
-    public class GrainPlacementTests : HostedTestClusterPerFixture
+    public class GrainPlacementTests : HostedTestClusterPerTest
     {
-        public static TestingSiloHost CreateSiloHost()
+        public override TestingSiloHost CreateSiloHost()
         {
             return new TestingSiloHost(
                 new TestingSiloOptions
@@ -27,19 +26,13 @@ namespace UnitTests
                 }, new TestingClientOptions
                 {
                     ProxiedGateway = true,
-                    Gateways = new List<IPEndPoint>(new IPEndPoint[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
+                    Gateways = new List<IPEndPoint>(new[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
                     PreferedGatewayIndex = -1,
                     ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
                 });
         }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            this.HostedCluster.RestartDefaultSilos();
-        }
-
-        [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
+        
+        [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -52,7 +45,7 @@ namespace UnitTests
                 "The default placement strategy is expected to be random.");
         }
 
-        [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
+        [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task RandomlyPlacedGrainShouldPlaceActivationsRandomly()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -75,7 +68,7 @@ namespace UnitTests
                 "Grains should be on different silos, but they are on " + Utils.EnumerableToString(placesAsArray.ToArray())); // will randomly fail one in a million times if RNG is good :-)
         }
 
-        //[TestMethod, TestCategory("Placement"), TestCategory("Functional")]
+        //[Fact, TestCategory("Placement"), TestCategory("Functional")]
         //public void PreferLocalPlacedGrainShouldPlaceActivationsLocally_OneHop()
         //{
         //    HostedCluster.WaitForLivenessToStabilize();
@@ -98,7 +91,7 @@ namespace UnitTests
         //    }
         //}
 
-        [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
+        [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task PreferLocalPlacedGrainShouldPlaceActivationsLocally_TwoHops()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -152,7 +145,7 @@ namespace UnitTests
             return ActivationCount(CollectActivationIds(grain, sampleSize));
         }
 
-        //[TestMethod, TestCategory("Placement"), TestCategory("Functional")]
+        //[Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -168,7 +161,7 @@ namespace UnitTests
                 "A grain instantiated with the local placement strategy should create multiple activations acording to the parameterization of the strategy.");
         }
 
-        [TestMethod, TestCategory("Placement"), TestCategory("Functional")]
+        [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task LocallyPlacedGrainShouldCreateActivationsOnLocalSilo()
         {
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();

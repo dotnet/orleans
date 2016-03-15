@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
@@ -21,46 +23,36 @@ namespace UnitTests.StorageTests
         Sql
     }
 
-    [TestClass]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class LocalStoreTests
+    public class LocalStoreTestsFixture : IDisposable
     {
-        public TestContext TestContext { get; set; }
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        public LocalStoreTestsFixture()
         {
-            Console.WriteLine("ClassInitialize {0}", testContext.TestName);
-
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
 
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             TraceLogger.Initialize(cfg);
         }
 
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public void Dispose()
         {
             LocalDataStoreInstance.LocalDataStore = null;
         }
+    }
 
-        [TestInitialize]
-        public void TestInitialize()
+    public class LocalStoreTests : IClassFixture<LocalStoreTestsFixture>
+    {
+        private readonly ITestOutputHelper output;
+
+        public LocalStoreTests(ITestOutputHelper output)
         {
+            this.output = output;
             LocalDataStoreInstance.LocalDataStore = null;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            Console.WriteLine("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_Read()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -73,16 +65,16 @@ namespace UnitTests.StorageTests
             sw.Start();
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             Assert.AreEqual(state.A, data["A"], "A");
             Assert.AreEqual(state.B, data["B"], "B");
             Assert.AreEqual(state.C, data["C"], "C");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_WriteRead()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -97,34 +89,34 @@ namespace UnitTests.StorageTests
             sw.Restart();
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.AreEqual(state.State.A, data["A"], "A");
             Assert.AreEqual(state.State.B, data["B"], "B");
             Assert.AreEqual(state.State.C, data["C"], "C");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_Delete()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
             var data = TestStoreGrainState.NewRandomState();
 
-            Console.WriteLine("Using store = {0}", store.GetType().FullName);
+            output.WriteLine("Using store = {0}", store.GetType().FullName);
             Stopwatch sw = new Stopwatch();
 
             var keys = GetKeys(name, reference);
 
             sw.Restart();
             string eTag = store.WriteRow(keys, AsDictionary(data.State), null);
-            Console.WriteLine("Write returned Etag={0} after {1} {2}", eTag, sw.Elapsed, StorageProviderUtils.PrintOneWrite(keys, data, eTag));
+            output.WriteLine("Write returned Etag={0} after {1} {2}", eTag, sw.Elapsed, StorageProviderUtils.PrintOneWrite(keys, data, eTag));
 
             sw.Restart();
             var storedData = store.ReadRow(keys);
-            Console.WriteLine("Read returned {0} after {1}", StorageProviderUtils.PrintOneWrite(keys, storedData, eTag), sw.Elapsed);
+            output.WriteLine("Read returned {0} after {1}", StorageProviderUtils.PrintOneWrite(keys, storedData, eTag), sw.Elapsed);
             Assert.IsNotNull(data, "Should get some data from Read");
 
             sw.Restart();
@@ -133,14 +125,14 @@ namespace UnitTests.StorageTests
 
             sw.Restart();
             storedData = store.ReadRow(keys); // Try to re-read after delete
-            Console.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(storedData));
+            output.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(storedData));
             Assert.IsNotNull(data, "Should not get null data from Re-Read");
             Assert.IsTrue(storedData.Count == 0, "Should get no data from Re-Read but got: {0}", StorageProviderUtils.PrintData(storedData));
 
             sw.Restart();
             const string oldEtag = null;
             eTag = store.WriteRow(keys, storedData, oldEtag);
-            Console.WriteLine("Write for Keys={0} Etag={1} Data={2} returned New Etag={3} after {4}",
+            output.WriteLine("Write for Keys={0} Etag={1} Data={2} returned New Etag={3} after {4}",
                 StorageProviderUtils.PrintKeys(keys), oldEtag, StorageProviderUtils.PrintData(storedData),
                 eTag, sw.Elapsed);
 
@@ -149,10 +141,10 @@ namespace UnitTests.StorageTests
             Assert.IsTrue(ok, "Row deleted OK after {0}. Etag={1} Keys={2}", sw.Elapsed, eTag, StorageProviderUtils.PrintKeys(keys));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_ReadMulti()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -189,10 +181,10 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, results.Count, "Count");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void GrainState_Store_WriteRead()
         {
-            string name = TestContext.TestName;
+            string name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -211,7 +203,7 @@ namespace UnitTests.StorageTests
             sw.Restart();
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.AreEqual(state.A, data["A"], "A");
             Assert.AreEqual(state.B, data["B"], "B");
             Assert.AreEqual(state.C, data["C"], "C");

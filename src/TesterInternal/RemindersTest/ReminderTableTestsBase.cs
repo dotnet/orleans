@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -11,27 +11,19 @@ using UnitTests.StorageTests;
 
 namespace UnitTests.RemindersTest
 {
-    [TestClass]
-    public abstract class ReminderTableTestsBase
+    public abstract class ReminderTableTestsBase : IDisposable
     {
-        public TestContext TestContext { get; set; }
-
         private TraceLogger logger;
 
         private IReminderTable remindersTable;
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext = null)
+        public ReminderTableTestsBase()
         {
             TraceLogger.Initialize(new NodeConfiguration());
 
             // Set shorter init timeout for these tests
             OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
-        }
 
-        [TestInitialize]
-        public void TestInitialize()
-        {
             logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
             var serviceId = Guid.NewGuid();
             var deploymentId = "test-" + serviceId;
@@ -51,22 +43,16 @@ namespace UnitTests.RemindersTest
             remindersTable = rmndr;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public virtual void Dispose()
         {
+            // Reset init timeout after tests
+            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+
             if (remindersTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
                 remindersTable.TestOnlyClearTable().Wait();
                 remindersTable = null;
             }
-            logger.Info("Test {0} completed - Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            // Reset init timeout after tests
-            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
         }
 
         protected abstract IReminderTable CreateRemindersTable();

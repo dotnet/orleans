@@ -1,15 +1,15 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
     public class PolymorphicInterfaceTest : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic_SimpleTest()
         {
             var grainFullName = typeof(PolymorphicTestGrain).FullName;
@@ -19,7 +19,7 @@ namespace UnitTests.General
             Assert.AreEqual("A3", IARef.A3Method().Result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic_UpCastTest()
         {
             var grainFullName = typeof(PolymorphicTestGrain).FullName;
@@ -47,7 +47,7 @@ namespace UnitTests.General
             
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic_FactoryMethods()
         {
             var grainFullName = typeof(PolymorphicTestGrain).FullName;
@@ -58,7 +58,7 @@ namespace UnitTests.General
             Assert.AreEqual("A1", IARef.A1Method().Result);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic_ServiceType()
         {
             var grainFullName = typeof(ServiceType).FullName;
@@ -74,7 +74,7 @@ namespace UnitTests.General
         /// <summary>
         /// This unit test should consolidate all the use cases we are trying to cover with regard to polymorphic grain references
         /// </summary>
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void Polymorphic__DerivedServiceType()
         {
             var grainFullName = typeof(DerivedServiceType).FullName;

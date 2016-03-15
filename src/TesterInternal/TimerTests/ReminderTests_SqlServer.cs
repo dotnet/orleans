@@ -2,14 +2,13 @@
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
-using TestUtils = Tester.TestUtils;
+using Xunit;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -17,59 +16,40 @@ using TestUtils = Tester.TestUtils;
 namespace UnitTests.TimerTests
 {
 
+
 #if USE_SQL_SERVER || DEBUG
-    [TestClass]
-    public class ReminderTests_SqlServer : ReminderTests_Base
+    public class ReminderTests_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_SqlServer.Fixture>
     {
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            StartFreshOrleans = true,
-            DataConnectionString = "Set-in-ClassInitialize",
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer,
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-        };
-
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(siloOptions);
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(),
+                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer,
+                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
+                });
+            }
         }
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext context)
+        public ReminderTests_SqlServer(Fixture fixture) : base(fixture)
         {
-            Console.WriteLine("TestContext.DeploymentDirectory={0}", context.DeploymentDirectory);
-            Console.WriteLine("TestContext=");
-            Console.WriteLine(TestUtils.DumpTestContext(context));
-
-            siloOptions.DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(context);
-        }
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            this.DoTestInitialize();
-
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            DoTestCleanup();
-        }
-
+        
         // Basic tests
 
-        [TestMethod, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
         public async Task Rem_Sql_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [TestMethod, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
         public async Task Rem_Sql_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -77,7 +57,7 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [TestMethod, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();

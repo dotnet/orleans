@@ -2,21 +2,20 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
-    [TestClass]
-    [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("ClientConfig_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    public class StreamLifecycleTests : HostedTestClusterPerTest
+    public class StreamLifecycleTests : HostedTestClusterPerTest, IDisposable
     {
         protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
         {
@@ -35,62 +34,57 @@ namespace UnitTests.StreamingTests
         protected string StreamProviderName;
         protected string StreamNamespace;
 
+        private readonly ITestOutputHelper output;
         private IActivateDeactivateWatcherGrain watcher;
-
-        public TestContext TestContext { get; set; }
-
-        public static TestingSiloHost CreateSiloHost()
+        
+        public override TestingSiloHost CreateSiloHost()
         {
             return new TestingSiloHost(SiloRunOptions, ClientRunOptions);
         }
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public StreamLifecycleTests(ITestOutputHelper output)
         {
-            logger.Info("TestInitialize - {0}", TestContext.TestName);
+            this.output = output;
             watcher = GrainClient.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public override void Dispose()
         {
-            logger.Info("TestCleanup - {0} - Test completed: Outcome = {1}", TestContext.TestName, TestContext.CurrentTestOutcome);
-            StreamId = default(Guid);
-            StreamProviderName = null;
-            watcher.Clear().Wait();
+            watcher.Clear().WaitWithThrow(TimeSpan.FromSeconds(15));
+            base.Dispose();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_UseAfter_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task StreamCleanup_UseAfter_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
         public async Task Stream_Lifecycle_AddRemoveProducers()
         {
-            string testName = TestContext.TestName;
+            string testName = "Stream_Lifecycle_AddRemoveProducers";
             StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger);
 
             int numProducers = 10;
@@ -117,7 +111,7 @@ namespace UnitTests.StreamingTests
 
                 // Force Remove
                 await producer.TestInternalRemoveProducer(StreamId, StreamProviderName);
-                await StreamTestUtils.CheckPubSubCounts("producer #" + i + " remove", (i - 1), 1,
+                await StreamTestUtils.CheckPubSubCounts(output, "producer #" + i + " remove", (i - 1), 1,
                     StreamId, StreamProviderName, StreamNamespace);
             }
 
@@ -136,7 +130,7 @@ namespace UnitTests.StreamingTests
             }
             await Task.WhenAll(promises);
             await WaitForDeactivation();
-            await StreamTestUtils.CheckPubSubCounts("all producers deactivated", 0, 1,
+            await StreamTestUtils.CheckPubSubCounts(output, "all producers deactivated", 0, 1,
                     StreamId, StreamProviderName, StreamNamespace);
 
             when = "round 3";
@@ -155,6 +149,7 @@ namespace UnitTests.StreamingTests
 
                 // These Producers test grains always send first message when they register
                 await StreamTestUtils.CheckPubSubCounts(
+                    output, 
                     string.Format("producer #{0} create - {1}", i, when),
                     i, 1,
                     StreamId, StreamProviderName, StreamNamespace);
@@ -163,9 +158,8 @@ namespace UnitTests.StreamingTests
 
         // ---------- Test support methods ----------
 
-        private async Task DoStreamCleanupTest_Deactivate(bool uncleanShutdown, bool useStreamAfterDeactivate)
+        private async Task DoStreamCleanupTest_Deactivate(bool uncleanShutdown, bool useStreamAfterDeactivate, [CallerMemberName]string testName = null)
         {
-            string testName = TestContext.TestName;
             StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger);
 
             var producer1 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
@@ -176,7 +170,7 @@ namespace UnitTests.StreamingTests
 
             await consumer1.BecomeConsumer(StreamId, StreamNamespace, StreamProviderName);
             await producer1.BecomeProducer(StreamId, StreamNamespace, StreamProviderName);
-            await StreamTestUtils.CheckPubSubCounts("after first producer added", 1, 1,
+            await StreamTestUtils.CheckPubSubCounts(output, "after first producer added", 1, 1,
                 StreamId, StreamProviderName, StreamNamespace);
 
             Assert.AreEqual(1, await producer1.GetSendCount(), "SendCount after first send");
@@ -203,13 +197,13 @@ namespace UnitTests.StreamingTests
             Assert.AreEqual(1, deactivations.Count(), "Number of deactivations");
 
             // Test grains that did unclean shutdown will not have cleaned up yet, so PubSub counts are unchanged here for them
-            await StreamTestUtils.CheckPubSubCounts("after deactivate first producer", expectedNumProducers, 1,
+            await StreamTestUtils.CheckPubSubCounts(output, "after deactivate first producer", expectedNumProducers, 1,
                 StreamId, StreamProviderName, StreamNamespace);
 
             // Add another consumer - which forces cleanup of dead producers and PubSub counts should now always be correct
             await consumer2.BecomeConsumer(StreamId, StreamNamespace, StreamProviderName);
             // Runtime should have cleaned up after next consumer added
-            await StreamTestUtils.CheckPubSubCounts("after add second consumer", 0, 2,
+            await StreamTestUtils.CheckPubSubCounts(output, "after add second consumer", 0, 2,
                 StreamId, StreamProviderName, StreamNamespace);
 
             if (useStreamAfterDeactivate)
@@ -218,7 +212,7 @@ namespace UnitTests.StreamingTests
                 await producer2.BecomeProducer(StreamId, StreamNamespace, StreamProviderName);
 
                 // These Producer test grains always send first message when they BecomeProducer, so should be registered with PubSub
-                await StreamTestUtils.CheckPubSubCounts("after add second producer", 1, 2,
+                await StreamTestUtils.CheckPubSubCounts(output, "after add second producer", 1, 2,
                     StreamId, StreamProviderName, StreamNamespace);
                 Assert.AreEqual(1, await producer1.GetSendCount(), "SendCount (Producer#1) after second publisher added");
                 Assert.AreEqual(1, await producer2.GetSendCount(), "SendCount (Producer#2) after second publisher added");
@@ -228,7 +222,7 @@ namespace UnitTests.StreamingTests
 
                 await producer2.SendItem(3);
 
-                await StreamTestUtils.CheckPubSubCounts("after second producer send", 1, 2,
+                await StreamTestUtils.CheckPubSubCounts(output, "after second producer send", 1, 2,
                     StreamId, StreamProviderName, StreamNamespace);
                 Assert.AreEqual(3, await consumer1.GetReceivedCount(), "ReceivedCount (Consumer#1) after second publisher send");
                 Assert.AreEqual(2, await consumer2.GetReceivedCount(), "ReceivedCount (Consumer#2) after second publisher send");

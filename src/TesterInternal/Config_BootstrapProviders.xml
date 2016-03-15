@@ -16,7 +16,7 @@
   <Defaults>
     <Networking Address="localhost" Port="22222"/>
     <ProxyingGateway Address="localhost" Port="40000" />
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false" >
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false" >
       <TraceLevelOverride LogPrefix="ProviderLoader" TraceLevel="Verbose" />
       <TraceLevelOverride LogPrefix="BootstrapProviderManager" TraceLevel="Verbose" />
       <TraceLevelOverride LogPrefix="ManagementGrain" TraceLevel="Verbose" />

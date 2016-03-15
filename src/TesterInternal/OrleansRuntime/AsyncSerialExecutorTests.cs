@@ -1,28 +1,27 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime
 {
-    [TestClass]
     public class AsyncSerialExecutorTests
     {
-        private static TraceLogger logger;
+        public TraceLogger logger;
         private SafeRandom random;
-        private int operationsInProgress;
+        public int operationsInProgress;
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext context)
+        public AsyncSerialExecutorTests()
         {
             TraceLogger.Initialize(new NodeConfiguration());
             logger = TraceLogger.GetLogger("AsyncSerialExecutorTests", TraceLogger.LoggerType.Application);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Async")]
+        [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_Small()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
@@ -37,7 +36,7 @@ namespace UnitTests.OrleansRuntime
             await Task.WhenAll(tasks);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Async")]
+        [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_SerialSubmit()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
@@ -52,7 +51,7 @@ namespace UnitTests.OrleansRuntime
             await Task.WhenAll(tasks);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Async")]
+        [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_ParallelSubmit()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();

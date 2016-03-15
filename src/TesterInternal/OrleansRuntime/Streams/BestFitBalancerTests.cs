@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Streams;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
     public class BestFitBalancerTests
     {
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void IdealCaseMoreResourcesThanBucketsTest()
         {
             const int resourceCount = 99;
@@ -22,7 +22,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void IdealCaseMoreResourcesThanBuckets2Test()
         {
             const int resourceCount = 100;
@@ -35,7 +35,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void IdealCaseLessResourcesThanBucketsTest()
         {
             const int bucketCount = 99;
@@ -48,7 +48,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void IdealCaseLessResourcesThanBuckets2Test()
         {
             const int bucketCount = 100;
@@ -61,7 +61,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void IdealCaseResourcesMatchBucketsTest()
         {
             const int bucketCount = 100;
@@ -74,7 +74,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void IdealCaseResourcesDevisibleByBucketsTest()
         {
             const int resourceCount = 100;
@@ -87,7 +87,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(buckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void IdealCaseRangedTest()
         {
             const int MaxResourceCount = 20;
@@ -107,7 +107,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void HalfBucketsActiveTest()
         {
             const int resourceCount = 99;
@@ -122,7 +122,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ValidateBalance(activeBuckets, resources, balancerResults, idealBalance);
         }
 
-        [TestMethod, TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public void OrderIrrelevantTest()
         {
             const int resourceCount = 99;

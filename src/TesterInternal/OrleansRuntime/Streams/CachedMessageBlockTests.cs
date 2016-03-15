@@ -1,13 +1,13 @@
 ﻿
 using System;
 using System.Collections.Generic;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
     public class CachedMessageBlockTests
     {
         private const int TestBlockSize = 100;
@@ -104,7 +104,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Add1Remove1Test()
         {
             IObjectPool<CachedMessageBlock<TestQueueMessage, TestCachedMessage>> pool = new MyTestPooled();
@@ -114,7 +114,7 @@ namespace UnitTests.OrleansRuntime.Streams
             RemoveAndCheck(block, 0, 0);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Add2Remove1UntilFull()
         {
             IObjectPool<CachedMessageBlock<TestQueueMessage, TestCachedMessage>> pool = new MyTestPooled();
@@ -144,7 +144,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.IsFalse(block.HasCapacity);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void FirstMessageWithSequenceNumberTest()
         {
             IObjectPool<CachedMessageBlock<TestQueueMessage, TestCachedMessage>> pool = new MyTestPooled();
@@ -167,7 +167,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber / 2 + 1)));
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void NextInStreamTest()
         {
             IObjectPool<CachedMessageBlock<TestQueueMessage, TestCachedMessage>> pool = new MyTestPooled();

@@ -1,6 +1,6 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -8,6 +8,9 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
+using Xunit;
+using Tester;
+using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -18,109 +21,110 @@ namespace UnitTests.StorageTests
     /// <summary>
     /// PersistenceGrainTests using AzureTableStore - Requires access to external Azure table storage
     /// </summary>
-    [TestClass]
-    [DeploymentItem("Config_AzureTableStorage.xml")]
-    public class PersistenceGrainTests_AzureTableStore : Base_PersistenceGrainTests_AzureStore
+    public class PersistenceGrainTests_AzureTableStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableStore.Fixture>
     {
-        private static Guid serviceId = Guid.NewGuid();
-
-        private static readonly TestingSiloOptions testSiloOptions = new TestingSiloOptions
+        public class Fixture : BaseClusterFixture
         {
-            SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            AdjustConfig = config =>
+            protected override TestingSiloHost CreateClusterHost()
             {
-                config.Globals.ServiceId = serviceId;
+                Guid serviceId = Guid.NewGuid();
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    SiloConfigFile = new FileInfo("Config_AzureTableStorage.xml"),
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    AdjustConfig = config =>
+                    {
+                        config.Globals.ServiceId = serviceId;
+                    }
+                });
             }
-        };
-
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(testSiloOptions);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        public PersistenceGrainTests_AzureTableStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        {
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_AzureTableStore_Delete()
         {
             await base.Grain_AzureStore_Delete();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_AzureTableStore_Read()
         {
             await base.Grain_AzureStore_Read();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_GuidKey_AzureTableStore_Read_Write()
         {
             await base.Grain_GuidKey_AzureStore_Read_Write();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_LongKey_AzureTableStore_Read_Write()
         {
             await base.Grain_LongKey_AzureStore_Read_Write();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_LongKeyExtended_AzureTableStore_Read_Write()
         {
             await base.Grain_LongKeyExtended_AzureStore_Read_Write();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_GuidKeyExtended_AzureTableStore_Read_Write()
         {
             await base.Grain_GuidKeyExtended_AzureStore_Read_Write();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_Generic_AzureTableStore_Read_Write()
         {
             await base.Grain_Generic_AzureStore_Read_Write();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_Generic_AzureTableStore_DiffTypes()
         {
             await base.Grain_Generic_AzureStore_DiffTypes();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task Grain_AzureTableStore_SiloRestart()
         {
             await base.Grain_AzureStore_SiloRestart();
         }
 
-        [TestMethod, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
+        [Fact, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
         public void Persistence_Perf_Activate_AzureTableStore()
         {
             base.Persistence_Perf_Activate();
         }
 
-        [TestMethod, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
+        [Fact, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
         public void Persistence_Perf_Write_AzureTableStore()
         {
             base.Persistence_Perf_Write();
         }
 
-        [TestMethod, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
+        [Fact, TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("Performance"), TestCategory("Azure"), TestCategory("Stress")]
         public void Persistence_Perf_Write_Reread_AzureTableStore()
         {
             base.Persistence_Perf_Write_Reread();
         }
 
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void Persistence_Silo_StorageProvider_AzureTableStore()
         {
             base.Persistence_Silo_StorageProvider_Azure(typeof(AzureTableStorage));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void AzureTableStore_ConvertToFromStorageFormat_GrainReference()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
@@ -139,7 +143,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(initialState.Grain, convertedState.Grain, "Grain");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void AzureTableStore_ConvertToFromStorageFormat_GrainReference_List()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.

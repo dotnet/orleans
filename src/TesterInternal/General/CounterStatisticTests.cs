@@ -1,32 +1,32 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    [TestClass]
-    public class CounterStatisticTest
+    public class CounterStatisticTest : IDisposable
     {
+        private readonly ITestOutputHelper output;
         private CounterStatistic[] counters;
         
-        [TestInitialize]
-        public void InitializeForTesting()
+        public CounterStatisticTest(ITestOutputHelper output)
         {
+            this.output = output;
             counters = new CounterStatistic[Environment.ProcessorCount];
         }
 
-        [TestCleanup]
-        public void Clean()
+        public virtual void Dispose()
         {
             for (int i = 0; i < counters.Length; i++)
             {
                 CounterStatistic.Delete("test" + i);                
             }
-            counters = null;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Statistics")]
+        [Fact, TestCategory("Functional"), TestCategory("Statistics")]
         public void TestMultithreadedCorrectness()
         {
             int numOfIterations = 1000000;
@@ -49,7 +49,7 @@ namespace UnitTests.General
             for (int i = 0; i < counters.Length; i++)
             {
                 var counter = CounterStatistic.FindOrCreate(new StatisticName("test" + i));
-                Console.WriteLine(""+ counter.GetCurrentValue());
+                output.WriteLine(""+ counter.GetCurrentValue());
                 
                 Assert.AreEqual(i*Environment.ProcessorCount*numOfIterations, counter.GetCurrentValue());
             }

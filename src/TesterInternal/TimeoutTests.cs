@@ -1,34 +1,35 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests
 {
-    [TestClass]
     // if we paralellize tests, this should run in isolation
-    public class TimeoutTests : HostedTestClusterEnsureDefaultStarted
+    public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
+        private readonly ITestOutputHelper output;
         private TimeSpan originalTimeout;
-
-        [TestInitialize]
-        public void Initialize()
+        
+        public TimeoutTests(ITestOutputHelper output)
         {
+            this.output = output;
             originalTimeout = RuntimeClient.Current.GetResponseTimeout();
         }
 
-        [TestCleanup]
-        public void Cleanup()
+        public void Dispose()
         {
             RuntimeClient.Current.SetResponseTimeout(originalTimeout);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timeout")]
+        [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public void Timeout_LongMethod()
         {
             bool finished = false;
@@ -57,7 +58,7 @@ namespace UnitTests
                     Assert.Fail("Should not have got here " + exc);
                 }
             }
-            Console.WriteLine("Waited for " + stopwatch.Elapsed);
+            output.WriteLine("Waited for " + stopwatch.Elapsed);
             Assert.IsTrue(!finished);
             Assert.IsTrue(stopwatch.Elapsed >= timeout.Multiply(0.9), "Waited less than " + timeout.Multiply(0.9) + ". Waited " + stopwatch.Elapsed);
             Assert.IsTrue(stopwatch.Elapsed <= timeout.Multiply(2), "Waited longer than " + timeout.Multiply(2) + ". Waited " + stopwatch.Elapsed);

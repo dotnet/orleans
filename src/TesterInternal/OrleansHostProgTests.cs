@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Net;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
+using Xunit;
 
 // ReSharper disable ConvertToConstant.Local
 
 namespace UnitTests.Management
 {
-    [TestClass]
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [DeploymentItem("ClientConfiguration.xml")]
     public class OrleansHostProgTests
     {
         readonly string hostname;
@@ -20,7 +18,7 @@ namespace UnitTests.Management
             this.hostname = Dns.GetHostName();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseNoArgs()
         {
             var expectedSiloName = this.hostname;
@@ -31,7 +29,7 @@ namespace UnitTests.Management
             Assert.AreEqual(expectedSiloName, prog.SiloHost.Name);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseUsageArg()
         {
             WindowsServerHost prog = new WindowsServerHost();
@@ -40,7 +38,7 @@ namespace UnitTests.Management
             Assert.IsFalse(prog.ParseArguments(new string[] { "/help" }));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseUsageArgWithOtherArgs()
         {
             WindowsServerHost prog = new WindowsServerHost();
@@ -48,7 +46,7 @@ namespace UnitTests.Management
             Assert.IsFalse(prog.ParseArguments(new string[] { "SiloName", "CfgFile.xml", "/?" }));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseBadArguments()
         {
             WindowsServerHost prog = new WindowsServerHost();
@@ -60,7 +58,7 @@ namespace UnitTests.Management
             Assert.IsFalse(prog.ParseArguments(new string[] { "DeploymentGroup=" }));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseSiloNameArg()
         {
             var expectedSiloName = "MySilo";
@@ -71,7 +69,7 @@ namespace UnitTests.Management
             Assert.AreEqual(expectedSiloName, prog.SiloHost.Name);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParsePrimarySiloNameArg()
         {
             var expectedSiloName = "Primary";
@@ -83,7 +81,7 @@ namespace UnitTests.Management
             Assert.AreEqual(expectedSiloName, prog.SiloHost.Name);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseConfigFileArg()
         {
             var expectedSiloName = "MySilo";
@@ -96,7 +94,7 @@ namespace UnitTests.Management
             Assert.AreEqual(expectedConfigFileName, prog.SiloHost.ConfigFileName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseDeploymentIdArg()
         {
             var expectedSiloName = this.hostname;
@@ -107,7 +105,7 @@ namespace UnitTests.Management
             Assert.AreEqual(expectedDeploymentId, prog.SiloHost.DeploymentId);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseDeploymentGroupArg()
         {
             var expectedSiloName = this.hostname;
@@ -118,7 +116,7 @@ namespace UnitTests.Management
             Assert.IsNull(prog.SiloHost.DeploymentId);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseDeploymentGroupArgFormats()
         {
             var expectedDeploymentId = Guid.NewGuid().ToString("N");
@@ -157,7 +155,7 @@ namespace UnitTests.Management
             Assert.AreEqual(expectedDeploymentId, prog.SiloHost.DeploymentId);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseDeploymentGroupLastArgWins()
         {
             var expectedDeploymentId1 = Guid.NewGuid();
@@ -172,7 +170,7 @@ namespace UnitTests.Management
             Assert.AreEqual(expectedDeploymentId2.ToString(), prog.SiloHost.DeploymentId);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
+        [Fact, TestCategory("Functional"), TestCategory("Host"), TestCategory("CmdLineArgs")]
         public void OrleansHostParseMultipleArgs()
         {
             var expectedSiloName = "MySilo";

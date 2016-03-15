@@ -1,21 +1,34 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
+using Xunit;
+using Tester;
 
 namespace UnitTests.HaloTests.Streaming
 {
-    [DeploymentItem("Config_StreamProviders.xml")]
-    [DeploymentItem("OrleansProviders.dll")]
-    [TestClass]
-    public class HaloStreamSubscribeTests : HostedTestClusterPerFixture
+    public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>, IDisposable
     {
+        public class Fixture : BaseClusterFixture
+        {
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    // StartSecondary = false,
+                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
+                });
+            }
+        }
+
+        protected TestingSiloHost HostedCluster { get; private set; }
+
         private const string SmsStreamProviderName = "SMSProvider";
         private const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
@@ -23,18 +36,12 @@ namespace UnitTests.HaloTests.Streaming
         private Guid _streamId;
         private string _streamProvider;
 
-        public static TestingSiloHost CreateSiloHost()
+        public HaloStreamSubscribeTests(Fixture fixture)
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    // StartSecondary = false,
-                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-                });
+            HostedCluster = fixture.HostedCluster;
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public void Dispose()
         {
             if (_streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
@@ -42,7 +49,7 @@ namespace UnitTests.HaloTests.Streaming
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
         public async Task Halo_SMS_ResubscribeTest_ConsumerProducer()
         {
             logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ConsumerProducer ********************************* \n\n");
@@ -54,7 +61,7 @@ namespace UnitTests.HaloTests.Streaming
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
         public async Task Halo_SMS_ResubscribeTest_ProducerConsumer()
         {
             logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ProducerConsumer ********************************* \n\n");
@@ -66,7 +73,7 @@ namespace UnitTests.HaloTests.Streaming
             await ProducerConsumerTest(producerGuid, consumerGuid);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
         public async Task Halo_AzureQueue_ResubscribeTest_ConsumerProducer()
         {
             logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
@@ -78,7 +85,7 @@ namespace UnitTests.HaloTests.Streaming
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
         public async Task Halo_AzureQueue_ResubscribeTest_ProducerConsumer()
         {
             logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");

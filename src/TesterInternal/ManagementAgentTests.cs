@@ -1,12 +1,12 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
+using Xunit;
 
 namespace UnitTests
 {
-    [TestClass]
     public class ManagementAgentTests
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void SystemStatusEquals()
         {
             SystemStatus same1 = SystemStatus.Terminated;
@@ -18,7 +18,7 @@ namespace UnitTests
             CheckNotEquals(same2, other);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void SystemStatusCurrent()
         {
             SystemStatus.Current = null;
@@ -31,7 +31,7 @@ namespace UnitTests
             Assert.IsTrue(SystemStatus.Current == SystemStatus.Running);
         }
 
-        //[TestMethod]
+        //[Fact]
         //public void CheckEventChannelEnvSetup()
         //{
         //    bool found = ManagementBusConnector.CheckEventChannelEnvSetup();

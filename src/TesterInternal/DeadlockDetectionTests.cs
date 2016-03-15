@@ -2,32 +2,34 @@
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
-    public class DeadlockDetectionTests : HostedTestClusterPerFixture
+    public class DeadlockDetectionTests : OrleansTestingBase, IClassFixture<DeadlockDetectionTests.Fixture>
     {
-        private const int numIterations = 30;
-
-        public static TestingSiloHost CreateSiloHost()
+        private class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
                 {
-                    StartFreshOrleans = true,
                     AdjustConfig = config =>
                     {
                         config.Globals.PerformDeadlockDetection = true;
                     }
                 });
+            }
         }
+
+        private const int numIterations = 30;
 
         // 2 silos, loop across all cases (to force all grains to be local and remote):
         //      Non Reentrant A, B
@@ -39,12 +41,13 @@ namespace UnitTests.General
         // 5) No Deadlock C, A, C
 
         // 1) Deadlock A, A
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_1()
         {
+            long baseGrainId = random.Next();
             for (int i = 0; i < numIterations; i++)
             {
-                long grainId = i;
+                long grainId = baseGrainId + i;
                 IDeadlockNonReentrantGrain firstGrain = GrainClient.GrainFactory.GetGrain<IDeadlockNonReentrantGrain>(grainId);
                 List<Tuple<long, bool>> callChain = new List<Tuple<long, bool>>();
                 callChain.Add(new Tuple<long, bool>(grainId, true));
@@ -66,13 +69,14 @@ namespace UnitTests.General
         }
 
         // 2) Deadlock A, B, A
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_2()
         {
+            long baseGrainId = random.Next();
             long bBase = 100;
             for (int i = 0; i < numIterations; i++)
             {
-                long grainId = i;
+                long grainId = baseGrainId + i;
                 IDeadlockNonReentrantGrain firstGrain = GrainClient.GrainFactory.GetGrain<IDeadlockNonReentrantGrain>(grainId);
                 List<Tuple<long, bool>> callChain = new List<Tuple<long, bool>>();
                 callChain.Add(new Tuple<long, bool>(grainId, true));
@@ -95,13 +99,14 @@ namespace UnitTests.General
         }
 
         // 3) Deadlock C, A, C, A
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_3()
         {
+            long baseGrainId = random.Next();
             long cBase = 200;
             for (int i = 0; i < numIterations; i++)
             {
-                long grainId = i;
+                long grainId = baseGrainId + i;
                 IDeadlockReentrantGrain firstGrain = GrainClient.GrainFactory.GetGrain<IDeadlockReentrantGrain>(grainId);
                 List<Tuple<long, bool>> callChain = new List<Tuple<long, bool>>();
                 callChain.Add(new Tuple<long, bool>(cBase + grainId, false));
@@ -125,13 +130,14 @@ namespace UnitTests.General
         }
 
         // 4) No Deadlock C, C
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_4()
         {
+            long baseGrainId = random.Next();
             long cBase = 200;
             for (int i = 0; i < numIterations; i++)
             {
-                long grainId = i;
+                long grainId = baseGrainId + i;
                 IDeadlockReentrantGrain firstGrain = GrainClient.GrainFactory.GetGrain<IDeadlockReentrantGrain>(grainId);
                 List<Tuple<long, bool>> callChain = new List<Tuple<long, bool>>();
                 callChain.Add(new Tuple<long, bool>(cBase + grainId, false));
@@ -142,13 +148,14 @@ namespace UnitTests.General
         }
 
         // 5) No Deadlock C, A, C
-        [TestMethod, TestCategory("Functional"), TestCategory("Deadlock")]
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
         public async Task DeadlockDetection_5()
         {
+            long baseGrainId = random.Next();
             long cBase = 200;
             for (int i = 0; i < numIterations; i++)
             {
-                long grainId = i;
+                long grainId = baseGrainId + i;
                 IDeadlockReentrantGrain firstGrain = GrainClient.GrainFactory.GetGrain<IDeadlockReentrantGrain>(grainId);
                 List<Tuple<long, bool>> callChain = new List<Tuple<long, bool>>();
                 callChain.Add(new Tuple<long, bool>(cBase + grainId, false));

@@ -1,6 +1,6 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -15,6 +15,9 @@ using System.Threading.Tasks;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
+using System.IO;
+using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -25,8 +28,10 @@ namespace UnitTests.StorageTests
     /// <summary>
     /// Base_PersistenceGrainTests - a base class for testing persistence providers
     /// </summary>
-    public abstract class Base_PersistenceGrainTests_AzureStore : HostedTestClusterPerFixture
+    public abstract class Base_PersistenceGrainTests_AzureStore : OrleansTestingBase
     {
+        private readonly ITestOutputHelper output;
+        protected TestingSiloHost HostedCluster { get; private set; }
         private readonly double timingFactor;
 
         private const int LoopIterations_Grain = 1000;
@@ -35,8 +40,10 @@ namespace UnitTests.StorageTests
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
 
-        public Base_PersistenceGrainTests_AzureStore()
+        public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseClusterFixture fixture)
         {
+            this.output = output;
+            HostedCluster = fixture.HostedCluster;
             timingFactor = TestUtils.CalibrateTimings();
         }
 
@@ -264,7 +271,7 @@ namespace UnitTests.StorageTests
             var initialServiceId = this.HostedCluster.Globals.ServiceId;
             var initialDeploymentId = this.HostedCluster.DeploymentId;
 
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
+            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -275,11 +282,11 @@ namespace UnitTests.StorageTests
 
             await grain.DoWrite(1);
 
-            Console.WriteLine("About to reset Silos");
+            output.WriteLine("About to reset Silos");
             this.HostedCluster.RestartDefaultSilos(true);
-            Console.WriteLine("Silos restarted");
+            output.WriteLine("Silos restarted");
 
-            Console.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
+            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
             Assert.AreEqual(initialServiceId, this.HostedCluster.Globals.ServiceId, "ServiceId same after restart.");
             Assert.AreNotEqual(initialDeploymentId, this.HostedCluster.DeploymentId, "DeploymentId different after restart.");
 
@@ -408,7 +415,7 @@ namespace UnitTests.StorageTests
             }
         }
 
-        private static void RunIterations(string testName, int n, Func<int, Task> action)
+        private void RunIterations(string testName, int n, Func<int, Task> action)
         {
             List<Task> promises = new List<Task>();
             Stopwatch sw = Stopwatch.StartNew();
@@ -421,13 +428,13 @@ namespace UnitTests.StorageTests
                 {
                     Task.WaitAll(promises.ToArray(), AzureTableDefaultPolicies.TableCreationTimeout);
                     promises.Clear();
-                    //Console.WriteLine("{0} has done {1} iterations  in {2} at {3} RPS",
+                    //output.WriteLine("{0} has done {1} iterations  in {2} at {3} RPS",
                     //                  testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
                 }
             }
             Task.WaitAll(promises.ToArray(), AzureTableDefaultPolicies.TableCreationTimeout);
             sw.Stop();
-            Console.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
+            output.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
                               testName, n, sw.Elapsed, n / sw.Elapsed.TotalSeconds);
         }
         #endregion

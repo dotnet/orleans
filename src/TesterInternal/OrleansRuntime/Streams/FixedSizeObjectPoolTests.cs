@@ -1,12 +1,12 @@
 ﻿
 using System;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
     public class FixedSizeObjectPoolTests
     {
         private class Accumulator
@@ -33,7 +33,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Alloc1Free1Test()
         {
             var accumulator = new Accumulator();
@@ -50,7 +50,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(0, accumulator.CurrentlyAllocated);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Alloc10Free1Test()
         {
             var accumulator = new Accumulator();
@@ -78,7 +78,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(0, accumulator.CurrentlyAllocated);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Alloc50Max10Test()
         {
             var accumulator = new Accumulator();
@@ -92,7 +92,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(10, accumulator.CurrentlyAllocated);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Alloc50Max10DoubleFreeTest()
         {
             var accumulator = new Accumulator();

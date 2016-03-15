@@ -1,27 +1,42 @@
 ﻿using System;
 using System.Threading;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.MessageCenterTests
 {
-    [TestClass]
     public class AsynchAgentRestartTest
     {
+        private readonly ITestOutputHelper output;
+
         private class TestAgent : AsynchAgent
         {
+            private readonly ITestOutputHelper output;
+
+            public TestAgent(ITestOutputHelper output)
+            {
+                this.output = output;
+            }
+
             protected override void Run()
             {
-                Console.WriteLine("Agent running in thread " + this.ManagedThreadId);
+                output.WriteLine("Agent running in thread " + this.ManagedThreadId);
                 Cts.Token.WaitHandle.WaitOne();
-                Console.WriteLine("Agent stopping in thread " + this.ManagedThreadId);
+                output.WriteLine("Agent stopping in thread " + this.ManagedThreadId);
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Messaging")]
+        public AsynchAgentRestartTest(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentRestart()
         {
-            TestAgent t = new TestAgent();
+            TestAgent t = new TestAgent(output);
 
             t.Start();
             Assert.AreEqual<ThreadState>(ThreadState.Running, t.State, "Agent state is wrong after initial start");
@@ -48,10 +63,10 @@ namespace UnitTests.MessageCenterTests
             Thread.Sleep(100);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Messaging")]
+        [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentStartWhileStarted()
         {
-            TestAgent t = new TestAgent();
+            TestAgent t = new TestAgent(output);
 
             t.Start();
             Thread.Sleep(100);
@@ -69,10 +84,10 @@ namespace UnitTests.MessageCenterTests
             t.Stop();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Messaging")]
+        [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentStopWhileStopped()
         {
-            TestAgent t = new TestAgent();
+            TestAgent t = new TestAgent(output);
 
             t.Start();
             Thread.Sleep(100);

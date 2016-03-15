@@ -2,10 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -14,10 +15,9 @@ namespace UnitTests.CodeGeneration
     /// <summary>
     /// Summary description for CodeGeneratorTests
     /// </summary>
-    [TestClass]
     public class CodeGeneratorTests
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen")]
         public void ServiceInterface_IsGrainClass()
         {
             Type t = typeof(Grain);
@@ -27,28 +27,28 @@ namespace UnitTests.CodeGeneration
             Assert.IsTrue(TypeUtils.IsSystemTargetClass(t), t.FullName + " should be a system target class");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
         public void TypeUtils_RawClassName_Generic_1()
         {
             Type t = typeof(ISimpleGenericGrain1<>);
             Assert.AreEqual("ISimpleGenericGrain1`1", TypeUtils.GetRawClassName(TypeUtils.GetSimpleTypeName(t), t));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
         public void TypeUtils_RawClassName_Generic_2()
         {
             Type t = typeof(ISimpleGenericGrain2<,>);
             Assert.AreEqual("ISimpleGenericGrain2`2", TypeUtils.GetRawClassName(TypeUtils.GetSimpleTypeName(t), t));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
         public void TypeUtils_RawClassName_Generic_String_1()
         {
             string typeString = "GenericTestGrains.SimpleGenericGrain1`1[[System.Object, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]";
             Assert.AreEqual("GenericTestGrains.SimpleGenericGrain1`1", TypeUtils.GetRawClassName(typeString));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen")]
         public void IsGrainMethod()
         {
             Type t = typeof (ISimpleGrain);
@@ -58,7 +58,7 @@ namespace UnitTests.CodeGeneration
             Assert.IsTrue(TypeUtils.IsGrainMethod(meth), "Method " + meth.DeclaringType + "." + meth.Name + " should be a grain method");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen")]
         public void IsTaskGrainMethod()
         {
             Type t = typeof(IEchoTaskGrain);
@@ -70,7 +70,7 @@ namespace UnitTests.CodeGeneration
             Assert.IsTrue(TypeUtils.IsGrainMethod(meth), "Method " + meth.DeclaringType + "." + meth.Name + " should be a grain method");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("CodeGen")]
+        [Fact, TestCategory("Functional"), TestCategory("CodeGen")]
         public void CodeGen_ObjectTo_List()
         {
             List<String> list = new List<string> { "1", "2" };

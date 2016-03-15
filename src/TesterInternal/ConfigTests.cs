@@ -3,7 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -11,6 +11,8 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost;
 using UnitTests.StorageTests;
+using Xunit;
+using Xunit.Abstractions;
 
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable CheckNamespace
@@ -18,70 +20,50 @@ using UnitTests.StorageTests;
 
 namespace UnitTests
 {
-    [TestClass]
-    [DeploymentItem("ClientConfig_AzureWebRole.xml")]
-    [DeploymentItem("ClientConfig_NewAzure.xml")]
-    [DeploymentItem("Config_LogConsumers-OrleansConfiguration.xml")]
-    [DeploymentItem("Config_LogConsumers-ClientConfiguration.xml")]
-    [DeploymentItem("Config_NonTimestampedLogFileNames.xml")]
-    [DeploymentItem("Config_TestSiloConfig.xml")]
-    [DeploymentItem("Config_StorageProvider_Azure1.xml")]
-    [DeploymentItem("Config_StorageProvider_Azure2.xml")]
-    [DeploymentItem("Config_StorageProvider_Memory2.xml")]
-    [DeploymentItem("Config_StorageProvider_SomeConfig.xml")]
-    [DeploymentItem("Config_Azure_Default.xml")]
-    [DeploymentItem("Config_OldAzure.xml")]
-    [DeploymentItem("Config_NewAzure.xml")]
-    [DeploymentItem("DevTestClientConfiguration.xml")]
-    [DeploymentItem("DevTestServerConfiguration.xml")]
-    [DeploymentItem("ClientConfiguration.xml")]
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [DeploymentItem("Config_Different_Membership_Reminders.xml")]
-    public class ConfigTests
+    public class ConfigTests : IDisposable
     {
-        public TestContext TestContext { get; set; }
+        private readonly ITestOutputHelper output;
 
-        [TestInitialize]
-        public void TestInitialize()
+        public ConfigTests(ITestOutputHelper output)
+        {
+            this.output = output;
+            TraceLogger.UnInitialize();
+            GrainClient.Uninitialize();
+            GrainClient.TestOnlyNoConnect = false;
+        }
+
+        public void Dispose()
         {
             TraceLogger.UnInitialize();
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            TraceLogger.UnInitialize();
-            GrainClient.Uninitialize();
-            GrainClient.TestOnlyNoConnect = false;
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_ParseTimeSpan()
         {
             string str = "1ms";
             TimeSpan ts = TimeSpan.FromMilliseconds(1);
             Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
-            
+
             str = "2s";
             ts = TimeSpan.FromSeconds(2);
             Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
-            
+
             str = "3m";
             ts = TimeSpan.FromMinutes(3);
             Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
-            
+
             str = "4hr";
             ts = TimeSpan.FromHours(4);
             Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
-            
+
             str = "5"; // Default unit is seconds
             ts = TimeSpan.FromSeconds(5);
             Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_NewConfigTest()
         {
             TextReader input = File.OpenText("Config_TestSiloConfig.xml");
@@ -131,14 +113,13 @@ namespace UnitTests
             //Assert.AreEqual<IPEndPoint>(ep, nc.Endpoint, "IP endpoint is set incorrectly for node Store");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void LogFileName()
         {
             var oc = new ClusterConfiguration();
             oc.StandardLoad();
             NodeConfiguration n = oc.CreateNodeConfigurationForSilo("Node1");
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
             Assert.IsNotNull(fname);
             Assert.IsFalse(fname.Contains(":"), "Log file name should not contain colons.");
 
@@ -148,7 +129,7 @@ namespace UnitTests
             Assert.AreEqual(fname, f.Name);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void NodeLogFileName()
         {
             string siloName = "MyNode1";
@@ -164,8 +145,7 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
-            
+
             Assert.AreEqual(baseLogFileName, fname);
 
             TraceLogger.Initialize(n);
@@ -175,7 +155,7 @@ namespace UnitTests
             Assert.IsFalse(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void NodeLogFileNameAlreadyExists()
         {
             string siloName = "MyNode2";
@@ -193,7 +173,6 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
 
             Assert.AreEqual(baseLogFileName, fname);
 
@@ -204,7 +183,7 @@ namespace UnitTests
             Assert.IsFalse(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void LogFile_Write_AlreadyExists()
         {
             const string siloName = "MyNode3";
@@ -222,7 +201,6 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
 
             Assert.AreEqual(logFileName, fname);
 
@@ -244,7 +222,7 @@ namespace UnitTests
             Assert.IsTrue(currentSize > initialSize, "Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void LogFile_Write_NotExists()
         {
             const string siloName = "MyNode4";
@@ -263,7 +241,6 @@ namespace UnitTests
             config.LoadFromFile(configFileName);
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
-            Console.WriteLine("LogFileName = " + fname);
 
             Assert.AreEqual(logFileName, fname);
 
@@ -285,7 +262,7 @@ namespace UnitTests
             Assert.IsTrue(currentSize > initialSize, "Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void LogFile_Create()
         {
             const string siloName = "MyNode5";
@@ -308,87 +285,87 @@ namespace UnitTests
             Assert.AreEqual(0, initialSize, "Log file {0} should be empty. Current size = {1}", logFileName, initialSize);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_Default_ToString()
         {
             var cfg = new ClientConfiguration();
             var str = cfg.ToString();
             Assert.IsNotNull(str, "ClientConfiguration.ToString");
-            Console.WriteLine(str);
+            output.WriteLine(str);
             Assert.IsNull(cfg.SourceFile, "SourceFile");
             //Assert.IsNull(cfg.TraceFileName, "TraceFileName");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_TraceFileName_Blank()
         {
             var cfg = new ClientConfiguration();
             cfg.TraceFileName = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
 
             cfg.TraceFileName = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_TraceFilePattern_Blank()
         {
             var cfg = new ClientConfiguration();
             cfg.TraceFilePattern = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
 
             cfg.TraceFilePattern = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ServerConfig_TraceFileName_Blank()
         {
             var cfg = new NodeConfiguration();
             cfg.TraceFileName = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
 
             cfg.TraceFileName = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ServerConfig_TraceFilePattern_Blank()
         {
             var cfg = new NodeConfiguration();
             cfg.TraceFilePattern = string.Empty;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
 
             cfg.TraceFilePattern = null;
-            Console.WriteLine(cfg.ToString());
+            output.WriteLine(cfg.ToString());
             Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
         public void ClientConfig_LogConsumers()
         {
             TraceLogger.UnInitialize();
 
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
-            
+
             var cfg = ClientConfiguration.LoadFromFile(filename);
             Assert.AreEqual(filename, cfg.SourceFile);
 
             TraceLogger.Initialize(cfg);
-            Assert.AreEqual(1, TraceLogger.LogConsumers.Count, 
+            Assert.AreEqual(1, TraceLogger.LogConsumers.Count,
                 "Number of log consumers: " + string.Join(",", TraceLogger.LogConsumers));
             Assert.AreEqual(typeof(DummyLogConsumer).FullName, TraceLogger.LogConsumers.Last().GetType().FullName, "Log consumer type #1");
 
             Assert.AreEqual(1, TraceLogger.TelemetryConsumers.Count,
                 "Number of telemetry consumers: " + string.Join(",", TraceLogger.TelemetryConsumers));
             Assert.AreEqual(typeof(TraceTelemetryConsumer).FullName, TraceLogger.TelemetryConsumers.First().GetType().FullName, "TelemetryConsumers consumer type #1");
-            
+
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
         public void ServerConfig_LogConsumers()
         {
             TraceLogger.UnInitialize();
@@ -410,7 +387,7 @@ namespace UnitTests
             Assert.AreEqual(typeof(ConsoleTelemetryConsumer).FullName, TraceLogger.TelemetryConsumers.Last().GetType().FullName, "TelemetryConsumers consumer type #1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_ClientConfig()
         {
             const string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -437,7 +414,7 @@ namespace UnitTests
             Assert.AreEqual(0, limit.HardLimitThreshold, "Hard limit " + limitName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_ServerConfig()
         {
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
@@ -469,7 +446,7 @@ namespace UnitTests
             Assert.AreEqual(0, limit.HardLimitThreshold, "Hard limit " + limitName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_ClientConfig_NotSpecified()
         {
             const string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -482,7 +459,7 @@ namespace UnitTests
             Assert.AreEqual(limitName, limit.Name);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_ServerConfig_NotSpecified()
         {
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
@@ -500,7 +477,7 @@ namespace UnitTests
             Assert.AreEqual(limitName, limit.Name);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_LimitsManager_ServerConfig()
         {
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
@@ -538,7 +515,7 @@ namespace UnitTests
             Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + limitName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_LimitsManager_ClientConfig()
         {
             const string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -571,7 +548,7 @@ namespace UnitTests
             Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + limitName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_ClientConfig_NotSpecified_WithDefault()
         {
             const string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -599,7 +576,7 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
         public void Limits_ServerConfig_NotSpecified_WithDefault()
         {
             const string filename = "Config_LogConsumers-OrleansConfiguration.xml";
@@ -631,31 +608,31 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_AzureConnectionInfo()
         {
             string azureConnectionStringInput =
                 @"DefaultEndpointsProtocol=https;AccountName=test;AccountKey=q-SOMEKEY-==";
-            Console.WriteLine("Input = " + azureConnectionStringInput);
+            output.WriteLine("Input = " + azureConnectionStringInput);
             string azureConnectionString = ConfigUtilities.PrintDataConnectionInfo(azureConnectionStringInput);
-            Console.WriteLine("Output = " + azureConnectionString);
-            Assert.IsTrue(azureConnectionString.EndsWith("AccountKey=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase), 
+            output.WriteLine("Output = " + azureConnectionString);
+            Assert.IsTrue(azureConnectionString.EndsWith("AccountKey=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed account key info from Azure connection string " + azureConnectionString);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
         public void Config_SqlConnectionInfo()
         {
             string sqlConnectionStringInput =
                 @"Server=myServerName\myInstanceName;Database=myDataBase;User Id=myUsername;Password=myPassword";
-            Console.WriteLine("Input = " + sqlConnectionStringInput);
+            output.WriteLine("Input = " + sqlConnectionStringInput);
             string sqlConnectionString = ConfigUtilities.PrintSqlConnectionString(sqlConnectionStringInput);
-            Console.WriteLine("Output = " + sqlConnectionString);
-            Assert.IsTrue(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase), 
+            output.WriteLine("Output = " + sqlConnectionString);
+            Assert.IsTrue(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed password info from SqlServer connection string " + sqlConnectionString);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_StorageProvider_Azure1()
         {
             const string filename = "Config_StorageProvider_Azure1.xml";
@@ -667,12 +644,12 @@ namespace UnitTests
             Assert.IsNotNull(providerConfigs.Providers, "Null providers");
             Assert.AreEqual(numProviders, providerConfigs.Providers.Count, "Num provider configs");
 
-            ProviderConfiguration pCfg = (ProviderConfiguration) providerConfigs.Providers.Values.ToList()[0];
+            ProviderConfiguration pCfg = (ProviderConfiguration)providerConfigs.Providers.Values.ToList()[0];
             Assert.AreEqual("orleanstest1", pCfg.Name, "Provider name #1");
             Assert.AreEqual("AzureTable", pCfg.Type, "Provider type #1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_StorageProvider_Azure2()
         {
             const string filename = "Config_StorageProvider_Azure2.xml";
@@ -683,8 +660,8 @@ namespace UnitTests
             Assert.IsNotNull(providerConfigs, "Null provider configs");
             Assert.IsNotNull(providerConfigs.Providers, "Null providers");
             Assert.AreEqual(numProviders, providerConfigs.Providers.Count, "Num provider configs");
-            
-            ProviderConfiguration pCfg = (ProviderConfiguration) providerConfigs.Providers.Values.ToList()[0];
+
+            ProviderConfiguration pCfg = (ProviderConfiguration)providerConfigs.Providers.Values.ToList()[0];
             Assert.AreEqual("orleanstest1", pCfg.Name, "Provider name #1");
             Assert.AreEqual("AzureTable", pCfg.Type, "Provider type #1");
 
@@ -693,7 +670,7 @@ namespace UnitTests
             Assert.AreEqual("AzureTable", pCfg.Type, "Provider type #2");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
         public void Config_StorageProvider_NoConfig()
         {
             const string filename = "Config_StorageProvider_Memory2.xml";
@@ -712,7 +689,7 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
         public void Config_StorageProvider_SomeConfig()
         {
             const string filename = "Config_StorageProvider_SomeConfig.xml";
@@ -727,11 +704,11 @@ namespace UnitTests
             {
                 IProviderConfiguration provider = providerConfigs.Providers.Values.ToList()[i];
                 Assert.AreEqual("config" + i, ((ProviderConfiguration)provider).Name, "Provider name #" + i);
-                Assert.AreEqual(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type, "Provider type #"+i);
+                Assert.AreEqual(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type, "Provider type #" + i);
                 for (int j = 0; j < 2; j++)
                 {
                     int num = 2 * i + j;
-                    string key = "Prop" + num; 
+                    string key = "Prop" + num;
                     string cfg = provider.Properties[key];
                     Assert.IsNotNull(cfg, "Null config value " + key);
                     Assert.IsFalse(string.IsNullOrWhiteSpace(cfg), "Blank config value " + key);
@@ -739,7 +716,7 @@ namespace UnitTests
                 }
             }
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_StorageProviders_AzureTable_Default()
         {
             const string filename = "Config_StorageProvider_Azure1.xml";
@@ -747,25 +724,25 @@ namespace UnitTests
             var config = new ClusterConfiguration();
             config.LoadFromFile(filename);
 
-            Console.WriteLine(config.Globals);
+            output.WriteLine(config.Globals.ToString());
 
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, config.Globals.LivenessType, "LivenessType");
             Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, config.Globals.ReminderServiceType, "ReminderServiceType");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Gateway")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Gateway")]
         public void ClientConfig_Default()
         {
             const string filename = "ClientConfiguration.xml";
 
             ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(ClientConfiguration.GatewayProviderType.Config, config.GatewayProvider, "GatewayProviderType");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ClientConfig_ClientInit_FromFile()
         {
             const string filename = "ClientConfig_NewAzure.xml";
@@ -778,7 +755,7 @@ namespace UnitTests
 
                 ClientConfiguration config = GrainClient.CurrentConfig;
 
-                Console.WriteLine(config);
+                output.WriteLine(config);
 
                 Assert.IsNotNull(config, "Client.CurrentConfig");
 
@@ -792,23 +769,15 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
-        [ExpectedException(typeof(FileNotFoundException))]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ClientConfig_AzureInit_FileNotFound()
         {
             const string filename = "ClientConfig_NotFound.xml";
-
+            GrainClient.TestOnlyNoConnect = true;
             try
             {
-                GrainClient.TestOnlyNoConnect = true;
-
-                GrainClient.Initialize(filename);
-
-                Assert.Fail("Should have been FileNotFoundException");
-            }
-            catch (AggregateException ae)
-            {
-                throw ae.Flatten().GetBaseException();
+                Xunit.Assert.Throws<FileNotFoundException>(() =>
+                    GrainClient.Initialize(filename));
             }
             finally
             {
@@ -816,44 +785,24 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
-        [ExpectedException(typeof(FileNotFoundException))]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ClientConfig_FromFile_FileNotFound()
         {
             const string filename = "ClientConfig_NotFound.xml";
-
-            try
-            {
-                ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
-            }
-            catch (AggregateException ae)
-            {
-                throw ae.Flatten().GetBaseException();
-            }
-
-            Assert.Fail("Should have been FileNotFoundException");
+            Xunit.Assert.Throws<FileNotFoundException>(() => 
+            ClientConfiguration.LoadFromFile(filename));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
-        [ExpectedException(typeof(FileNotFoundException))]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void ServerConfig_FromFile_FileNotFound()
         {
             const string filename = "SiloConfig_NotFound.xml";
-
-            try
-            {
-                var config = new ClusterConfiguration();
-                config.LoadFromFile(filename);
-            }
-            catch (AggregateException ae)
-            {
-                throw ae.Flatten().GetBaseException();
-            }
-
-            Assert.Fail("Should have got FileNotFoundException");
+            var config = new ClusterConfiguration();
+            Xunit.Assert.Throws<FileNotFoundException>(() => 
+                config.LoadFromFile(filename));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_LoadFrom()
         {
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
@@ -866,7 +815,7 @@ namespace UnitTests
             Assert.AreEqual(filename, Path.GetFileName(config.SourceFile), "ClientConfig.SourceFile");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ServerConfig_LoadFrom()
         {
             string filename = "Config_LogConsumers-OrleansConfiguration.xml";
@@ -879,14 +828,14 @@ namespace UnitTests
             Assert.AreEqual(filename, Path.GetFileName(config.SourceFile), "OrleansConfiguration.SourceFile");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
         public void ClientConfig_SqlServer()
         {
             const string filename = "DevTestClientConfiguration.xml";
 
             ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider, "GatewayProviderType");
             Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProviderToUse, "GatewayProviderToUse");
@@ -898,26 +847,26 @@ namespace UnitTests
             Assert.IsTrue(config.UseSqlSystemStore, "Should be using SqlServer storage");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
         public void ClientConfig_SqlServer_StatsProvider()
         {
             const string filename = "DevTestClientConfiguration.xml";
 
             ClientConfiguration config = ClientConfiguration.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(1, config.ProviderConfigurations.Count, "Number of Providers Types");
             Assert.AreEqual("Statistics", config.ProviderConfigurations.Keys.First(), "Client Stats Providers");
             ProviderCategoryConfiguration statsProviders = config.ProviderConfigurations["Statistics"];
             Assert.AreEqual(1, statsProviders.Providers.Count, "Number of Stats Providers");
             Assert.AreEqual("SQL", statsProviders.Providers.Keys.First(), "Stats provider name");
-            ProviderConfiguration providerConfig = (ProviderConfiguration) statsProviders.Providers["SQL"];
+            ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
             Assert.AreEqual("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type, "Stats provider class name");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
         public void SiloConfig_SqlServer()
         {
             const string filename = "DevTestServerConfiguration.xml";
@@ -928,7 +877,7 @@ namespace UnitTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
 
-            Console.WriteLine(orleansConfig.Globals);
+            output.WriteLine(orleansConfig.Globals);
 
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.SqlServer, orleansConfig.Globals.LivenessType, "LivenessType");
             Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.SqlServer, orleansConfig.Globals.ReminderServiceType, "ReminderServiceType");
@@ -942,7 +891,7 @@ namespace UnitTests
             Assert.AreEqual(orleansConfig.Globals.ServiceId, myGuid, "ServiceId");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
         public void SiloConfig_SqlServer_StatsProvider()
         {
             const string filename = "DevTestServerConfiguration.xml";
@@ -950,34 +899,34 @@ namespace UnitTests
             var config = new ClusterConfiguration();
             config.LoadFromFile(filename);
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(2, config.Globals.ProviderConfigurations.Count, "Number of Providers Types");
             Assert.IsTrue(config.Globals.ProviderConfigurations.Keys.Contains("Statistics"), "Stats Providers");
             ProviderCategoryConfiguration statsProviders = config.Globals.ProviderConfigurations["Statistics"];
             Assert.AreEqual(1, statsProviders.Providers.Count, "Number of Stats Providers");
             Assert.AreEqual("SQL", statsProviders.Providers.Keys.First(), "Stats provider name");
-            ProviderConfiguration providerConfig = (ProviderConfiguration) statsProviders.Providers["SQL"];
+            ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
             Assert.AreEqual("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type, "Stats provider class name");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void SiloConfig_Azure_Default()
         {
             const string filename = "Config_Azure_Default.xml";
 
-            string deploymentId = TestContext.TestName + TestConstants.random.Next();
+            string deploymentId = "SiloConfig_Azure_Default" + TestConstants.random.Next();
             string connectionString = StorageTestConstants.DataConnectionString;
 
             var initialConfig = new ClusterConfiguration();
             initialConfig.LoadFromFile(filename);
 
-            Console.WriteLine(initialConfig.Globals);
+            output.WriteLine(initialConfig.Globals);
 
             // Do same code that AzureSilo does for configuring silo host
 
-            var host = new SiloHost(TestContext.TestName, initialConfig); // Use supplied config data + Initializes logger configurations
+            var host = new SiloHost("SiloConfig_Azure_Default", initialConfig); // Use supplied config data + Initializes logger configurations
             host.SetSiloType(Silo.SiloType.Secondary);
             ////// Always use Azure table for membership when running silo in Azure
             host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
@@ -996,11 +945,11 @@ namespace UnitTests
             Assert.IsFalse(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void SiloConfig_Programatic()
         {
-            string siloName = TestContext.TestName;
-            
+            string siloName = "SiloConfig_Programatic";
+
             var config = new ClusterConfiguration();
             config.Globals.CacheSize = 11;
 
@@ -1008,16 +957,16 @@ namespace UnitTests
 
             ClusterConfiguration siloConfig = host.Config;
 
-            Console.WriteLine(siloConfig.Globals);
+            output.WriteLine(siloConfig.Globals);
 
             Assert.AreEqual("", siloConfig.SourceFile, "SourceFile should be blank for programmatic config");
             Assert.AreEqual(11, siloConfig.Globals.CacheSize, "CacheSize picked up from config object");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClientConfig_Programatic()
         {
-            string deploymentId = TestContext.TestName;
+            string deploymentId = "ClientConfig_Programatic";
 
             var config = new ClientConfiguration();
 
@@ -1027,7 +976,7 @@ namespace UnitTests
 
             config.PreferedGatewayIndex = 11;
 
-            Console.WriteLine(config);
+            output.WriteLine(config);
 
             Assert.AreEqual(null, config.SourceFile, "SourceFile should be blank for programmatic config");
             Assert.AreEqual(11, config.PreferedGatewayIndex, "PreferedGatewayIndex picked up from config object");
@@ -1035,7 +984,7 @@ namespace UnitTests
             config.CheckGatewayProviderSettings();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config")]
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_Different_Membership_And_Reminders()
         {
             const string filename = "Config_Different_Membership_Reminders.xml";
@@ -1050,7 +999,7 @@ namespace UnitTests
             Assert.IsTrue(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void SiloConfig_Azure_SystemStore()
         {
             const string filename = "Config_NewAzure.xml";
@@ -1060,7 +1009,7 @@ namespace UnitTests
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 
-            Console.WriteLine(siloConfig.Globals);
+            output.WriteLine(siloConfig.Globals);
 
             Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType, "LivenessType");
             Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType, "ReminderServiceType");
@@ -1072,7 +1021,7 @@ namespace UnitTests
             Assert.IsFalse(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void SiloConfig_OldAzure()
         {
             const string filename = "Config_OldAzure.xml";

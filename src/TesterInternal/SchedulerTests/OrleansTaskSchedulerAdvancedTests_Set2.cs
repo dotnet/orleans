@@ -2,50 +2,41 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using UnitTests.Grains;
 using UnitTests.TesterInternal;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.SchedulerTests
 {
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [TestClass]
-    public class OrleansTaskSchedulerAdvancedTests_Set2
+    public class OrleansTaskSchedulerAdvancedTests_Set2 : IDisposable
     {
+        private readonly ITestOutputHelper output;
         private static readonly object lockable = new object();
         private static readonly int waitFactor = Debugger.IsAttached ? 100 : 1;
         private OrleansTaskScheduler masterScheduler;
         private UnitTestSchedulingContext context;
         private static readonly SafeRandom random = new SafeRandom();
 
-        public OrleansTaskSchedulerAdvancedTests_Set2()
+        public OrleansTaskSchedulerAdvancedTests_Set2(ITestOutputHelper output)
         {
+            this.output = output;
             OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
-        }
-
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-            TraceLogger.UnInitialize();
-        }
-
-        [TestInitialize]
-        public void TestInit()
-        {
             context = new UnitTestSchedulingContext();
             masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public void Dispose()
         {
             masterScheduler.Stop();
+            TraceLogger.UnInitialize();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_SimpleFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
@@ -69,19 +60,19 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(15, n, "Work items executed out of order");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_NewTask_ContinueWith_Wrapped()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
 
             Task<Task> wrapped = new Task<Task>(() =>
             {
-                Console.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
 
                 Task t0 = new Task(() =>
                 {
-                    Console.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                    output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
                 });
@@ -89,7 +80,7 @@ namespace UnitTests.SchedulerTests
                 {
                     Assert.IsFalse(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
 
-                    Console.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                    output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #2");
                 });
@@ -101,7 +92,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(ok, "Finished OK");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_SubTaskExecutionSequencing()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -124,9 +115,9 @@ namespace UnitTests.SchedulerTests
                         // ReSharper disable AccessToModifiedClosure
                         LogContext("Sub-task " + id + " n=" + n);
                         int k = n;
-                        Console.WriteLine("Sub-task " + id + " sleeping");
+                        output.WriteLine("Sub-task " + id + " sleeping");
                         Thread.Sleep(100);
-                        Console.WriteLine("Sub-task " + id + " awake");
+                        output.WriteLine("Sub-task " + id + " awake");
                         n = k + 1;
                         // ReSharper restore AccessToModifiedClosure
                     })
@@ -134,7 +125,7 @@ namespace UnitTests.SchedulerTests
                     {
                         LogContext("Sub-task " + id + "-ContinueWith");
 
-                        Console.WriteLine("Sub-task " + id + " Done");
+                        output.WriteLine("Sub-task " + id + " Done");
                     });
                 }
             };
@@ -144,16 +135,16 @@ namespace UnitTests.SchedulerTests
             t.Start(scheduler);
 
             // Pause to let things run
-            Console.WriteLine("Main-task sleeping");
+            output.WriteLine("Main-task sleeping");
             Thread.Sleep(TimeSpan.FromSeconds(2));
-            Console.WriteLine("Main-task awake");
+            output.WriteLine("Main-task awake");
 
             // N should be 10, because all tasks should execute serially
             Assert.IsTrue(n != 0, "Work items did not get executed");
             Assert.AreEqual(10, n, "Work items executed concurrently");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_ContinueWith_1_Test()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -164,14 +155,14 @@ namespace UnitTests.SchedulerTests
             Task wrapper = new Task(() =>
             {
                 // ReSharper disable AccessToModifiedClosure
-                Task task1 = Task.Factory.StartNew(() => { Console.WriteLine("===> 1a"); Thread.Sleep(1000); n = n + 3; Console.WriteLine("===> 1b"); });
-                Task task2 = task1.ContinueWith(task => { n = n * 5; Console.WriteLine("===> 2"); });
-                Task task3 = task2.ContinueWith(task => { n = n / 5; Console.WriteLine("===> 3"); });
-                Task task4 = task3.ContinueWith(task => { n = n - 2; Console.WriteLine("===> 4"); result.SetResult(true); });
+                Task task1 = Task.Factory.StartNew(() => { output.WriteLine("===> 1a"); Thread.Sleep(1000); n = n + 3; output.WriteLine("===> 1b"); });
+                Task task2 = task1.ContinueWith(task => { n = n * 5; output.WriteLine("===> 2"); });
+                Task task3 = task2.ContinueWith(task => { n = n / 5; output.WriteLine("===> 3"); });
+                Task task4 = task3.ContinueWith(task => { n = n - 2; output.WriteLine("===> 4"); result.SetResult(true); });
                 // ReSharper restore AccessToModifiedClosure
                 task4.ContinueWith(task =>
                 {
-                    Console.WriteLine("Done Faulted={0}", task.IsFaulted);
+                    output.WriteLine("Done Faulted={0}", task.IsFaulted);
                     Assert.IsFalse(task.IsFaulted, "Faulted with Exception=" + task.Exception);
                 });
             });
@@ -191,7 +182,7 @@ namespace UnitTests.SchedulerTests
             Assert.AreEqual(1, n, "Work items executed out of order");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -206,18 +197,18 @@ namespace UnitTests.SchedulerTests
             {
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
-                    Console.WriteLine("Task-1 Started");
+                    output.WriteLine("Task-1 Started");
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     pause1.WaitOne();
-                    Console.WriteLine("Task-1 Done");
+                    output.WriteLine("Task-1 Done");
                     return 1;
                 });
                 task2 = Task<int>.Factory.StartNew(() =>
                 {
-                    Console.WriteLine("Task-2 Started");
+                    output.WriteLine("Task-2 Started");
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     pause2.WaitOne();
-                    Console.WriteLine("Task-2 Done");
+                    output.WriteLine("Task-2 Done");
                     return 2;
                 });
 
@@ -247,7 +238,7 @@ namespace UnitTests.SchedulerTests
             task2.Ignore();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Timeout()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -262,18 +253,18 @@ namespace UnitTests.SchedulerTests
             {
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
-                    Console.WriteLine("Task-1 Started");
+                    output.WriteLine("Task-1 Started");
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     pause1.WaitOne();
-                    Console.WriteLine("Task-1 Done");
+                    output.WriteLine("Task-1 Done");
                     return 1;
                 });
                 task2 = Task<int>.Factory.StartNew(() =>
                 {
-                    Console.WriteLine("Task-2 Started");
+                    output.WriteLine("Task-2 Started");
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     pause2.WaitOne();
-                    Console.WriteLine("Task-2 Done");
+                    output.WriteLine("Task-2 Done");
                     return 2;
                 });
 
@@ -306,7 +297,7 @@ namespace UnitTests.SchedulerTests
             task2.Ignore();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_WhenAny_Busy_Timeout()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -321,26 +312,26 @@ namespace UnitTests.SchedulerTests
             {
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
-                    Console.WriteLine("Task-1 Started");
+                    output.WriteLine("Task-1 Started");
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     int num1 = 1;
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
                         num1 = random.Next();
                     }
-                    Console.WriteLine("Task-1 Done");
+                    output.WriteLine("Task-1 Done");
                     return num1;
                 });
                 task2 = Task<int>.Factory.StartNew(() =>
                 {
-                    Console.WriteLine("Task-2 Started");
+                    output.WriteLine("Task-2 Started");
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     int num2 = 2;
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
                         num2 = random.Next();
                     }
-                    Console.WriteLine("Task-2 Done");
+                    output.WriteLine("Task-2 Done");
                     return num2;
                 });
 
@@ -370,7 +361,7 @@ namespace UnitTests.SchedulerTests
         }
 
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -385,27 +376,27 @@ namespace UnitTests.SchedulerTests
             {
                 task1 = Task.Run(() =>
                 {
-                    Console.WriteLine("Task-1 Started");
+                    output.WriteLine("Task-1 Started");
                     Assert.AreNotEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     pause1.WaitOne();
-                    Console.WriteLine("Task-1 Done");
+                    output.WriteLine("Task-1 Done");
                     return 1;
                 });
                 task2 = Task.Run(() =>
                 {
-                    Console.WriteLine("Task-2 Started");
+                    output.WriteLine("Task-2 Started");
                     Assert.AreNotEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
                     pause2.WaitOne();
-                    Console.WriteLine("Task-2 Done");
+                    output.WriteLine("Task-2 Done");
                     return 2;
                 });
 
                 join = Task.WhenAll(task1, task2).ContinueWith(t =>
                 {
-                    Console.WriteLine("Join Started");
+                    output.WriteLine("Join Started");
                     if (t.IsFaulted) throw t.Exception;
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
-                    Console.WriteLine("Join Done");
+                    output.WriteLine("Join Done");
                 });
 
                 finish.SetResult(true);
@@ -431,7 +422,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(task2.IsCompleted && !task2.IsFaulted, "Task-2 Status " + task2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Run_Delay()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -446,31 +437,31 @@ namespace UnitTests.SchedulerTests
             {
                 task1 = Task.Run(() =>
                 {
-                    Console.WriteLine("Task-1 Started");
+                    output.WriteLine("Task-1 Started");
                     Assert.AreNotEqual(scheduler, TaskScheduler.Current, "Before Task.Delay TaskScheduler.Current=" + TaskScheduler.Current);
                     Task.Delay(1);
                     Assert.AreNotEqual(scheduler, TaskScheduler.Current, "After Task.Delay TaskScheduler.Current=" + TaskScheduler.Current);
                     pause1.WaitOne();
-                    Console.WriteLine("Task-1 Done");
+                    output.WriteLine("Task-1 Done");
                     return 1;
                 });
                 task2 = Task.Run(() =>
                 {
-                    Console.WriteLine("Task-2 Started");
+                    output.WriteLine("Task-2 Started");
                     Assert.AreNotEqual(scheduler, TaskScheduler.Current, "Before Task.Delay TaskScheduler.Current=" + TaskScheduler.Current);
                     Task.Delay(1);
                     Assert.AreNotEqual(scheduler, TaskScheduler.Current, "After Task.Delay TaskScheduler.Current=" + TaskScheduler.Current);
                     pause2.WaitOne();
-                    Console.WriteLine("Task-2 Done");
+                    output.WriteLine("Task-2 Done");
                     return 2;
                 });
 
                 join = Task.WhenAll(task1, task2).ContinueWith(t =>
                 {
-                    Console.WriteLine("Join Started");
+                    output.WriteLine("Join Started");
                     if (t.IsFaulted) throw t.Exception;
                     Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current=" + TaskScheduler.Current);
-                    Console.WriteLine("Join Done");
+                    output.WriteLine("Join Done");
                 });
 
                 finish.SetResult(true);
@@ -496,7 +487,7 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(task2.IsCompleted && !task2.IsFaulted, "Task-2 Status " + task2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Task_Delay()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -514,13 +505,13 @@ namespace UnitTests.SchedulerTests
             await wrapper;
         }
 
-        private static async Task DoDelay(int i)
+        private async Task DoDelay(int i)
         {
             try
             {
-                Console.WriteLine("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+                output.WriteLine("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
                 await Task.Delay(1);
-                Console.WriteLine("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
+                output.WriteLine("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
             }
             catch (ObjectDisposedException)
             {
@@ -528,7 +519,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Turn_Execution_Order_Loop()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -577,7 +568,7 @@ namespace UnitTests.SchedulerTests
                     task = task.ContinueWith(t =>
                     {
                         if (t.IsFaulted) throw t.Exception;
-                        Console.WriteLine("Inside Chain {0} Task {1}", chainNum, taskNum);
+                        output.WriteLine("Inside Chain {0} Task {1}", chainNum, taskNum);
                         try
                         {
                             Assert.AreEqual(-1, executingGlobal, "Detected unexpected other execution in chain " + chainNum + " Task " + taskNum);
@@ -600,7 +591,7 @@ namespace UnitTests.SchedulerTests
                 taskChainEnds[chainNum] = task.ContinueWith(t =>
                 {
                     if (t.IsFaulted) throw t.Exception;
-                    Console.WriteLine("Inside Chain {0} Final Task", chainNum);
+                    output.WriteLine("Inside Chain {0} Final Task", chainNum);
                     resultHandles[chainNum].SetResult(true);
                 }, scheduler);
             }
@@ -632,7 +623,7 @@ namespace UnitTests.SchedulerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -640,7 +631,7 @@ namespace UnitTests.SchedulerTests
             await Run_ActivationSched_Test1(scheduler, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1_Bounce()
         {
             TaskScheduler scheduler = masterScheduler.GetWorkItemGroup(context).TaskRunner;
@@ -648,7 +639,7 @@ namespace UnitTests.SchedulerTests
             await Run_ActivationSched_Test1(scheduler, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task OrleansSched_Test1()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
@@ -657,7 +648,7 @@ namespace UnitTests.SchedulerTests
 
             await Run_ActivationSched_Test1(scheduler, false);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("Scheduler")]
+        [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task OrleansSched_Test1_Bounce()
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
@@ -667,7 +658,7 @@ namespace UnitTests.SchedulerTests
             await Run_ActivationSched_Test1(scheduler, true);
         }
 
-        internal static async Task Run_ActivationSched_Test1(TaskScheduler scheduler, bool bounceToThreadPool)
+        internal async Task Run_ActivationSched_Test1(TaskScheduler scheduler, bool bounceToThreadPool)
         {
             var grainId = GrainId.GetGrainId(0, Guid.NewGuid());
             var grain = new NonReentrentStressGrainWithoutState( grainId, new GrainRuntime(Guid.NewGuid(), null, null, null, null, null, null));
@@ -678,7 +669,7 @@ namespace UnitTests.SchedulerTests
             var wrappedDone = new TaskCompletionSource<bool>();
             Task<Task> wrapper = new Task<Task>(() =>
             {
-                Console.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
 
                 Task t1 = grain.Test1();
@@ -732,11 +723,11 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(wrapped.IsCompleted, "Wrapped Task completed");
         }
 
-        private static void LogContext(string what)
+        private void LogContext(string what)
         {
             lock (lockable)
             {
-                Console.WriteLine(
+                output.WriteLine(
                     "{0}\n"
                     + " TaskScheduler.Current={1}\n"
                     + " Task.Factory.Scheduler={2}\n"
@@ -748,7 +739,7 @@ namespace UnitTests.SchedulerTests
                 );
 
                 //var st = new StackTrace();
-                //Console.WriteLine(st.ToString());
+                //output.WriteLine(st.ToString());
             }
         }
     }

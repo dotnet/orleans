@@ -5,20 +5,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Tester;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.MessageCenterTests
 {
-    [TestClass]
-    public class GatewaySelectionTest
+    public class GatewaySelectionTest : IDisposable
     {
-        public TestContext TestContext { get; set; }
+        private readonly ITestOutputHelper output;
 
         private static readonly List<Uri> gatewayAddressUris = new[]
         {
@@ -27,29 +28,28 @@ namespace UnitTests.MessageCenterTests
             new Uri("gwy.tcp://127.0.0.1:3/0"),
             new Uri("gwy.tcp://127.0.0.1:4/0")
         }.ToList();
-
-        [TestInitialize]
-        public void TestInitialize()
+        
+        public GatewaySelectionTest(ITestOutputHelper output)
+        {
+            this.output = output;
+            GrainClient.Uninitialize();
+            GrainClient.TestOnlyNoConnect = false;
+        }
+        
+        public void Dispose()
         {
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
-        {
-            GrainClient.Uninitialize();
-            GrainClient.TestOnlyNoConnect = false;
-        }
-
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
         public void GatewaySelection()
         {
             var listProvider = new TestListProvider(gatewayAddressUris);
             Test_GatewaySelection(listProvider);
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
         public void GatewaySelection_ClientInit_EmptyList()
         {
             var cfg = new ClientConfiguration();
@@ -61,7 +61,7 @@ namespace UnitTests.MessageCenterTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc);
+                output.WriteLine(exc.ToString());
                 failed = true;
             }
             Assert.IsTrue(failed, "GatewaySelection_EmptyList failed as GatewayManager did not throw on empty Gateway list.");
@@ -77,12 +77,10 @@ namespace UnitTests.MessageCenterTests
         }
 
 #if USE_SQL_SERVER || DEBUG
-        [TestMethod, TestCategory("Gateway"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Gateway"), TestCategory("SqlServer")]
         public async Task GatewaySelection_SqlServer()
         {
-            string testName = TestContext.TestName;
-
-            Console.WriteLine(TestUtils.DumpTestContext(TestContext));
+            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             Guid serviceId = Guid.NewGuid();
 
@@ -90,7 +88,7 @@ namespace UnitTests.MessageCenterTests
             {
                 ServiceId = serviceId,
                 DeploymentId = testName,
-                DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(TestContext)
+                DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString()
             };
 
             var membership = new SqlMembershipTable();
@@ -103,7 +101,7 @@ namespace UnitTests.MessageCenterTests
             int count = 1;
             foreach (Uri gateway in gatewayAddressUris)
             {
-                Console.WriteLine("Adding gataway data for {0}", gateway);
+                output.WriteLine("Adding gataway data for {0}", gateway);
 
                 SiloAddress siloAddress = gateway.ToSiloAddress();
                 Assert.IsNotNull(siloAddress, "Unable to get SiloAddress from Uri {0}", gateway);
@@ -119,13 +117,13 @@ namespace UnitTests.MessageCenterTests
 
                 var tableVersion = new TableVersion(count, Guid.NewGuid().ToString());
 
-                Console.WriteLine("Inserting gataway data for {0} with TableVersion={1}", MembershipEntry, tableVersion);
+                output.WriteLine("Inserting gataway data for {0} with TableVersion={1}", MembershipEntry, tableVersion);
 
                 bool ok = await membershipTable.InsertRow(MembershipEntry, tableVersion);
                 count++;
                 Assert.IsTrue(ok, "Membership record should have been written OK but were not: {0}", MembershipEntry);
 
-                Console.WriteLine("Successfully inserted Membership row {0}", MembershipEntry);
+                output.WriteLine("Successfully inserted Membership row {0}", MembershipEntry);
             }
 
             MembershipTableData data = await membershipTable.ReadAll();

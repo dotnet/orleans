@@ -1,63 +1,64 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
-using UnitTests.Tester;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.LivenessTests
 {
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [TestClass]
-    public class ConsistentRingProviderTests
+    public class ConsistentRingProviderTests : IClassFixture<ConsistentRingProviderTests.Fixture>
     {
-        public ConsistentRingProviderTests()
+        private readonly ITestOutputHelper output;
+
+        public class Fixture
         {
-            if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            public Fixture()
+            {
+                if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
+                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            }
         }
 
-        [TestInitialize]
-        public void TestInitialize()
+        public ConsistentRingProviderTests(ITestOutputHelper output)
         {
-            if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.StandardLoad());
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+            this.output = output;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test1()
         {
             SiloAddress silo1 = SiloAddress.NewLocalAddress(0);
             ConsistentRingProvider ring = new ConsistentRingProvider(silo1);
-            Console.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
+            output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
 
             ring.AddServer(SiloAddress.NewLocalAddress(1));
-            Console.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
+            output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
 
             ring.AddServer(SiloAddress.NewLocalAddress(2));
-            Console.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
+            output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test2()
         {
             SiloAddress silo1 = SiloAddress.NewLocalAddress(0);
             VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, 30);
             //ring.logger.SetSeverityLevel(Severity.Warning);
-            Console.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
+            output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
 
             for (int i = 1; i <= 10; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddress.NewLocalAddress(i), SiloStatus.Active);
                 var range = new EquallyDevidedMultiRange(ring.GetMyRange(), 5);
-                Console.WriteLine("\n\n*** Silo1 range: {0}. \n*** The whole ring with {1} silos is:\n{2}\n\n", range.ToCompactString(), i + 1, ring.ToString());
+                output.WriteLine("\n\n*** Silo1 range: {0}. \n*** The whole ring with {1} silos is:\n{2}\n\n", range.ToCompactString(), i + 1, ring.ToString());
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
+        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test3()
         {
             int NUM_SILOS = 100;
@@ -100,12 +101,12 @@ namespace UnitTests.LivenessTests
                     queueHistogram[tuple.Item1].Sum(),
                     Utils.EnumerableToString(queueHistogram[tuple.Item1])), "\n");
 
-            Console.WriteLine("\n\n*** The whole ring with {0} silos is:\n{1}\n\n", NUM_SILOS, str);
+            output.WriteLine("\n\n*** The whole ring with {0} silos is:\n{1}\n\n", NUM_SILOS, str);
 
-            Console.WriteLine("Total number of queues is: {0}", queueHistogram.Values.Select(list => list.Sum()).Sum());
-            Console.WriteLine("Expected average range per silo is: {0:0.00}%, expected #queues per silo is: {1:0.00}, expected #queues per agent is: {2:0.000}.",
+            output.WriteLine("Total number of queues is: {0}", queueHistogram.Values.Select(list => list.Sum()).Sum());
+            output.WriteLine("Expected average range per silo is: {0:0.00}%, expected #queues per silo is: {1:0.00}, expected #queues per agent is: {2:0.000}.",
                 100.0 / NUM_SILOS, NUM_QUEUES / NUM_SILOS, NUM_QUEUES / (NUM_SILOS * NUM_AGENTS));
-            Console.WriteLine("Min #queues per silo is: {0}, Max #queues per silo is: {1}.",
+            output.WriteLine("Min #queues per silo is: {0}, Max #queues per silo is: {1}.",
                 queueHistogram.Values.Select(list => list.Sum()).ToList().Min(), queueHistogram.Values.Select(list => list.Sum()).ToList().Max());
         }
 

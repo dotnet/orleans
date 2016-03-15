@@ -6,19 +6,21 @@ using System.IO;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
+using Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    [TestClass]
-    public class RequestContextTests_Local
+    public class RequestContextTests_Local : IDisposable
     {
         private readonly Dictionary<string, object> headers = new Dictionary<string, object>();
 
@@ -26,9 +28,9 @@ namespace UnitTests.General
 
         private static readonly SafeRandom random = new SafeRandom();
 
-        [TestInitialize]
-        public void TestInitialize()
+        public RequestContextTests_Local()
         {
+            SerializationManager.InitializeForTesting();
             oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
             Trace.CorrelationManager.ActivityId = Guid.Empty;
@@ -36,9 +38,13 @@ namespace UnitTests.General
             headers.Clear();
             GrainClient.ClientInvokeCallback = null;
         }
+        
+        public void Dispose()
+        {
+            TestCleanup();
+        }
 
-        [TestCleanup]
-        public void TestCleanup()
+        private void TestCleanup()
         {
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
@@ -46,7 +52,7 @@ namespace UnitTests.General
             GrainClient.ClientInvokeCallback = null;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_MultiThreads_ExportToMessage()
         {
             const int NumLoops = 50;
@@ -71,10 +77,9 @@ namespace UnitTests.General
             await Task.WhenAll(promises);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportToMessage()
         {
-            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
@@ -127,10 +132,9 @@ namespace UnitTests.General
             TestCleanup();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportImport()
         {
-            SerializationManager.InitializeForTesting();
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
@@ -187,7 +191,7 @@ namespace UnitTests.General
             TestCleanup();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_Basic()
         {
             string name1 = "Name" + random.Next();
@@ -219,7 +223,7 @@ namespace UnitTests.General
             }
             await Task.WhenAll(promises);
         }
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_Dictionary()
         {
             string name1 = "Name" + random.Next();
@@ -266,7 +270,7 @@ namespace UnitTests.General
             await Task.WhenAll(promises);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_CrossThread()
         {
             const int NumLoops = 1000;
@@ -298,7 +302,7 @@ namespace UnitTests.General
             Assert.AreEqual(data1, CallContext.LogicalGetData(name1), "LCC.GetData-Main-Final");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_CrossThread_Dictionary()
         {
             const int NumLoops = 1000;
@@ -356,7 +360,7 @@ namespace UnitTests.General
             Assert.AreEqual(data1, result0[name1], "LCC.GetData-Main-Final");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_CrossThread()
         {
             const int NumLoops = 1000;
@@ -391,39 +395,40 @@ namespace UnitTests.General
 
     }
 
-    [TestClass]
-    public class RequestContextTests_Silo : HostedTestClusterPerFixture
+    public class RequestContextTests_Silo : OrleansTestingBase, IClassFixture<RequestContextTests_Silo.Fixture>, IDisposable
     {
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
-        {
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = false,
-            PropagateActivityId = true,
-            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-        };
+        private readonly ITestOutputHelper output;
 
-        public static TestingSiloHost CreateSiloHost()
+        public class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(siloOptions);
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartPrimary = true,
+                    StartSecondary = false,
+                    PropagateActivityId = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
+                },
+                new TestingClientOptions { PropagateActivityId = true });
+            }
         }
 
-        [TestInitialize]
-        public void TestInitialize()
+        public RequestContextTests_Silo(ITestOutputHelper output)
         {
+            this.output = output;
             RequestContext.PropagateActivityId = true; // Client-side setting
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
         }
-
-        [TestCleanup]
-        public void TestCleanup()
+        
+        public void Dispose()
         {
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_Simple()
         {
             Guid activityId = Guid.NewGuid();
@@ -433,7 +438,7 @@ namespace UnitTests.General
             Assert.AreEqual(activityId, result, "E2E ActivityId not propagated correctly");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_AC_Test1()
         {
             long id = GetRandomGrainId();
@@ -460,7 +465,7 @@ namespace UnitTests.General
             Assert.AreEqual(val2, result, "Delayed (ContinueWith) RequestContext echo was not correct");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_Task_Test1()
         {
             long id = GetRandomGrainId();
@@ -496,7 +501,7 @@ namespace UnitTests.General
             //Assert.AreEqual(val2, result, "Delayed (Task.Run) RequestContext echo was not correct");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_Task_TestRequestContext()
         {
             var grain = GrainClient.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
@@ -506,7 +511,7 @@ namespace UnitTests.General
             Assert.AreEqual("binks", requestContext.Item2, "Item2=" + requestContext.Item2);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_RC_Set_E2E()
         {
             Guid activityId = Guid.NewGuid();
@@ -531,7 +536,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_E2E()
         {
             Guid activityId = Guid.NewGuid();
@@ -562,7 +567,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_E2E_ViaProxy()
         {
             Guid activityId = Guid.NewGuid();
@@ -593,7 +598,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_RC_None_E2E()
         {
             Guid nullActivityId = Guid.Empty;
@@ -625,7 +630,7 @@ namespace UnitTests.General
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_None_E2E()
         {
             Guid nullActivityId = Guid.Empty;
@@ -657,7 +662,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_DynamicChange_Client()
         {
             Guid activityId = Guid.NewGuid();
@@ -671,7 +676,7 @@ namespace UnitTests.General
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = false;
-            Console.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
+            output.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
@@ -679,7 +684,7 @@ namespace UnitTests.General
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = true;
-            Console.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
+            output.WriteLine("Set RequestContext.PropagateActivityId={0}", RequestContext.PropagateActivityId);
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
@@ -692,7 +697,7 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_DynamicChange_Server()
         {
             Guid activityId = Guid.NewGuid();
@@ -711,16 +716,17 @@ namespace UnitTests.General
             RequestContext.Clear();
 
             changeConfig[PropagateActivityIdConfigKey] = Boolean.FalseString;
-            Console.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
+            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
             await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
+            Assert.AreNotEqual(activityId2, result, "E2E ActivityId #2 should not have been propagated");
             Assert.AreEqual(Guid.Empty, result, "E2E ActivityId #2 should not have been propagated");
             RequestContext.Clear();
 
             changeConfig[PropagateActivityIdConfigKey] = Boolean.TrueString;
-            Console.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
+            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
             await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
 
             Trace.CorrelationManager.ActivityId = activityId2;
@@ -734,10 +740,10 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_CountCallbacks()
         {
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(Guid.Empty);
+            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
@@ -752,7 +758,7 @@ namespace UnitTests.General
             Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks - should be unchanged");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_SetActivityId()
         {
             Guid setActivityId = Guid.NewGuid();
@@ -760,7 +766,7 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId2; // Set up initial value that will be overridden by the callback function
 
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(setActivityId);
+            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, setActivityId);
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
             IRequestContextProxyGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
@@ -777,12 +783,12 @@ namespace UnitTests.General
             Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks - should be unchanged");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_GrainObserver()
         {
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(Guid.Empty);
+            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
             GrainClient.ClientInvokeCallback = callback.OnInvoke;
-            RequestContextGrainObserver observer = new RequestContextGrainObserver(null, null);
+            RequestContextGrainObserver observer = new RequestContextGrainObserver(output, null, null);
             // CreateObjectReference will result in system target call to IClientObserverRegistrar.
             // We want to make sure this does not invoke ClientInvokeCallback.
             ISimpleGrainObserver reference = await GrainClient.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
@@ -794,18 +800,20 @@ namespace UnitTests.General
 
     internal class RequestContextGrainObserver : ISimpleGrainObserver
     {
+        private readonly ITestOutputHelper output;
         readonly Action<int, int, object> action;
         readonly object result;
 
-        public RequestContextGrainObserver(Action<int, int, object> action, object result)
+        public RequestContextGrainObserver(ITestOutputHelper output, Action<int, int, object> action, object result)
         {
+            this.output = output;
             this.action = action;
             this.result = result;
         }
 
         public void StateChanged(int a, int b)
         {
-            Console.WriteLine("RequestContextGrainObserver.StateChanged a={0} b={1}", a, b);
+            output.WriteLine("RequestContextGrainObserver.StateChanged a={0} b={1}", a, b);
             if (action != null)
             {
                 action(a, b, result);
@@ -813,10 +821,16 @@ namespace UnitTests.General
         }
     }
     
-    [TestClass]
-    public class Halo_RequestContextTests
+    public class Halo_RequestContextTests : OrleansTestingBase
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        private readonly ITestOutputHelper output;
+
+        public Halo_RequestContextTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_RequestContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
             int numTasks = 20;
@@ -836,7 +850,7 @@ namespace UnitTests.General
         {
             RequestContext.Set("threadId", i);
             int contextId = (int)(RequestContext.Get("threadId") ?? -1);
-            Console.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
+            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
@@ -846,16 +860,22 @@ namespace UnitTests.General
             {
                 await Task.Delay(10);
                 int contextId = (int)(RequestContext.Get("threadId") ?? -1);
-                Console.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
+                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.AreEqual(id, contextId);
             }
         }
     }
-
-    [TestClass]
-    public class Halo_CallContextTests
+    
+    public class Halo_CallContextTests : OrleansTestingBase
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("RequestContext")]
+        private readonly ITestOutputHelper output;
+
+        public Halo_CallContextTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_LogicalCallContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
             int numTasks = 20;
@@ -875,7 +895,7 @@ namespace UnitTests.General
         {
             CallContext.LogicalSetData("threadId", i);
             int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
-            Console.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
+            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
@@ -885,7 +905,7 @@ namespace UnitTests.General
             {
                 await Task.Delay(10);
                 int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
-                Console.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
+                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.AreEqual(id, contextId);
             }
         }
@@ -895,10 +915,12 @@ namespace UnitTests.General
     {
         public int TotalCalls;
 
+        private readonly ITestOutputHelper output;
         private readonly Guid setActivityId;
 
-        public TestClientInvokeCallback(Guid setActivityId)
+        public TestClientInvokeCallback(ITestOutputHelper output, Guid setActivityId)
         {
+            this.output = output;
             this.setActivityId = setActivityId;
         }
 
@@ -912,11 +934,11 @@ namespace UnitTests.General
 
             TotalCalls++;
 
-            Console.WriteLine("OnInvoke TotalCalls={0}", TotalCalls);
+            output.WriteLine("OnInvoke TotalCalls={0}", TotalCalls);
 
             try
             {
-                Console.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} GrainId={2} with {3} arguments",
+                output.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} GrainId={2} with {3} arguments",
                     grain.GetType().FullName,
                     ((GrainReference) grain).GrainId.GetPrimaryKeyLong(),
                     ((GrainReference) grain).GrainId,
@@ -924,7 +946,7 @@ namespace UnitTests.General
             }
             catch (Exception exc)
             {
-                Console.WriteLine("**** Error OnInvoke for Grain={0} GrainId={1} with {2} arguments. Exception = {3}",
+                output.WriteLine("**** Error OnInvoke for Grain={0} GrainId={1} with {2} arguments. Exception = {3}",
                     grain.GetType().FullName,
                     ((GrainReference)grain).GrainId,
                     request.Arguments != null ? request.Arguments.Length : 0,
@@ -934,9 +956,9 @@ namespace UnitTests.General
             if (setActivityId != Guid.Empty)
             {
                 Trace.CorrelationManager.ActivityId = setActivityId;
-                Console.WriteLine("OnInvoke Set ActivityId={0}", setActivityId);
+                output.WriteLine("OnInvoke Set ActivityId={0}", setActivityId);
             }
-            Console.WriteLine("OnInvoke Current ActivityId={0}", Trace.CorrelationManager.ActivityId);
+            output.WriteLine("OnInvoke Current ActivityId={0}", Trace.CorrelationManager.ActivityId);
         }
     }
 }

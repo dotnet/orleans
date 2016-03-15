@@ -5,25 +5,24 @@ namespace UnitTests.Serialization
     using System.Linq;
     using System.Reflection;
 
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
     using Orleans.Serialization;
 
-    using UnitTests.GrainInterfaces;
+    using GrainInterfaces;
+    using Xunit;
 
     /// <summary>
     /// Tests for the serialization system.
     /// </summary>
-    [TestClass]
     public class InternalSerializationTests
     {
         /// <summary>
         /// Initializes the system for testing.
         /// </summary>
-        [TestInitialize]
-        public void InitializeForTesting()
+        public InternalSerializationTests()
         {
             SerializationManager.InitializeForTesting();
         }
@@ -31,7 +30,7 @@ namespace UnitTests.Serialization
         /// <summary>
         /// Tests that grain references are serialized correctly.
         /// </summary>
-        [TestMethod]
+        [Fact]
         [TestCategory("BVT")]
         [TestCategory("Functional")]
         [TestCategory("Serialization")]
@@ -43,7 +42,7 @@ namespace UnitTests.Serialization
         /// <summary>
         /// Tests that generic grain references are serialized correctly.
         /// </summary>
-        [TestMethod]
+        [Fact]
         [TestCategory("BVT")]
         [TestCategory("Functional")]
         [TestCategory("Serialization")]

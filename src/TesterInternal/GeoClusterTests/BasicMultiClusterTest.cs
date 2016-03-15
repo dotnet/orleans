@@ -1,19 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
+using Xunit;
 
 namespace Tests.GeoClusterTests
 {
-    [TestClass]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    public class BasicMultiClusterTest : TestingClusterHost
+    public class BasicMultiClusterTest : TestingClusterHost, IDisposable
     {
         // Kill all clients and silos.
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             try
             {
@@ -42,8 +39,8 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        [TestMethod, TestCategory("GeoCluster"), TestCategory("Functional")]
-        [Timeout(120000)]
+        [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
+        //[Timeout(120000)]
         public void CreateTwoIndependentClusters()
         {
             // create cluster A with one silo and clientA

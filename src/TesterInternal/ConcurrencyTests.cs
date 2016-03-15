@@ -1,35 +1,36 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.ConcurrencyTests
 {
     /// <summary>
     /// Summary description for PersistenceTest
     /// </summary>
-    [TestClass]
-    public class ConcurrencyTests : HostedTestClusterPerFixture
+    public class ConcurrencyTests : OrleansTestingBase, IClassFixture<ConcurrencyTests.Fixture>
     {
-        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
-
-        public static TestingSiloHost CreateSiloHost()
+        private class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
                 {
                     StartSecondary = false,
-                    AdjustConfig = config => {
+                    AdjustConfig = config =>
+                    {
                         config.Overrides["Primary"].MaxActiveThreads = 2;
-                    },
+                    }
                 });
+            }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public async Task ConcurrencyTest_ReadOnly()
         {
             IConcurrentGrain first = GrainClient.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
@@ -42,15 +43,12 @@ namespace UnitTests.ConcurrencyTests
                 promises.Add(p);
             }
             await Task.WhenAll(promises);
-            Console.WriteLine("\n\nENDED TEST\n\n");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public void ConcurrencyTest_ModifyReturnList()
         {
             IConcurrentGrain grain = GrainClient.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
-
-            Console.WriteLine("\n\nStarting TEST\n\n");
 
             Task<List<int>>[] ll = new Task<List<int>>[20];
             for (int i = 0; i < 2000; i++)
@@ -59,9 +57,7 @@ namespace UnitTests.ConcurrencyTests
                     ll[j] = grain.ModifyReturnList_Test();
 
                 Task.WhenAll(ll).Wait();
-                Console.Write(".");
             }
-            Console.WriteLine("\n\nENDED TEST\n\n");
         }
     }
 }

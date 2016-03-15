@@ -3,13 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
+using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
-    [TestClass]
     public class PooledQueueCacheTests
     {
         private const int PooledBufferCount = 8;
@@ -168,7 +168,7 @@ namespace UnitTests.OrleansRuntime.Streams
         /// Walk each cursor until there is no more data on each stream.
         /// Alternate adding messages to cache and walking cursors.
         /// </summary>
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void GoldenPathTest()
         {
             var bufferPool = new TestBlockPool();
@@ -182,7 +182,7 @@ namespace UnitTests.OrleansRuntime.Streams
         /// Run normal golden path test, then purge the cache, and then run another golden path test.  
         /// Goal is to make sure cache cleans up correctly when all data is purged.
         /// </summary>
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void CacheDrainTest()
         {
             var bufferPool = new TestBlockPool();
@@ -283,7 +283,7 @@ namespace UnitTests.OrleansRuntime.Streams
             return sequenceNumber;
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void QueueCacheMissTest()
         {
             var bufferPool = new TestBlockPool();

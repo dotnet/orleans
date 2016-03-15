@@ -15,17 +15,16 @@ namespace UnitTests.StreamingTests
 {
     public class SampleStreamingTestsFixture : BaseClusterFixture
     {
-        public SampleStreamingTestsFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                },
-                new TestingClientOptions()
-                {
-                    ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-                }))
+        protected override TestingSiloHost CreateClusterHost()
         {
+            return new TestingSiloHost(new TestingSiloOptions
+            {
+                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+            },
+            new TestingClientOptions()
+            {
+                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
+            });
         }
     }
 

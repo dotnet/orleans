@@ -1,96 +1,54 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
-    [TestClass]
     public class LoadSheddingTest : HostedTestClusterPerTest
     {
-        public static TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(true);
-        }
-
-        [TestMethod, TestCategory("Functional"), TestCategory("LoadShedding")]
-        public void LoadSheddingBasic()
+        [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
+        public async Task LoadSheddingBasic()
         {
             ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(true);
-            Assert.IsTrue(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
+            Assert.True(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
 
-            var promise = grain.SetA(5);
-            bool failed = false;
-            try
-            {
-                promise.Wait();
-            }
-            catch (Exception)
-            {
-                failed = true;
-            }
-            Assert.IsTrue(failed, "Message was accepted even though silo was in overload state");
+            // Do not accept message in overloaded state
+            await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
+                grain.SetA(5));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("LoadShedding")]
-        public void LoadSheddingComplex()
+        [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
+        public async Task LoadSheddingComplex()
         {
             ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            
-            Console.WriteLine("Acquired grain reference");
 
-            var promise = grain.SetA(1);
-            try
-            {
-                promise.Wait();
-            }
-            catch (Exception ex)
-            {
-                Assert.Fail("Simple request failed with exception: " + ex);
-            }
+            logger.Info("Acquired grain reference");
 
-            Console.WriteLine("First set succeeded");
+            await grain.SetA(1);
+            logger.Info("First set succeeded");
 
             this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(true);
-            Assert.IsTrue(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
+            Assert.True(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
 
-            promise = grain.SetA(2);
-            try
-            {
-                promise.Wait();
-                Assert.Fail("Message was accepted even though silo was in overload state");
-            }
-            catch (Exception ex)
-            {
-                var exc = ex.GetBaseException();
-                if (!(exc is GatewayTooBusyException))
-                {
-                    Assert.Fail("Incorrect exception thrown for load-shed rejection: " + exc);
-                }
-            }
+            // Do not accept message in overloaded state
+            await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
+                grain.SetA(2));
 
-            Console.WriteLine("Second set was shed");
+            logger.Info("Second set was shed");
 
             this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(false);
-            Assert.IsFalse(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch non-overload state");
+            Assert.False(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch non-overload state");
 
-            promise = grain.SetA(4);
-            try
-            {
-                promise.Wait();
-            }
-            catch (Exception ex)
-            {
-                Assert.Fail("Simple request after overload is cleared failed with exception: " + ex);
-            }
-
-            Console.WriteLine("Third set succeeded");
+            // Simple request after overload is cleared should succeed
+            await grain.SetA(4);
+            logger.Info("Third set succeeded");
         }
     }
 }

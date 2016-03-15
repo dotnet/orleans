@@ -5,12 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
-
 using Orleans.Runtime;
 using Tester;
+using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests
 {
@@ -18,22 +19,14 @@ namespace UnitTests
     ///This is a test class for LoggerTest and is intended
     ///to contain all LoggerTest Unit Tests
     ///</summary>
-    [TestClass]
-    [DeploymentItem("OrleansConfigurationForTesting.xml")]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class LoggerTest : HostedTestClusterEnsureDefaultStarted
+    public class LoggerTest : OrleansTestingBase, IClassFixture<DefaultClusterFixture>, IDisposable
     {
+        private readonly ITestOutputHelper output;
         private double timingFactor;
-
-        /// <summary>
-        ///Gets or sets the test context which provides
-        ///information about and functionality for the current test run.
-        ///</summary>
-        public TestContext TestContext { get; set; }
-
-        [TestInitialize]
-        public void SetUpDefaults()
+                
+        public LoggerTest(ITestOutputHelper output)
         {
+            this.output = output;
             TraceLogger.UnInitialize();
             TraceLogger.SetRuntimeLogLevel(Severity.Verbose);
             TraceLogger.SetAppLogLevel(Severity.Info);
@@ -45,8 +38,7 @@ namespace UnitTests
             timingFactor = TestUtils.CalibrateTimings();
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             TraceLogger.Flush();
             TraceLogger.UnInitialize();
@@ -55,7 +47,7 @@ namespace UnitTests
         /// <summary>
         ///A test for Logger Constructor
         ///</summary>
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_ConstructorTest()
         {
             TraceLogger target = TraceLogger.GetLogger("Test", TraceLogger.LoggerType.Runtime);
@@ -74,7 +66,7 @@ namespace UnitTests
         /// <summary>
         ///A test for Logger Constructor
         ///</summary>
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_ConstructorTest1()
         {
             TraceLogger target = TraceLogger.GetLogger("Test", TraceLogger.LoggerType.Application);
@@ -89,7 +81,7 @@ namespace UnitTests
         /// <summary>
         ///A test for SetRuntimeLogLevel
         ///</summary>
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_SetRuntimeLogLevelTest()
         {
             TraceLogger target = TraceLogger.GetLogger("Test");
@@ -100,7 +92,7 @@ namespace UnitTests
                 "Default severity level not re-calculated correctly for runtime logger with no overrides");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_SeverityLevelTest()
         {
             TraceLogger target = TraceLogger.GetLogger("Test");
@@ -115,7 +107,7 @@ namespace UnitTests
         }
 
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_GetLoggerTest()
         {
             TraceLogger logger = TraceLogger.GetLogger("GetLoggerTest", TraceLogger.LoggerType.Runtime);
@@ -130,18 +122,18 @@ namespace UnitTests
             Assert.IsTrue(ReferenceEquals(logger, logger3));
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_CreateMiniDump()
         {
             var dumpFile = TraceLogger.CreateMiniDump();
-            Console.WriteLine("Logger.CreateMiniDump dump file = " + dumpFile);
+            output.WriteLine("Logger.CreateMiniDump dump file = " + dumpFile);
             Assert.IsNotNull(dumpFile);
             Assert.IsTrue(dumpFile.Exists, "Mini-dump file exists");
             Assert.IsTrue(dumpFile.Length > 0, "Mini-dump file has content");
-            Console.WriteLine("Logger.CreateMiniDump dump file location = " + dumpFile.FullName);
+            output.WriteLine("Logger.CreateMiniDump dump file location = " + dumpFile.FullName);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_AddRemoveOverride()
         {
             const string name = "LoggerOverrideTest";
@@ -156,7 +148,7 @@ namespace UnitTests
             Assert.AreEqual(initialLevel, logger.SeverityLevel, "Logger level not reset after override removed");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_DifferentLoggers()
         {
             int n = 10000;
@@ -169,7 +161,7 @@ namespace UnitTests
             int expectedBulkLogMessages1 = 0;
             int expectedBulkLogMessages2 = 1;
 
-            TestLogConsumer logConsumer = new TestLogConsumer();
+            TestLogConsumer logConsumer = new TestLogConsumer(output);
             TraceLogger.LogConsumers.Add(logConsumer);
             TraceLogger logger1 = TraceLogger.GetLogger("logger1");
             TraceLogger logger2 = TraceLogger.GetLogger("logger2");
@@ -215,7 +207,7 @@ namespace UnitTests
             Assert.AreEqual(0, logConsumer.GetEntryCount(logCode2 + 1), "Should not see any other entries +1");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_VerboseNotFiltered()
         {
             const string testName = "Logger_BulkMessageLimit_InfoNotFiltered";
@@ -226,7 +218,7 @@ namespace UnitTests
             int expectedLogMessages1 = n + 2;
             int expectedBulkLogMessages1 = 0;
 
-            TestLogConsumer logConsumer = new TestLogConsumer();
+            TestLogConsumer logConsumer = new TestLogConsumer(output);
             TraceLogger.LogConsumers.Add(logConsumer);
             TraceLogger logger1 = TraceLogger.GetLogger(testName);
 
@@ -249,14 +241,14 @@ namespace UnitTests
                     "Should see {0} real entries in total via logger#1", expectedLogMessages1);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_DifferentFinalLogCode()
         {
             const string testName = "Logger_BulkMessageLimit_DifferentFinalLogCode";
             int n = 10000;
             TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
 
-            int mainLogCode = random.Next(100000);
+            int mainLogCode = TestUtils.Random.Next();
             int finalLogCode = mainLogCode + 10;
             int expectedMainLogMessages = TraceLogger.BulkMessageLimit;
             int expectedFinalLogMessages = 1;
@@ -265,14 +257,14 @@ namespace UnitTests
             RunTestForLogFiltering(testName, n, mainLogCode, finalLogCode, expectedMainLogMessages, expectedFinalLogMessages, expectedBulkLogMessages);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_SameFinalLogCode()
         {
             const string testName = "Logger_BulkMessageLimit_SameFinalLogCode";
             int n = 10000;
             TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
 
-            int mainLogCode = random.Next(100000);
+            int mainLogCode = TestUtils.Random.Next(100000);
             int finalLogCode = mainLogCode; // Same as main code
             int expectedMainLogMessages = TraceLogger.BulkMessageLimit + 1; // == Loop + 1 final
             int expectedFinalLogMessages = expectedMainLogMessages;
@@ -282,7 +274,7 @@ namespace UnitTests
                                    expectedFinalLogMessages, expectedBulkLogMessages);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_Excludes_100000()
         {
             const string testName = "Logger_BulkMessageLimit_Excludes_100000";
@@ -298,11 +290,11 @@ namespace UnitTests
             RunTestForLogFiltering(testName, n, finalLogCode, mainLogCode, expectedMainLogMessages, expectedFinalLogMessages, expectedBulkLogMessages);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_MessageSizeLimit()
         {
             const string testName = "Logger_MessageSizeLimit";
-            TestLogConsumer logConsumer = new TestLogConsumer();
+            TestLogConsumer logConsumer = new TestLogConsumer(output);
             TraceLogger.LogConsumers.Add(logConsumer);
             TraceLogger logger1 = TraceLogger.GetLogger(testName);
 
@@ -322,11 +314,11 @@ namespace UnitTests
             Assert.AreEqual(1, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should also see 'Message truncated' message");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Logger")]
+        [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_Stats_MessageSizeLimit()
         {
             const string testName = "Logger_Stats_MessageSizeLimit";
-            TestLogConsumer logConsumer = new TestLogConsumer();
+            TestLogConsumer logConsumer = new TestLogConsumer(output);
             TraceLogger.LogConsumers.Add(logConsumer);
             TraceLogger logger1 = TraceLogger.GetLogger(testName);
 
@@ -349,7 +341,7 @@ namespace UnitTests
                 statsLogger.DumpCounters().Wait();
 
                 int count = logConsumer.GetEntryCount((int)ErrorCode.PerfCounterDumpAll);
-                Console.WriteLine(count + " stats log message entries written");
+                output.WriteLine(count + " stats log message entries written");
                 Assert.IsTrue(count > 1, "Should be some stats log message entries - saw " + count);
                 Assert.AreEqual(0, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should not see any 'Message truncated' message");
             }
@@ -359,44 +351,44 @@ namespace UnitTests
             }
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_FileLogWriter()
         {
             const string testName = "Logger_Perf_FileLogWriter";
             TimeSpan target = TimeSpan.FromMilliseconds(1000);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             var logFile = new FileInfo("log-" + testName + ".txt");
             ITraceTelemetryConsumer log = new FileTelemetryConsumer(logFile);
             RunLogWriterPerfTest(testName, n, logCode, target, log);
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_TraceLogWriter()
         {
             const string testName = "Logger_Perf_TraceLogWriter";
             TimeSpan target = TimeSpan.FromMilliseconds(360);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             ITraceTelemetryConsumer log = new TraceTelemetryConsumer();
             RunLogWriterPerfTest(testName, n, logCode, target, log);
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_ConsoleLogWriter()
         {
             const string testName = "Logger_Perf_ConsoleLogWriter";
             TimeSpan target = TimeSpan.FromMilliseconds(100);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             ITraceTelemetryConsumer log = new ConsoleTelemetryConsumer();
             RunLogWriterPerfTest(testName, n, logCode, target, log);
         }
 
-        //[TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        //[Fact, TestCategory("Logger"), TestCategory("Performance")]
         //public void Logger_Perf_EtwLogWriter()
         //{
         //    const string testName = "Logger_Perf_EtwLogWriter";
@@ -407,13 +399,13 @@ namespace UnitTests
         //    RunLogWriterPerfTest(testName, n, target, log);
         //}
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_Logger_Console()
         {
             const string testName = "Logger_Perf_Logger_Console";
             TimeSpan target = TimeSpan.FromMilliseconds(50);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
             ITraceTelemetryConsumer logConsumer = new ConsoleTelemetryConsumer();
             TraceLogger.TelemetryConsumers.Add(logConsumer);
@@ -423,15 +415,15 @@ namespace UnitTests
             RunLoggerPerfTest(testName, n, logCode, target, logger);
         }
 
-        [TestMethod, TestCategory("Logger"), TestCategory("Performance")]
+        [Fact, TestCategory("Logger"), TestCategory("Performance")]
         public void Logger_Perf_Logger_Dummy()
         {
             const string testName = "Logger_Perf_Logger_Dummy";
             TimeSpan target = TimeSpan.FromMilliseconds(30);
             int n = 10000;
-            int logCode = random.Next(100000);
+            int logCode = TestUtils.Random.Next(100000);
 
-            ILogConsumer logConsumer = new TestLogConsumer();
+            ILogConsumer logConsumer = new TestLogConsumer(output);
             TraceLogger.LogConsumers.Add(logConsumer);
             TraceLogger.BulkMessageInterval = target;
             TraceLogger logger = TraceLogger.GetLogger(testName);
@@ -441,15 +433,21 @@ namespace UnitTests
 
         private void RunLogWriterPerfTest(string testName, int n, int logCode, TimeSpan target, ITraceTelemetryConsumer log)
         {
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
-            for (int i = 0; i < n; i++)
+            // warm up
+            log.TrackTrace(string.Format( "{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg warm up", logCode), Severity.Info);
+
+            var messages = Enumerable.Range(0, n)
+                .Select(i => string.Format("{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg " + i, logCode))
+                .ToList();
+
+            var stopwatch = Stopwatch.StartNew();
+            foreach (string message in messages)
             {
-                log.TrackTrace(string.Format( "{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg " + i, logCode), Severity.Info);
+                log.TrackTrace(message, Severity.Info);
             }
             stopwatch.Stop();
             var elapsed = stopwatch.Elapsed;
-            Console.WriteLine(testName + " : Elapsed time = " + elapsed);
+            output.WriteLine(testName + " : Elapsed time = " + elapsed);
             Assert.IsTrue(elapsed < target.Multiply(timingFactor), "{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
         }
 
@@ -470,16 +468,16 @@ namespace UnitTests
                 Thread.Sleep(10);
             }
 
-            Console.WriteLine(msg);
+            output.WriteLine(msg);
             logger.Info(logCode, msg);
             Assert.IsTrue(elapsed < target.Multiply(timingFactor), "{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
         }
 
-        private static void RunTestForLogFiltering(string testName, int n, int finalLogCode, int mainLogCode, int expectedMainLogMessages, int expectedFinalLogMessages, int expectedBulkLogMessages)
+        private void RunTestForLogFiltering(string testName, int n, int finalLogCode, int mainLogCode, int expectedMainLogMessages, int expectedFinalLogMessages, int expectedBulkLogMessages)
         {
             Assert.IsTrue(finalLogCode != (mainLogCode - 1), "Test code constraint -1");
 
-            TestLogConsumer logConsumer = new TestLogConsumer();
+            TestLogConsumer logConsumer = new TestLogConsumer(output);
             TraceLogger.LogConsumers.Add(logConsumer);
             TraceLogger logger = TraceLogger.GetLogger(testName);
 
@@ -495,7 +493,7 @@ namespace UnitTests
             TimeSpan delay = TraceLogger.BulkMessageInterval - stopwatch.Elapsed;
             if (delay > TimeSpan.Zero)
             {
-                Console.WriteLine("Sleeping for " + delay);
+                output.WriteLine("Sleeping for " + delay);
                 Thread.Sleep(delay);
             }
             Thread.Sleep(10);
@@ -517,6 +515,13 @@ namespace UnitTests
 
     class TestLogConsumer : ILogConsumer
     {
+        private readonly ITestOutputHelper output;
+
+        public TestLogConsumer(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         private readonly Dictionary<int,int> entryCounts = new Dictionary<int, int>();
         private int lastLogCode;
 
@@ -529,7 +534,7 @@ namespace UnitTests
 
                 if (eventCode != lastLogCode)
                 {
-                    Console.WriteLine("{0} {1} - {2}", severity, eventCode, message);
+                    output.WriteLine("{0} {1} - {2}", severity, eventCode, message);
                     lastLogCode = eventCode;
                 }
             }
@@ -540,7 +545,7 @@ namespace UnitTests
             lock (this)
             {
                 int count = (entryCounts.ContainsKey(eventCode)) ? entryCounts[eventCode] : 0;
-                Console.WriteLine("Count {0} = {1}", eventCode, count);
+                output.WriteLine("Count {0} = {1}", eventCode, count);
                 return count;
             }
         }

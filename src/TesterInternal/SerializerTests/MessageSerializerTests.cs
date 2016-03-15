@@ -2,22 +2,23 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Reflection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.SerializerTests
 {
-    [DeploymentItem("OrleansConfiguration.xml")]
-    [TestClass]
     public class MessageSerializerTests
     {
-        [TestInitialize]
-        public void TestInitialize()
+        private readonly ITestOutputHelper output;
+
+        public MessageSerializerTests(ITestOutputHelper output)
         {
+            this.output = output;
             MessagingStatisticsGroup.Init(false);
 
             var orleansConfig = new ClusterConfiguration();
@@ -27,13 +28,13 @@ namespace UnitTests.SerializerTests
             SerializationManager.InitializeForTesting();
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void MessageTest_BinaryRoundTrip()
         {
             RunTest(1000);
         }
 
-        private static void RunTest(int numItems)
+        private void RunTest(int numItems)
         {
             InvokeMethodRequest request = new InvokeMethodRequest(0, 0, null);
             Message resp = Message.CreateMessage(request, InvokeMethodOptions.None);
@@ -55,7 +56,7 @@ namespace UnitTests.SerializerTests
             resp.BodyObject = requestBody;
 
             string s = resp.ToString();
-            Console.WriteLine(s);
+            output.WriteLine(s);
 
             int dummy = 0;
             var serialized = resp.Serialize(out dummy);

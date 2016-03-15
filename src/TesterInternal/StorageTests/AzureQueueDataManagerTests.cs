@@ -3,18 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Queue;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
-using Tester;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    public class AzureQueueDataManagerTests
+    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTestFixture>, IDisposable
     {
         private readonly TraceLogger logger;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
@@ -28,14 +26,7 @@ namespace UnitTests.StorageTests
             logger = TraceLogger.GetLogger("AzureQueueDataManagerTests", TraceLogger.LoggerType.Application);
         }
 
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            TestUtils.CheckForAzureStorage();
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             AzureQueueDataManager manager = GetTableManager(queueName).Result;
             manager.DeleteQueue().Wait();
@@ -49,7 +40,7 @@ namespace UnitTests.StorageTests
             return manager;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
         public async Task AQ_Standalone_1()
         {
             queueName = "Test-1-".ToLower() + Guid.NewGuid();
@@ -83,7 +74,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, await manager.GetApproximateMessageCount());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
         public async Task AQ_Standalone_2()
         {
             queueName = "Test-2-".ToLower() + Guid.NewGuid();
@@ -114,7 +105,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(0, await manager.GetApproximateMessageCount());
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
         public async Task AQ_Standalone_3_Init_MultipleThreads()
         {
             queueName = "Test-4-".ToLower() + Guid.NewGuid();

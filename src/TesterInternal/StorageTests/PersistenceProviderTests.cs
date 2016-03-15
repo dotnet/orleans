@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -14,38 +14,30 @@ using Orleans.TestingHost;
 using Samples.StorageProviders;
 using Tester;
 using UnitTests.Tester;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
-    [TestClass]
-    [DeploymentItem("ClientConfigurationForTesting.xml")]
-    public class PersistenceProviderTests_Local
+    public class PersistenceProviderTests_Local : IClassFixture<PersistenceProviderTests_Local.Fixture>, IDisposable
     {
-        public TestContext TestContext { get; set; }
-
-        StorageProviderManager storageProviderManager;
-        readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
+        public class Fixture
         {
-            Console.WriteLine("ClassInitialize {0}", testContext.TestName);
-            testContext.WriteLine("ClassInitialize");
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            testContext.WriteLine(cfg.ToString());
-            TraceLogger.Initialize(cfg);
+            public Fixture()
+            {
+                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
+                TraceLogger.Initialize(cfg);
+            }
         }
 
-        [ClassCleanup]
-        public static void ClassCleanup()
-        {
-        }
+        private StorageProviderManager storageProviderManager;
+        private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
+        private readonly ITestOutputHelper output;
 
-        [TestInitialize]
-        public void TestInitialize()
+        public PersistenceProviderTests_Local(ITestOutputHelper output)
         {
-            TestContext.WriteLine("TestInitialize");
+            this.output = output;
             storageProviderManager = new StorageProviderManager(new GrainFactory(), new DefaultServiceProvider());
             storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), new DefaultServiceProvider())).WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
@@ -53,17 +45,15 @@ namespace UnitTests.StorageTests
             LocalDataStoreInstance.LocalDataStore = null;
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
-            TestContext.WriteLine("TestCleanup");
             LocalDataStoreInstance.LocalDataStore = null;
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Mock_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_Mock_WriteRead";
 
             IStorageProvider store = new MockStorageProvider();
             var cfg = new ProviderConfiguration(providerCfgProps, null);
@@ -72,10 +62,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_FileStore_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_FileStore_WriteRead";
 
             IStorageProvider store = new OrleansFileStorage();
             providerCfgProps.Add("RootDirectory", "Data");
@@ -85,10 +75,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Sharded_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_Sharded_WriteRead";
 
             IStorageProvider store1 = new MockStorageProvider(2);
             IStorageProvider store2 = new MockStorageProvider(2);
@@ -99,10 +89,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, composite);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task PersistenceProvider_Sharded_9_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_Sharded_9_WriteRead";
 
             IStorageProvider store1 = new MockStorageProvider(2);
             IStorageProvider store2 = new MockStorageProvider(2);
@@ -128,10 +118,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, composite);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_Read()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_Azure_Read";
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -141,10 +131,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_Read(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_Azure_WriteRead";
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -154,10 +144,10 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public async Task PersistenceProvider_Azure_WriteRead_Json()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_Azure_WriteRead_Json";
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
@@ -168,7 +158,7 @@ namespace UnitTests.StorageTests
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void AzureTableStorage_ConvertToFromStorageFormat()
         {
             TestStoreGrainState initialState = new TestStoreGrainState { A = "1", B = 2, C = 3 };
@@ -185,10 +175,10 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(initialState.C, convertedState.C, "C");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task PersistenceProvider_Memory_FixedLatency_WriteRead()
         {
-            string testName = TestContext.TestName;
+            string testName = "PersistenceProvider_Memory_FixedLatency_WriteRead";
             TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
 
             IStorageProvider store = new MemoryStorageWithLatency();
@@ -203,18 +193,18 @@ namespace UnitTests.StorageTests
             sw.Start();
             await store.WriteStateAsync(testName, reference, state);
             TimeSpan writeTime = sw.Elapsed;
-            Console.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
+            output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
             Assert.IsTrue(writeTime >= expectedLatency, "Write: Expected minimum latency = {0} Actual = {1}", expectedLatency, writeTime);
 
             sw.Restart();
             var storedState = new GrainState<TestStoreGrainState>();
             await store.ReadStateAsync(testName, reference, storedState);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             Assert.IsTrue(readTime >= expectedLatency, "Read: Expected minimum latency = {0} Actual = {1}", expectedLatency, readTime);
         }
 
-        [TestMethod, TestCategory("Persistence"), TestCategory("Performance"), TestCategory("JSON")]
+        [Fact, TestCategory("Persistence"), TestCategory("Performance"), TestCategory("JSON")]
         public void Json_Perf_Newtonsoft_vs_Net()
         {
             int numIterations = 10000;
@@ -242,10 +232,10 @@ namespace UnitTests.StorageTests
                 dataValues.Add("C", idx[0]++);
                 jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(dataValues);
             });
-            Console.WriteLine("Elapsed: {0} Date: {1}", elapsed, jsonData);
+            output.WriteLine("Elapsed: {0} Date: {1}", elapsed, jsonData);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Persistence")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void LoadClassByName()
         {
             string className = typeof(MockStorageProvider).FullName;
@@ -256,7 +246,7 @@ namespace UnitTests.StorageTests
 
         #region Utility functions
 
-        private static async Task Test_PersistenceProvider_Read(string grainTypeName, IStorageProvider store)
+        private async Task Test_PersistenceProvider_Read(string grainTypeName, IStorageProvider store)
         {
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
             TestStoreGrainState state = new TestStoreGrainState();
@@ -268,14 +258,14 @@ namespace UnitTests.StorageTests
             sw.Start();
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             var storedState = storedGrainState.State;
             Assert.AreEqual(state.A, storedState.A, "A");
             Assert.AreEqual(state.B, storedState.B, "B");
             Assert.AreEqual(state.C, storedState.C, "C");
         }
 
-        private static async Task Test_PersistenceProvider_WriteRead(string grainTypeName, IStorageProvider store)
+        private async Task Test_PersistenceProvider_WriteRead(string grainTypeName, IStorageProvider store)
         {
             GrainReference reference = GrainReference.FromGrainId(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
@@ -290,7 +280,7 @@ namespace UnitTests.StorageTests
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            Console.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             var storedState = storedGrainState.State;
             Assert.AreEqual(state.State.A, storedState.A, "A");
             Assert.AreEqual(state.State.B, storedState.B, "B");

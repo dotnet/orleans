@@ -1,14 +1,14 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests
 {
-    [TestClass]
     public class SerializationTests : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Serialization_LargeTestData()
         {
             var data = new LargeTestData
@@ -27,7 +27,7 @@ namespace UnitTests
             Assert.IsInstanceOfType(copy, typeof(LargeTestData), "Deserialized result is of wrong type");
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Serialization_ValueTypePhase1()
         {
             ValueTypeTestData data = new ValueTypeTestData(4);
@@ -38,7 +38,7 @@ namespace UnitTests
             Assert.AreEqual<int>(4, ((ValueTypeTestData)obj).GetValue(), "Deserialized result is incorrect");
         }
 
-        [TestMethod, TestCategory("Serialization")]
+        [Fact, TestCategory("Serialization")]
         public void Serialization_ValueTypePhase2()
         {
             ValueTypeTestData data = new ValueTypeTestData(4);

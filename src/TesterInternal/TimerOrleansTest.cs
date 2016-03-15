@@ -4,20 +4,34 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
+using Xunit.Abstractions;
 
 namespace UnitTests.TimerTests
 {
-    [TestClass]
-    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
+    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        private readonly ITestOutputHelper output;
+
+        public TimerOrleansTest(ITestOutputHelper output, DefaultClusterFixture fixture)
+            : base(fixture)
+        {
+            this.output = output;
+        }
+
+        public void Dispose()
+        {
+            this.HostedCluster.StopAdditionalSilos();
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Basic()
         {
             for (int i = 0; i < 10; i++)
@@ -26,7 +40,7 @@ namespace UnitTests.TimerTests
                 TimeSpan period = grain.GetTimerPeriod().Result;
                 Thread.Sleep(period.Multiply(10));
                 int last = grain.GetCounter().Result;
-                Console.WriteLine("value = " + last);
+                output.WriteLine("value = " + last);
                 //Assert.IsTrue(10 == last || 9 == last, last.ToString());
 
                 grain.StopDefaultTimer().Wait();
@@ -36,7 +50,7 @@ namespace UnitTests.TimerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Parallel()
         {
             TimeSpan period = TimeSpan.Zero;
@@ -53,7 +67,7 @@ namespace UnitTests.TimerTests
             {
                 ITimerGrain grain = grains[i];
                 int last = grain.GetCounter().Result;
-                Console.WriteLine("value = " + last);
+                output.WriteLine("value = " + last);
                 //Assert.AreEqual(10, last);
             }
             for (int i = 0; i < grains.Count; i++)
@@ -63,7 +77,7 @@ namespace UnitTests.TimerTests
             }
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Migration()
         {
             Stopwatch stopwatch = new Stopwatch();
@@ -73,7 +87,7 @@ namespace UnitTests.TimerTests
             TimeSpan period = grain.GetTimerPeriod().Result;
             Thread.Sleep(period.Multiply(10));
             int last = grain.GetCounter().Result;
-            Console.WriteLine("value = " + last);
+            output.WriteLine("value = " + last);
             Assert.IsTrue(last >= 10 && last <= 11, "last = " + last.ToString(CultureInfo.InvariantCulture));
 
             this.HostedCluster.StartAdditionalSilo();
@@ -90,10 +104,10 @@ namespace UnitTests.TimerTests
             double maximalNumTicks = stopwatch.Elapsed.Divide(grain.GetTimerPeriod().Result);
             Assert.IsTrue(last <= maximalNumTicks);
             //mgmtGrain.ResumeHost(Orleans.SiloAddress).Wait();
-            Console.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
+            output.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("Functional"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall()
         {
             const string testName = "AsyncTimerTest_GrainCall";
@@ -119,7 +133,7 @@ namespace UnitTests.TimerTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc);
+                output.WriteLine(exc);
                 error = exc;
             }
 
@@ -130,8 +144,7 @@ namespace UnitTests.TimerTests
             catch (Exception exc)
             {
                 // Ignore
-                Console.WriteLine("Ignoring exception from StopTimer : {0}", exc);
-                TestingSiloHost.StopAllSilosIfRunning();
+                output.WriteLine("Ignoring exception from StopTimer : {0}", exc);
             }
 
             if (error != null)

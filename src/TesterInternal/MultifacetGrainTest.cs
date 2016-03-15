@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
+using Xunit;
 using UnitTests.Tester;
 
 namespace UnitTests.General
 {
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
-
-    [TestClass]
+    
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         IMultifacetWriter writer;
@@ -18,7 +18,7 @@ namespace UnitTests.General
         const int EXPECTED_NUMBER_OF_EVENTS = 4;
         private TimeSpan timeout = TimeSpan.FromSeconds(5);
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void RWReferences()
         {
             writer = GrainClient.GrainFactory.GetGrain<IMultifacetWriter>(GetRandomGrainId());
@@ -31,15 +31,17 @@ namespace UnitTests.General
             Assert.AreEqual(x, y);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
-        [ExpectedException(typeof(InvalidCastException))]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void RWReferencesInvalidCastException()
         {
-            reader = GrainClient.GrainFactory.GetGrain<IMultifacetReader>(GetRandomGrainId());
-            writer = (IMultifacetWriter)reader;
+            Xunit.Assert.Throws<InvalidCastException>(() =>
+            {
+                reader = GrainClient.GrainFactory.GetGrain<IMultifacetReader>(GetRandomGrainId());
+                writer = (IMultifacetWriter)reader;
+            });
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public async Task MultifacetFactory()
         {
             IMultifacetFactoryTestGrain factory = GrainClient.GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
@@ -52,7 +54,7 @@ namespace UnitTests.General
             
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public async Task Multifacet_InterfacesAsArguments()
         {
             IMultifacetFactoryTestGrain factory = GrainClient.GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());

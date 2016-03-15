@@ -16,19 +16,17 @@ namespace UnitTests.StreamingTests
 {
     public class PullingAgentManagementTestsFixture : BaseClusterFixture
     {
-        public PullingAgentManagementTestsFixture()
-            : base(
-                  new TestingSiloHost(
-                    new TestingSiloOptions
-                    {
-                        StartSecondary = true,
-                        SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                    },
-                    new TestingClientOptions()
-                    {
-                        ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-                    }))
+        protected override TestingSiloHost CreateClusterHost()
         {
+            return new TestingSiloHost(new TestingSiloOptions
+            {
+                StartSecondary = true,
+                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+            },
+            new TestingClientOptions()
+            {
+                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
+            });
         }
     }
 
