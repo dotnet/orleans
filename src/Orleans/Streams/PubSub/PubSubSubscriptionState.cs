@@ -1,9 +1,11 @@
 using System;
+using Newtonsoft.Json;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
     [Serializable]
+    [JsonObject(MemberSerialization.OptIn)]
     internal class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
         internal enum SubscriptionStates
@@ -15,14 +17,24 @@ namespace Orleans.Streams
         // IMPORTANT!!!!!
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
+        [JsonProperty]
         public GuidId SubscriptionId;
+        [JsonProperty]
         public StreamId Stream;
+        [JsonProperty]
         public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        [JsonProperty]
         public object filterWrapper; // Serialized func info
+        [JsonProperty]
         public SubscriptionStates state;
 
+        // This property does not need to be Json serialized, since we already have producerReference.
+        [JsonIgnore]
         public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
-
+        [JsonIgnore]
+        public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
+        [JsonIgnore]
+        public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
 
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
@@ -36,8 +48,6 @@ namespace Orleans.Streams
             consumerReference = streamConsumer as GrainReference;
             state = SubscriptionStates.Active;
         }
-
-        public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
 
         internal void AddFilter(IStreamFilterPredicateWrapper newFilter)
         {
@@ -108,7 +118,5 @@ namespace Orleans.Streams
         {
             state = SubscriptionStates.Faulted;
         }
-
-        public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
     }
 }
