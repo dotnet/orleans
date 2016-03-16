@@ -15,8 +15,6 @@ using Tester;
 using Xunit;
 using Xunit.Abstractions;
 
-//using UnitTests.Streaming.Reliability;
-
 namespace UnitTests.StreamingTests
 {
     public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTests.Fixture>
@@ -43,11 +41,9 @@ namespace UnitTests.StreamingTests
         protected Guid StreamId;
         protected string StreamProviderName;
         protected string StreamNamespace;
-        private readonly ITestOutputHelper output;
 
-        public StreamPubSubReliabilityTests(ITestOutputHelper output, Fixture fixture)
+        public StreamPubSubReliabilityTests(Fixture fixture)
         {
-            this.output = output;
             HostedCluster = fixture.HostedCluster;
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
@@ -63,7 +59,6 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
-        // TODO: [ExpectedException(typeof(StorageProviderInjectedError))]
         public async Task PubSub_Store_ReadError()
         {
             // Expected behaviour: Underlying error StorageProviderInjectedError returned to caller
@@ -74,23 +69,9 @@ namespace UnitTests.StreamingTests
 
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
 
-            await Xunit.Assert.ThrowsAsync<OrleansException>(async () =>
-            {
-                try
-                {
-                    await Test_PubSub_Stream(StreamProviderName, StreamId);
-                }
-                catch (AggregateException ae)
-                {
-                    output.WriteLine("Received error = {0}", ae);
-
-                    Exception exc = ae.GetBaseException();
-                    if (exc.InnerException != null)
-                        exc = exc.GetBaseException();
-                    output.WriteLine("Returning error = {0}", exc);
-                    throw exc;
-                }
-            });
+            // TODO: expect StorageProviderInjectedError directly instead of OrleansException
+            await Xunit.Assert.ThrowsAsync<OrleansException>(() =>
+                Test_PubSub_Stream(StreamProviderName, StreamId));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
@@ -98,23 +79,10 @@ namespace UnitTests.StreamingTests
         {
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
 
-            await Xunit.Assert.ThrowsAsync<StorageProviderInjectedError>(async () =>
-            {
-                try
-                {
-                    await Test_PubSub_Stream(StreamProviderName, StreamId);
-                }
-                catch (AggregateException ae)
-                {
-                    output.WriteLine("Received error = {0}", ae);
+            var exception = await Xunit.Assert.ThrowsAsync<OrleansException>(() =>
+                Test_PubSub_Stream(StreamProviderName, StreamId));
 
-                    Exception exc = ae.GetBaseException();
-                    if (exc.InnerException != null)
-                        exc = exc.GetBaseException();
-                    output.WriteLine("Returning error = {0}", exc);
-                    throw exc;
-                }
-            });
+            Assert.IsInstanceOfType(exception.InnerException, typeof (StorageProviderInjectedError));
         }
 
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)

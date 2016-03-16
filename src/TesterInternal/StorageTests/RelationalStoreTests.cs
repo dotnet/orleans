@@ -104,6 +104,8 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static Task<bool>[] InsertAndReadStreamsAndCheckMatch(RelationalStorageForTesting sut, int streamSize, int countOfStreams, CancellationToken cancellationToken)
         {
+            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
+
             //Stream in and steam out three binary streams in parallel.
             var streamChecks = new Task<bool>[countOfStreams];
             var sr = new SafeRandom();
@@ -125,8 +127,9 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static async Task InsertIntoDatabaseUsingStream(RelationalStorageForTesting sut, int streamId, byte[] dataToInsert, CancellationToken cancellationToken)
         {
+            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
             //The dataToInsert could be inserted here directly, but it wouldn't be streamed.
-            using(var ms = new MemoryStream(dataToInsert))
+            using (var ms = new MemoryStream(dataToInsert))
             {
                 await sut.Storage.ExecuteAsync(sut.StreamTestInsert, command =>
                 {
@@ -152,6 +155,7 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static async Task<StreamingTest> ReadFromDatabaseUsingAsyncStream(RelationalStorageForTesting sut, int streamId, CancellationToken cancellationToken)
         {
+            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
             return (await sut.Storage.ReadAsync(sut.StreamTestSelect, command =>
             {
                 var p = command.CreateParameter();
@@ -176,7 +180,8 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static Task CancellationTokenTest(RelationalStorageForTesting sut, TimeSpan timeoutLimit)
         {
-            using(var tokenSource = new CancellationTokenSource(timeoutLimit))
+            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
+            using (var tokenSource = new CancellationTokenSource(timeoutLimit))
             {
                 try
                 {

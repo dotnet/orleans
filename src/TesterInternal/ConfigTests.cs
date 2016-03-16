@@ -372,19 +372,20 @@ namespace UnitTests
 
             string filename = "Config_LogConsumers-OrleansConfiguration.xml";
 
-
             var cfg = new ClusterConfiguration();
             cfg.LoadFromFile(filename);
             Assert.AreEqual(filename, cfg.SourceFile);
 
             TraceLogger.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
-            Assert.AreEqual(1, TraceLogger.LogConsumers.Count, "Number of log consumers: " + string.Join(",", TraceLogger.LogConsumers));
-            Assert.AreEqual("UnitTests.DummyLogConsumer", TraceLogger.LogConsumers.Last().GetType().FullName, "Log consumer type");
 
-            Assert.AreEqual(2, TraceLogger.TelemetryConsumers.Count,
-                "Number of telemetry consumers: " + string.Join(",", TraceLogger.TelemetryConsumers));
-            Assert.AreEqual(typeof(TraceTelemetryConsumer).FullName, TraceLogger.TelemetryConsumers.First().GetType().FullName, "TelemetryConsumers consumer type #1");
-            Assert.AreEqual(typeof(ConsoleTelemetryConsumer).FullName, TraceLogger.TelemetryConsumers.Last().GetType().FullName, "TelemetryConsumers consumer type #1");
+            var actualLogConsumers = TraceLogger.LogConsumers.Select(x => x.GetType()).ToList();
+            Xunit.Assert.Contains(typeof(DummyLogConsumer), actualLogConsumers);
+            Assert.AreEqual(1, actualLogConsumers.Count);
+
+            var actualTelemetryConsumers = TraceLogger.TelemetryConsumers.Select(x => x.GetType()).ToList();
+            Xunit.Assert.Contains(typeof(TraceTelemetryConsumer), actualTelemetryConsumers);
+            Xunit.Assert.Contains(typeof(ConsoleTelemetryConsumer), actualTelemetryConsumers);
+            Assert.AreEqual(2, actualTelemetryConsumers.Count);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
