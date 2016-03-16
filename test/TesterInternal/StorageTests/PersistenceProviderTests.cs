@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -13,7 +15,6 @@ using Orleans.Storage;
 using Orleans.TestingHost;
 using Samples.StorageProviders;
 using Tester;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -162,12 +163,51 @@ namespace UnitTests.StorageTests
         public void AzureTableStorage_ConvertToFromStorageFormat()
         {
             TestStoreGrainState initialState = new TestStoreGrainState { A = "1", B = 2, C = 3 };
-            AzureTableStorage.GrainStateEntity entity = new AzureTableStorage.GrainStateEntity();
+            var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
             var logger = TraceLogger.GetLogger("PersistenceProviderTests");
             storage.InitLogger(logger);
             storage.ConvertToStorageFormat(initialState, entity);
-            Assert.IsNotNull(entity.Data, "Entity.Data");
+            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity);
+            Assert.IsNotNull(convertedState, "Converted state");
+            Assert.AreEqual(initialState.A, convertedState.A, "A");
+            Assert.AreEqual(initialState.B, convertedState.B, "B");
+            Assert.AreEqual(initialState.C, convertedState.C, "C");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        public void AzureTableStorage_ConvertToFromStorageFormat_LargeData_Binary()
+        {
+            var longString = string.Join("", Enumerable.Repeat(Guid.NewGuid(), 20000));
+            TestStoreGrainState initialState = new TestStoreGrainState { A = longString, B = 2, C = 3 };
+            var entity = new DynamicTableEntity();
+            var storage = new AzureTableStorage();
+            var logger = TraceLogger.GetLogger("PersistenceProviderTests");
+            storage.InitLogger(logger);
+            storage.ConvertToStorageFormat(initialState, entity);
+            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity);
+            Assert.IsNotNull(convertedState, "Converted state");
+            Assert.AreEqual(initialState.A, convertedState.A, "A");
+            Assert.AreEqual(initialState.B, convertedState.B, "B");
+            Assert.AreEqual(initialState.C, convertedState.C, "C");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
+        public async Task AzureTableStorage_ConvertToFromStorageFormat_LargeData_Json()
+        {
+            var longString = string.Join("", Enumerable.Repeat(Guid.NewGuid(), 10000));
+            TestStoreGrainState initialState = new TestStoreGrainState { A = longString, B = 2, C = 3 };
+            var entity = new DynamicTableEntity();
+            var storage = new AzureTableStorage();
+            providerCfgProps.Add("DataConnectionString", StorageTestConstants.DataConnectionString);
+            providerCfgProps.Add("UseJsonFormat", "true");
+            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            await storage.Init("AzureTableStorage_ConvertToFromStorageFormat_LargeData_Json",
+                storageProviderManager, cfg);
+
+            var logger = TraceLogger.GetLogger("PersistenceProviderTests");
+            storage.InitLogger(logger);
+            storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity);
             Assert.IsNotNull(convertedState, "Converted state");
             Assert.AreEqual(initialState.A, convertedState.A, "A");
@@ -299,6 +339,7 @@ namespace UnitTests.StorageTests
             await composite.Init(name, storageProviderMgr, cfg);
             return composite;
         }
+
         #endregion
     }
 }
