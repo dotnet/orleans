@@ -282,7 +282,7 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
-    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
+    <ProjectReference Include="..\..\src\TestFSharp\TestFSharp.fsproj">
       <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
       <Name>TestFSharp</Name>
     </ProjectReference>
