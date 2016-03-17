@@ -34,9 +34,13 @@ static void Main(string[] args)
 }
 ```
 
-Now you should add reference to Microsoft.Orleans.OrleansHost NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library.
-OrleansHost.exe is a ready-made host executable intended for running Orleans code on Windows Server (Azure has a different host). 
-It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
+Now you should add reference to `Microsoft.Orleans.Server` NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. You also need to change the client gateway port in the `OrleansConfiguration.xml` file added to the collection project by `Microsoft.Orleans.Server` to match the gateway port specified in `DevTestClientConfiguration.xml`. Open `OrleansConfiguration.xml`, find the `ProxyingGateway` element inside its `Defaults` section, and change it to.
+
+```xml
+<ProxyingGateway Address="localhost" Port="30000" />
+```
+
+OrleansHost.exe is a ready-made host executable intended for running Orleans silo code. It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
 
 ![](../Images/Standalone 1.PNG)
 
