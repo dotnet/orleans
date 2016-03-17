@@ -178,7 +178,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_08,
-                    "Failed to unregister myself as stream producer to some streams taht used to be in my responsibility.", exc);
+                    "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.", exc);
             }
             pubSubCache.Clear();
             IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix));          
