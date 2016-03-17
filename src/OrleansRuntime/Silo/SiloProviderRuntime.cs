@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
+using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
@@ -21,9 +23,21 @@ namespace Orleans.Runtime.Providers
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
 
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
+        private InvokeInterceptor invokeInterceptor;
 
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
+
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
+        {
+            this.invokeInterceptor = interceptor;
+        }
+
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return this.invokeInterceptor;
+        }
+
         public Guid ServiceId { get; private set; }
         public string SiloIdentity { get; private set; }
 
@@ -222,6 +236,11 @@ namespace Orleans.Runtime.Providers
             // Need to call it as a grain reference though.
             await pullingAgentManager.Initialize(queueAdapter.AsImmutable());
             return pullingAgentManager;
+        }
+
+        public Task<object> CallInvokeInterceptor(MethodInfo method, InvokeMethodRequest request, IAddressable target, IGrainMethodInvoker invoker)
+        {
+            return this.invokeInterceptor(method, request, (IGrain)target, invoker);
         }
     }
 }

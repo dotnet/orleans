@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
@@ -15,6 +16,7 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
+using Orleans.Runtime.Providers;
 
 
 namespace Orleans.Runtime
@@ -357,15 +359,32 @@ namespace Orleans.Runtime
                         throw exc;
                     }
 
-                    // If the target has an interceptor, invoke that instead.
+                    // If the target has a grain-level interceptor or there is a silo-level interceptor, intercept the call.
+                    var shouldCallSiloWideInterceptor = SiloProviderRuntime.Instance.GetInvokeInterceptor() != null && target is IGrain;
                     var intercepted = target as IGrainInvokeInterceptor;
-                    if (intercepted != null)
+                    if (intercepted != null || shouldCallSiloWideInterceptor)
                     {
-                        var methodInfo = this.invocationMethodInfoMap.GetMethodInfo(target.GetType(), request);
-                        resultObject = await intercepted.Invoke(methodInfo, request, invoker);
+                        // Fetch the method info for the intercepted call.
+                        var implementationInvoker =
+                            invocationMethodInfoMap.GetInterceptedMethodInvoker(target.GetType(), request.InterfaceId,
+                                invoker);
+                        var methodInfo = implementationInvoker.GetMethodInfo(request.MethodId);
+                        if (shouldCallSiloWideInterceptor)
+                        {
+                            // There is a silo-level interceptor and possibly a grain-level interceptor.
+                            var runtime = SiloProviderRuntime.Instance;
+                            resultObject =
+                                await runtime.CallInvokeInterceptor(methodInfo, request, target, implementationInvoker);
+                        }
+                        else
+                        {
+                            // The grain has an interceptor, but there is no silo-wide interceptor.
+                            resultObject = await intercepted.Invoke(methodInfo, request, invoker);
+                        }
                     }
                     else
                     {
+                        // The call is not intercepted.
                         resultObject = await invoker.Invoke(target, request);
                     }
                 }

@@ -170,6 +170,7 @@
     <Compile Include="DefaultClusterFixture.cs" />
     <Compile Include="ProviderTests.cs" />
     <Compile Include="RelationalUtilities\MySqlStorageForTesting.cs" />
+    <Compile Include="InvocationInterceptTests.cs" />
     <Compile Include="RelationalUtilities\RelationalStorageForTesting.cs" />
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="ReminderTest.cs" />
