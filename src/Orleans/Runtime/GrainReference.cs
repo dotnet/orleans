@@ -631,7 +631,7 @@ namespace Orleans.Runtime
 
             if (genericIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, genericIndex);
+                grainIdStr = trimmed.Substring(grainIdIndex, genericIndex - grainIdIndex).Trim();
                 string genericStr = trimmed.Substring(genericIndex + (GENERIC_ARGUMENTS_STR + "=").Length);
                 if (String.IsNullOrEmpty(genericStr))
                 {
@@ -641,14 +641,14 @@ namespace Orleans.Runtime
             }
             else if (observerIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, observerIndex);
+                grainIdStr = trimmed.Substring(grainIdIndex, observerIndex - grainIdIndex).Trim();
                 string observerIdStr = trimmed.Substring(observerIndex + (OBSERVER_ID_STR + "=").Length);
                 GuidId observerId = GuidId.FromParsableString(observerIdStr);
                 return NewObserverGrainReference(GrainId.FromParsableString(grainIdStr), observerId);
             }
             else if (systemTargetIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex);
+                grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
                 string systemTargetStr = trimmed.Substring(systemTargetIndex + (SYSTEM_TARGET_STR + "=").Length);
                 SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr);
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), null, siloAddress);
