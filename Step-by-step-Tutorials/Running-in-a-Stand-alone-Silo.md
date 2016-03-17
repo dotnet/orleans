@@ -34,7 +34,7 @@ static void Main(string[] args)
 }
 ```
 
-Now you should add reference to `Microsoft.Orleans.Server` NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. You also need to change the client gateway port in the `OrleansConfiguration.xml` file added to the collection project by `Microsoft.Orleans.Server` to match the gateway port specified in `DevTestClientConfiguration.xml`. Open `OrleansConfiguration.xml`, find the `ProxyingGateway` element inside its `Defaults` section, and change it to.
+Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. You also need to change the client gateway port in the OrleansConfiguration.xml file added to the collection project by Microsoft.Orleans.Server to match the gateway port specified in DevTestClientConfiguration.xml. Open OrleansConfiguration.xml, find the `ProxyingGateway` element inside its Defaults section, and change it to.
 
 ```xml
 <ProxyingGateway Address="localhost" Port="30000" />
