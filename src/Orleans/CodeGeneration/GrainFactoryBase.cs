@@ -18,7 +18,7 @@ namespace Orleans.CodeGeneration
             string grainClassNamePrefix = null)
         {
             CheckRuntimeEnvironmentSetup();
-            if (!GrainInterfaceData.IsGrainType(interfaceType))
+            if (!GrainInterfaceUtils.IsGrainType(interfaceType))
             {
                 throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + interfaceType.FullName);
             }

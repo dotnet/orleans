@@ -14,7 +14,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
 
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -345,7 +345,7 @@ namespace Orleans.CodeGenerator
                         Logger.Verbose2("Generating code for: {0}", type.GetParseableName());
                     }
 
-                    if (GrainInterfaceData.IsGrainInterface(type))
+                    if (GrainInterfaceUtils.IsGrainInterface(type))
                     {
                         if (Logger.IsVerbose2)
                         {
@@ -354,7 +354,7 @@ namespace Orleans.CodeGenerator
                                 type.GetParseableName());
                         }
 
-                        GrainInterfaceData.ValidateInterfaceRules(type);
+                        GrainInterfaceUtils.ValidateInterfaceRules(type);
 
                         namespaceMembers.Add(GrainReferenceGenerator.GenerateClass(type, onEncounteredType));
                         namespaceMembers.Add(GrainMethodInvokerGenerator.GenerateClass(type));
@@ -433,7 +433,7 @@ namespace Orleans.CodeGenerator
             ConsiderGenericInterfacesArguments(typeInfo, module, targetAssembly, includedTypes);
 
             // Collect the types which require code generation.
-            if (GrainInterfaceData.IsGrainInterface(type))
+            if (GrainInterfaceUtils.IsGrainInterface(type))
             {
                 if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
 

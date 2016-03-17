@@ -320,7 +320,7 @@
     <Compile Include="Messaging\ProxiedMessageCenter.cs" />
     <Compile Include="Messaging\SocketManager.cs" />
     <Compile Include="Async\ObserverSubscriptionManager.cs" />
-    <Compile Include="CodeGeneration\GrainInterfaceData.cs" />
+    <Compile Include="CodeGeneration\GrainInterfaceUtils.cs" />
     <Compile Include="IDs\ActivationAddress.cs" />
     <Compile Include="IDs\ActivationId.cs" />
     <Compile Include="Runtime\AsynchAgent.cs" />

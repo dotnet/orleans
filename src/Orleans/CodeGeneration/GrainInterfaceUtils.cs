@@ -10,7 +10,7 @@ using Orleans.Concurrency;
 
 namespace Orleans.CodeGeneration
 {
-    internal static class GrainInterfaceData
+    internal static class GrainInterfaceUtils
     {
         [Serializable]
         internal class RulesViolationException : ArgumentException

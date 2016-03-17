@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
-using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace Orleans
 {
@@ -318,7 +318,7 @@ namespace Orleans
                     Expression.Constant(interfaceType),
                     createLambda,
                     grainRefParameter,
-                    Expression.Constant(GrainInterfaceData.GetGrainInterfaceId(interfaceType)));
+                    Expression.Constant(GrainInterfaceUtils.GetGrainInterfaceId(interfaceType)));
 
             // Compile and return the reference casting lambda.
             var lambda = Expression.Lambda<GrainReferenceCaster>(body, grainRefParameter);
