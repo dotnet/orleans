@@ -23,9 +23,9 @@ Unlike in the client subscription case, the subscribing grain simply implements 
 
 ## Code Example
 
-Let's assume that we have a grain that periodicaly sends messages to clients. For simplicity, the message in our example will be a  string. We first define the interface on the client taht will receive the  message.
+Let's assume that we have a grain that periodicaly sends messages to clients. For simplicity, the message in our example will be a  string. We first define the interface on the client that will receive the message.
 
-the interface will looklike this
+the interface will look like this
 
 ``` csharp
 public interface IChat : IGrainObserver
