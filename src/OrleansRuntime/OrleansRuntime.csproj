@@ -166,7 +166,7 @@
     <Compile Include="Silo\Silo.cs" />
     <Compile Include="Catalog\Catalog.cs" />
     <Compile Include="Core\Dispatcher.cs" />
-    <Compile Include="Core\InsideGrainClient.cs" />
+    <Compile Include="Core\InsideRuntimeClient.cs" />
     <Compile Include="GrainTypeManager\TypeManager.cs" />
     <Compile Include="Silo\Watchdog.cs" />
     <Compile Include="Streams\QueueBalancer\BestFitBalancer.cs" />
