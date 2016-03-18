@@ -332,10 +332,23 @@ namespace Orleans.Storage
                 EntityProperty dataProperty;
                 if (entity.Properties.TryGetValue(binaryDataPropertyName, out dataProperty))
                 {
-                    var data = dataProperty.BinaryValue;
-                    if (data != null && data.Length > 0)
+                    switch (dataProperty.PropertyType)
                     {
-                        yield return data;
+                        case EdmType.Binary:
+                            var binaryValue = dataProperty.BinaryValue;
+                            if (binaryValue != null && binaryValue.Length > 0)
+                            {
+                                yield return binaryValue;
+                            }
+                            break;
+
+                        case EdmType.String:
+                            var stringValue = dataProperty.StringValue;
+                            if (!string.IsNullOrEmpty(stringValue))
+                            {
+                                yield return Convert.FromBase64String(stringValue);
+                            }
+                            break;
                     }
                 }
             }
