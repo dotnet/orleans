@@ -7,7 +7,7 @@ using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 using UnitTests.Tester;
 
 namespace UnitTests
@@ -100,11 +100,11 @@ namespace UnitTests
             Type t1 = typeof(IGeneratorTestDerivedDerivedGrain);
             Type t2 = typeof(IGeneratorTestDerivedGrain2);
             Type t3 = typeof(IGeneratorTestGrain);
-            int id1 = GrainInterfaceData.GetGrainInterfaceId(t1);
-            int id2 = GrainInterfaceData.GetGrainInterfaceId(t2);
-            int id3 = GrainInterfaceData.GetGrainInterfaceId(t3); 
+            int id1 = GrainInterfaceUtils.GetGrainInterfaceId(t1);
+            int id2 = GrainInterfaceUtils.GetGrainInterfaceId(t2);
+            int id3 = GrainInterfaceUtils.GetGrainInterfaceId(t3); 
 
-            var interfaces = GrainInterfaceData.GetRemoteInterfaces(typeof(IGeneratorTestDerivedDerivedGrain));
+            var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(typeof(IGeneratorTestDerivedDerivedGrain));
             Assert.IsNotNull(interfaces);
             Assert.AreEqual(3, interfaces.Keys.Count);
             Assert.IsTrue(interfaces.Keys.Contains(id1), "id1 is present");
@@ -116,7 +116,7 @@ namespace UnitTests
         public void CastCheckExpectedCompatIds()
         {
             Type t = typeof(ISimpleGrain);
-            int expectedInterfaceId = GrainInterfaceData.GetGrainInterfaceId(t);
+            int expectedInterfaceId = GrainInterfaceUtils.GetGrainInterfaceId(t);
             GrainReference grain = (GrainReference)GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
             Assert.IsTrue(grain.IsCompatible(expectedInterfaceId));
         }
@@ -129,9 +129,9 @@ namespace UnitTests
             Type t1 = typeof(IGeneratorTestDerivedDerivedGrain);
             Type t2 = typeof(IGeneratorTestDerivedGrain2);
             Type t3 = typeof(IGeneratorTestGrain);
-            int id1 = GrainInterfaceData.GetGrainInterfaceId(t1);
-            int id2 = GrainInterfaceData.GetGrainInterfaceId(t2);
-            int id3 = GrainInterfaceData.GetGrainInterfaceId(t3);
+            int id1 = GrainInterfaceUtils.GetGrainInterfaceId(t1);
+            int id2 = GrainInterfaceUtils.GetGrainInterfaceId(t2);
+            int id3 = GrainInterfaceUtils.GetGrainInterfaceId(t3);
             GrainReference grain = (GrainReference) GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
             Assert.IsTrue(grain.IsCompatible(id1));
             Assert.IsTrue(grain.IsCompatible(id2));
@@ -148,7 +148,7 @@ namespace UnitTests
                 typeof(Boolean),
                 null,
                 grain,
-                GrainInterfaceData.GetGrainInterfaceId(t));
+                GrainInterfaceUtils.GetGrainInterfaceId(t));
             Assert.Fail("Exception should have been raised");
             });
         }

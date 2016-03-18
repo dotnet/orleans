@@ -16,7 +16,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
 
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -169,8 +169,8 @@ namespace Orleans.CodeGenerator
             ExpressionSyntax methodIdArgument,
             Func<MethodInfo, StatementSyntax[]> generateMethodHandler)
         {
-            var interfaces = GrainInterfaceData.GetRemoteInterfaces(grainType);
-            interfaces[GrainInterfaceData.GetGrainInterfaceId(grainType)] = grainType;
+            var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(grainType);
+            interfaces[GrainInterfaceUtils.GetGrainInterfaceId(grainType)] = grainType;
 
             // Switch on interface id.
             var interfaceCases = new List<SwitchSectionSyntax>();
@@ -178,7 +178,7 @@ namespace Orleans.CodeGenerator
             {
                 var interfaceType = @interface.Value;
                 var interfaceId = @interface.Key;
-                var methods = GrainInterfaceData.GetMethods(interfaceType);
+                var methods = GrainInterfaceUtils.GetMethods(interfaceType);
 
                 var methodCases = new List<SwitchSectionSyntax>();
 
@@ -186,7 +186,7 @@ namespace Orleans.CodeGenerator
                 foreach (var method in methods)
                 {
                     // Generate switch case.
-                    var methodId = GrainInterfaceData.ComputeMethodId(method);
+                    var methodId = GrainInterfaceUtils.ComputeMethodId(method);
                     var methodType = method;
 
                     // Generate the switch label for this interface id.

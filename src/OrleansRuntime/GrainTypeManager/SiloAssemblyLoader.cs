@@ -143,7 +143,7 @@ namespace Orleans.Runtime
                 var assemblyName = grainType.Type.Assembly.FullName.Split(',')[0];
                 if (!typeof(ISystemTarget).IsAssignableFrom(grainType.Type))
                 {
-                    int grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainType.Type);
+                    int grainClassTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainType.Type);
                     sb.AppendFormat("Grain class {0}.{1} [{2} (0x{3})] from {4}.dll implementing interfaces: ",
                         grainType.Type.Namespace,
                         TypeUtils.GetTemplatedName(grainType.Type),
@@ -159,9 +159,9 @@ namespace Orleans.Runtime
                         
                         sb.Append(iface.Namespace).Append(".").Append(TypeUtils.GetTemplatedName(iface));
 
-                        if (CodeGeneration.GrainInterfaceData.IsGrainType(iface))
+                        if (CodeGeneration.GrainInterfaceUtils.IsGrainType(iface))
                         {
-                            int ifaceTypeCode = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface);
+                            int ifaceTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainInterfaceId(iface);
                             sb.AppendFormat(" [{0} (0x{1})]", ifaceTypeCode, ifaceTypeCode.ToString("X"));
                         }
                         first = false;

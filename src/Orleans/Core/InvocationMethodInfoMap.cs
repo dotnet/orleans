@@ -46,14 +46,14 @@ namespace Orleans
             Type implementationType)
         {
             // Get the interface mapping for the current implementation.
-            var interfaceTypes = GrainInterfaceData.GetRemoteInterfaces(implementationType);
+            var interfaceTypes = GrainInterfaceUtils.GetRemoteInterfaces(implementationType);
             var interfaceType = interfaceTypes[interfaceId];
             var interfaceMapping = implementationType.GetInterfaceMap(interfaceType);
 
             // Map the interface methods to implementation methods.
-            var interfaceMethods = GrainInterfaceData.GetMethods(interfaceType);
+            var interfaceMethods = GrainInterfaceUtils.GetMethods(interfaceType);
             return interfaceMethods.ToDictionary(
-                GrainInterfaceData.ComputeMethodId,
+                GrainInterfaceUtils.ComputeMethodId,
                 interfaceMethod => GetImplementingMethod(interfaceMethod, interfaceMapping));
         }
 
