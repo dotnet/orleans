@@ -1,7 +1,6 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -118,6 +117,7 @@ namespace UnitTests.StorageTests
             base.Persistence_Perf_Write_Reread();
         }
 
+
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
         public void Persistence_Silo_StorageProvider_AzureTableStore()
         {
@@ -132,10 +132,11 @@ namespace UnitTests.StorageTests
             IUser grain = GrainClient.GrainFactory.GetGrain<IUser>(id);
 
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
-            var entity = new DynamicTableEntity();
+            var entity = new AzureTableStorage.GrainStateEntity();
             var storage = new AzureTableStorage();
             storage.InitLogger(logger);
             storage.ConvertToStorageFormat(initialState, entity);
+            Assert.IsNotNull(entity.Data, "Entity.Data");
             var convertedState = new GrainStateContainingGrainReferences();
             convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.IsNotNull(convertedState, "Converted state");
@@ -146,7 +147,7 @@ namespace UnitTests.StorageTests
         public void AzureTableStore_ConvertToFromStorageFormat_GrainReference_List()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
-            Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+            Guid[] ids = {Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()};
             IUser[] grains = new IUser[3];
             grains[0] = GrainClient.GrainFactory.GetGrain<IUser>(ids[0]);
             grains[1] = GrainClient.GrainFactory.GetGrain<IUser>(ids[1]);
@@ -158,10 +159,11 @@ namespace UnitTests.StorageTests
                 initialState.GrainList.Add(g);
                 initialState.GrainDict.Add(g.GetPrimaryKey().ToString(), g);
             }
-            var entity = new DynamicTableEntity();
+            var entity = new AzureTableStorage.GrainStateEntity();
             var storage = new AzureTableStorage();
             storage.InitLogger(logger);
             storage.ConvertToStorageFormat(initialState, entity);
+            Assert.IsNotNull(entity.Data, "Entity.Data");
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.IsNotNull(convertedState, "Converted state");
             Assert.AreEqual(initialState.GrainList.Count, convertedState.GrainList.Count, "GrainList size");
@@ -174,6 +176,9 @@ namespace UnitTests.StorageTests
             }
             Assert.AreEqual(initialState.Grain, convertedState.Grain, "Grain");
         }
+
+      
+
     }
 }
 
