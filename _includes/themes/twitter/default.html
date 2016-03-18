@@ -40,13 +40,18 @@
   </head>
 
   <body>
-   
+
 
     {{ content }}
-    
+
     <hr>
     <footer>
       <div class="container">
+        <div style="float:right">
+          <a href="{{ site.github.repository_url }}/edit/gh-pages/{{ page.path }}">
+            Edit this page on GitHub
+          </a>
+        </div>
         <p>&copy; {{ site.time | date: '%Y' }} {{ site.author.name }}
           with help from <a href="http://jekyllbootstrap.com" target="_blank" title="The Definitive Jekyll Blogging Framework">Jekyll Bootstrap</a>
           and <a href="http://twitter.github.com/bootstrap/" target="_blank">Twitter Bootstrap</a>
