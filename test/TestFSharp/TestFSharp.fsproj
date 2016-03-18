@@ -34,9 +34,9 @@
   </PropertyGroup>
   <!--BEGIN: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
   <Choose>
-    <When Condition="Exists('..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
+    <When Condition="Exists('..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
       <PropertyGroup>
-        <FSharpTargets>..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargets>
+        <FSharpTargets>..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargets>
         <PackagesRestored>true</PackagesRestored>
       </PropertyGroup>
     </When>
@@ -57,23 +57,15 @@
   <Import Project="$(FSharpTargets)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="..\Build\GlobalAssemblyInfo.fs">
-      <Link>GlobalAssemblyInfo.fs</Link>
-    </Compile>
     <Compile Include="Types.fs" />
     <Compile Include="Grains.fs" />
     <Content Include="packages.config" />
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.fs">
+      <Link>GlobalAssemblyInfo.fs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Core">
-      <HintPath>..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="mscorlib" />
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\Orleans\Orleans.csproj">
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
       <Name>Orleans</Name>
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Private>True</Private>
@@ -83,6 +75,14 @@
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <Reference Include="FSharp.Core">
+      <HintPath>..\..\src\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
   </ItemGroup>
   <!--END: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
 </Project>
