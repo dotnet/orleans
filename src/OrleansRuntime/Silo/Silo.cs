@@ -225,6 +225,7 @@ namespace Orleans.Runtime
 
             BufferPool.InitGlobalBufferPool(globalConfig);
             PlacementStrategy.Initialize(globalConfig);
+            Threading.CancellationTokenManager.Initialize(globalConfig);
 
             UnobservedExceptionsHandlerClass.SetUnobservedExceptionHandler(UnobservedExceptionHandler);
             AppDomain.CurrentDomain.UnhandledException +=

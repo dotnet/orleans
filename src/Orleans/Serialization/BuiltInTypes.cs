@@ -4,9 +4,12 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;
+using Orleans.Threading;
 
 namespace Orleans.Serialization
 {
@@ -1275,6 +1278,34 @@ namespace Orleans.Serialization
         }
 
         #endregion Type
+    
+        #region CancellationTokenWrapper
+        internal static void SerializeCancellationTokenWrapper(object obj, BinaryTokenStreamWriter stream, Type expected)
+        {
+            var ctw = (CancellationTokenWrapper)obj;
+            var cancelled = ctw.CancellationToken.IsCancellationRequested;
+            if (!cancelled)
+            {
+                CancellationTokenManager.RegisterTokenCallbacks(ctw.CancellationToken, ctw.Id);
+            }
+
+            stream.Write(cancelled);
+            stream.Write(ctw.Id);
+        }
+
+        internal static object DeserializeCancellationTokenWrapper(Type expected, BinaryTokenStreamReader stream)
+        {
+            var cancellationRequested = stream.ReadToken() == SerializationTokenType.True;
+            var tokenId = stream.ReadGuid();
+            return new CancellationTokenWrapper(tokenId, new CancellationToken(cancellationRequested)) { WentThroughSerialization = true };
+        }
+
+        internal static object CopyCancellationTokenWrapper(object obj)
+        {
+            return obj; // CancellationToken is value type
+        }
+
+        #endregion
 
         #region GUID
 

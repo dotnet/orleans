@@ -15,6 +15,7 @@ using Orleans.Storage;
 using Orleans.Runtime.Configuration;
 using System.Collections.Concurrent;
 using Orleans.Streams;
+using Orleans.Threading;
 
 namespace Orleans
 {
@@ -132,6 +133,8 @@ namespace Orleans
             if (!TraceLogger.IsInitialized) TraceLogger.Initialize(config);
             StatisticsCollector.Initialize(config);
             SerializationManager.Initialize(config.UseStandardSerializer, cfg.SerializationProviders, config.UseJsonFallbackSerializer);
+            CancellationTokenManager.Initialize(config);
+
             logger = TraceLogger.GetLogger("OutsideRuntimeClient", TraceLogger.LoggerType.Runtime);
             appLogger = TraceLogger.GetLogger("Application", TraceLogger.LoggerType.Application);
 
@@ -578,6 +581,7 @@ namespace Orleans
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
+            CancellationTokenManager.WrapCancellationTokens(request.Arguments);
             var message = Message.CreateMessage(request, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
