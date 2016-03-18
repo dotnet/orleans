@@ -30,7 +30,6 @@ namespace Orleans.Runtime
             {
                 // Prep the socket so it will reset on close
                 s.LingerState = new LingerOption(true, 0);
-                s.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 // And bind it to the address
                 s.Bind(address);
             }
