@@ -266,9 +266,9 @@
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSqlUtils.csproj">
+    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj">
       <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
-      <Name>OrleansSqlUtils</Name>
+      <Name>OrleansSQLUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
@@ -282,23 +282,23 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\TestFSharp\TestFSharp.fsproj">
+    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
       <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
       <Name>TestFSharp</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\TestGrainInterfaces\TestGrainInterfaces.csproj">
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
       <Name>TestGrainInterfaces</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\TestGrains\TestGrains.csproj">
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj">
       <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
       <Name>TestGrains</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
+    <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
       <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>
       <Name>TestInternalGrainInterfaces</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\TestInternalGrains\TestInternalGrains.csproj">
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
       <Project>{4682abc1-1a51-4794-8012-da8e59ebc72e}</Project>
       <Name>TestInternalGrains</Name>
     </ProjectReference>

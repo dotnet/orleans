@@ -34,9 +34,9 @@
   </PropertyGroup>
   <!--BEGIN: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
   <Choose>
-    <When Condition="Exists('..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
+    <When Condition="Exists('..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
       <PropertyGroup>
-        <FSharpTargets>..\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargets>
+        <FSharpTargets>..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargets>
         <PackagesRestored>true</PackagesRestored>
       </PropertyGroup>
     </When>
@@ -57,16 +57,16 @@
   <Import Project="$(FSharpTargets)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="..\Build\GlobalAssemblyInfo.fs">
+    <Compile Include="IFSharpBaseInterface.fs" />
+    <Compile Include="IFSharpParameters.fs" />
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.fs">
       <Link>GlobalAssemblyInfo.fs</Link>
     </Compile>
     <Content Include="packages.config" />
-    <Compile Include="IFSharpBaseInterface.fs" />
-    <Compile Include="IFSharpParameters.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">
-      <HintPath>..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+      <HintPath>..\..\src\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
