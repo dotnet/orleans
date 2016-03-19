@@ -18,6 +18,7 @@ using Orleans.Runtime.Configuration;
 using Newtonsoft.Json;
 using Orleans.Providers;
 using System.Runtime.Serialization.Formatters;
+using Orleans.Threading;
 
 namespace Orleans.Serialization
 {
@@ -273,6 +274,7 @@ namespace Orleans.Serialization
             Register(typeof(ActivationAddress), BuiltInTypes.CopyActivationAddress, BuiltInTypes.SerializeActivationAddress, BuiltInTypes.DeserializeActivationAddress);
             Register(typeof(CorrelationId), BuiltInTypes.CopyCorrelationId, BuiltInTypes.SerializeCorrelationId, BuiltInTypes.DeserializeCorrelationId);
             Register(typeof(SiloAddress), BuiltInTypes.CopySiloAddress, BuiltInTypes.SerializeSiloAddress, BuiltInTypes.DeserializeSiloAddress);
+            Register(typeof(CancellationTokenWrapper), BuiltInTypes.CopyCancellationTokenWrapper, BuiltInTypes.SerializeCancellationTokenWrapper, BuiltInTypes.DeserializeCancellationTokenWrapper);
 
             // Type names that we need to recognize for generic parameters
             Register(typeof(bool));

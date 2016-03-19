@@ -51,6 +51,11 @@ namespace Orleans.Runtime
         public static readonly TimeSpan DEFAULT_RESPONSE_TIMEOUT = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(30);
 
         /// <summary>
+        /// The delay after a cancellation token holder grain will be marked for collection.
+        /// </summary>
+        public static readonly TimeSpan DEFAULT_CANCELLATION_TOKEN_HOLDER_DEACTIVATION_DELAY = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(30);
+
+        /// <summary>
         /// Minimum period for registering a reminder ... we want to enforce a lower bound
         /// </summary>
         public static readonly TimeSpan MinReminderPeriod = TimeSpan.FromMinutes(1); // increase this period, reminders are supposed to be less frequent ... we use 2 seconds just to reduce the running time of the unit tests
