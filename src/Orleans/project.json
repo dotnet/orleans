@@ -1,12 +1,14 @@
 {
+  "version": "1.0.0-*",
   "dependencies": {
     "Newtonsoft.Json": "7.0.1"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+    "net451": {
+      "frameworkAssemblies": {
+        "System.Xml": "4.0.0.0",
+        "System.Management": "4.0.0.0"
+      }
+    }
   }
 }

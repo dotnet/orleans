@@ -1,13 +1,14 @@
 {
+  "version": "1.0.0-*",
   "dependencies": {
-"FSharp.Core": "4.0.0.1",
-"Newtonsoft.Json": "7.0.1"
+    "Orleans": { "target": "project" },
+    "OrleansRuntime": { "target": "project" },
+    "TestFSharpInterfaces": { "target": "project" },
+    "TestInterfaces": { "target": "project" },
+    "FSharp.Core": "4.0.0.1",
+    "Newtonsoft.Json": "7.0.1"
   },
   "frameworks": {
     "net451": {}
-  },
-    "runtimes":  {
-        "win-anycpu": {},
-        "win": {}
-    }
+  }
 }

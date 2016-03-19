@@ -1,8 +1,5 @@
 ﻿{
   "version": "1.0.0-*",
-  "dependencies": {
-    "Orleans": { "target": "project" }
-  },
   "frameworks": {
      "net451": {}
   }

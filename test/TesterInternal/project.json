@@ -1,17 +1,45 @@
-{
+﻿{
+  "version": "1.0.0-*",
+  "testRunner": "xunit",
+  "buildOptions": {
+    "copyToOutput": {
+      "include": [ "Config_*.xml", "ClientConfig_*.xml", "*Configuration.xml" ]
+    }
+  },
   "dependencies": {
-    "FSharp.Core": "4.0.0.1",
+    "Orleans": { "target": "project" },
+    "ClientGenerator": { "target": "project" },
+    "OrleansAzureUtils": { "target": "project" },
+    "OrleansCounterControl": { "target": "project" },
+    "OrleansHost": { "target": "project" },
+    "OrleansManager": { "target": "project" },
+    "OrleansProviders": { "target": "project" },
+    "OrleansRuntime": { "target": "project" },
+    "OrleansSQLUtils": { "target": "project" },
+    "OrleansTestingHost": { "target": "project" },
+    "OrleansZooKeeperUtils": { "target": "project" },
+    "Tester": { "target": "project" },
+    "TestExtensions": { "target": "project" },
+    "TestFSharp": { "target": "project" },
+    "TestFSharpInterfaces": { "target": "project" },
+    "TestGrainInterfaces": { "target": "project" },
+    "TestGrains": { "target": "project" },
+    "TestInterfaces": { "target": "project" },
+    "TestInternalDtosRefOrleans": { "target": "project" },
+    "TestInternalGrainInterfaces": { "target": "project" },
+    "TestInternalGrains": { "target": "project" },
+    "dotnet-test-xunit": "2.2.0-preview2-build1029",
     "Newtonsoft.Json": "7.0.1",
+    "System.Threading.Tasks.Parallel": "4.0.1",
     "WindowsAzure.Storage": "7.0.0",
-    "xunit": "2.1.0",
+    "xunit": "2.2.0-beta2-build3300",
     "xunit.runner.visualstudio": "2.1.0",
     "Xunit.SkippableFact": "1.2.14"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+    "net451":{
+      "frameworkAssemblies": { 
+        "System.Web.Extensions": "4.0.0.0" }
+    }
   }
 }

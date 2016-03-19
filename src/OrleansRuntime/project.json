@@ -1,12 +1,20 @@
-{
+﻿{
+  "version": "1.0.0-*",
   "dependencies": {
-    "Microsoft.Extensions.DependencyInjection": "1.0.0"
+    "Orleans": { "target": "project" },
+    "Microsoft.Extensions.DependencyInjection": "1.0.0",
+    "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+    "net451": {
+      "dependencies": {
+        "System.Runtime": "4.0.10" 
+      },
+      "frameworkAssemblies": {
+        "System": "4.0.0.0",
+        "System.Data": "4.0.0.0",
+        "System.Configuration.Install": "4.0.0.0"
+      }
+    }
   }
 }

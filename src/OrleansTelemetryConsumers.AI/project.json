@@ -1,12 +1,10 @@
-{
+﻿{
+  "version": "1.0.0-*",
   "dependencies": {
+    "Orleans": { "target": "project" },
     "Microsoft.ApplicationInsights": "1.2.3"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+     "net451": {}
   }
 }

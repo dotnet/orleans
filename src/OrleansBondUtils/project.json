@@ -1,13 +1,17 @@
 {
+  "version": "1.0.0-*",
   "dependencies": {
+    "Orleans": { "target": "project" },
+    "OrleansRuntime": { "target": "project" },
     "Bond.Runtime.CSharp": "3.0.7",
     "Newtonsoft.Json": "7.0.1"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+     "net451": {
+      "frameworkAssemblies": {
+        "System.Runtime": "4.0.10.0",
+        "System.Text.Encoding": "4.0.0.0"
+      }
+    }
   }
 }

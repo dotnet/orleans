@@ -1,12 +1,10 @@
-{
+﻿{
+  "version": "1.0.0-*",
   "dependencies": {
-    "NewRelic.Agent.Api": "5.10.59.0"
+    "Orleans": { "target": "project" },
+    "NewRelic.Agent.Api": "5.10.59"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+     "net451": {}
   }
 }

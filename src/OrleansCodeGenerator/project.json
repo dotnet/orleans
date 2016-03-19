@@ -1,12 +1,23 @@
-{
+﻿{
+  "version": "1.0.0-*",
   "dependencies": {
-    "Microsoft.CodeAnalysis.CSharp": "1.0.0"
+    "Orleans": { "target": "project" },
+    "Microsoft.CodeAnalysis.CSharp" : "1.0.0"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+    "net451": {
+      "frameworkAssemblies": {
+        "System": "4.0.0.0",
+        "System.Xml": "4.0.0.0",
+        "System.Xml.Linq": "4.0.0.0",
+        "System.Core": "4.0.0.0",
+        "System.Data": "4.0.0.0",
+        "System.Data.DataSetExtensions": "4.0.0.0",
+        "System.Collections": "4.0.0.0",
+        "System.Runtime": "4.0.10.0",
+        "System.IO": "4.0.0.0",
+        "System.Threading.Tasks": "4.0.0.0"
+      }
+    }
   }
 }

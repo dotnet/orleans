@@ -1,14 +1,21 @@
-{
+﻿{
+  "version": "1.0.0-*",
   "dependencies": {
-    "EnterpriseLibrary.TransientFaultHandling": "6.0.1304.0",
+    "Orleans": { "target": "project" },
+    "EnterpriseLibrary.TransientFaultHandling": "6.0.1304",
     "Microsoft.Azure.SqlDatabase.ElasticScale.Client": "1.1.0",
-    "Microsoft.Tpl.Dataflow": "4.5.24"
+    "Microsoft.Tpl.Dataflow": "4.5.24",
+    "System.Data.Common": "4.1.0"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+    "net451": {
+      "frameworkAssemblies": {
+        "System.Runtime": "4.0.10.0",
+        "System.Threading.Tasks": "4.0.0.0",
+        "System.Data": "4.0.0.0",
+        "System.Configuration": "4.0.0.0",
+        "System.Configuration.Install": "4.0.0.0"
+      }
+    }
   }
 }

@@ -1,0 +1,18 @@
+﻿{
+  "version": "1.0.0-*",
+  "buildOptions": {
+    "emitEntryPoint": true,
+    "compile": { "exclude": "Serialization/*.cs" }
+  },
+  "dependencies": {
+    "Orleans": { "target": "project" },
+    "OrleansCodeGenerator": { "target": "project" }
+  },
+  "commands": {
+    "codegen": "ClientGenerator"
+  },
+  "frameworks": {
+     "net451": {}
+  }
+}
+

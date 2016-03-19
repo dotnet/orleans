@@ -1,13 +1,11 @@
 {
+  "version": "1.0.0-*",
   "dependencies": {
+    "Orleans": { "target": "project" },
     "Consul": "0.6.4.1",
-    "Newtonsoft.Json": "7.0.1"
+    "Newtonsoft.Json": "7.0.1",
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+     "net451": {}
   }
 }

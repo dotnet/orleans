@@ -1,13 +1,16 @@
-{
+﻿{
+  "version": "1.0.0-*",
   "dependencies": {
+    "Orleans": { "target": "project" },
+    "OrleansManager": { "target": "project" },
+    "OrleansRuntime": { "target": "project" },
+    "TestGrainInterfaces": { "target": "project" },
+    "TestGrains": { "target": "project" },
+    "TestInternalGrainInterfaces": { "target": "project" },
     "Newtonsoft.Json": "7.0.1",
     "xunit.assert": "2.1.0"
   },
   "frameworks": {
     "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
   }
 }

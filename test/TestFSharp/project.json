@@ -1,0 +1,30 @@
+﻿{
+  "version": "1.0.0-*",
+  "buildOptions": {
+    "compilerName": "fsc",
+    "compile": {
+      "include": [ "*.fs" ]
+    }
+  },
+  "dependencies": {
+    "Orleans": { "target": "project" },
+    "TestGrainInterfaces": { "target": "project" }
+  },
+  "tools": {
+    "dotnet-compile-fsc": {
+      "version": "1.0.0-preview2-*",
+      "imports": [
+        "dnxcore50",
+        "portable-net45+win81",
+        "netstandard1.3"
+      ]
+    }
+  },
+  "frameworks": {
+    "net451": {
+      "dependencies": {
+        "FSharp.Core": "4.0.0.1"
+      }
+    }
+  }
+}

@@ -1,13 +1,11 @@
 {
+  "version": "1.0.0-*",
   "dependencies": {
-    "Newtonsoft.Json": "7.0.1",
-    "ZooKeeperNetEx": "3.4.8.5"
+    "Orleans": { "target": "project" },
+    "ZooKeeperNetEx": "3.4.8.5",
+    "Newtonsoft.Json": "7.0.1"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+     "net451": {}
   }
 }

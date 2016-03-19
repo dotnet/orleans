@@ -1,22 +1,52 @@
-{
+﻿{
+  "version": "1.0.0-*",
+  "testRunner": "xunit",
+  "buildOptions": {
+    "copyToOutput": {
+      "include": [
+        "SerializationTests/ConfigurationTests/*.xml",
+        "DeploymentTests/Configuration/**/*.xml"
+      ]
+    }
+  },
   "dependencies": {
-    "Bond.Runtime.CSharp": "3.0.7",
+    "Orleans": { "target": "project" },
+    "ClientGenerator": { "target": "project" },
+    "OrleansAzureUtils": { "target": "project" },
+    "OrleansBondUtils": { "target": "project" },
+    "OrleansCodeGenerator": { "target": "project" },
+    "OrleansGoogleUtils": { "target": "project" },
+    "OrleansManager": { "target": "project" },
+    "OrleansProviders": { "target": "project" },
+    "OrleansRuntime": { "target": "project" },
+    "OrleansServiceBus": { "target": "project" },
+    "OrleansSQLUtils": { "target": "project" },
+    "OrleansTestingHost": { "target": "project" },
+    "TestExtensions": { "target": "project" },
+    "TestFSharp": { "target": "project" },
+    "TestFSharpInterfaces": { "target": "project" },
+    "TestGrainInterfaces": { "target": "project" },
+    "TestGrains": { "target": "project" },
+    "TestInterfaces": { "target": "project" },
+    "TestInternalGrainInterfaces": { "target": "project" },
+    "TestInternalGrains": { "target": "project" },
+    "dotnet-test-xunit": "2.2.0-preview2-build1029",
     "FluentAssertions": "4.0.0",
-    "FSharp.Core": "4.0.0.1",
     "Google.Protobuf": "3.0.0-alpha4",
     "Microsoft.Extensions.DependencyInjection": "1.0.0",
     "Newtonsoft.Json": "7.0.1",
+    "System.Management.Automation" : "6.1.7601.17515", 
     "WindowsAzure.ServiceBus": "3.2.2",
     "WindowsAzure.Storage": "7.0.0",
-    "xunit": "2.1.0",
+    "xunit": "2.2.0-beta2-build3300",
     "xunit.runner.visualstudio": "2.1.0",
     "Xunit.SkippableFact": "1.2.14"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+    "net451":{
+      "frameworkAssemblies": {
+        "System.Management": "4.0.0.0"
+      }
+    }
   }
 }

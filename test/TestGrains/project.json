@@ -1,12 +1,16 @@
 {
+  "version": "1.0.0-*",
   "dependencies": {
+    "Orleans": { "target": "project" },
+    "OrleansEventSourcing": { "target": "project" },
+    "OrleansProviders": { "target": "project" },
+    "OrleansSQLUtils": { "target": "project" },
+    "TestFSharpInterfaces": { "target": "project" },
+    "TestGrainInterfaces": { "target": "project" },
+    "TestInterfaces": { "target": "project" },
     "Newtonsoft.Json": "7.0.1"
   },
   "frameworks": {
     "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
   }
 }

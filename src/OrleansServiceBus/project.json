@@ -1,15 +1,15 @@
 {
+  "version": "1.0.0-*",
   "dependencies": {
+    "Orleans": { "target": "project" },
+    "OrleansAzureUtils": { "target": "project" },
+    "OrleansProviders": { "target": "project" },
     "Microsoft.WindowsAzure.ConfigurationManager": "3.1.0",
     "Newtonsoft.Json": "7.0.1",
     "WindowsAzure.ServiceBus": "3.2.2",
     "WindowsAzure.Storage": "7.0.0"
   },
   "frameworks": {
-    "net451": {}
-  },
-  "runtimes": {
-    "win-anycpu": {},
-    "win": {}
+     "net451": {}
   }
 }
