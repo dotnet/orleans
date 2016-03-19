@@ -1,0 +1,28 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansSQLUtils Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": "",
+    "Microsoft.Tpl.Dataflow": "4.5.24",
+    "Microsoft.Azure.SqlDatabase.ElasticScale.Client": "1.2.0",
+    "EnterpriseLibrary.TransientFaultHandling" : "6.0.1304"
+  },
+
+  "frameworks": {
+    "dnx451": {
+      "frameworkAssemblies": {
+        "System.Runtime": "4.0.10.0",
+        "System.Threading.Tasks": "4.0.0.0",
+        "System.Data": "4.0.0.0",
+        "System.Configuration": "4.0.0.0",
+        "System.Configuration.Install": "4.0.0.0"
+      }
+    }
+  }
+}

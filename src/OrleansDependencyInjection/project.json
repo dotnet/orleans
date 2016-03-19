@@ -1,0 +1,20 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansDependencyInjection Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansRuntime": "",
+    "SharedContent": "",
+    "Microsoft.Extensions.DependencyInjection": "1.0.0-rc1-final",
+    "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0-rc1-final"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

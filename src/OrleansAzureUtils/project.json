@@ -1,0 +1,25 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansAzureUtils Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansProviders": "",
+    "OrleansRuntime": "",
+    "SharedContent": "",
+    "WindowsAzure.Storage": "5.0.2",
+    "Newtonsoft.Json": "7.0.1"
+  },
+
+  "frameworks": {
+    "dnx451": {
+      "frameworkAssemblies": {
+        "System.Web": "4.0.0.0"
+      }
+    }
+  }
+}

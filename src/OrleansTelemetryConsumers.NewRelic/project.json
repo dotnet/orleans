@@ -1,0 +1,18 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansTelemetryConsumers.NewRelic Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": "",
+    "NewRelic.Agent.Api": "5.10.59"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

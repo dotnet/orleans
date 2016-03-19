@@ -1,0 +1,22 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansServiceBus Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansAzureUtils": "",
+    "OrleansProviders": "",
+    "SharedContent": "",
+    "Newtonsoft.Json": "7.0.1",
+    "Microsoft.WindowsAzure.ConfigurationManager": "3.1.0",
+    "WindowsAzure.ServiceBus": "3.0.8"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

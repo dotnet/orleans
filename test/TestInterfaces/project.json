@@ -1,0 +1,12 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "TestInterfaces Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+  
+  "frameworks": {
+    "dnx451": { }
+  }
+}

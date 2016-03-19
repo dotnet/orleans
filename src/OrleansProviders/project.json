@@ -1,0 +1,17 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansProviders Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": ""
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

@@ -1,0 +1,33 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansCodeGenerator Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": "",
+    "Microsoft.CodeAnalysis.CSharp": "1.0.0",
+    "System.Collections.Immutable": "1.1.36",
+    "System.Reflection.Metadata": "1.0.21"
+  },
+
+  "frameworks": {
+    "dnx451": {
+      "frameworkAssemblies": {
+        "System": "4.0.0.0",
+        "System.Xml": "4.0.0.0",
+        "System.Xml.Linq": "4.0.0.0",
+        "System.Core": "4.0.0.0",
+        "System.Data": "4.0.0.0",
+        "System.Data.DataSetExtensions": "4.0.0.0",
+        "System.Collections": "4.0.0.0",
+        "System.Runtime": "4.0.10.0",
+        "System.IO": "4.0.0.0",
+        "System.Threading.Tasks": "4.0.0.0"
+      }
+    }
+  }
+}

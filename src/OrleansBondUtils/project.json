@@ -1,0 +1,25 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansBondUtils Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansRuntime": "",
+    "Bond.Runtime.CSharp": "3.0.7",
+    "Newtonsoft.Json": "7.0.1",
+    "SharedContent": ""
+  },
+
+  "frameworks": {
+    "dnx451": {
+      "frameworkAssemblies": {
+        "System.Runtime": "4.0.10.0",
+        "System.Text.Encoding": "4.0.0.0"
+      }
+    }
+  }
+}

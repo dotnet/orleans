@@ -1,0 +1,23 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "Orleans Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Newtonsoft.Json": "7.0.1",
+    "SharedContent": ""
+  },
+
+  "frameworks": {
+    "dnx451": {
+      "frameworkAssemblies": {
+        "System": "4.0.0.0",
+        "System.Xml": "4.0.0.0",
+        "System.Management": "4.0.0.0"
+      }
+    }
+  }
+}

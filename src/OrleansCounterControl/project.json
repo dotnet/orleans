@@ -1,0 +1,18 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansCounterControl Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": "",
+    "OrleansRuntime": ""
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

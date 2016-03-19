@@ -10,11 +10,12 @@ namespace UnitTests.Grains
     // (do so once code generation succeeds)
     // NOTE: also uncomment the corresponding test in Tester/GeneratorGrainTests.cs
 
-    public class GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain : Grain, IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain
-    {
-        public Task<int> Echo(int x)
-        {
-            return Task.FromResult(x);
-        }
-    }
+    //TODO: FIX ME - F# 
+    //public class GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain : Grain, IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain
+    //{
+    //    public Task<int> Echo(int x)
+    //    {
+    //        return Task.FromResult(x);
+    //    }
+    //}
 }

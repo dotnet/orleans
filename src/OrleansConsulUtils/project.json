@@ -1,0 +1,19 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansConsulUtils Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": "",
+    "Consul": "0.6.1",
+    "Newtonsoft.Json": "7.0.1"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

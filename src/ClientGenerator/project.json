@@ -1,0 +1,28 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "ClientGenerator Console Application",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "exclude": "Serialization/*.cs",
+
+  "compilationOptions": {
+    "emitEntryPoint": true
+  },
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansCodeGenerator": "",
+    "SharedContent": ""
+  },
+
+  "commands": {
+    "codegen": "ClientGenerator"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

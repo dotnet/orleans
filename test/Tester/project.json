@@ -1,0 +1,49 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "Tester Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "exclude": [ "DeploymentTests/**", "FSharpGrainTests.cs" ],
+
+  "dependencies": {
+    "Orleans": "",
+    "ClientGenerator": "",
+    "OrleansAzureUtils": "",
+    "OrleansBondUtils": "",
+    "OrleansCodeGenerator": "",
+    "OrleansDependencyInjection": "",
+    "OrleansGoogleUtils": "",
+    "OrleansManager": "",
+    "OrleansProviders": "",
+    "OrleansRuntime": "",
+    "OrleansServiceBus": "",
+    "OrleansSQLUtils": "",
+    "OrleansTestingHost": "",
+    "TestExtensions": "",
+    "TestFSharp": "",
+    "TestFSharpInterfaces": "",
+    "TestGrainInterfaces": "",
+    "TestGrains": "",
+    "TestInterfaces": "",
+    "TestInternalGrainInterfaces": "",
+    "TestInternalGrains": "",
+    "xunit": "2.1.0",
+    "xunit.runner.dnx": "2.1.0-rc1-build204",
+    "MSTest.UnitTestFramework": "1.0.0-alpha7",
+    "FluentAssertions": "4.0.0"
+  },
+  "commands": {
+    "test": "xunit.runner.dnx"
+  },
+  "frameworks": {
+    "dnx451": {
+      "frameworkAssemblies": {
+        "System.Globalization": "4.0.0.0",
+        "System.Management": "4.0.0.0"
+      }
+    }
+  }
+}

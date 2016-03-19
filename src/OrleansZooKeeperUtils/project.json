@@ -1,0 +1,19 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansZooKeeperUtils Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": "",
+    "ZooKeeperNetEx": "3.4.8",
+    "Newtonsoft.Json": "7.0.1"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

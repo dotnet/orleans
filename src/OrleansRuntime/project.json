@@ -1,0 +1,23 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansRuntime Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": ""
+  },
+
+  "frameworks": {
+    "dnx451": {
+      "frameworkAssemblies": {
+        "System": "4.0.0.0",
+        "System.Data": "4.0.0.0",
+        "System.Configuration.Install": "4.0.0.0"
+      }
+    }
+  }
+}

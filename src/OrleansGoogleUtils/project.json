@@ -1,0 +1,19 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansGoogleUtils Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansRuntime": "",
+    "SharedContent": "",
+    "Google.Protobuf": "3.0.0-alpha4"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

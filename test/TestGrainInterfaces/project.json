@@ -1,0 +1,21 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "TestGrainInterfaces Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansRuntime": "",
+    "TestFSharpInterfaces": "",
+    "TestInterfaces": "",
+    "FSharp.Core": "4.0.0.1",
+    "Newtonsoft.Json": "7.0.1"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

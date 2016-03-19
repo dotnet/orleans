@@ -1,0 +1,22 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "TestInternalGrains Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansManager": "",
+    "OrleansRuntime": "",
+    "TestGrainInterfaces": "",
+    "TestGrains": "",
+    "TestInternalGrainInterfaces": "",
+    "MSTest.UnitTestFramework": "1.0.0-alpha7"
+  },
+
+  "frameworks": {
+    "dnx451": { "frameworkAssemblies": {"System.Globalization": "4.0.0.0"} }
+  }
+}

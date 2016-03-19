@@ -1,0 +1,18 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansTelemetryConsumers.AI Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": "",
+    "Microsoft.ApplicationInsights": "1.2.3"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

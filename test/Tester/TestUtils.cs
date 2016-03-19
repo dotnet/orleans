@@ -45,11 +45,12 @@ namespace Tester
             sb.AppendFormat(@"TestName={0}", context.TestName).AppendLine();
             sb.AppendFormat(@"FullyQualifiedTestClassName={0}", context.FullyQualifiedTestClassName).AppendLine();
             sb.AppendFormat(@"CurrentTestOutcome={0}", context.CurrentTestOutcome).AppendLine();
-            sb.AppendFormat(@"DeploymentDirectory={0}", context.DeploymentDirectory).AppendLine();
-            sb.AppendFormat(@"TestRunDirectory={0}", context.TestRunDirectory).AppendLine();
-            sb.AppendFormat(@"TestResultsDirectory={0}", context.TestResultsDirectory).AppendLine();
-            sb.AppendFormat(@"ResultsDirectory={0}", context.ResultsDirectory).AppendLine();
-            sb.AppendFormat(@"TestRunResultsDirectory={0}", context.TestRunResultsDirectory).AppendLine();
+            // Those fields doesn't exist on MSTest apis for DNX. 
+            //sb.AppendFormat(@"DeploymentDirectory={0}", context.DeploymentDirectory).AppendLine();
+            //sb.AppendFormat(@"TestRunDirectory={0}", context.TestRunDirectory).AppendLine();
+            //sb.AppendFormat(@"TestResultsDirectory={0}", context.TestResultsDirectory).AppendLine();
+            //sb.AppendFormat(@"ResultsDirectory={0}", context.ResultsDirectory).AppendLine();
+            //sb.AppendFormat(@"TestRunResultsDirectory={0}", context.TestRunResultsDirectory).AppendLine();
             sb.AppendFormat(@"Properties=[ ");
             foreach (var key in context.Properties.Keys)
             {

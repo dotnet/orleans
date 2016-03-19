@@ -1,0 +1,19 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansTestingHost Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansRuntime": "",
+    "SharedContent": "",
+    "Newtonsoft.Json": "7.0.1"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

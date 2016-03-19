@@ -1,0 +1,26 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansHost Console Application",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "compilationOptions": {
+    "emitEntryPoint": true
+  },
+
+  "dependencies": {
+    "Orleans": "",
+    "OrleansRuntime": "",
+    "SharedContent": ""
+  },
+
+  "commands": {
+    "OrleansHost": "OrleansHost"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

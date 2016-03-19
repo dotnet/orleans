@@ -1,12 +1,14 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-using UnitTests.FSharpInterfaces;
+﻿//TODO: FIX ME - F# 
 
-namespace UnitTests.GrainInterfaces
-{
-    // uncomment the following interface definition to reproduce #1349
+//using System.Threading.Tasks;
+//using Orleans;
+//using UnitTests.FSharpInterfaces;
 
-    public interface IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain : IGrainWithGuidKey, IFSharpBaseInterface
-    {
-    }
-}
+//namespace UnitTests.GrainInterfaces
+//{
+//    // uncomment the following interface definition to reproduce #1349
+
+//    public interface IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain : IGrainWithGuidKey, IFSharpBaseInterface
+//    {
+//    }
+//}

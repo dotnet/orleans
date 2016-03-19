@@ -1,0 +1,25 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "OrleansManager Console Application",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "compilationOptions": {
+    "emitEntryPoint": true
+  },
+
+  "dependencies": {
+    "Orleans": "",
+    "SharedContent": ""
+  },
+
+  "commands": {
+    "OrleansManager": "OrleansManager"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}

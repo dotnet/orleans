@@ -1,0 +1,19 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "TestFSharp Class Library",
+  "authors": [ "Gutemberg" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "dependencies": {
+    "Orleans": "",
+    "TestGrainInterfaces": "",
+    "FSharp.Compiler.Tools": "4.0.0.1",
+    "FSharp.Core": "4.0.0.1"
+  },
+
+  "frameworks": {
+    "dnx451": { }
+  }
+}
