@@ -100,3 +100,122 @@ Primary is designated in the configuration file with the following setting withi
 <SeedNode Address="<host name or IP address of the primary node>" Port="11111" />
 ```
 
+Here is an example how to configure and launch Orleans silo hosted inside worker-role.
+This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment. 
+
+```csharp
+var dataConnection = "DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY";
+
+var proxyEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansProxyEndpoint"]; // 30 000
+var siloEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansSiloEndpoint"]; // 11 111
+
+var config = new ClusterConfiguration
+{
+    PrimaryNode = siloEndpoint.IPEndpoint,
+    Globals =
+    {
+        DeploymentId = RoleEnvironment.DeploymentId,
+        ResponseTimeout = TimeSpan.FromSeconds(90),
+        DataConnectionString = dataConnection,
+        GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
+        
+        LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
+        ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
+        SeedNodes = { siloEndpoint.IPEndpoint },
+        UseJsonFallbackSerializer = true
+    },
+    Defaults =
+    {
+        PropagateActivityId = true,
+        ProxyGatewayEndpoint = proxyEndpoint.IPEndpoint,
+        HostNameOrIPAddress = siloEndpoint.IPEndpoint.Address.ToString(),
+        Port = siloEndpoint.IPEndpoint.Port,
+
+        // Statistics
+        StatisticsMetricsTableWriteInterval = TimeSpan.FromMinutes(10),
+        StatisticsPerfCountersWriteInterval = TimeSpan.FromMinutes(10),
+        StatisticsLogWriteInterval = TimeSpan.FromMinutes(10),
+        StatisticsWriteLogStatisticsToTable = false,
+        StatisticsCollectionLevel = StatisticsLevel.Info,
+
+        // Tracing
+        DefaultTraceLevel = Severity.Info,
+        TraceToConsole = false,
+        WriteMessagingTraces = true,
+        TraceFilePattern = @"Silo_{0}-{1}.log",
+        //TraceFilePattern = "false", // Set it to false or none to disable file tracing, effectively it sets config.Defaults.TraceFileName = null;
+        TraceLevelOverrides =
+        {
+            Tuple.Create("SiloLogStatistics", Severity.Warning),
+            Tuple.Create("Catalog", Severity.Off)
+        }
+    }
+};
+
+// Register bootstrap provider class 
+config.Globals.RegisterBootstrapProvider<AutoStartProvider>("AutoStartProvider");
+
+// Add Storage Providers
+config.Globals.RegisterStorageProvider<MemoryStorage>("MemoryStore");
+
+config.Globals.RegisterStorageProvider<AzureTableStorage>("PubSubStore",
+    new Dictionary<string, string>
+    {
+        { "DeleteStateOnClear", "true" },
+        //{ "UseJsonFormat", "true" }, // UseJsonFormat is somehow unreliable
+        { "DataConnectionString", dataConnection }
+    });
+
+config.Globals.RegisterStorageProvider<AzureTableStorage>("AzureTable",
+    new Dictionary<string, string>
+    {
+        { "DeleteStateOnClear", "true" },
+        { "DataConnectionString", dataConnection }
+    });
+
+config.Globals.RegisterStorageProvider<AzureTableStorage>("DataStorage",
+    new Dictionary<string, string>
+    {
+        { "DeleteStateOnClear", "true" },
+        { "DataConnectionString", dataConnection }
+    });
+
+config.Globals.RegisterStorageProvider<BlobStorageProvider>("BlobStorage",
+    new Dictionary<string, string>
+    {
+        { "DeleteStateOnClear", "true" },
+        { "ContainerName", "grainstate" },
+        { "DataConnectionString", dataConnection }
+    });
+
+// Add Stream Providers 
+config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueImplicitOnly",
+    new Dictionary<string, string>
+    {
+        { "PubSubType", "ImplicitOnly" },
+        { "DeploymentId", "orleans-stream" },
+        { "NumQueues", "4" },
+        { "GetQueueMessagesTimerPeriod", "3s" },
+        { "DataConnectionString", dataConnection }
+    });
+
+config.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("SimpleMessagingImplicitOnly",
+    new Dictionary<string, string>
+    {
+        { "PubSubType", "ImplicitOnly" }
+    });
+
+
+try
+{
+    _orleansAzureSilo = new AzureSilo();
+    var ok = _orleansAzureSilo.Start(config, config.Globals.DeploymentId, config.Globals.DataConnectionString);
+
+    _orleansAzureSilo.Run(); // Call will block until silo is shutdown
+}
+catch (Exception exc)
+{
+    //Log "Error when starting Silo"
+}
+
+```

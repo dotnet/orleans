@@ -89,3 +89,72 @@ When using OrleansAzureClient.Initialize() and OrleansSiloInstances table for ga
   </Tracing>
 </ClientConfiguration>
 ```
+
+
+Code-based client configuration. This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.
+
+``` csharp
+var dataConnection = "DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY";
+
+var config = new ClientConfiguration
+{
+    // Some top level features
+    GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
+    ResponseTimeout = TimeSpan.FromSeconds(90),
+    DeploymentId = RoleEnvironment.DeploymentId,
+    DataConnectionString = dataConnection,
+    PropagateActivityId = true,
+    UseJsonFallbackSerializer = true,
+
+    // Statistics
+    StatisticsMetricsTableWriteInterval = TimeSpan.FromMinutes(10),
+    StatisticsPerfCountersWriteInterval = TimeSpan.FromMinutes(10),
+    StatisticsLogWriteInterval = TimeSpan.FromMinutes(10),
+    StatisticsWriteLogStatisticsToTable = false,
+    StatisticsCollectionLevel = StatisticsLevel.Info,
+
+    // Tracing 
+    DefaultTraceLevel = Severity.Info,
+    TraceToConsole = false,
+    WriteMessagingTraces = true,
+    TraceFilePattern = @"Client_{0}-{1}.log",
+    //TraceFilePattern = "false", // Set it to false or none to disable file tracing, effectively it sets config.Defaults.TraceFileName = null;
+
+    TraceLevelOverrides =
+    {
+        Tuple.Create("Catalog", Severity.Off),
+        Tuple.Create("ClientLogStatistics", Severity.Warning)
+    }
+};
+
+config.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueImplicitOnly",
+    new Dictionary<string, string>
+    {
+        { "PubSubType", "ImplicitOnly" },
+        { "DeploymentId", "orleans-stream" }, // This will be a prefix name of your Queues - so be careful and use string that is valid for queue name
+        { "NumQueues", "4" },
+        { "GetQueueMessagesTimerPeriod", "3s" },
+        { "DataConnectionString", dataConnection }
+    });
+
+config.RegisterStreamProvider<SimpleMessageStreamProvider>("SimpleMessagingImplicitOnly",
+    new Dictionary<string, string>
+    {
+        { "PubSubType", "ImplicitOnly" }
+    });
+
+// Initialize client using config defined above 
+while (!GrainClient.IsInitialized)
+{
+    try
+    {
+        GrainClient.Initialize(config);
+    }
+    catch (Exception exc)
+    {
+        //Log "Exception when initializing Orleans Client"
+    }
+    Thread.Sleep(TimeSpan.FromSeconds(5)); // TODO: developer may want to add counter to break up infinity cycle (circuit breaker pattern)
+}
+```
+
