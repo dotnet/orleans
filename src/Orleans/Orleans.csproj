@@ -75,8 +75,6 @@
     <Compile Include="Async\AsyncExecutorWithRetries.cs" />
     <Compile Include="Async\AsyncLock.cs" />
     <Compile Include="Async\AsyncPipeline.cs" />
-    <Compile Include="Threading\GCObserver.cs" />
-    <Compile Include="Threading\CancellationTokenWrapper.cs" />
     <Compile Include="Async\TaskUtility.cs" />
     <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
     <Compile Include="Async\TaskExtensions.cs" />
@@ -152,9 +150,6 @@
     <Compile Include="Telemetry\ITraceTelemetryConsumer.cs" />
     <Compile Include="Telemetry\Severity.cs" />
     <Compile Include="Telemetry\TraceParserUtils.cs" />
-    <Compile Include="Threading\CancellationTokenHolderGrain.cs" />
-    <Compile Include="Threading\ICancellationTokenHolderGrain.cs" />
-    <Compile Include="Threading\CancellationTokenManager.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />

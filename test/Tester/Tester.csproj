@@ -131,7 +131,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CancellationTests\CancellationTokenPassingTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="BaseClusterFixture.cs" />

@@ -5,7 +5,6 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
-using System.Threading;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -17,7 +16,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
-using Orleans.Threading;
 using Orleans.Runtime.Providers;
 
 
@@ -101,7 +99,6 @@ namespace Orleans.Runtime
             InvokeMethodOptions options,
             string genericArguments = null)
         {
-            CancellationTokenManager.WrapCancellationTokens(request.Arguments);
             var message = Message.CreateMessage(request, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
@@ -339,27 +336,6 @@ namespace Orleans.Runtime
                 try
                 {
                     var request = (InvokeMethodRequest) message.BodyObject;
-                    if (request.Arguments != null)
-                    {
-                        for (var i = 0; i < request.Arguments.Length; i++)
-                        {
-                            var arg = request.Arguments[i];
-                            if (!(arg is CancellationTokenWrapper)) continue;
-
-                            // essentially unwrapping tokens that were previouly wrapped before request send;
-                            // inlined in order to avoid awaiting in general case
-                            var orleansTokenWrapper = ((CancellationTokenWrapper)arg);
-                            if (orleansTokenWrapper.WentThroughSerialization
-                                && !orleansTokenWrapper.CancellationToken.IsCancellationRequested)
-                            {
-                                request.Arguments[i] = await CancellationTokenManager.GetCancellationToken(orleansTokenWrapper.Id);
-                            }
-                            else
-                            {
-                                request.Arguments[i] = orleansTokenWrapper.CancellationToken;
-                            }
-                        }
-                    }
 
                     var invoker = invokable.GetInvoker(request.InterfaceId, message.GenericGrainType);
 
@@ -427,10 +403,6 @@ namespace Orleans.Runtime
                 }
 
                 if (message.Direction == Message.Directions.OneWay) return;
-                if (resultObject is CancellationToken)
-                {
-                    resultObject = CancellationTokenManager.WrapCancellationToken((CancellationToken)resultObject);
-                }
 
                 SafeSendResponse(message, resultObject);
             }
