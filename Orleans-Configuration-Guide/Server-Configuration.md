@@ -103,7 +103,7 @@ Primary is designated in the configuration file with the following setting withi
 Here is an example how to configure and launch Orleans silo hosted inside worker-role.
 This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment. 
 
-``` csharp
+```csharp
 var dataConnection = "DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY";
 
 var proxyEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansProxyEndpoint"]; // 30 000
@@ -170,7 +170,6 @@ config.Globals.RegisterStorageProvider<AzureTableStorage>("AzureTable",
     new Dictionary<string, string>
     {
         { "DeleteStateOnClear", "true" },
-        //{ "UseJsonFormat", "true" }, // UseJsonFormat is somehow unreliable
         { "DataConnectionString", dataConnection }
     });
 
@@ -178,7 +177,6 @@ config.Globals.RegisterStorageProvider<AzureTableStorage>("DataStorage",
     new Dictionary<string, string>
     {
         { "DeleteStateOnClear", "true" },
-        //{ "UseJsonFormat", "true" }, // UseJsonFormat is somehow unreliable
         { "DataConnectionString", dataConnection }
     });
 
@@ -213,14 +211,11 @@ try
     _orleansAzureSilo = new AzureSilo();
     var ok = _orleansAzureSilo.Start(config, config.Globals.DeploymentId, config.Globals.DataConnectionString);
 
-    //_logger.LogEnd(new { ok });
-
     _orleansAzureSilo.Run(); // Call will block until silo is shutdown
 }
 catch (Exception exc)
 {
-    //_logger.LogError("Error when starting Silo", exc);
-    //_logger.LogErrorData("Silo configuration", new { config });
+    //Log "Error when starting Silo"
 }
 
 ```

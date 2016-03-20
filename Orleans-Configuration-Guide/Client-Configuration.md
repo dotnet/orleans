@@ -94,7 +94,6 @@ When using OrleansAzureClient.Initialize() and OrleansSiloInstances table for ga
 Code-based client configuration. This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.
 
 ``` csharp
-
 var dataConnection = "DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY";
 
 var config = new ClientConfiguration
@@ -153,11 +152,9 @@ while (!GrainClient.IsInitialized)
     }
     catch (Exception exc)
     {
-        //_logger.LogError("Exception when initializing Orleans Client", exc);
-        //_logger.LogErrorData("Client configuration", new { config });
+        //Log "Exception when initializing Orleans Client"
     }
-    Thread.Sleep(TimeSpan.FromSeconds(5)); // TODO: Add counter to break up infinity cycle
+    Thread.Sleep(TimeSpan.FromSeconds(5)); // TODO: developer may want to add counter to break up infinity cycle (circuit breaker pattern)
 }
-
 ```
 
