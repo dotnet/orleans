@@ -697,7 +697,8 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact(Skip = "Silo setting update of PropagateActivityId is not correctly implemented")]
+        [TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_DynamicChange_Server()
         {
             Guid activityId = Guid.NewGuid();
