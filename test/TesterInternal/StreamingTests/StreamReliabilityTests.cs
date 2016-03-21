@@ -33,28 +33,27 @@ namespace UnitTests.Streaming.Reliability
 
         private Guid _streamId;
         private string _streamProviderName;
+        private int numExpectedSilos;
 #if DELETE_AFTER_TEST
         private HashSet<IStreamReliabilityTestGrain> _usedGrains; 
 #endif
 
-        private static readonly Guid serviceId = Guid.NewGuid();
-        private static readonly TestingSiloOptions siloRunOptions = new TestingSiloOptions
-        {
-            SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml"),
-            LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
-            DataConnectionString = StorageTestConstants.DataConnectionString,
-            AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
-        };
-
-        private static readonly TestingClientOptions clientRunOptions = new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("ClientConfig_AzureStreamProviders.xml")
-        };
-
-        private readonly int numExpectedSilos = siloRunOptions.StartSecondary ? 2 : 1;
-
         public override TestingSiloHost CreateSiloHost()
         {
+            Guid serviceId = Guid.NewGuid();
+            var siloRunOptions = new TestingSiloOptions
+            {
+                StartSecondary = true,
+                SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml"),
+                LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
+                DataConnectionString = StorageTestConstants.DataConnectionString,
+                AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
+            };
+            var clientRunOptions = new TestingClientOptions
+            {
+                ClientConfigFile = new FileInfo("ClientConfig_AzureStreamProviders.xml")
+            };
+            this.numExpectedSilos = siloRunOptions.StartSecondary ? 2 : 1;
             return new TestingSiloHost(siloRunOptions, clientRunOptions);
         }
         
