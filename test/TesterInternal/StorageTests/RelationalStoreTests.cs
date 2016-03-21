@@ -79,7 +79,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
+        [Fact, TestCategory("Persistence"), TestCategory("MySql")]
         public async Task Streaming_MySql_Test()
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
@@ -96,7 +96,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             await CancellationTokenTest(sqlServerStorage, CancellationTestTimeoutLimit);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
+        [Fact, TestCategory("Persistence"), TestCategory("MySql")]
         public async Task CancellationToken_MySql_Test()
         {
             await CancellationTokenTest(mySqlStorage, CancellationTestTimeoutLimit);
