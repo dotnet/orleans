@@ -117,7 +117,6 @@ var config = new ClusterConfiguration
         DeploymentId = RoleEnvironment.DeploymentId,
         ResponseTimeout = TimeSpan.FromSeconds(30),
         DataConnectionString = dataConnection,
-        GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
         
         LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
         ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
@@ -176,7 +175,7 @@ config.Globals.RegisterStorageProvider<BlobStorageProvider>("BlobStorage",
     });
 
 // Add Stream Providers 
-config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueImplicitOnly",
+config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueStreams",
     new Dictionary<string, string>
     {
         { "PubSubType", "ExplicitGrainBasedAndImplicit" },
