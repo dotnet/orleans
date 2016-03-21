@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace Tester
 {
@@ -35,7 +36,7 @@ namespace Tester
             {
                 string errorMsg = "Azure Storage Emulator could not be started.";
                 Console.WriteLine(errorMsg);
-                Assert.Inconclusive(errorMsg);
+                throw new SkipException(errorMsg);
             }
         }
 

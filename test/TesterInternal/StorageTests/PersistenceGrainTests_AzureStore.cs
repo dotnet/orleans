@@ -410,7 +410,7 @@ namespace UnitTests.StorageTests
                 }
                 else
                 {
-                    Assert.Inconclusive(msg);
+                    throw new SkipException(msg);
                 }
             }
         }

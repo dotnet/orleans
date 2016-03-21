@@ -357,11 +357,8 @@ namespace UnitTests.TimerTests
             logger.Info(sb.ToString());
 
             bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
-            if (!tickCountIsInsideRange)
-            {
-                Assert.Inconclusive("AssertIsInRange: {0}  -- WHICH IS OUTSIDE RANGE.", sb);
-                // Not reached
-            }
+
+            Skip.IfNot(tickCountIsInsideRange, string.Format("AssertIsInRange: {0}  -- WHICH IS OUTSIDE RANGE.", sb));
         }
 
         protected async Task ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)
