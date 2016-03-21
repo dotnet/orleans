@@ -25,7 +25,7 @@ namespace UnitTests.StorageTests
         private readonly ITestOutputHelper output;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
-        private static string _deploymentId;
+        private string deploymentId;
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
@@ -33,6 +33,7 @@ namespace UnitTests.StorageTests
         public AzureQueueAdapterTests(ITestOutputHelper output)
         {
             this.output = output;
+            this.deploymentId = MakeDeploymentId();
             TraceLogger.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             SerializationManager.InitializeForTesting();
@@ -40,17 +41,16 @@ namespace UnitTests.StorageTests
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, _deploymentId, StorageTestConstants.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, StorageTestConstants.DataConnectionString).Wait();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Halo"), TestCategory("Azure"), TestCategory("Streaming")]
         public async Task SendAndReceiveFromAzureQueue()
         {
-            _deploymentId = MakeDeploymentId();
             var properties = new Dictionary<string, string>
                 {
                     {AzureQueueAdapterFactory.DATA_CONNECTION_STRING, StorageTestConstants.DataConnectionString},
-                    {AzureQueueAdapterFactory.DEPLOYMENT_ID, _deploymentId}
+                    {AzureQueueAdapterFactory.DEPLOYMENT_ID, deploymentId}
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
