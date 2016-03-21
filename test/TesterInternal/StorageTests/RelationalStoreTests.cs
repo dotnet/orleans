@@ -79,7 +79,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             }
         }
 
-        [Fact, TestCategory("Persistence"), TestCategory("MySql")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
         public async Task Streaming_MySql_Test()
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
@@ -96,7 +96,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             await CancellationTokenTest(sqlServerStorage, CancellationTestTimeoutLimit);
         }
 
-        [Fact, TestCategory("Persistence"), TestCategory("MySql")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
         public async Task CancellationToken_MySql_Test()
         {
             await CancellationTokenTest(mySqlStorage, CancellationTestTimeoutLimit);
@@ -104,7 +104,7 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static Task<bool>[] InsertAndReadStreamsAndCheckMatch(RelationalStorageForTesting sut, int streamSize, int countOfStreams, CancellationToken cancellationToken)
         {
-            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
+            Skip.If(sut == null, "Database was not initialized correctly");
 
             //Stream in and steam out three binary streams in parallel.
             var streamChecks = new Task<bool>[countOfStreams];
@@ -127,7 +127,7 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static async Task InsertIntoDatabaseUsingStream(RelationalStorageForTesting sut, int streamId, byte[] dataToInsert, CancellationToken cancellationToken)
         {
-            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
+            Skip.If(sut == null, "Database was not initialized correctly");
             //The dataToInsert could be inserted here directly, but it wouldn't be streamed.
             using (var ms = new MemoryStream(dataToInsert))
             {
@@ -155,7 +155,7 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static async Task<StreamingTest> ReadFromDatabaseUsingAsyncStream(RelationalStorageForTesting sut, int streamId, CancellationToken cancellationToken)
         {
-            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
+            Skip.If(sut == null, "Database was not initialized correctly");
             return (await sut.Storage.ReadAsync(sut.StreamTestSelect, command =>
             {
                 var p = command.CreateParameter();
@@ -180,7 +180,7 @@ namespace UnitTests.StorageTests.SQLAdapter
 
         private static Task CancellationTokenTest(RelationalStorageForTesting sut, TimeSpan timeoutLimit)
         {
-            if (sut == null) Assert.Inconclusive("Database was not initialized correctly");
+            Skip.If(sut == null, "Database was not initialized correctly");
             using (var tokenSource = new CancellationTokenSource(timeoutLimit))
             {
                 try
