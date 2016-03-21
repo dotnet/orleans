@@ -117,7 +117,7 @@ var config = new ClientConfiguration
     }
 };
 
-config.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueImplicitOnly",
+config.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueStreams",
     new Dictionary<string, string>
     {
         { "PubSubType", "ExplicitGrainBasedAndImplicit" },
@@ -127,7 +127,7 @@ config.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueImplicitOnly"
         { "DataConnectionString", dataConnection }
     });
 
-config.RegisterStreamProvider<SimpleMessageStreamProvider>("SimpleMessagingImplicitOnly",
+config.RegisterStreamProvider<SimpleMessageStreamProvider>("SimpleMessagingStreams",
     new Dictionary<string, string>
     {
         { "PubSubType", "ExplicitGrainBasedAndImplicit" }
