@@ -22,12 +22,16 @@ namespace UnitTests.CatalogTests
                     StartSecondary = true,
                     AdjustConfig = config =>
                     {
-                        config.Globals.ResponseTimeout = TimeSpan.FromSeconds(45);
+                        config.Globals.ResponseTimeout = TimeSpan.FromSeconds(50);
                         foreach (var nodeConfig in config.Overrides.Values)
                         {
                             nodeConfig.MaxActiveThreads = 1;
                         }
                     },
+                },
+                new TestingClientOptions
+                {
+                    AdjustConfig = config => { config.ResponseTimeout = TimeSpan.FromSeconds(50); }
                 });
             }
         }
