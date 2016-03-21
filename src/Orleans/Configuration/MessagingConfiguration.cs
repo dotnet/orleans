@@ -36,11 +36,6 @@ namespace Orleans.Runtime.Configuration
         /// Default is true.
         /// </summary>
         bool DropExpiredMessages { get; set; }
-        /// <summary>
-        /// The CancellationTokenHolderDeactivationDelay attribute specifies how long to keep an cancellation token holder grain after
-        /// cancel request. Default is 30 seconds
-        /// </summary>
-        TimeSpan CancellationTokenHolderDeactivationDelay { get; set; }
 
         /// <summary>
         /// The SiloSenderQueues attribute specifies the number of parallel queues and attendant threads used by the silo to send outbound
@@ -109,7 +104,6 @@ namespace Orleans.Runtime.Configuration
         public bool ResendOnTimeout { get; set; }
         public TimeSpan MaxSocketAge { get; set; }
         public bool DropExpiredMessages { get; set; }
-        public TimeSpan CancellationTokenHolderDeactivationDelay { get; set; }
 
         public int SiloSenderQueues { get; set; }
         public int GatewaySenderQueues { get; set; }
@@ -162,7 +156,6 @@ namespace Orleans.Runtime.Configuration
             ResendOnTimeout = DEFAULT_RESEND_ON_TIMEOUT;
             MaxSocketAge = DEFAULT_MAX_SOCKET_AGE;
             DropExpiredMessages = DEFAULT_DROP_EXPIRED_MESSAGES;
-            CancellationTokenHolderDeactivationDelay = Constants.DEFAULT_CANCELLATION_TOKEN_HOLDER_DEACTIVATION_DELAY;
 
             SiloSenderQueues = DEFAULT_SILO_SENDER_QUEUES;
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
@@ -199,7 +192,6 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("       Resend On Timeout: {0}", ResendOnTimeout).AppendLine();
             sb.AppendFormat("       Maximum Socket Age: {0}", MaxSocketAge).AppendLine();
             sb.AppendFormat("       Drop Expired Messages: {0}", DropExpiredMessages).AppendLine();
-            sb.AppendFormat("       Cancellation Token Holder Deactivation Delay: {0}", CancellationTokenHolderDeactivationDelay).AppendLine();
 
             if (isSiloConfig)
             {
@@ -257,10 +249,6 @@ namespace Orleans.Runtime.Configuration
                 DropExpiredMessages = ConfigUtilities.ParseBool(child.GetAttribute("DropExpiredMessages"),
                                                           "Invalid integer value for the DropExpiredMessages attribute on the Messaging element");
             }
-            CancellationTokenHolderDeactivationDelay = child.HasAttribute("CancellationTokenHolderDeactivationDelay")
-                                   ? ConfigUtilities.ParseTimeSpan(child.GetAttribute("CancellationTokenHolderDeactivationDelay"),
-                                                              "Invalid CancellationTokenHolderDeactivationDelay")
-                                   : Constants.DEFAULT_CANCELLATION_TOKEN_HOLDER_DEACTIVATION_DELAY;
             //--
             if (isSiloConfig)
             {

@@ -6,7 +6,7 @@ using Orleans.Concurrency;
 using Orleans.Providers;
 using UnitTests.GrainInterfaces;
 using System.Globalization;
-using System.Threading;
+using Orleans.CodeGeneration;
 
 namespace UnitTests.Grains
 {
@@ -585,25 +585,6 @@ namespace UnitTests.Grains
             return await target.LongRunningTask(t, delay);
         }
 
-        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay)
-        {
-            await target.LongWait(tc, delay);
-        }
-
-        public async Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel)
-        {
-            var tcs = new CancellationTokenSource();
-            var task = target.LongWait(tcs.Token, delay);
-            await Task.Delay(delayBeforeCancel);
-            tcs.Cancel();
-            await task;
-        }
-
-        public async Task LongWait(CancellationToken tc, TimeSpan delay)
-        {
-            await Task.Delay(delay, tc);
-        }
-        
         public async Task<T> LongRunningTask(T t, TimeSpan delay)
         {
             await Task.Delay(delay);

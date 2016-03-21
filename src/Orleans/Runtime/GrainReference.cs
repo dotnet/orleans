@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Serialization;
 using Orleans.CodeGeneration;
-using Orleans.Threading;
 
 namespace Orleans.Runtime
 {
@@ -406,30 +405,11 @@ namespace Orleans.Runtime
 
             if (!response.ExceptionFlag)
             {
-                if (response.Data is CancellationTokenWrapper)
-                {
-                    UnwrapCancellationToken(context, response);
-                    return;
-                }
-
                 context.TrySetResult(response.Data);
             }
             else
             {
                 context.TrySetException(response.Exception);
-            }
-        }
-
-        private static void UnwrapCancellationToken(TaskCompletionSource<object> context, Response response)
-        {
-            var orleansTokenWrapper = (CancellationTokenWrapper) response.Data;
-            if (orleansTokenWrapper.WentThroughSerialization && !orleansTokenWrapper.CancellationToken.IsCancellationRequested)
-            {
-                context.TrySetResult(CancellationTokenManager.GetCancellationToken(orleansTokenWrapper.Id).GetResult());
-            }
-            else
-            {
-                context.TrySetResult(orleansTokenWrapper.CancellationToken);
             }
         }
 

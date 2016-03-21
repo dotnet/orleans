@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
-using System.Threading;
+
 using Orleans.Runtime;
 using Orleans.Concurrency;
 
@@ -43,7 +43,7 @@ namespace Orleans.Serialization
         {
             var typeInfo = t.GetTypeInfo();
             if (typeInfo.IsPrimitive || typeInfo.IsEnum || t == typeof (string) || t == typeof (DateTime) || t == typeof (Decimal) ||
-                t == typeof (Immutable<>) || t == typeof(CancellationToken))
+                t == typeof (Immutable<>))
                 return true;
 
             if (typeInfo.GetCustomAttributes(typeof (ImmutableAttribute), false).Length > 0) 
