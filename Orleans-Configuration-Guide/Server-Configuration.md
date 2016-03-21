@@ -106,8 +106,8 @@ This is a reference only example and SHOULD NOT be used AS-IS - you may need to 
 ```csharp
 var dataConnection = "DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY";
 
-var proxyEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansProxyEndpoint"]; // 30 000
-var siloEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansSiloEndpoint"]; // 11 111
+var proxyEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansProxyEndpoint"];
+var siloEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansSiloEndpoint"];
 
 var config = new ClusterConfiguration
 {
@@ -115,45 +115,32 @@ var config = new ClusterConfiguration
     Globals =
     {
         DeploymentId = RoleEnvironment.DeploymentId,
-        ResponseTimeout = TimeSpan.FromSeconds(90),
+        ResponseTimeout = TimeSpan.FromSeconds(30),
         DataConnectionString = dataConnection,
         GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
         
         LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
         ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
-        SeedNodes = { siloEndpoint.IPEndpoint },
-        UseJsonFallbackSerializer = true
     },
     Defaults =
     {
         PropagateActivityId = true,
         ProxyGatewayEndpoint = proxyEndpoint.IPEndpoint,
-        HostNameOrIPAddress = siloEndpoint.IPEndpoint.Address.ToString(),
-        Port = siloEndpoint.IPEndpoint.Port,
-
-        // Statistics
-        StatisticsMetricsTableWriteInterval = TimeSpan.FromMinutes(10),
-        StatisticsPerfCountersWriteInterval = TimeSpan.FromMinutes(10),
-        StatisticsLogWriteInterval = TimeSpan.FromMinutes(10),
-        StatisticsWriteLogStatisticsToTable = false,
-        StatisticsCollectionLevel = StatisticsLevel.Info,
-
+        
         // Tracing
         DefaultTraceLevel = Severity.Info,
         TraceToConsole = false,
-        WriteMessagingTraces = true,
         TraceFilePattern = @"Silo_{0}-{1}.log",
         //TraceFilePattern = "false", // Set it to false or none to disable file tracing, effectively it sets config.Defaults.TraceFileName = null;
         TraceLevelOverrides =
         {
-            Tuple.Create("SiloLogStatistics", Severity.Warning),
-            Tuple.Create("Catalog", Severity.Off)
+            Tuple.Create("ComponentName", Severity.Warning),
         }
     }
 };
 
 // Register bootstrap provider class 
-config.Globals.RegisterBootstrapProvider<AutoStartProvider>("AutoStartProvider");
+config.Globals.RegisterBootstrapProvider<AutoStartBootstrapProvider>("MyAutoStartBootstrapProvider");
 
 // Add Storage Providers
 config.Globals.RegisterStorageProvider<MemoryStorage>("MemoryStore");
@@ -162,7 +149,7 @@ config.Globals.RegisterStorageProvider<AzureTableStorage>("PubSubStore",
     new Dictionary<string, string>
     {
         { "DeleteStateOnClear", "true" },
-        //{ "UseJsonFormat", "true" }, // UseJsonFormat is somehow unreliable
+        //{ "UseJsonFormat", "true" },
         { "DataConnectionString", dataConnection }
     });
 
@@ -192,19 +179,12 @@ config.Globals.RegisterStorageProvider<BlobStorageProvider>("BlobStorage",
 config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueImplicitOnly",
     new Dictionary<string, string>
     {
-        { "PubSubType", "ImplicitOnly" },
-        { "DeploymentId", "orleans-stream" },
+        { "PubSubType", "ExplicitGrainBasedAndImplicit" },
+        { "DeploymentId", "orleans-streams" },
         { "NumQueues", "4" },
-        { "GetQueueMessagesTimerPeriod", "3s" },
+        { "GetQueueMessagesTimerPeriod", "100ms" },
         { "DataConnectionString", dataConnection }
     });
-
-config.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("SimpleMessagingImplicitOnly",
-    new Dictionary<string, string>
-    {
-        { "PubSubType", "ImplicitOnly" }
-    });
-
 
 try
 {
