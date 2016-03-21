@@ -2,32 +2,19 @@
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
     <StorageProviders>
-      <Provider Type="Orleans.Storage.MemoryStorage" Name="PubSubStore" NumStorageGrains="1"/>
-      <!--<Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />-->
+      <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />
       <!-- To use Azure storage, uncomment one of the following lines: -->
       <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="UseDevelopmentStorage=true" />-->
       <!--<Provider Type="Orleans.Storage.AzureTableStorage" Name="AzureStore" DataConnectionString="DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY" />-->
     </StorageProviders>
-    <StreamProviders>
-      <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
-      <!--<Provider Type="Orleans.Providers.Streams.Persistent.AzureQueueStreamProvider" Name="AzureQueueProvider" DataConnectionString=""/> -->
-    </StreamProviders>
-    <SeedNode Address="localhost" Port="22222"/>
-    <Messaging ResponseTimeout="30s"/>
+    <SeedNode Address="localhost" Port="11111" />
   </Globals>
   <Defaults>
-    <Networking Address="localhost" Port="22222"/>
-    <ProxyingGateway Address="localhost" Port="40000" />
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
-       <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
-       <!--
-       <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
-       <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose" />
-       <TraceLevelOverride LogPrefix="AssemblyLoader.Silo" TraceLevel="Warning" />
-       -->
+    <Networking Address="localhost" Port="11111" />
+    <ProxyingGateway Address="localhost" Port="30000" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" BulkMessageLimit="1000">
+        <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
     </Tracing>
     <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
   </Defaults>
 </OrleansConfiguration>
-
-
