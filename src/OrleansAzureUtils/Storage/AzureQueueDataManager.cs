@@ -162,7 +162,9 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("Clearing a queue: {0}", QueueName);
             try
             {
-                await Task.Factory.FromAsync(queue.BeginClear, queue.EndClear, null);
+                // that way we don't have first to create the queue to be able later to delete it.
+                CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
+                await Task.Factory.FromAsync(queueRef.BeginClear, queueRef.EndClear, null);
                 logger.Info(ErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
             }
             catch (Exception exc)
