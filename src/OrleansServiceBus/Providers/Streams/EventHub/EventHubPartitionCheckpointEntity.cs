@@ -26,7 +26,7 @@ namespace Orleans.ServiceBus.Providers
 
         public static string MakePartitionKey(string streamProviderName, string checkpointNamespace)
         {
-            string key = String.Format("EHCheckpoints_{0}_{1}", streamProviderName, checkpointNamespace);
+            string key = String.Format("EventHubCheckpoints_{0}_{1}", streamProviderName, checkpointNamespace);
             return AzureStorageUtils.SanitizeTableProperty(key);
         }
 

@@ -7,8 +7,7 @@ namespace Orleans.Providers.Streams.Common
 {
     public class SimpleQueueCacheCursor : IQueueCacheCursor
     {
-        private readonly Guid streamGuid;
-        private readonly string streamNamespace;
+        private readonly IStreamIdentity streamIdentity;
         private readonly SimpleQueueCache cache;
         private readonly Logger logger;
         private IBatchContainer current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
@@ -37,18 +36,17 @@ namespace Orleans.Providers.Streams.Common
             SequenceToken = item.Value.SequenceToken;
         }
 
-        public SimpleQueueCacheCursor(SimpleQueueCache cache, Guid streamGuid, string streamNamespace, Logger logger)
+        public SimpleQueueCacheCursor(SimpleQueueCache cache, IStreamIdentity streamIdentity, Logger logger)
         {
             if (cache == null)
             {
                 throw new ArgumentNullException("cache");
             }
             this.cache = cache;
-            this.streamGuid = streamGuid;
-            this.streamNamespace = streamNamespace;
+            this.streamIdentity = streamIdentity;
             this.logger = logger;
             current = null;
-            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor New Cursor for {0}, {1}", streamGuid, streamNamespace);
+            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor New Cursor for {0}, {1}", streamIdentity.Guid, streamIdentity.Namespace);
         }
 
         public virtual IBatchContainer GetCurrent(out Exception exception)
@@ -93,8 +91,8 @@ namespace Orleans.Providers.Streams.Common
         private bool IsInStream(IBatchContainer batchContainer)
         {
             return batchContainer != null &&
-                    batchContainer.StreamGuid.Equals(streamGuid) &&
-                    String.Equals(batchContainer.StreamNamespace, streamNamespace);
+                    batchContainer.StreamGuid.Equals(streamIdentity.Guid) &&
+                    String.Equals(batchContainer.StreamNamespace, streamIdentity.Namespace);
         }
 
         #region IDisposable Members

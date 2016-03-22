@@ -3,17 +3,14 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.AzureUtils;
+using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
-    /// This class stores EventHub partition checkpoint information (a partition offset) in azure table storage.
-    /// TODO: Use dependency injection to fill this behavior.
-    /// This class stores data into table storage, which will not be ideal for all users.  Further, it introduces
-    ///   a dependency on azure storage to this assembly.  Ideally this should be an injectable behavior, rather
-    ///   than a concrete class.
+    /// This class stores EventHub partition checkpointer information (a partition offset) in azure table storage.
     /// </summary>
-    internal class EventHubPartitionCheckpoint
+    public class EventHubCheckpointer : IStreamQueueCheckpointer<string>
     {
         private readonly AzureTableDataManager<EventHubPartitionCheckpointEntity> dataManager;
         private readonly TimeSpan persistInterval;
@@ -22,16 +19,16 @@ namespace Orleans.ServiceBus.Providers
         private Task inProgressSave;
         private DateTime? throttleSavesUntilUtc;
 
-        public bool Exists { get { return entity != null && entity.Offset != EventHubConsumerGroup.StartOfStream; } }
+        public bool CheckpointExists { get { return entity != null && entity.Offset != EventHubConsumerGroup.StartOfStream; } }
 
-        public static async Task<EventHubPartitionCheckpoint> Create(ICheckpointSettings settings, string streamProviderName, string partition)
+        public static async Task<IStreamQueueCheckpointer<string>> Create(ICheckpointerSettings settings, string streamProviderName, string partition)
         {
-            var checkpoint = new EventHubPartitionCheckpoint(settings, streamProviderName, partition);
-            await checkpoint.Initialize();
-            return checkpoint;
+            var checkpointer = new EventHubCheckpointer(settings, streamProviderName, partition);
+            await checkpointer.Initialize();
+            return checkpointer;
         }
 
-        private EventHubPartitionCheckpoint(ICheckpointSettings settings, string streamProviderName, string partition)
+        private EventHubCheckpointer(ICheckpointerSettings settings, string streamProviderName, string partition)
         {
             if (settings == null)
             {

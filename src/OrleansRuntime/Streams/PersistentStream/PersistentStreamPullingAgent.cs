@@ -249,12 +249,12 @@ namespace Orleans.Streams
                     if (requestedHandshakeToken != null)
                     {
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, requestedHandshakeToken.Token);
+                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedHandshakeToken.Token);
                     }
                     else
                     {
                         if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, jsut keep using it.
-                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, cacheToken);
+                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                     }
                 }
                 catch (Exception exception)
@@ -273,11 +273,11 @@ namespace Orleans.Streams
             {
                 try
                 {
-                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, cacheToken);
+                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                 }
                 catch (Exception)
                 {
-                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, null); // just in case last GetCacheCursor failed.
+                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null); // just in case last GetCacheCursor failed.
                 }
             }
             return true;
@@ -408,7 +408,7 @@ namespace Orleans.Streams
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer) 
             // and later production.
-            var pinCursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, firstToken);
+            var pinCursor = queueCache.GetCacheCursor(streamId, firstToken);
 
             try
             {
@@ -465,7 +465,7 @@ namespace Orleans.Streams
                     {
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, null);
+                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
                     }
 
                     // Apply filtering to this batch, if applicable
@@ -500,8 +500,7 @@ namespace Orleans.Streams
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;
-                                IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
-                                    consumerData.StreamId.Namespace, newToken.Token);
+                                IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
                                 consumerData.SafeDisposeCursor(logger);
                                 consumerData.Cursor = newCursor;
                             }

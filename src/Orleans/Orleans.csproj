@@ -131,6 +131,7 @@
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Serialization\NonSerializableAttribute.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
+    <Compile Include="Streams\PersistentStreams\IStreamQueueCheckpointer.cs" />
     <Compile Include="Streams\PersistentStreams\NoOpStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamFailureHandler.cs" />
     <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />

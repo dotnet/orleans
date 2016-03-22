@@ -5,7 +5,7 @@ using Orleans.Providers;
 
 namespace Orleans.ServiceBus.Providers
 {
-    public interface ICheckpointSettings
+    public interface ICheckpointerSettings
     {
         /// <summary>
         /// Azure table storage data connections string
@@ -23,22 +23,22 @@ namespace Orleans.ServiceBus.Providers
         TimeSpan PersistInterval { get; }
 
         /// <summary>
-        /// This name partitions a services checkpoint information from other services.
+        /// This name partitions a service's checkpoint information from other services.
         /// </summary>
         string CheckpointNamespace { get; }
     }
 
-    public class EventHubCheckpointSettings : ICheckpointSettings
+    public class EventHubCheckpointerSettings : ICheckpointerSettings
     {
-        private const string DataConnectionStringName = "CheckpointDataConnectionString";
+        private const string DataConnectionStringName = "CheckpointerDataConnectionString";
         private const string TableNameName = "CheckpointTableName";
         private const string PersistIntervalName = "CheckpointPersistInterval";
         private const string CheckpointNamespaceName = "CheckpointNamespace";
         private static readonly TimeSpan DefaultPersistInterval = TimeSpan.FromMinutes(1);
 
-        public EventHubCheckpointSettings(){}
+        public EventHubCheckpointerSettings(){}
 
-        public EventHubCheckpointSettings(string dataConnectionString, string table, string checkpointNamespace, TimeSpan? persistInterval = null)
+        public EventHubCheckpointerSettings(string dataConnectionString, string table, string checkpointNamespace, TimeSpan? persistInterval = null)
         {
             if (string.IsNullOrWhiteSpace(dataConnectionString))
             {

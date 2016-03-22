@@ -1,5 +1,6 @@
 ﻿
 using System;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -12,7 +13,6 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     /// <typeparam name="TQueueMessage"></typeparam>
     /// <typeparam name="TCachedMessage"></typeparam>
-    ///   most recent message purged from the cache.</typeparam>
     public interface ICacheDataAdapter<in TQueueMessage, TCachedMessage>
         where TQueueMessage : class
         where TCachedMessage : struct
@@ -20,9 +20,26 @@ namespace Orleans.Providers.Streams.Common
         void QueueMessageToCachedMessage(ref TCachedMessage cachedMessage, TQueueMessage queueMessage);
         IBatchContainer GetBatchContainer(ref TCachedMessage cachedMessage);
         StreamSequenceToken GetSequenceToken(ref TCachedMessage cachedMessage);
-        int CompareCachedMessageToSequenceToken(ref TCachedMessage cachedMessage, StreamSequenceToken token);
-        bool IsInStream(ref TCachedMessage cachedMessage, Guid streamGuid, string streamNamespace);
         bool ShouldPurge(ref TCachedMessage cachedMessage, IDisposable purgeRequest);
         Action<IDisposable> PurgeAction { set; }
+    }
+
+    public interface ICacheDataComparer<in TCachedMessage>
+    {
+        int Compare(TCachedMessage cachedMessage, StreamSequenceToken streamToken);
+        int Compare(TCachedMessage cachedMessage, IStreamIdentity streamIdentity);
+    }
+
+    public static class CacheDataComparerExtensions
+    {
+        public static int Compare<TCachedMessage>(this ICacheDataComparer<TCachedMessage> comparer, StreamSequenceToken streamToken, TCachedMessage cachedMessage)
+        {
+            return 0 - comparer.Compare(cachedMessage, streamToken);
+        }
+
+        public static int Compare<TCachedMessage>(this ICacheDataComparer<TCachedMessage> comparer, IStreamIdentity streamIdentity, TCachedMessage cachedMessage)
+        {
+            return 0 - comparer.Compare(cachedMessage, streamIdentity);
+        }
     }
 }

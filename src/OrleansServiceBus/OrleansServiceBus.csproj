@@ -86,15 +86,17 @@
     <Compile Include="Providers\Streams\EventHub\EventHubAdapterReceiver.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubBatchContainer.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubDataAdapter.cs" />
-    <Compile Include="Providers\Streams\EventHub\EventHubPartitionCheckpoint.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubCheckpointer.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubPartitionCheckpointEntity.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubQueueCache.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubQueueMapper.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubSequenceToken.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProvider.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProviderConfig.cs" />
-    <Compile Include="Providers\Streams\EventHub\ICheckpointSettings.cs" />
+    <Compile Include="Providers\Streams\EventHub\ICheckpointerSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubSettings.cs" />
+    <Compile Include="Providers\Streams\EventHub\IEventHubQueueCache.cs" />
     <Compile Include="Providers\Streams\EventHub\SegmentBuilder.cs" />
   </ItemGroup>
   <ItemGroup>

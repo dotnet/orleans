@@ -11,8 +11,8 @@ namespace Orleans.ServiceBus.Providers
         public const string EventHubConfigTypeName = "EventHubSettingsType";
         public Type EventHubSettingsType { get; set; }
 
-        public const string CheckpointSettingsTypeName = "CheckpointSettingsType";
-        public Type CheckpointSettingsType { get; set; }
+        public const string CheckpointerSettingsTypeName = "CheckpointerSettingsType";
+        public Type CheckpointerSettingsType { get; set; }
 
         public string StreamProviderName { get; private set; }
 
@@ -30,15 +30,15 @@ namespace Orleans.ServiceBus.Providers
         {
             if (EventHubSettingsType != null)
                 properties.Add(EventHubConfigTypeName, EventHubSettingsType.AssemblyQualifiedName);
-            if (CheckpointSettingsType != null)
-                properties.Add(CheckpointSettingsTypeName, CheckpointSettingsType.AssemblyQualifiedName);
+            if (CheckpointerSettingsType != null)
+                properties.Add(CheckpointerSettingsTypeName, CheckpointerSettingsType.AssemblyQualifiedName);
             properties.Add(CacheSizeMbName, CacheSizeMb.ToString(CultureInfo.InvariantCulture));
         }
 
         public void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
             EventHubSettingsType = providerConfiguration.GetTypeProperty(EventHubConfigTypeName, null);
-            CheckpointSettingsType = providerConfiguration.GetTypeProperty(CheckpointSettingsTypeName, null);
+            CheckpointerSettingsType = providerConfiguration.GetTypeProperty(CheckpointerSettingsTypeName, null);
             if (string.IsNullOrWhiteSpace(StreamProviderName))
             {
                 throw new ArgumentOutOfRangeException("providerConfiguration", "StreamProviderName not set.");
@@ -70,28 +70,28 @@ namespace Orleans.ServiceBus.Providers
             return hubSettings;
         }
 
-        public ICheckpointSettings GetCheckpointSettings(IProviderConfiguration providerConfig, IServiceProvider serviceProvider)
+        public ICheckpointerSettings GetCheckpointerSettings(IProviderConfiguration providerConfig, IServiceProvider serviceProvider)
         {
-            // if no checkpoint settings type is provided, use EventHubCheckpointSettings and get populate settings from providerConfig
-            if (CheckpointSettingsType == null)
+            // if no checkpointer settings type is provided, use EventHubCheckpointerSettings and get populate settings from providerConfig
+            if (CheckpointerSettingsType == null)
             {
-                CheckpointSettingsType = typeof(EventHubCheckpointSettings);
+                CheckpointerSettingsType = typeof(EventHubCheckpointerSettings);
             }
 
-            var checkpointConfig = serviceProvider.GetService(CheckpointSettingsType) as ICheckpointSettings;
-            if (checkpointConfig == null)
+            var checkpointerSettings = serviceProvider.GetService(CheckpointerSettingsType) as ICheckpointerSettings;
+            if (checkpointerSettings == null)
             {
-                throw new ArgumentOutOfRangeException("providerConfig", "CheckpointSettingsType not valid.");
+                throw new ArgumentOutOfRangeException("providerConfig", "CheckpointerSettingsType not valid.");
             }
 
-            // if settings is an EventHubCheckpointSettings class, populate settings from providerConfig
-            var settings = checkpointConfig as EventHubCheckpointSettings;
+            // if settings is an EventHubCheckpointerSettings class, populate settings from providerConfig
+            var settings = checkpointerSettings as EventHubCheckpointerSettings;
             if (settings != null)
             {
                 settings.PopulateFromProviderConfig(providerConfig);
             }
 
-            return checkpointConfig;
+            return checkpointerSettings;
         }
     }
 }

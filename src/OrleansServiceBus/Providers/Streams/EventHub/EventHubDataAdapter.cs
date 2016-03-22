@@ -19,6 +19,29 @@ namespace Orleans.ServiceBus.Providers
         public ArraySegment<byte> Segment;
     }
 
+    internal class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
+    {
+        public static readonly ICacheDataComparer<CachedEventHubMessage> Instance = new EventHubDataComparer();
+
+        public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken token)
+        {
+            var realToken = (EventSequenceToken)token;
+            return cachedMessage.SequenceNumber != realToken.SequenceNumber
+                ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
+                : 0 - realToken.EventIndex;
+        }
+
+        public int Compare(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
+        {
+            int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+            if (result != 0) return result;
+
+            int readOffset = 0;
+            string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
+            return String.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+        }
+    }
+
     internal class EventHubDataAdapter : ICacheDataAdapter<EventData, CachedEventHubMessage>
     {
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
@@ -88,26 +111,6 @@ namespace Orleans.ServiceBus.Providers
         public StreamSequenceToken GetSequenceToken(ref CachedEventHubMessage cachedMessage)
         {
             return new EventSequenceToken(cachedMessage.SequenceNumber, 0);
-        }
-
-        public int CompareCachedMessageToSequenceToken(ref CachedEventHubMessage cachedMessage, StreamSequenceToken token)
-        {
-            var realToken = (EventSequenceToken) token;
-            return cachedMessage.SequenceNumber != realToken.SequenceNumber
-                ? (int) (cachedMessage.SequenceNumber - realToken.SequenceNumber)
-                : 0 - realToken.EventIndex;
-        }
-
-        public bool IsInStream(ref CachedEventHubMessage cachedMessage, Guid streamGuid, string streamNamespace)
-        {
-            // fail out early if guids does not match.  Don't incur cost of decoding namespace unless necessary.
-            if (cachedMessage.StreamGuid != streamGuid)
-            {
-                return false;
-            }
-            int readOffset = 0;
-            string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            return decodedStreamNamespace == streamNamespace;
         }
 
         public bool ShouldPurge(ref CachedEventHubMessage cachedMessage, IDisposable purgeRequest)

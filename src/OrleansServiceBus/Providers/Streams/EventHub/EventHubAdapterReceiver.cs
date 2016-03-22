@@ -14,8 +14,6 @@ namespace Orleans.ServiceBus.Providers
     internal class EventHubPartitionConfig
     {
         public IEventHubSettings Hub { get; set; }
-        public ICheckpointSettings CheckpointSettings { get; set; }
-        public string StreamProviderName { get; set; }
         public string Partition { get; set; }
     }
 
@@ -24,38 +22,40 @@ namespace Orleans.ServiceBus.Providers
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionConfig config;
-        private readonly IObjectPool<FixedSizeBuffer> bufferPool;
+        private readonly Func<IStreamQueueCheckpointer<string>, IEventHubQueueCache> cacheFactory;
+        private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
 
-        private PooledQueueCache<EventData, CachedEventHubMessage> cache;
+        private IEventHubQueueCache cache;
         private EventHubReceiver receiver;
-        private EventHubPartitionCheckpoint checkpoint;
+        private IStreamQueueCheckpointer<string> checkpointer;
 
         public int MaxAddCount { get { return 1000; } }
 
-        public EventHubAdapterReceiver(EventHubPartitionConfig partitionConfig, IObjectPool<FixedSizeBuffer> bufferPool, Logger log)
+        public EventHubAdapterReceiver(EventHubPartitionConfig partitionConfig,
+            Func<IStreamQueueCheckpointer<string>,IEventHubQueueCache> cacheFactory,
+            Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
+            Logger log)
         {
+            this.cacheFactory = cacheFactory;
+            this.checkpointerFactory = checkpointerFactory;
             config = partitionConfig;
-            this.bufferPool = bufferPool;
         }
 
         public async Task Initialize(TimeSpan timeout)
         {
-            var dataAdapter = new EventHubDataAdapter(bufferPool);
-            cache = new PooledQueueCache<EventData, CachedEventHubMessage>(dataAdapter) { OnPurged = OnPurged };
-            dataAdapter.PurgeAction = cache.Purge;
-            checkpoint = await EventHubPartitionCheckpoint.Create(config.CheckpointSettings, config.StreamProviderName, config.Partition);
-            string offset = await checkpoint.Load();
+            checkpointer = await checkpointerFactory(config.Partition);
+            cache = cacheFactory(checkpointer);
+            string offset = await checkpointer.Load();
             receiver = await CreateReceiver(config, offset);
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            var localReciever = receiver;
-            if (localReciever == null)
+            if (receiver == null)
             {
                 return new List<IBatchContainer>();
             }
-            List<EventData> messages = (await localReciever.ReceiveAsync(maxCount, ReceiveTimeout)).ToList();
+            List<EventData> messages = (await receiver.ReceiveAsync(maxCount, ReceiveTimeout)).ToList();
 
             var batches = new List<IBatchContainer>();
             if (messages.Count == 0)
@@ -70,9 +70,9 @@ namespace Orleans.ServiceBus.Providers
 
             }
 
-            if (!checkpoint.Exists)
+            if (!checkpointer.CheckpointExists)
             {
-                checkpoint.Update(messages[0].Offset, DateTime.UtcNow);
+                checkpointer.Update(messages[0].Offset, DateTime.UtcNow);
             }
             return batches;
         }
@@ -88,9 +88,9 @@ namespace Orleans.ServiceBus.Providers
             return false;
         }
 
-        public IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
-            return new Cursor(cache, streamGuid, streamNamespace, token);
+            return new Cursor(cache, streamIdentity, token);
         }
 
         public bool IsUnderPressure()
@@ -103,17 +103,24 @@ namespace Orleans.ServiceBus.Providers
             return TaskDone.Done;
         }
 
-        public async Task Shutdown(TimeSpan timeout)
+        public Task Shutdown(TimeSpan timeout)
         {
-            if (cache != null)
-            {
-                cache.OnPurged = null;
-            }
+            // clear cache and receiver
+            IEventHubQueueCache localCache = Interlocked.Exchange(ref cache, null);
             EventHubReceiver localReceiver = Interlocked.Exchange(ref receiver, null);
+            // start closing receiver
+            Task closeTask = TaskDone.Done;
             if (localReceiver != null)
             {
-                await localReceiver.CloseAsync();
+                closeTask = localReceiver.CloseAsync();
             }
+            // dispose of cache
+            if (localCache != null)
+            {
+                localCache.Dispose();
+            }
+            // finish return receiver closing task
+            return closeTask;
         }
 
         private static Task<EventHubReceiver> CreateReceiver(EventHubPartitionConfig partitionConfig, string offset)
@@ -130,14 +137,6 @@ namespace Orleans.ServiceBus.Providers
                 return consumerGroup.CreateReceiverAsync(partitionConfig.Partition, offset, true);
             }
             return consumerGroup.CreateReceiverAsync(partitionConfig.Partition, DateTime.UtcNow);
-        }
-
-        private void OnPurged(CachedEventHubMessage lastItemPurged)
-        {
-            int readOffset = 0;
-            SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read namespace, not needed so throw away.
-            string offset = SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset
-            checkpoint.Update(offset, DateTime.UtcNow);
         }
 
         private class StreamActivityNotificationBatch : IBatchContainer
@@ -161,14 +160,14 @@ namespace Orleans.ServiceBus.Providers
 
         private class Cursor : IQueueCacheCursor
         {
-            private readonly PooledQueueCache<EventData, CachedEventHubMessage> cache;
+            private readonly IEventHubQueueCache cache;
             private readonly object cursor;
             private IBatchContainer current;
 
-            public Cursor(PooledQueueCache<EventData, CachedEventHubMessage> cache, Guid streamGuid, string streamNamespace, StreamSequenceToken token)
+            public Cursor(IEventHubQueueCache cache, IStreamIdentity streamIdentity, StreamSequenceToken token)
             {
                 this.cache = cache;
-                cursor = cache.GetCursor(streamGuid, streamNamespace, token);
+                cursor = cache.GetCursor(streamIdentity, token);
             }
 
             public void Dispose()
