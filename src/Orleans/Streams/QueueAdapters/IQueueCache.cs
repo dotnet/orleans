@@ -27,11 +27,10 @@ namespace Orleans.Streams
         /// Acquire a stream message cursor.  This can be used to retreave messages from the
         ///   cache starting at the location indicated by the provided token.
         /// </summary>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="streamIdentity"></param>
         /// <param name="token"></param>
         /// <returns></returns>
-        IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token);
+        IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token);
 
         /// <summary>
         /// Returns true if this cache is under pressure.

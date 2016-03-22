@@ -131,7 +131,7 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        public virtual IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token)
+        public virtual IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
             if (token != null && !(token is EventSequenceToken))
             {
@@ -139,7 +139,7 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException("token", "token must be of type EventSequenceToken");
             }
 
-            var cursor = new SimpleQueueCacheCursor(this, streamGuid, streamNamespace, logger);
+            var cursor = new SimpleQueueCacheCursor(this, streamIdentity, logger);
             InitializeCursor(cursor, token, true);
             return cursor;
         }

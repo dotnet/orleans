@@ -34,8 +34,8 @@ namespace UnitTests.StreamingTests
         private static readonly EventHubStreamProviderConfig ProviderConfig =
             new EventHubStreamProviderConfig(StreamProviderName);
 
-        private static readonly EventHubCheckpointSettings CheckpointSettings =
-            new EventHubCheckpointSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
+        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
+            new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
                 TimeSpan.FromSeconds(1));
 
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
@@ -73,7 +73,7 @@ namespace UnitTests.StreamingTests
             public override void Dispose()
             {
                 base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointSettings.TableName, CheckpointSettings.DataConnectionString);
+                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
                 dataManager.DeleteTableAsync().Wait();
             }
@@ -85,7 +85,7 @@ namespace UnitTests.StreamingTests
                 // get initial settings from configs
                 ProviderConfig.WriteProperties(settings);
                 EventHubConfig.WriteProperties(settings);
-                CheckpointSettings.WriteProperties(settings);
+                CheckpointerSettings.WriteProperties(settings);
 
                 // add queue balancer setting
                 settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());

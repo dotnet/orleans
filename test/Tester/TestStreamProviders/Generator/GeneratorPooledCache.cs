@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Microsoft.Data.OData;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -16,7 +17,7 @@ namespace Tester.TestStreamProviders.Generator
         public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool);
-            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter);
+            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance);
             dataAdapter.PurgeAction = cache.Purge;
         }
 
@@ -27,6 +28,25 @@ namespace Tester.TestStreamProviders.Generator
             public string StreamNamespace;
             public long SequenceNumber;
             public ArraySegment<byte> Payload;
+        }
+
+        private class CacheDataComparer : ICacheDataComparer<CachedMessage>
+        {
+            public static readonly ICacheDataComparer<CachedMessage> Instance = new CacheDataComparer(); 
+
+            public int Compare(CachedMessage cachedMessage, StreamSequenceToken token)
+            {
+                var realToken = (EventSequenceToken)token;
+                return cachedMessage.SequenceNumber != realToken.SequenceNumber
+                    ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
+                    : 0 - realToken.EventIndex;
+            }
+
+            public int Compare(CachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            {
+                int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+                return results != 0 ? results : String.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+            }
         }
 
         private class CacheDataAdapter : ICacheDataAdapter<GeneratedBatchContainer, CachedMessage>
@@ -93,19 +113,6 @@ namespace Tester.TestStreamProviders.Generator
                 return new EventSequenceToken(cachedMessage.SequenceNumber);
             }
 
-            public int CompareCachedMessageToSequenceToken(ref CachedMessage cachedMessage, StreamSequenceToken token)
-            {
-                var realToken = (EventSequenceToken) token;
-                return cachedMessage.SequenceNumber != realToken.SequenceNumber
-                    ? (int) (cachedMessage.SequenceNumber - realToken.SequenceNumber)
-                    : 0 - realToken.EventIndex;
-            }
-
-            public bool IsInStream(ref CachedMessage cachedMessage, Guid streamGuid, string streamNamespace)
-            {
-                return cachedMessage.StreamGuid == streamGuid && cachedMessage.StreamNamespace == streamNamespace;
-            }
-
             public bool ShouldPurge(ref CachedMessage cachedMessage, IDisposable purgeRequest)
             {
                 var purgedResource = (FixedSizeBuffer) purgeRequest;
@@ -124,10 +131,10 @@ namespace Tester.TestStreamProviders.Generator
             private readonly object cursor;
             private IBatchContainer current;
 
-            public Cursor(PooledQueueCache<GeneratedBatchContainer, CachedMessage> cache, Guid streamGuid, string streamNamespace, StreamSequenceToken token)
+            public Cursor(PooledQueueCache<GeneratedBatchContainer, CachedMessage> cache, IStreamIdentity streamIdentity, StreamSequenceToken token)
             {
                 this.cache = cache;
-                cursor = cache.GetCursor(streamGuid, streamNamespace, token);
+                cursor = cache.GetCursor(streamIdentity, token);
             }
 
             public void Dispose()
@@ -177,9 +184,9 @@ namespace Tester.TestStreamProviders.Generator
             return false;
         }
 
-        public IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
-            return new Cursor(cache, streamGuid, streamNamespace, token);
+            return new Cursor(cache, streamIdentity, token);
         }
 
         public bool IsUnderPressure()

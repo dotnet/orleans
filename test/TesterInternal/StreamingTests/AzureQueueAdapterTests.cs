@@ -15,6 +15,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -77,7 +78,7 @@ namespace UnitTests.StorageTests
             Guid streamId2 = Guid.NewGuid();
 
             int receivedBatches = 0;
-            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<Guid>>();
+            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<IStreamIdentity>>();
 
             // reader threads (at most 2 active queues because only two streams)
             var work = new List<Task>();
@@ -98,10 +99,10 @@ namespace UnitTests.StorageTests
                         foreach (AzureQueueBatchContainer message in messages.Cast<AzureQueueBatchContainer>())
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<Guid> { message.StreamGuid },
+                                id => new HashSet<IStreamIdentity> { new TestStreamIdentity { Guid = message.StreamGuid } },
                                 (id, set) =>
                                 {
-                                    set.Add(message.StreamGuid);
+                                    set.Add(new TestStreamIdentity { Guid = message.StreamGuid });
                                     return set;
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
@@ -133,15 +134,15 @@ namespace UnitTests.StorageTests
 
             // check to see if all the events are in the cache and we can enumerate through them
             StreamSequenceToken firstInCache = new EventSequenceToken(0);
-            foreach (KeyValuePair<QueueId, HashSet<Guid>> kvp in streamsPerQueue)
+            foreach (KeyValuePair<QueueId, HashSet<IStreamIdentity>> kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];
                 var qCache = caches[kvp.Key];
 
-                foreach (Guid streamGuid in kvp.Value)
+                foreach (IStreamIdentity streamGuid in kvp.Value)
                 {
                     // read all messages in cache for stream
-                    IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, streamGuid.ToString(), firstInCache);
+                    IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
                     int messageCount = 0;
                     StreamSequenceToken tenthInCache = null;
                     StreamSequenceToken lastToken = firstInCache;
@@ -163,7 +164,7 @@ namespace UnitTests.StorageTests
                     Assert.IsNotNull(tenthInCache);
 
                     // read all messages from the 10th
-                    cursor = qCache.GetCacheCursor(streamGuid, streamGuid.ToString(), tenthInCache);
+                    cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
                     messageCount = 0;
                     while (cursor.MoveNext())
                     {

@@ -12,8 +12,9 @@ namespace Orleans.Providers.Streams.Common
         where TQueueMessage : class
         where TCachedMessage : struct
     {
-        private readonly IObjectPool<CachedMessageBlock<TQueueMessage, TCachedMessage>> cachedMessagePool;
-        private CachedMessageBlock<TQueueMessage, TCachedMessage> cachedMessageBlock;
+        private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter;
+        private readonly IObjectPool<CachedMessageBlock<TCachedMessage>> messagePool;
+        private CachedMessageBlock<TCachedMessage> currentMessageBlock;
 
         /// <summary>
         /// Allocates a pool of cached message blocks.
@@ -21,8 +22,13 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cacheDataAdapter"></param>
         public CachedMessagePool(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter)
         {
-            cachedMessagePool = new ObjectPool<CachedMessageBlock<TQueueMessage, TCachedMessage>>(
-                pool => new CachedMessageBlock<TQueueMessage, TCachedMessage>(pool, cacheDataAdapter));
+            if (cacheDataAdapter == null)
+            {
+                throw new ArgumentNullException("cacheDataAdapter");
+            }
+            dataAdapter = cacheDataAdapter;
+            messagePool = new ObjectPool<CachedMessageBlock<TCachedMessage>>(
+                pool => new CachedMessageBlock<TCachedMessage>(pool));
         }
 
         /// <summary>
@@ -30,7 +36,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="queueMessage"></param>
         /// <returns></returns>
-        public CachedMessageBlock<TQueueMessage, TCachedMessage> AllocateMessage(TQueueMessage queueMessage)
+        public CachedMessageBlock<TCachedMessage> AllocateMessage(TQueueMessage queueMessage)
         {
             if (queueMessage == null)
             {
@@ -38,14 +44,14 @@ namespace Orleans.Providers.Streams.Common
             }
 
             // allocate new cached message block if needed
-            if (cachedMessageBlock == null || !cachedMessageBlock.HasCapacity)
+            if (currentMessageBlock == null || !currentMessageBlock.HasCapacity)
             {
-                cachedMessageBlock = cachedMessagePool.Allocate();
+                currentMessageBlock = messagePool.Allocate();
             }
 
-            cachedMessageBlock.Add(queueMessage);
+            currentMessageBlock.Add(queueMessage, dataAdapter);
 
-            return cachedMessageBlock;
+            return currentMessageBlock;
         }
     }
 }
