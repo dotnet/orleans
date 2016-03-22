@@ -230,6 +230,7 @@ namespace UnitTests.StorageTests
     }
 
     #region Grain State class for these tests
+
     [Serializable]
     public class TestStoreGrainState
     {
@@ -237,18 +238,31 @@ namespace UnitTests.StorageTests
         public int B { get; set; }
         public long C { get; set; }
 
-        internal static GrainState<TestStoreGrainState> NewRandomState()
+        internal static GrainState<TestStoreGrainState> NewRandomState(int? aPropertyLength = null)
         {
             return new GrainState<TestStoreGrainState>
             {
                 State = new TestStoreGrainState
                 {
-                    A = TestConstants.random.Next().ToString(CultureInfo.InvariantCulture),
+                    A = aPropertyLength == null
+                        ? TestConstants.random.Next().ToString(CultureInfo.InvariantCulture)
+                        : GenerateRandomDigitString(aPropertyLength.Value),
                     B = TestConstants.random.Next(),
                     C = TestConstants.random.Next()
                 }
             };
         }
+
+        private static string GenerateRandomDigitString(int stringLength)
+        {
+            var characters = new char[stringLength];
+            for (var i = 0; i < stringLength; ++i)
+            {
+                characters[i] = (char)TestConstants.random.Next('0', '9' + 1);
+            }
+            return new string(characters);
+        }
     }
-    #endregion
+
+    #endregion Grain State class for these tests
 }
