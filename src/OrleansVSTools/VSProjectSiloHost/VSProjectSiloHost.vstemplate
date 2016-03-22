@@ -17,8 +17,6 @@
     <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
       <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" TargetFileName="App.config">App.config</ProjectItem>
-      <ProjectItem ReplaceParameters="true" TargetFileName="DevTestClientConfiguration.xml">DevTestClientConfiguration.xml</ProjectItem>
-      <ProjectItem ReplaceParameters="true" TargetFileName="DevTestServerConfiguration.xml">DevTestServerConfiguration.xml</ProjectItem>
       <ProjectItem ReplaceParameters="true" TargetFileName="OrleansHostWrapper.cs">OrleansHostWrapper.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" OpenInEditor="true">Program.cs</ProjectItem>
     </Project>
@@ -32,8 +30,6 @@
       <package id="Microsoft.CodeAnalysis.Analyzers" version="1.0.0" />
       <package id="Microsoft.CodeAnalysis.Common" version="1.0.0" />
       <package id="Microsoft.CodeAnalysis.CSharp" version="1.0.0" />
-      <package id="Microsoft.Extensions.DependencyInjection" version="1.0.0-rc1-final" />
-      <package id="Microsoft.Extensions.DependencyInjection.Abstractions" version="1.0.0-rc1-final" />
       <package id="Microsoft.Orleans.Core" version="1.2.0" />
       <package id="Microsoft.Orleans.CounterControl" version="1.2.0" />
       <package id="Microsoft.Orleans.OrleansCodeGenerator" version="1.2.0" />
@@ -70,8 +66,6 @@
       <Asset Type="Microsoft.Orleans.OrleansProviders.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansProviders.1.2.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.Orleans.Server.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Server.1.2.0.nupkg" d:VsixSubPath="Packages" />
-      <Asset Type="Microsoft.Orleans.Templates.Grains.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg" d:VsixSubPath="Packages" />
-      <Asset Type="Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Newtonsoft.Json.7.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.7.0.1.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Collections.Immutable.1.1.36.nupkg" d:Source="File" Path="Packages\System.Collections.Immutable.1.1.36.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Reflection.Metadata.1.0.21.nupkg" d:Source="File" Path="Packages\System.Reflection.Metadata.1.0.21.nupkg" d:VsixSubPath="Packages" />

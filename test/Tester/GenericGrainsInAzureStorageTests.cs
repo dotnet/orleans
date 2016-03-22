@@ -9,11 +9,13 @@ using Xunit;
 
 namespace UnitTests.General
 {
-    public class GenericGrainsInAzureStorageTestsFixture : BaseClusterFixture
+    public class GenericGrainsInAzureStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureStorageTests.Fixture>
     {
-        public GenericGrainsInAzureStorageTestsFixture()
-        : base(new TestingSiloHost(
-                new TestingSiloOptions
+        private class Fixture : BaseClusterFixture
+        {
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
                 {
                     StartPrimary = true,
                     StartSecondary = false,
@@ -25,13 +27,10 @@ namespace UnitTests.General
                         properties.Add("DataConnectionString", "UseDevelopmentStorage=true");
                         config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
                     }
-                }))
-        {
+                });
+            }
         }
-    }
 
-    public class GenericGrainsInAzureStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureStorageTestsFixture>
-    {
         [Fact(Skip = "Ignored"), TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
         //This test currently fails, because the name of the interface is too long
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()

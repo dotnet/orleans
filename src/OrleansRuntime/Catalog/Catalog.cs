@@ -403,7 +403,6 @@ namespace Orleans.Runtime
             {
                 if (TryGetActivationData(address.Activation, out result))
                 {
-                    ActivationCollector.TryRescheduleCollection(result);
                     return result;
                 }
                 

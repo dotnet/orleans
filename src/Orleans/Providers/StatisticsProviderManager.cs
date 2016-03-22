@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -22,6 +21,15 @@ namespace Orleans.Providers
 
         public IGrainFactory GrainFactory { get { return runtime.GrainFactory; }}
         public IServiceProvider ServiceProvider { get { return runtime.ServiceProvider; } }
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
+        {
+            runtime.SetInvokeInterceptor(interceptor);
+        }
+
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return runtime.GetInvokeInterceptor();
+        }
 
         public async Task<string> LoadProvider(IDictionary<string, ProviderCategoryConfiguration> configs)
         {

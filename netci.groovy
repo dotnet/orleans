@@ -26,7 +26,7 @@ def buildString = '''call Build.cmd && Test.cmd'''
         publishers {
             archiveXUnit {
                 xUnitDotNET {
-                    pattern('src/TestResults/xUnit-Results.xml')
+                    pattern('**/xUnit-Results.xml')
                     skipNoTestFiles(true)
                     failIfNotNew(true)
                     deleteOutputFiles(true)

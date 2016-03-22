@@ -17,7 +17,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
 
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -51,7 +51,7 @@ namespace Orleans.CodeGenerator
                                    : new TypeParameterSyntax[0];
 
             // Create the special method invoker marker attribute.
-            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(grainType);
+            var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(grainType);
             var interfaceIdArgument = SF.LiteralExpression(SyntaxKind.NumericLiteralExpression, SF.Literal(interfaceId));
             var grainTypeArgument = SF.TypeOfExpression(grainType.GetTypeSyntax(includeGenericParameters: false));
             var attributes = new List<AttributeSyntax>
@@ -104,7 +104,7 @@ namespace Orleans.CodeGenerator
             var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceId);
             var returnValue = SF.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
-                SF.Literal(GrainInterfaceData.GetGrainInterfaceId(grainType)));
+                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceId(grainType)));
             return
                 SF.PropertyDeclaration(typeof(int).GetTypeSyntax(), property.Name)
                     .AddAccessorListAccessors(

@@ -42,41 +42,40 @@ namespace UnitTests.StreamingTests
 
         private class Fixture : BaseClusterFixture
         {
-            public Fixture()
-                : base(new TestingSiloHost(
-                    new TestingSiloOptions
-                    {
-                        StartFreshOrleans = true,
-                        SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                        AdjustConfig = config =>
-                        {
-                            // register stream provider
-                            config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName,
-                                BuildProviderSettings());
-
-                            // Make sure a node config exist for each silo in the cluster.
-                            // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                            config.GetOrCreateNodeConfigurationForSilo("Primary");
-                            config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-                        }
-                    }, new TestingClientOptions
-                    {
-                        AdjustConfig = config =>
-                        {
-                            config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName,
-                                BuildProviderSettings());
-                            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
-                        },
-                    }))
+            protected override TestingSiloHost CreateClusterHost()
             {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartFreshOrleans = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
+                    AdjustConfig = config =>
+                    {
+                        // register stream provider
+                        config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName,
+                            BuildProviderSettings());
+
+                        // Make sure a node config exist for each silo in the cluster.
+                        // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
+                        config.GetOrCreateNodeConfigurationForSilo("Primary");
+                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
+                    }
+                }, new TestingClientOptions
+                {
+                    AdjustConfig = config =>
+                    {
+                        config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName,
+                            BuildProviderSettings());
+                        config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
+                    },
+                });
             }
 
             public override void Dispose()
             {
+                base.Dispose();
                 var dataManager = new AzureTableDataManager<TableEntity>(CheckpointSettings.TableName, CheckpointSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
                 dataManager.DeleteTableAsync().Wait();
-                base.Dispose();
             }
 
             private static Dictionary<string, string> BuildProviderSettings()

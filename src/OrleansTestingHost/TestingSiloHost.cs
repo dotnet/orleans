@@ -277,8 +277,6 @@ namespace Orleans.TestingHost
                     restartedAdditionalSilos.Add(restartedSilo);
                 }
             }
-            additionalSilos.Clear();
-            additionalSilos.AddRange(restartedAdditionalSilos);
         }
 
         /// <summary>
@@ -399,16 +397,17 @@ namespace Orleans.TestingHost
                 StopOrleansSilo(instance, true);
                 var newInstance = StartOrleansSilo(type, options, InstanceCounter++);
 
-                if (type == Silo.SiloType.Primary)
+                if (Primary == instance)
                 {
                     Primary = newInstance;
                 }
-                else if (type == Silo.SiloType.Secondary)
+                else if (Secondary == instance)
                 {
                     Secondary = newInstance;
                 }
                 else
                 {
+                    additionalSilos.Remove(instance);
                     additionalSilos.Add(newInstance);
                 }
 

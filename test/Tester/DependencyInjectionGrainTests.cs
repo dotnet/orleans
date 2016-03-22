@@ -11,22 +11,21 @@ using Xunit;
 
 namespace UnitTests.General
 {
-    public class DependencyInjectionGrainTestsFixture : BaseClusterFixture
+    public class DependencyInjectionGrainTests : OrleansTestingBase, IClassFixture<DependencyInjectionGrainTests.Fixture>
     {
-        public DependencyInjectionGrainTestsFixture()
-            : base(
-                new TestingSiloHost(new TestingSiloOptions
+        private class Fixture : BaseClusterFixture
+        {
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
                 {
                     StartPrimary = true,
                     StartSecondary = false,
                     SiloConfigFile = new FileInfo("OrleansStartupConfigurationForTesting.xml")
-                }))
-        {
+                });
+            }
         }
-    }
 
-    public class DependencyInjectionGrainTests : OrleansTestingBase, IClassFixture<DependencyInjectionGrainTestsFixture>
-    {
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DiTests_SimpleDiGrainGetGrain()
         {

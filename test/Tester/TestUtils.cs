@@ -8,16 +8,17 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace Tester
 {
     public class TestUtils
     {
-        protected static readonly Random random = new Random();
+        public static readonly Random Random = new Random();
 
         public static long GetRandomGrainId()
         {
-            return random.Next();
+            return Random.Next();
         }
 
         public static void CheckForAzureStorage()
@@ -26,8 +27,7 @@ namespace Tester
 
             if (!usingLocalWAS)
             {
-                string msg = "Tests are using Azure Cloud Storage, not local WAS emulator.";
-                Console.WriteLine(msg);
+                // Tests are using Azure Cloud Storage, not local WAS emulator.
                 return;
             }
 
@@ -36,7 +36,7 @@ namespace Tester
             {
                 string errorMsg = "Azure Storage Emulator could not be started.";
                 Console.WriteLine(errorMsg);
-                Assert.Inconclusive(errorMsg);
+                throw new SkipException(errorMsg);
             }
         }
 

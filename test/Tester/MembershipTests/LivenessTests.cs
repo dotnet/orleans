@@ -14,17 +14,24 @@ using Tester;
 using UnitTests.General;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
     public class LivenessTestsBase : HostedTestClusterPerTest
     {
+        private readonly ITestOutputHelper output;
         private const int numAdditionalSilos = 1;
         private const int numGrains = 20;
 
+        public LivenessTestsBase(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         protected async Task Do_Liveness_OracleTest_1()
         {
-            Console.WriteLine("DeploymentId= {0}", this.HostedCluster.DeploymentId);
+            output.WriteLine("DeploymentId= {0}", this.HostedCluster.DeploymentId);
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
 
@@ -33,23 +40,23 @@ namespace UnitTests.MembershipTests
             Dictionary<SiloAddress, SiloStatus> statuses = await mgmtGrain.GetHosts(false);
             foreach (var pair in statuses)
             {
-                Console.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                output.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
                 Assert.AreEqual(SiloStatus.Active, pair.Value);
             }
             Assert.AreEqual(3, statuses.Count);
 
             IPEndPoint address = silo3.Endpoint;
-            Console.WriteLine("About to stop {0}", address);
+            output.WriteLine("About to stop {0}", address);
             this.HostedCluster.StopSilo(silo3);
 
             // TODO: Should we be allowing time for changes to percolate?
 
-            Console.WriteLine("----------------");
+            output.WriteLine("----------------");
 
             statuses = await mgmtGrain.GetHosts(false);
             foreach (var pair in statuses)
             {
-                Console.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                output.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
                 IPEndPoint silo = pair.Key.Endpoint;
                 if (silo.Equals(address))
                 {
@@ -180,6 +187,10 @@ namespace UnitTests.MembershipTests
 
     public class LivenessTests_MembershipGrain : LivenessTestsBase
     {
+        public LivenessTests_MembershipGrain(ITestOutputHelper output) : base(output)
+        {
+        }
+
         public override TestingSiloHost CreateSiloHost()
         {
             var siloOptions = new TestingSiloOptions
@@ -245,6 +256,10 @@ namespace UnitTests.MembershipTests
 
     public class LivenessTests_AzureTable : LivenessTestsBase
     {
+        public LivenessTests_AzureTable(ITestOutputHelper output) : base(output)
+        {
+        }
+
         public override TestingSiloHost CreateSiloHost()
         {
             TestUtils.CheckForAzureStorage();
@@ -303,6 +318,10 @@ namespace UnitTests.MembershipTests
 
     public class LivenessTests_ZK : LivenessTestsBase
     {
+        public LivenessTests_ZK(ITestOutputHelper output) : base(output)
+        {
+        }
+
         public override TestingSiloHost CreateSiloHost()
         {
             TestUtils.CheckForAzureStorage();
@@ -354,10 +373,13 @@ namespace UnitTests.MembershipTests
     public class LivenessTests_SqlServer : LivenessTestsBase
     {
         public const string TestDatabaseName = "OrleansTest";
+        public LivenessTests_SqlServer(ITestOutputHelper output) : base(output)
+        {
+        }
 
         public override TestingSiloHost CreateSiloHost()
         {
-            //Console.WriteLine("Initializing relational databases...");
+            //output.WriteLine("Initializing relational databases...");
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
 
             var siloOptions = new TestingSiloOptions
@@ -370,9 +392,9 @@ namespace UnitTests.MembershipTests
                 ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
             };
 
-            //Console.WriteLine("TestContext.DeploymentDirectory={0}", context.DeploymentDirectory);
-            //Console.WriteLine("TestContext=");
-            //Console.WriteLine(TestUtils.DumpTestContext(context));
+            //output.WriteLine("TestContext.DeploymentDirectory={0}", context.DeploymentDirectory);
+            //output.WriteLine("TestContext=");
+            //output.WriteLine(TestUtils.DumpTestContext(context));
 
             return new TestingSiloHost(siloOptions);
         }

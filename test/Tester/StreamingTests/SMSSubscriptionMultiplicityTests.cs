@@ -15,20 +15,22 @@ namespace UnitTests.StreamingTests
     {
         public const string SMSStreamProviderName = "SMSProvider";
 
-        public SMSSubscriptionMultiplicityTestsFixture()
-            : base(new TestingSiloHost(
+        protected override TestingSiloHost CreateClusterHost()
+        {
+            return new TestingSiloHost(
                 new TestingSiloOptions
                 {
                     StartFreshOrleans = true,
                     SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                }, new TestingClientOptions()
+                },
+                new TestingClientOptions()
                 {
                     AdjustConfig = config =>
                     {
-                        config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName, new Dictionary<string, string>());
+                        config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName,
+                            new Dictionary<string, string>());
                     },
-                }))
-        {
+                });
         }
     }
 

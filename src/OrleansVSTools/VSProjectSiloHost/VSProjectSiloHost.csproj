@@ -60,8 +60,6 @@
     <None Include="AssemblyInfo.cs" />
     <None Include="Program.cs" />
     <None Include="ProjectTemplate.csproj" />
-    <None Include="DevTestServerConfiguration.xml" />
-    <None Include="DevTestClientConfiguration.xml" />
   </ItemGroup>
   <ItemGroup>
     <VSTemplate Include="VSProjectSiloHost.vstemplate">

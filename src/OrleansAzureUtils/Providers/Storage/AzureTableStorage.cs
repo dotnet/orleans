@@ -1,16 +1,17 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
+using Orleans.Providers;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Providers;
 using Orleans.Serialization;
-
 
 namespace Orleans.Storage
 {
@@ -22,7 +23,7 @@ namespace Orleans.Storage
     /// Required configuration params: <c>DataConnectionString</c>
     /// </para>
     /// <para>
-    /// Optional configuration params: 
+    /// Optional configuration params:
     /// <c>TableName</c> -- defaults to <c>OrleansGrainState</c>
     /// <c>DeleteStateOnClear</c> -- defaults to <c>false</c>
     /// </para>
@@ -53,8 +54,18 @@ namespace Orleans.Storage
         private bool isDeleteStateOnClear;
         private static int counter;
         private readonly int id;
-        private const int MAX_DATA_SIZE = 64 * 1024; // 64KB
+
+        // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
+        // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
+        private const int MAX_DATA_CHUNK_SIZE = 64 * 1024;
+        private const int MAX_STRING_PROPERTY_LENGTH = 32 * 1024;
+        private const int MAX_DATA_CHUNKS_COUNT = 15;
+
+        private const string BINARY_DATA_PROPERTY_NAME = "Data";
+        private const string STRING_DATA_PROPERTY_NAME = "StringData";
+
         private const string USE_JSON_FORMAT_PROPERTY = "UseJsonFormat";
+
         private bool useJsonFormat;
         private Newtonsoft.Json.JsonSerializerSettings jsonSettings;
 
@@ -98,11 +109,8 @@ namespace Orleans.Storage
 
             if (config.Properties.ContainsKey(USE_JSON_FORMAT_PROPERTY))
                 useJsonFormat = "true".Equals(config.Properties[USE_JSON_FORMAT_PROPERTY], StringComparison.OrdinalIgnoreCase);
-            
-            if (useJsonFormat)
-            {
-                jsonSettings = OrleansJsonSerializer.SerializerSettings;
-            }
+
+            this.jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);
@@ -159,7 +167,7 @@ namespace Orleans.Storage
             if (Log.IsVerbose3)
                 Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.ETag, tableName);
 
-            var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
+            var entity = new DynamicTableEntity(pk, grainType);
             ConvertToStorageFormat(grainState.State, entity);
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             try
@@ -177,8 +185,8 @@ namespace Orleans.Storage
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
         /// <remarks>
-        /// If the <c>DeleteStateOnClear</c> is set to <c>true</c> then the table row 
-        /// for this grain will be deleted / removed, otherwise the table row will be 
+        /// If the <c>DeleteStateOnClear</c> is set to <c>true</c> then the table row
+        /// for this grain will be deleted / removed, otherwise the table row will be
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IStorageProvider.ClearStateAsync"/>
@@ -188,7 +196,7 @@ namespace Orleans.Storage
 
             string pk = GetKeyString(grainReference);
             if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.ETag, isDeleteStateOnClear, tableName);
-            var entity = new GrainStateEntity { PartitionKey = pk, RowKey = grainType };
+            var entity = new DynamicTableEntity(pk, grainType);
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             string operation = "Clearing";
             try
@@ -223,9 +231,11 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal void ConvertToStorageFormat(object grainState, GrainStateEntity entity)
+        internal void ConvertToStorageFormat(object grainState, DynamicTableEntity entity)
         {
             int dataSize;
+            IEnumerable<EntityProperty> properties;
+            string basePropertyName;
 
             if (useJsonFormat)
             {
@@ -234,9 +244,12 @@ namespace Orleans.Storage
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
-                
-                dataSize = data.Length;
-                entity.StringData = data;
+
+                // each Unicode character takes 2 bytes
+                dataSize = data.Length * 2;
+
+                properties = SplitStringData(data).Select(t => new EntityProperty(t));
+                basePropertyName = STRING_DATA_PROPERTY_NAME;
             }
             else
             {
@@ -246,49 +259,169 @@ namespace Orleans.Storage
 
                 if (Log.IsVerbose3) Log.Verbose3("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
-                
+
                 dataSize = data.Length;
-                entity.Data = data;
+
+                properties = SplitBinaryData(data).Select(t => new EntityProperty(t));
+                basePropertyName = BINARY_DATA_PROPERTY_NAME;
             }
-            if (dataSize > MAX_DATA_SIZE)
+
+            CheckMaxDataSize(dataSize, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
+
+            foreach (var keyValuePair in properties.Zip(GetPropertyNames(basePropertyName),
+                (property, name) => new KeyValuePair<string, EntityProperty>(name, property)))
             {
-                var msg = string.Format("Data too large to write to Azure table. Size={0} MaxSize={1}", dataSize, MAX_DATA_SIZE);
+                entity.Properties.Add(keyValuePair);
+            }
+        }
+
+        private void CheckMaxDataSize(int dataSize, int maxDataSize)
+        {
+            if (dataSize > maxDataSize)
+            {
+                var msg = string.Format("Data too large to write to Azure table. Size={0} MaxSize={1}", dataSize, maxDataSize);
                 Log.Error(0, msg);
                 throw new ArgumentOutOfRangeException("GrainState.Size", msg);
             }
+        }
+
+        private static IEnumerable<string> SplitStringData(string stringData)
+        {
+            var startIndex = 0;
+            while (startIndex < stringData.Length)
+            {
+                var chunkSize = Math.Min(MAX_STRING_PROPERTY_LENGTH, stringData.Length - startIndex);
+
+                yield return stringData.Substring(startIndex, chunkSize);
+
+                startIndex += chunkSize;
+            }
+        }
+
+        private static IEnumerable<byte[]> SplitBinaryData(byte[] binaryData)
+        {
+            var startIndex = 0;
+            while (startIndex < binaryData.Length)
+            {
+                var chunkSize = Math.Min(MAX_DATA_CHUNK_SIZE, binaryData.Length - startIndex);
+
+                var chunk = new byte[chunkSize];
+                Array.Copy(binaryData, startIndex, chunk, 0, chunkSize);
+                yield return chunk;
+
+                startIndex += chunkSize;
+            }
+        }
+
+        private static IEnumerable<string> GetPropertyNames(string basePropertyName)
+        {
+            yield return basePropertyName;
+            for (var i = 1; i < MAX_DATA_CHUNKS_COUNT; ++i)
+            {
+                yield return basePropertyName + i;
+            }
+        }
+
+        private static IEnumerable<byte[]> ReadBinaryDataChunks(DynamicTableEntity entity)
+        {
+            foreach (var binaryDataPropertyName in GetPropertyNames(BINARY_DATA_PROPERTY_NAME))
+            {
+                EntityProperty dataProperty;
+                if (entity.Properties.TryGetValue(binaryDataPropertyName, out dataProperty))
+                {
+                    switch (dataProperty.PropertyType)
+                    {
+                        // if TablePayloadFormat.JsonNoMetadata is used
+                        case EdmType.String:
+                            var stringValue = dataProperty.StringValue;
+                            if (!string.IsNullOrEmpty(stringValue))
+                            {
+                                yield return Convert.FromBase64String(stringValue);
+                            }
+                            break;
+
+                        // if any payload type providing metadata is used
+                        case EdmType.Binary:
+                            var binaryValue = dataProperty.BinaryValue;
+                            if (binaryValue != null && binaryValue.Length > 0)
+                            {
+                                yield return binaryValue;
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+
+        private static byte[] ReadBinaryData(DynamicTableEntity entity)
+        {
+            var dataChunks = ReadBinaryDataChunks(entity).ToArray();
+            var dataSize = dataChunks.Select(d => d.Length).Sum();
+            var result = new byte[dataSize];
+            var startIndex = 0;
+            foreach (var dataChunk in dataChunks)
+            {
+                Array.Copy(dataChunk, 0, result, startIndex, dataChunk.Length);
+                startIndex += dataChunk.Length;
+            }
+            return result;
+        }
+
+        private static IEnumerable<string> ReadStringDataChunks(DynamicTableEntity entity)
+        {
+            foreach (var stringDataPropertyName in GetPropertyNames(STRING_DATA_PROPERTY_NAME))
+            {
+                EntityProperty dataProperty;
+                if (entity.Properties.TryGetValue(stringDataPropertyName, out dataProperty))
+                {
+                    var data = dataProperty.StringValue;
+                    if (!string.IsNullOrEmpty(data))
+                    {
+                        yield return data;
+                    }
+                }
+            }
+        }
+
+        private static string ReadStringData(DynamicTableEntity entity)
+        {
+            return string.Join(string.Empty, ReadStringDataChunks(entity));
         }
 
         /// <summary>
         /// Deserialize from Azure storage format
         /// </summary>
         /// <param name="entity">The Azure table entity the stored data</param>
-        internal object ConvertFromStorageFormat(GrainStateEntity entity)
+        internal object ConvertFromStorageFormat(DynamicTableEntity entity)
         {
+            var binaryData = ReadBinaryData(entity);
+            var stringData = ReadStringData(entity);
+
             object dataValue = null;
             try
             {
-                if (entity.Data != null)
+                if (binaryData.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = SerializationManager.DeserializeFromByteArray<object>(entity.Data);
+                    dataValue = SerializationManager.DeserializeFromByteArray<object>(binaryData);
                 }
-                else if (entity.StringData != null)
+                else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(entity.StringData, jsonSettings);
-                } 
+                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(stringData, jsonSettings);
+                }
 
                 // Else, no data found
             }
             catch (Exception exc)
             {
                 var sb = new StringBuilder();
-                if (entity.Data != null)
+                if (binaryData.Length > 0)
                 {
-                    sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", entity.Data);
+                    sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", binaryData);
                 }
-                else if (entity.StringData != null)
+                else if (!string.IsNullOrEmpty(stringData))
                 {
-                    sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", entity.StringData);
+                    sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", stringData);
                 }
                 if (dataValue != null)
                 {
@@ -308,33 +441,23 @@ namespace Orleans.Storage
             return AzureStorageUtils.SanitizeTableProperty(key);
         }
 
-
-        [Serializable]
-        internal class GrainStateEntity : TableEntity
-        {
-            public byte[] Data { get; set; }
-            public string StringData { get; set; }
-        }
-
-
         internal class GrainStateRecord
         {
             public string ETag { get; set; }
-            public GrainStateEntity Entity { get; set; }
+            public DynamicTableEntity Entity { get; set; }
         }
-        
 
         private class GrainStateTableDataManager
         {
             public string TableName { get; private set; }
-            private readonly AzureTableDataManager<GrainStateEntity> tableManager;
+            private readonly AzureTableDataManager<DynamicTableEntity> tableManager;
             private readonly Logger logger;
 
             public GrainStateTableDataManager(string tableName, string storageConnectionString, Logger logger)
             {
                 this.logger = logger;
                 TableName = tableName;
-                tableManager = new AzureTableDataManager<GrainStateEntity>(tableName, storageConnectionString);
+                tableManager = new AzureTableDataManager<DynamicTableEntity>(tableName, storageConnectionString);
             }
 
             public Task InitTableAsync()
@@ -347,13 +470,13 @@ namespace Orleans.Storage
                 if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_Reading, "Reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
                 try
                 {
-                    Tuple<GrainStateEntity, string> data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey).ConfigureAwait(false);
+                    Tuple<DynamicTableEntity, string> data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey).ConfigureAwait(false);
                     if (data == null || data.Item1 == null)
                     {
                         if (logger.IsVerbose2) logger.Verbose2((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading: PartitionKey={0} RowKey={1} from Table={2}", partitionKey, rowKey, TableName);
                         return null;
                     }
-                    GrainStateEntity stateEntity = data.Item1;
+                    DynamicTableEntity stateEntity = data.Item1;
                     var record = new GrainStateRecord { Entity = stateEntity, ETag = data.Item2 };
                     if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_DataRead, "Read: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", stateEntity.PartitionKey, stateEntity.RowKey, TableName, record.ETag);
                     return record;
@@ -371,17 +494,17 @@ namespace Orleans.Storage
 
             public async Task Write(GrainStateRecord record)
             {
-                GrainStateEntity entity = record.Entity;
+                var entity = record.Entity;
                 if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Writing: PartitionKey={0} RowKey={1} to Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 string eTag = String.IsNullOrEmpty(record.ETag) ?
-                    await tableManager.CreateTableEntryAsync(record.Entity).ConfigureAwait(false) :
+                    await tableManager.CreateTableEntryAsync(entity).ConfigureAwait(false) :
                     await tableManager.UpdateTableEntryAsync(entity, record.ETag).ConfigureAwait(false);
                 record.ETag = eTag;
             }
 
             public async Task Delete(GrainStateRecord record)
             {
-                GrainStateEntity entity = record.Entity;
+                var entity = record.Entity;
                 if (logger.IsVerbose3) logger.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Deleting: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 await tableManager.DeleteTableEntryAsync(entity, record.ETag).ConfigureAwait(false);
                 record.ETag = null;

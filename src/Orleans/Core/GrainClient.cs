@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -12,8 +14,6 @@ using Orleans.Streams;
 
 namespace Orleans
 {
-    using System.Runtime.ExceptionServices;
-
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>

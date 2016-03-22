@@ -189,7 +189,7 @@ namespace Orleans.Streams
             }
 
             // we'll need the class type code.
-            int implTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainClass);
+            int implTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
 
             foreach (string s in namespaces)
             {
