@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.General
 {
@@ -12,14 +13,14 @@ namespace UnitTests.General
     [TestClass]
     public class CodeGeneratorTests_TakeSerializedData : HostedTestClusterEnsureDefaultStarted
     {
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task TakeSerializedDataNotRefOrleans()
         {
             var grain = GrainFactory.GetGrain<ISerializerPresenceTest>(Guid.NewGuid());
             await grain.TakeSerializedData(new Dtos.ClassNotReferencingOrleansTypeDto { MyProperty = "Test" });
         }
 
-        [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task TakeSerializedDataRefOrleans()
         {
             var grain = GrainFactory.GetGrain<ISerializerPresenceTest>(Guid.NewGuid());
