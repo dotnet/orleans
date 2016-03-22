@@ -135,6 +135,7 @@ namespace $safeprojectname$
             }
 
             var config = ClusterConfiguration.LocalhostPrimarySilo();
+            config.AddMemoryStorageProvider();
             siloHost = new SiloHost(siloName, config);
 
             if (deploymentId != null)
