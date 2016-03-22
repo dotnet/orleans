@@ -545,7 +545,7 @@ namespace Orleans.Runtime
             if (maxEnqueuedRequestsLimit != null) return maxEnqueuedRequestsLimit;
             if (GrainInstanceType != null)
             {
-                string limitName = CodeGeneration.GrainInterfaceData.IsStatelessWorker(GrainInstanceType)
+                string limitName = CodeGeneration.GrainInterfaceUtils.IsStatelessWorker(GrainInstanceType)
                     ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER
                     : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
                 maxEnqueuedRequestsLimit = nodeConfiguration.LimitManager.GetLimit(limitName); // Cache for next time

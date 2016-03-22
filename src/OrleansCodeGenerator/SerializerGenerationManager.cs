@@ -10,7 +10,7 @@ namespace Orleans.CodeGenerator
     using Orleans.Runtime;
     using Orleans.Serialization;
 
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
     /// <summary>
     /// The serializer generation manager.
@@ -104,7 +104,7 @@ namespace Orleans.CodeGenerator
             }
 
             if (typeInfo.IsInterface || typeInfo.IsAbstract || t == typeof (object) || t == typeof (void)
-                || GrainInterfaceData.IsTaskType(t)) return false;
+                || GrainInterfaceUtils.IsTaskType(t)) return false;
 
             if (typeInfo.IsConstructedGenericType)
             {

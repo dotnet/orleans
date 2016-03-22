@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using Orleans;
@@ -9,28 +10,34 @@ using Xunit;
 
 namespace UnitTests.CatalogTests
 {
-    public class DuplicateActivationsTestsFixture : BaseClusterFixture
+    public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTests.Fixture>
     {
-        public DuplicateActivationsTestsFixture()
-        : base(new TestingSiloHost(new TestingSiloOptions
-            {
-                AdjustConfig = config =>
-                {
-                    foreach (var nodeConfig in config.Overrides.Values)
-                    {
-                        nodeConfig.MaxActiveThreads = 1;
-                    }
-                },
-            }))
+        private class Fixture : BaseClusterFixture
         {
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartPrimary = true,
+                    StartSecondary = true,
+                    AdjustConfig = config =>
+                    {
+                        config.Globals.ResponseTimeout = TimeSpan.FromSeconds(50);
+                        foreach (var nodeConfig in config.Overrides.Values)
+                        {
+                            nodeConfig.MaxActiveThreads = 1;
+                        }
+                    },
+                },
+                new TestingClientOptions
+                {
+                    AdjustConfig = config => { config.ResponseTimeout = TimeSpan.FromSeconds(50); }
+                });
+            }
         }
-    }
-
-    public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTestsFixture>
-    {
 
         [Fact, TestCategory("Catalog"), TestCategory("Functional")]
-        public void DuplicateActivations()
+        public async Task DuplicateActivations()
         {
             const int nRunnerGrains = 100;
             const int nTargetGRain = 10;
@@ -46,7 +53,7 @@ namespace UnitTests.CatalogTests
                 promises.Add(runnerGrains[i].Initialize());
             }
 
-            Task.WhenAll(promises).Wait();
+            await Task.WhenAll(promises);
             promises.Clear();
 
             for (int i = 0; i < nRunnerGrains; i++)
@@ -54,7 +61,7 @@ namespace UnitTests.CatalogTests
                 promises.Add(runnerGrains[i].BlastCallNewGrains(nTargetGRain, startingKey, nCallsToEach));
             }
 
-            Task.WhenAll(promises).Wait();
+            await Task.WhenAll(promises);
         }
     }
 }

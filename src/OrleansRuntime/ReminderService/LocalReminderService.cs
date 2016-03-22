@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.ReminderService
@@ -18,6 +19,10 @@ namespace Orleans.Runtime.ReminderService
             Stopped,
         }
 
+        private const int InitialReadRetryCountBeforeFastFailForUpdates = 2;
+        private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
+
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders;
         private readonly IConsistentRingProvider ring;
         private readonly IReminderTable reminderTable;
@@ -27,6 +32,8 @@ namespace Orleans.Runtime.ReminderService
         private long localTableSequence;
         private GrainTimer listRefresher; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly TaskCompletionSource<bool> startedTask;
+        private readonly CancellationTokenSource stoppedCancellationTokenSource;
+        private uint initialReadCallCount = 0;
 
         private readonly AverageTimeSpanStatistic tardinessStat;
         private readonly CounterStatistic ticksDeliveredStat;
@@ -59,6 +66,7 @@ namespace Orleans.Runtime.ReminderService
             IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
             ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
             startedTask = new TaskCompletionSource<bool>();
+            stoppedCancellationTokenSource = new CancellationTokenSource();
         }
 
         #region Public methods
@@ -72,26 +80,16 @@ namespace Orleans.Runtime.ReminderService
             myRange = ring.GetMyRange();
             logger.Info(ErrorCode.RS_ServiceStarting, "Starting reminder system target on: {0} x{1,8:X8}, with range {2}", Silo, Silo.GetConsistentHashCode(), myRange);
 
+            // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
             await reminderTable.Init(config,logger).WithTimeout(initTimeout);
-            await ReadAndUpdateReminders();
-            logger.Info(ErrorCode.RS_ServiceStarted, "Reminder system target started OK on: {0} x{1,8:X8}, with range {2}", Silo, Silo.GetConsistentHashCode(), myRange);
 
-            status = ReminderServiceStatus.Started;
-            startedTask.TrySetResult(true);
-            var random = new SafeRandom();
-            var dueTime = random.NextTimeSpan(Constants.RefreshReminderList);
-            listRefresher = GrainTimer.FromTaskCallback(
-                    _ => ReadAndUpdateReminders(),
-                    null,
-                    dueTime,
-                    Constants.RefreshReminderList,
-                    name: "ReminderService.ReminderListRefresher");
-            listRefresher.Start();
-            ring.SubscribeToRangeChangeEvents(this);
+            StartInBackground().Ignore();
         }
 
         public Task Stop()
         {
+            stoppedCancellationTokenSource.Cancel();
+
             logger.Info(ErrorCode.RS_ServiceStopping, "Stopping reminder system target");
             status = ReminderServiceStatus.Stopped;
 
@@ -202,6 +200,8 @@ namespace Orleans.Runtime.ReminderService
         /// </summary>
         private async Task ReadAndUpdateReminders()
         {
+            if (stoppedCancellationTokenSource.IsCancellationRequested) return;
+
             // try to retrieve reminder from all my subranges
             myRange = ring.GetMyRange();
             if (logger.IsVerbose2) logger.Verbose2("My range= {0}", myRange);
@@ -242,6 +242,74 @@ namespace Orleans.Runtime.ReminderService
 
         #region Internal implementation methods
 
+        private async Task StartInBackground()
+        {
+            await DoInitialReadAndUpdateReminders();
+            if (status == ReminderServiceStatus.Booting)
+            {
+                var random = new SafeRandom();
+                listRefresher = GrainTimer.FromTaskCallback(
+                    _ => DoInitialReadAndUpdateReminders(),
+                    null,
+                    random.NextTimeSpan(InitialReadRetryPeriod),
+                    InitialReadRetryPeriod,
+                    name: "ReminderService.ReminderListInitialRead");
+                listRefresher.Start();
+            }
+        }
+
+        private void PromoteToStarted()
+        {
+            if (stoppedCancellationTokenSource.IsCancellationRequested) return;
+
+            logger.Info(ErrorCode.RS_ServiceStarted, "Reminder system target started OK on: {0} x{1,8:X8}, with range {2}", this.Silo, this.Silo.GetConsistentHashCode(), this.myRange);
+
+            status = ReminderServiceStatus.Started;
+            startedTask.TrySetResult(true);
+            var random = new SafeRandom();
+            var dueTime = random.NextTimeSpan(Constants.RefreshReminderList);
+            if (listRefresher != null) listRefresher.Dispose();
+            listRefresher = GrainTimer.FromTaskCallback(
+                _ => ReadAndUpdateReminders(),
+                null,
+                dueTime,
+                Constants.RefreshReminderList,
+                name: "ReminderService.ReminderListRefresher");
+            listRefresher.Start();
+            ring.SubscribeToRangeChangeEvents(this);
+        }
+
+        private async Task DoInitialReadAndUpdateReminders()
+        {
+            try
+            {
+                if (stoppedCancellationTokenSource.IsCancellationRequested) return;
+
+                initialReadCallCount++;
+                await this.ReadAndUpdateReminders();
+                PromoteToStarted();
+            }
+            catch (Exception ex)
+            {
+                if (stoppedCancellationTokenSource.IsCancellationRequested) return;
+
+                if (initialReadCallCount <= InitialReadRetryCountBeforeFastFailForUpdates)
+                {
+                    logger.Warn(
+                        ErrorCode.RS_ServiceInitialLoadFailing,
+                        string.Format("ReminderService failed initial load of reminders and will retry. Attempt #{0}", this.initialReadCallCount),
+                        ex);
+                }
+                else
+                {
+                    const string baseErrorMsg = "ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.";
+                    var logErrorMessage = string.Format(baseErrorMsg + " Attempt #{0}", this.initialReadCallCount);
+                    logger.Error(ErrorCode.RS_ServiceInitialLoadFailed, logErrorMessage, ex);
+                    startedTask.TrySetException(new OrleansException(baseErrorMsg, ex));
+                }
+            }
+        }
+
         private async Task ReadTableAndStartTimers(IRingRange range)
         {
             if (logger.IsVerbose) logger.Verbose("Reading rows from {0}", range.ToString());
@@ -252,6 +320,8 @@ namespace Orleans.Runtime.ReminderService
             {
                 var srange = (SingleRange)range;
                 ReminderTableData table = await reminderTable.ReadRows(srange.Begin, srange.End); // get all reminders, even the ones we already have
+
+                if (stoppedCancellationTokenSource.IsCancellationRequested) return;
 
                 // if null is a valid value, it means that there's nothing to do.
                 if (null == table && reminderTable is MockReminderTable) return;
@@ -399,8 +469,37 @@ namespace Orleans.Runtime.ReminderService
 
         private async Task DoResponsibilitySanityCheck(GrainReference grainRef, string debugInfo)
         {
-            if (status != ReminderServiceStatus.Started)
-                await startedTask.Task;
+            switch (status)
+            {
+                case ReminderServiceStatus.Booting:
+                    // if service didn't finish the initial load, it could still be loading normally or it might have already 
+                    // failed a few attempts and callers should not be hold waiting for it to complete
+                    var task = this.startedTask.Task;
+                    if (task.IsCompleted)
+                    {
+                        // task at this point is already Faulted
+                        await task;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            // wait for the initial load task to complete (with a timeout)
+                            await task.WithTimeout(InitialReadMaxWaitTimeForUpdates);
+                        }
+                        catch (TimeoutException ex)
+                        {
+                            throw new OrleansException("Reminder Service is still initializing and it is taking a long time. Please retry again later.", ex);
+                        }
+                    }
+                    break;
+                case ReminderServiceStatus.Started:
+                    break;
+                case ReminderServiceStatus.Stopped:
+                    throw new OperationCanceledException("ReminderService has been stopped.");
+                default:
+                    throw new InvalidOperationException("status");
+            }
 
             if (!myRange.InRange(grainRef))
             {

@@ -7,7 +7,6 @@ using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans.Runtime;
 
-
 namespace Orleans.AzureUtils
 {
     /// <summary>

@@ -29,6 +29,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <RunCodeAnalysis>true</RunCodeAnalysis>
+    <DeployExtension>False</DeployExtension>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
@@ -253,6 +254,10 @@
     </Content>
     <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg">
       <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\..\Binaries\NuGet.Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <None Include="OrleansVSTools.snk" />

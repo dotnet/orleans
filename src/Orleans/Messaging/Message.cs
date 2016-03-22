@@ -23,8 +23,8 @@ namespace Orleans.Runtime
             DIRECTION,
             EXPIRATION,
             FORWARD_COUNT,
-            INTERFACE_ID,
-            METHOD_ID,
+            INTERFACE_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
+            METHOD_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
             NEW_GRAIN_TYPE,
             GENERIC_GRAIN_TYPE,
             RESULT,
@@ -341,18 +341,6 @@ namespace Orleans.Runtime
             return ForwardCount < config.MaxForwardCount;
         }
 
-        public int MethodId
-        {
-            get { return GetScalarHeader<int>(Header.METHOD_ID); }
-            set { SetHeader(Header.METHOD_ID, value); }
-        }
-
-        public int InterfaceId
-        {
-            get { return GetScalarHeader<int>(Header.INTERFACE_ID); }
-            set { SetHeader(Header.INTERFACE_ID, value); }
-        }
-
         /// <summary>
         /// Set by sender's placement logic when NewPlacementRequested is true
         /// so that receiver knows desired grain type
@@ -442,7 +430,10 @@ namespace Orleans.Runtime
 
         public Message()
         {
-            headers = new Dictionary<Header, object>();
+            // average headers items count is 14 items, and while the Header enum contains 18 entries
+            // the closest prime number is 17; assuming that possibility of all 18 headers being at the same time is low enough to
+            // choose 17 in order to avoid allocations of two additional items on each call, and allocate 37 instead of 19 in rare cases
+            headers = new Dictionary<Header, object>(17);
             metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
@@ -463,8 +454,6 @@ namespace Orleans.Runtime
                 (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request)
             {
                 Id = CorrelationId.GetNext(),
-                InterfaceId = request.InterfaceId,
-                MethodId = request.MethodId,
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 BodyObject = request
@@ -674,25 +663,13 @@ namespace Orleans.Runtime
 
         #region Serialization
 
-        internal List<ArraySegment<byte>> Serialize()
-        {
-            int dummy1;
-            int dummy2;
-            return Serialize_Impl(false, out dummy1, out dummy2);
-        }
-
         public List<ArraySegment<byte>> Serialize(out int headerLength)
         {
             int dummy;
-            return Serialize_Impl(false, out headerLength, out dummy);
+            return Serialize_Impl(out headerLength, out dummy);
         }
 
-        public List<ArraySegment<byte>> SerializeForBatching(out int headerLength, out int bodyLength)
-        {
-            return Serialize_Impl(true, out headerLength, out bodyLength);
-        }
-
-        private List<ArraySegment<byte>> Serialize_Impl(bool batching, out int headerLengthOut, out int bodyLengthOut)
+        private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
         {
             var headerStream = new BinaryTokenStreamWriter();
             lock (headers) // Guard against any attempts to modify message headers while we are serializing them
@@ -720,11 +697,9 @@ namespace Orleans.Runtime
             int bodyLength = bodyBytes.Sum(ab => ab.Count);
 
             var bytes = new List<ArraySegment<byte>>();
-            if (!batching)
-            {
-                bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
-                bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
-            }
+            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
+            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
+           
             bytes.AddRange(headerBytes);
             bytes.AddRange(bodyBytes);
 

@@ -113,6 +113,9 @@ namespace Orleans.Runtime
         private Dictionary<int, int> recentLogMessageCounts = new Dictionary<int, int>();
         private DateTime lastBulkLogMessageFlush = DateTime.MinValue;
 
+        private TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
+        private DateTime lastFlush = DateTime.UtcNow;
+
         /// <summary>List of log codes that won't have bulk message compaction policy applied to them</summary>
         private static readonly int[] excludedBulkLogCodes = {
             0,
@@ -803,6 +806,12 @@ namespace Orleans.Runtime
 
                 TrackTrace(formatedTraceMessage);
             }
+
+            if ((DateTime.UtcNow - lastFlush) > flushInterval)
+            {
+                lastFlush = DateTime.UtcNow;
+                Flush();
+            }
         }
 
         /// <summary>
@@ -977,6 +986,15 @@ namespace Orleans.Runtime
                     }
                     catch (Exception) { }
                 }
+
+                foreach (var consumer in TelemetryConsumers)
+                {
+                    try
+                    {
+                        consumer.Flush();
+                    }
+                    catch (Exception) { }
+                }
             }
             catch (Exception) { }
         }
@@ -988,6 +1006,15 @@ namespace Orleans.Runtime
             try
             {
                 foreach (ICloseableLogConsumer consumer in LogConsumers.OfType<ICloseableLogConsumer>())
+                {
+                    try
+                    {
+                        consumer.Close();
+                    }
+                    catch (Exception) { }
+                }
+
+                foreach (var consumer in TelemetryConsumers)
                 {
                     try
                     {

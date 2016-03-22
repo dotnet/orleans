@@ -1,70 +1,59 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Orleans.CodeGeneration;
+
 namespace Orleans
 {
-    using System;
-    using System.Collections.Concurrent;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Reflection;
-
-    using Orleans.CodeGeneration;
-
     internal class InvocationMethodInfoMap
     {
-        private readonly ConcurrentDictionary<Type, ConcurrentDictionary<int, IReadOnlyDictionary<int, MethodInfo>>> implementations =
-            new ConcurrentDictionary<Type, ConcurrentDictionary<int, IReadOnlyDictionary<int, MethodInfo>>>();
-
         /// <summary>
-        /// Returns the <see cref="MethodInfo"/> for the specified implementation and invocation request.
+        /// The map from implementation types to interface ids to invoker.
         /// </summary>
-        /// <param name="implementationType">The type of the implementation.</param>
-        /// <param name="request">The invocation request.</param>
-        /// <returns>The <see cref="MethodInfo"/> for the specified implementation and invocation request.</returns>
-        public MethodInfo GetMethodInfo(Type implementationType, InvokeMethodRequest request)
+        private readonly ConcurrentDictionary<Type, ConcurrentDictionary<int, InterceptedMethodInvoker>> invokers =
+            new ConcurrentDictionary<Type, ConcurrentDictionary<int, InterceptedMethodInvoker>>();
+
+        public InterceptedMethodInvoker GetInterceptedMethodInvoker(Type implementationType, int interfaceId, IGrainMethodInvoker invoker)
         {
-            var implementation = this.implementations.GetOrAdd(
+            var implementation = invokers.GetOrAdd(
                 implementationType,
-                _ => new ConcurrentDictionary<int, IReadOnlyDictionary<int, MethodInfo>>());
+                _ => new ConcurrentDictionary<int, InterceptedMethodInvoker>());
 
-            IReadOnlyDictionary<int, MethodInfo> interfaceMap;
-            if (!implementation.TryGetValue(request.InterfaceId, out interfaceMap))
+            InterceptedMethodInvoker interceptedMethodInvoker;
+            if (implementation.TryGetValue(interfaceId, out interceptedMethodInvoker))
             {
-                // Get the interface mapping for the current implementation.
-                var interfaces = GrainInterfaceData.GetRemoteInterfaces(implementationType);
-                Type interfaceType;
-                if (!interfaces.TryGetValue(request.InterfaceId, out interfaceType))
-                {
-                    // The specified type does not implement the provided interface.
-                    return null;
-                }
-
-                // Create a mapping between the interface and the implementation.
-                interfaceMap = implementation.GetOrAdd(
-                    request.InterfaceId,
-                    _ => MapInterfaceToImplementation(interfaceType, implementationType));
+                return interceptedMethodInvoker;
             }
 
-            // Attempt to retrieve the implementation's MethodInfo.
-            MethodInfo result;
-            interfaceMap.TryGetValue(request.MethodId, out result);
-            return result;
+            // Create a mapping between the interface and the implementation.
+            return implementation.GetOrAdd(
+                interfaceId,
+                _ =>
+                    new InterceptedMethodInvoker(invoker,
+                        GetInterfaceToImplementationMap(interfaceId, implementationType)));
         }
 
         /// <summary>
-        /// Maps the provided <paramref name="interfaceType"/> to the provided <paramref name="implementationType"/>.
+        /// Maps the provided <paramref name="interfaceId"/> to the provided <paramref name="implementationType"/>.
         /// </summary>
         /// <param name="interfaceType">The interface type.</param>
         /// <param name="implementationType">The implementation type.</param>
         /// <returns>The mapped interface.</returns>
-        private static IReadOnlyDictionary<int, MethodInfo> MapInterfaceToImplementation(
-            Type interfaceType,
+        private static IReadOnlyDictionary<int, MethodInfo> GetInterfaceToImplementationMap(
+            int interfaceId,
             Type implementationType)
         {
+            // Get the interface mapping for the current implementation.
+            var interfaceTypes = GrainInterfaceUtils.GetRemoteInterfaces(implementationType);
+            var interfaceType = interfaceTypes[interfaceId];
             var interfaceMapping = implementationType.GetInterfaceMap(interfaceType);
 
             // Map the interface methods to implementation methods.
-            var interfaceMethods = GrainInterfaceData.GetMethods(interfaceType);
+            var interfaceMethods = GrainInterfaceUtils.GetMethods(interfaceType);
             return interfaceMethods.ToDictionary(
-                GrainInterfaceData.ComputeMethodId,
+                GrainInterfaceUtils.ComputeMethodId,
                 interfaceMethod => GetImplementingMethod(interfaceMethod, interfaceMapping));
         }
 

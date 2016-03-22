@@ -1,7 +1,5 @@
 using System;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.ExceptionServices;
+using Orleans;
 using Orleans.TestingHost;
 using Tester;
 using Xunit;
@@ -33,6 +31,7 @@ namespace UnitTests.Tester
 
         public HostedTestClusterPerTest()
         {
+            GrainClient.Uninitialize();
             this.HostedCluster = this.CreateSiloHost();
         }
 

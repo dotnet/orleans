@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
@@ -8,14 +9,16 @@ namespace Orleans.Serialization
 {
     internal class OrleansJsonSerializer : IExternalSerializer
     {
-        private static JsonSerializerSettings settings;
+        private static JsonSerializerSettings defaultSettings;
         private TraceLogger logger;
 
-        internal static JsonSerializerSettings SerializerSettings { get { return settings; } }
-
-        static OrleansJsonSerializer()
+        /// <summary>
+        /// Returns a configured <see cref="JsonSerializerSettings"/> 
+        /// </summary>
+        /// <returns></returns>
+        internal static JsonSerializerSettings GetDefaultSerializerSettings()
         {
-            settings = new JsonSerializerSettings
+            var settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.All,
                 PreserveReferencesHandling = PreserveReferencesHandling.Objects,
@@ -23,7 +26,9 @@ namespace Orleans.Serialization
                 DefaultValueHandling = DefaultValueHandling.Ignore,
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
-                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+                Formatting = Formatting.None
             };
 
             settings.Converters.Add(new IPAddressConverter());
@@ -31,8 +36,15 @@ namespace Orleans.Serialization
             settings.Converters.Add(new GrainIdConverter());
             settings.Converters.Add(new SiloAddressConverter());
             settings.Converters.Add(new UniqueKeyConverter());
+
+            return settings;
         }
-        
+
+        static OrleansJsonSerializer()
+        {
+            defaultSettings = GetDefaultSerializerSettings();
+        }
+
         /// <summary>
         /// Initializes the serializer
         /// </summary>
@@ -84,7 +96,7 @@ namespace Orleans.Serialization
             }
 
             var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, settings);
+            return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
         }
 
         /// <summary>
@@ -106,14 +118,14 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var str = JsonConvert.SerializeObject(item, expectedType, settings);
+            var str = JsonConvert.SerializeObject(item, expectedType, defaultSettings);
             writer.Write(str);
         }
     }
 
     #region JsonConverters
 
-    class IPAddressConverter : JsonConverter
+    internal class IPAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -133,7 +145,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class GrainIdConverter : JsonConverter
+    internal class GrainIdConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -157,7 +169,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class SiloAddressConverter : JsonConverter
+    internal class SiloAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -181,7 +193,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class UniqueKeyConverter : JsonConverter
+    internal class UniqueKeyConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -204,8 +216,8 @@ namespace Orleans.Serialization
             return addr;
         }
     }
- 
-    class IPEndPointConverter : JsonConverter
+
+    internal class IPEndPointConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {

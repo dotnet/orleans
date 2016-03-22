@@ -34,11 +34,8 @@ namespace UnitTests
         }
 
         public DeployTest()
-        {        
-            //if (!RunningAsAdmin())
-            //{
-            //    Assert.Inconclusive("Cannot Run Test: The Orleans deployment PowerShell scripts require Visual Studio to be run with elevated privileges.");
-            //}
+        {     
+            //Skip.IfNot(RunningAsAdmin(), "Cannot Run Test: The Orleans deployment PowerShell scripts require Visual Studio to be run with elevated privileges.");
 
             // If the test does have elevated permission, make sure that it can run PowerShell scripts.
             Collection<PSObject> results = RunPowerShellCommand("Get-ExecutionPolicy");
@@ -51,7 +48,7 @@ namespace UnitTests
                 }
                 else
                 {
-                    Assert.Inconclusive("Cannot Run Test: The Orleans deployment PowerShell scripts require ExecutionPolicy be set to RemoteSigned.");
+                    throw new SkipException("Cannot Run Test: The Orleans deployment PowerShell scripts require ExecutionPolicy be set to RemoteSigned.");
                 }
             }
 
@@ -274,10 +271,7 @@ namespace UnitTests
                 // Pause to let Orleans get started up.
                 System.Threading.Thread.Sleep(9000);
                 orleansHostTestProcess = Process.GetProcessesByName("OrleansHost");
-                if (orleansHostTestProcess.Count() < 1)
-                {
-                    Assert.Inconclusive("Cannot Run Test: Could not start an OrleansHost necessary to test the StopOrleans.ps1 script.");
-                }
+                Skip.If(orleansHostTestProcess.Count() < 1, "Cannot Run Test: Could not start an OrleansHost necessary to test the StopOrleans.ps1 script.");
             }
 
             // Test script when Orleans Host is not running.
@@ -484,7 +478,7 @@ namespace UnitTests
             string pathValue = string.Empty;
             if (!File.Exists(Path.Combine(Directory.GetCurrentDirectory(), configFile)))
             {
-                Assert.Inconclusive("Cannot Run Test: Could not find configuration file {0}", configFile);
+                throw new SkipException("Cannot Run Test: Could not find configuration file " + configFile);
             }
             XDocument configDoc = XDocument.Load(configFile);
             Assert.IsNotNull(configDoc, string.Format("Could not load test configuration file: {0}", configFile));

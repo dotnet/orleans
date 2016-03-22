@@ -91,5 +91,8 @@ namespace Orleans.TelemetryConsumers.NewRelic
                 }); 
             }
         }
+
+        public void Flush() { }
+        public void Close() { }
     }
 }

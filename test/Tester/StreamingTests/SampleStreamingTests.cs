@@ -15,17 +15,16 @@ namespace UnitTests.StreamingTests
 {
     public class SampleStreamingTestsFixture : BaseClusterFixture
     {
-        public SampleStreamingTestsFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                },
-                new TestingClientOptions()
-                {
-                    ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-                }))
+        protected override TestingSiloHost CreateClusterHost()
         {
+            return new TestingSiloHost(new TestingSiloOptions
+            {
+                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+            },
+            new TestingClientOptions()
+            {
+                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
+            });
         }
     }
 
@@ -97,8 +96,9 @@ namespace UnitTests.StreamingTests
 
         public override void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, fixture.HostedCluster.DeploymentId, StorageTestConstants.DataConnectionString, logger).Wait();
+            var deploymentId = HostedCluster.DeploymentId;
             fixture.Dispose();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, StorageTestConstants.DataConnectionString).Wait();
         }
 
         [Fact, TestCategory("Functional")]

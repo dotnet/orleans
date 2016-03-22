@@ -20,20 +20,22 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class ControllableStreamGeneratorProviderTestsFixture : BaseClusterFixture
+    public class ControllableStreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamGeneratorProviderTests.Fixture>
     {
-        public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-        public static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
-        public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
-
-        public readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
+        private class Fixture : BaseClusterFixture
         {
-            TotalQueueCount = 4,
-        };
+            public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
+            public static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
+            public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-        public ControllableStreamGeneratorProviderTestsFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
+            public readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
+            {
+                TotalQueueCount = 4,
+            };
+
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(new TestingSiloOptions
                 {
                     StartFreshOrleans = true,
                     SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
@@ -57,18 +59,8 @@ namespace UnitTests.StreamingTests
                         config.GetOrCreateNodeConfigurationForSilo("Primary");
                         config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
                     }
-                }))
-        {
-        }
-    }
-
-    public class ControllableStreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamGeneratorProviderTestsFixture>
-    {
-        private readonly TestingSiloHost HostedCluster;
-
-        public ControllableStreamGeneratorProviderTests(ControllableStreamGeneratorProviderTestsFixture fixture)
-        {
-            HostedCluster = fixture.HostedCluster;
+                });
+            }
         }
 
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
@@ -94,12 +86,12 @@ namespace UnitTests.StreamingTests
             {
                 var generatorConfig = new SimpleGeneratorConfig
                 {
-                    StreamNamespace = ControllableStreamGeneratorProviderTestsFixture.StreamNamespace,
+                    StreamNamespace = Fixture.StreamNamespace,
                     EventsInStream = 100
                 };
 
                 var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
-                object[] results = await mgmt.SendControlCommandToProvider(ControllableStreamGeneratorProviderTestsFixture.StreamProviderTypeName, ControllableStreamGeneratorProviderTestsFixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+                object[] results = await mgmt.SendControlCommandToProvider(Fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
                 Assert.AreEqual(2, results.Length, "expected responses");
                 bool[] bResults = results.Cast<bool>().ToArray();
                 foreach (var result in bResults)
@@ -124,13 +116,13 @@ namespace UnitTests.StreamingTests
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.AreEqual(ControllableStreamGeneratorProviderTestsFixture.AdapterConfig.TotalQueueCount, report.Count, "Stream count");
+                Assert.AreEqual(Fixture.AdapterConfig.TotalQueueCount, report.Count, "Stream count");
                 foreach (int eventsPerStream in report.Values)
                 {
                     Assert.AreEqual(generatorConfig.EventsInStream, eventsPerStream, "Events per stream");
                 }
             }
-            else if (ControllableStreamGeneratorProviderTestsFixture.AdapterConfig.TotalQueueCount != report.Count ||
+            else if (Fixture.AdapterConfig.TotalQueueCount != report.Count ||
                      report.Values.Any(count => count != generatorConfig.EventsInStream))
             {
                 return false;

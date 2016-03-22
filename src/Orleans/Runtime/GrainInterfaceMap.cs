@@ -22,6 +22,48 @@ namespace Orleans.Runtime
     [Serializable]
     internal class GrainInterfaceMap : IGrainTypeResolver
     {
+        /// <summary>
+        /// Metadata for a grain interface
+        /// </summary>
+        [Serializable]
+        internal class GrainInterfaceData
+        {
+            [NonSerialized]
+            private readonly Type iface;
+            private readonly HashSet<GrainClassData> implementations;
+
+            internal Type Interface { get { return iface; } }
+            internal int InterfaceId { get; private set; }
+            internal string GrainInterface { get; private set; }
+            internal GrainClassData[] Implementations { get { return implementations.ToArray(); } }
+            internal GrainClassData PrimaryImplementation { get; private set; }
+
+            internal GrainInterfaceData(int interfaceId, Type iface, string grainInterface)
+            {
+                InterfaceId = interfaceId;
+                this.iface = iface;
+                GrainInterface = grainInterface;
+                implementations = new HashSet<GrainClassData>();
+            }
+
+            internal void AddImplementation(GrainClassData implementation, bool primaryImplemenation = false)
+            {
+                lock (this)
+                {
+                    if (!implementations.Contains(implementation))
+                        implementations.Add(implementation);
+
+                    if (primaryImplemenation)
+                        PrimaryImplementation = implementation;
+                }
+            }
+
+            public override string ToString()
+            {
+                return String.Format("{0}:{1}", GrainInterface, InterfaceId);
+            }
+        }
+
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
         private readonly Dictionary<int, GrainInterfaceData> table;
         private readonly HashSet<int> unordered;
@@ -306,55 +348,13 @@ namespace Orleans.Runtime
     }
 
     /// <summary>
-    /// Metadata for a grain interface
-    /// </summary>
-    [Serializable]
-    internal class GrainInterfaceData
-    {
-        [NonSerialized]
-        private readonly Type iface;
-        private readonly HashSet<GrainClassData> implementations;
-        
-        internal Type Interface { get { return iface; } }
-        internal int InterfaceId { get; private set; }
-        internal string GrainInterface { get; private set; }
-        internal GrainClassData[] Implementations { get { return implementations.ToArray(); } }
-        internal GrainClassData PrimaryImplementation { get; private set; }   
-
-        internal GrainInterfaceData(int interfaceId, Type iface, string grainInterface)
-        {
-            InterfaceId = interfaceId;
-            this.iface = iface;
-            GrainInterface = grainInterface;
-            implementations = new HashSet<GrainClassData>();
-        }
-
-        internal void AddImplementation(GrainClassData implementation, bool primaryImplemenation = false)
-        {
-            lock (this)
-            {
-                if (!implementations.Contains(implementation))
-                    implementations.Add(implementation);
-
-                if (primaryImplemenation)
-                    PrimaryImplementation = implementation;
-            }
-        }
-
-        public override string ToString()
-        {
-            return String.Format("{0}:{1}", GrainInterface, InterfaceId);
-        }
-    }
-
-    /// <summary>
     /// Metadata for a grain class
     /// </summary>
     [Serializable]
     internal sealed class GrainClassData
     {
         [NonSerialized]
-        private readonly GrainInterfaceData interfaceData;
+        private readonly GrainInterfaceMap.GrainInterfaceData interfaceData;
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;
         
@@ -365,11 +365,11 @@ namespace Orleans.Runtime
         internal int GrainTypeCode { get; private set; }
         internal string GrainClass { get; private set; }
         internal PlacementStrategy PlacementStrategy { get { return placementStrategy; } }
-        internal GrainInterfaceData InterfaceData { get { return interfaceData; } }
+        internal GrainInterfaceMap.GrainInterfaceData InterfaceData { get { return interfaceData; } }
         internal bool IsGeneric { get { return isGeneric; } }
         public MultiClusterRegistrationStrategy RegistrationStrategy { get { return registrationStrategy; } }
 
-        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, GrainInterfaceData interfaceData, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy)
+        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, GrainInterfaceMap.GrainInterfaceData interfaceData, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy)
         {
             GrainTypeCode = grainTypeCode;
             GrainClass = grainClass;

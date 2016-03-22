@@ -16,7 +16,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
 
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -150,36 +150,6 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Get types which have corresponding generated classes marked with the provided marker attributes.
-        /// </summary>
-        /// <returns>Types which have corresponding generated classes marked with any of the provided marker attributes.</returns>
-        internal static HashSet<Type> GetTypesWithImplementations(params Type[] markerAttributes)
-        {
-            // Get assemblies which contain generated code.
-            var all =
-                AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(_ => _.GetCustomAttribute<GeneratedCodeAttribute>() != null)
-                    .SelectMany(_ => _.DefinedTypes);
-
-            // Get all generated types in each assembly.
-            var attributes = all.SelectMany(_ => _.GetCustomAttributes()).OfType<GeneratedAttribute>();
-            var results = new HashSet<Type>();
-            foreach (var attribute in attributes)
-            {
-                if (attribute.GrainType != null)
-                {
-                    results.Add(attribute.GrainType);
-                }
-                else if (!string.IsNullOrWhiteSpace(attribute.ForGrainType))
-                {
-                    results.Add(Type.GetType(attribute.ForGrainType));
-                }
-            }
-
-            return results;
-        }
-
-        /// <summary>
         /// Generates switch cases for the provided grain type.
         /// </summary>
         /// <param name="grainType">
@@ -199,8 +169,8 @@ namespace Orleans.CodeGenerator
             ExpressionSyntax methodIdArgument,
             Func<MethodInfo, StatementSyntax[]> generateMethodHandler)
         {
-            var interfaces = GrainInterfaceData.GetRemoteInterfaces(grainType);
-            interfaces[GrainInterfaceData.GetGrainInterfaceId(grainType)] = grainType;
+            var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(grainType);
+            interfaces[GrainInterfaceUtils.GetGrainInterfaceId(grainType)] = grainType;
 
             // Switch on interface id.
             var interfaceCases = new List<SwitchSectionSyntax>();
@@ -208,7 +178,7 @@ namespace Orleans.CodeGenerator
             {
                 var interfaceType = @interface.Value;
                 var interfaceId = @interface.Key;
-                var methods = GrainInterfaceData.GetMethods(interfaceType);
+                var methods = GrainInterfaceUtils.GetMethods(interfaceType);
 
                 var methodCases = new List<SwitchSectionSyntax>();
 
@@ -216,7 +186,7 @@ namespace Orleans.CodeGenerator
                 foreach (var method in methods)
                 {
                     // Generate switch case.
-                    var methodId = GrainInterfaceData.ComputeMethodId(method);
+                    var methodId = GrainInterfaceUtils.ComputeMethodId(method);
                     var methodType = method;
 
                     // Generate the switch label for this interface id.
