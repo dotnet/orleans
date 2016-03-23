@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
-
+using System.Threading;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 
@@ -20,54 +21,63 @@ namespace Orleans.Serialization
             return typeInfo.IsPrimitive || typeInfo.IsEnum || t == typeof(string) || t == typeof(DateTime) || t == typeof(Decimal) || (typeInfo.IsArray && typeInfo.GetElementType().IsOrleansPrimitive());
         }
 
-        static readonly Dictionary<RuntimeTypeHandle, bool> shallowCopyableValueTypes = new Dictionary<RuntimeTypeHandle, bool>();
-        static readonly Dictionary<RuntimeTypeHandle, string> typeNameCache = new Dictionary<RuntimeTypeHandle, string>();
-        static readonly Dictionary<RuntimeTypeHandle, string> typeKeyStringCache = new Dictionary<RuntimeTypeHandle, string>();
-        static readonly Dictionary<RuntimeTypeHandle, byte[]> typeKeyCache = new Dictionary<RuntimeTypeHandle, byte[]>();
+        static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>();
+        static readonly ConcurrentDictionary<Type, string> typeNameCache = new ConcurrentDictionary<Type, string>();
+        static readonly ConcurrentDictionary<Type, string> typeKeyStringCache = new ConcurrentDictionary<Type, string>();
+        static readonly ConcurrentDictionary<Type, byte[]> typeKeyCache = new ConcurrentDictionary<Type, byte[]>();
 
         static TypeUtilities()
         {
-            shallowCopyableValueTypes[typeof(Decimal).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(DateTime).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(TimeSpan).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(IPAddress).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(IPEndPoint).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(SiloAddress).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(GrainId).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(ActivationId).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(ActivationAddress).TypeHandle] = true;
-            shallowCopyableValueTypes[typeof(CorrelationId).TypeHandle] = true;
+            shallowCopyableTypes[typeof(Decimal)] = true;
+            shallowCopyableTypes[typeof(DateTime)] = true;
+            shallowCopyableTypes[typeof(TimeSpan)] = true;
+            shallowCopyableTypes[typeof(IPAddress)] = true;
+            shallowCopyableTypes[typeof(IPEndPoint)] = true;
+            shallowCopyableTypes[typeof(SiloAddress)] = true;
+            shallowCopyableTypes[typeof(GrainId)] = true;
+            shallowCopyableTypes[typeof(ActivationId)] = true;
+            shallowCopyableTypes[typeof(ActivationAddress)] = true;
+            shallowCopyableTypes[typeof(CorrelationId)] = true;
+            shallowCopyableTypes[typeof(string)] = true;
+            shallowCopyableTypes[typeof(Immutable<>)] = true;
+            shallowCopyableTypes[typeof(CancellationToken)] = true;
         }
 
         internal static bool IsOrleansShallowCopyable(this Type t)
         {
-            var typeInfo = t.GetTypeInfo();
-            if (typeInfo.IsPrimitive || typeInfo.IsEnum || t == typeof (string) || t == typeof (DateTime) || t == typeof (Decimal) ||
-                t == typeof (Immutable<>))
-                return true;
-
-            if (typeInfo.GetCustomAttributes(typeof (ImmutableAttribute), false).Length > 0) 
-                return true;  
-
-            if (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == typeof (Immutable<>))
-                return true;
-
-            if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
+            bool result;
+            if (shallowCopyableTypes.TryGetValue(t, out result))
             {
-                bool result;
-                lock (shallowCopyableValueTypes)
-                {
-                    if (shallowCopyableValueTypes.TryGetValue(typeInfo.TypeHandle, out result))
-                        return result;
-                }
-                result = typeInfo.GetFields().All(f => !(f.FieldType == t) && f.FieldType.IsOrleansShallowCopyable());
-                lock (shallowCopyableValueTypes)
-                {
-                    shallowCopyableValueTypes[t.TypeHandle] = result;
-                }
                 return result;
             }
 
+            var typeInfo = t.GetTypeInfo();
+            if (typeInfo.IsPrimitive || typeInfo.IsEnum)
+            {
+                shallowCopyableTypes[t] = true;
+                return true;
+            }
+
+            if (typeInfo.GetCustomAttributes(typeof(ImmutableAttribute), false).Length > 0)
+            {
+                shallowCopyableTypes[t] = true;
+                return true;
+            }
+
+            if (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == typeof(Immutable<>))
+            {
+                shallowCopyableTypes[t] = true;
+                return true;
+            }
+
+            if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
+            {
+                result = typeInfo.GetFields().All(f => !(f.FieldType == t) && IsOrleansShallowCopyable(f.FieldType));
+                shallowCopyableTypes[t] = result;
+                return result;
+            }
+
+            shallowCopyableTypes[t] = false;
             return false;
         }
 
@@ -80,45 +90,32 @@ namespace Orleans.Serialization
         internal static string OrleansTypeName(this Type t)
         {
             string name;
-            lock (typeNameCache)
-            {
-                if (typeNameCache.TryGetValue(t.TypeHandle, out name))
-                    return name;
-            }
+            if (typeNameCache.TryGetValue(t, out name))
+                return name;
+
             name = TypeUtils.GetTemplatedName(t, _ => !_.IsGenericParameter);
-            lock (typeNameCache)
-            {
-                typeNameCache[t.TypeHandle] = name;
-            }
+            typeNameCache[t] = name;
             return name;
         }
 
         public static byte[] OrleansTypeKey(this Type t)
         {
             byte[] key;
-            lock (typeKeyCache)
-            {
-                if (typeKeyCache.TryGetValue(t.TypeHandle, out key))
-                    return key;
-            }
+            if (typeKeyCache.TryGetValue(t, out key))
+                return key;
+
             key = Encoding.UTF8.GetBytes(t.OrleansTypeKeyString());
-            lock (typeNameCache)
-            {
-                typeKeyCache[t.TypeHandle] = key;
-            }
+            typeKeyCache[t] = key;
             return key;
         }
 
         public static string OrleansTypeKeyString(this Type t)
         {
-            var typeInfo = t.GetTypeInfo();
             string key;
-            lock (typeKeyStringCache)
-            {
-                if (typeKeyStringCache.TryGetValue(typeInfo.TypeHandle, out key))
-                    return key;
-            }
+            if (typeKeyStringCache.TryGetValue(t, out key))
+                return key;
 
+            var typeInfo = t.GetTypeInfo();
             var sb = new StringBuilder();
             if (typeInfo.IsGenericTypeDefinition)
             {
@@ -158,10 +155,7 @@ namespace Orleans.Serialization
             }
 
             key = sb.ToString();
-            lock (typeKeyStringCache)
-            {
-                typeKeyStringCache[t.TypeHandle] = key;
-            }
+            typeKeyStringCache[t] = key;
 
             return key;
         }
