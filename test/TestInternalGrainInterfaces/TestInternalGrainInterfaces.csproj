@@ -60,6 +60,7 @@
     <Compile Include="IStressTestGrain.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StructWithPublicStaticReadonlyNullableVariable.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
