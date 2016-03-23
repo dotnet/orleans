@@ -10,7 +10,7 @@ namespace GPSTracker.Web
     {
         protected void Application_Start()
         {
-            if (RoleEnvironment.IsAvailable)
+            if (AzureHelper.IsInAzure)
             {
                 // running in Azure
                 AzureClient.Initialize(Server.MapPath(@"~/AzureConfiguration.xml"));
