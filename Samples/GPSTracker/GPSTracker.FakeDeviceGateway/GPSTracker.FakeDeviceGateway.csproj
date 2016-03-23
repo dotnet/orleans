@@ -79,14 +79,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="LocalConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\GPSTracker.Common\GPSTracker.Common.csproj">
       <Project>{cafe7fbb-a2e1-43e2-ba7d-725af8873558}</Project>
       <Name>GPSTracker.Common</Name>
