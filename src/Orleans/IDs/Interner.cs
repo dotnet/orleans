@@ -230,9 +230,16 @@ namespace Orleans
 
         private void InternCacheCleanupTimerCallback(object state)
         {
-            Stopwatch clock = new Stopwatch();
-            clock.Start();
-            long numEntries = internCache.Count;
+            Stopwatch clock = null;
+            long numEntries = 0;
+            var removalResultsLoggingNeeded = logger.IsVerbose || logger.IsVerbose2;
+            if (removalResultsLoggingNeeded)
+            {
+                clock = new Stopwatch();
+                clock.Start();
+                numEntries = internCache.Count;
+            }
+
             foreach (var e in internCache)
             {
                 if (e.Value == null || e.Value.IsAlive == false || e.Value.Target == null)
@@ -245,7 +252,10 @@ namespace Orleans
                     }
                 }
             }
-            long numRemoved = numEntries - internCache.Count;
+
+            if (!removalResultsLoggingNeeded) return;
+
+            var numRemoved = numEntries - internCache.Count;
             if (numRemoved > 0)
             {
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
