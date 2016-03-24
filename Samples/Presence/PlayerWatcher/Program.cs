@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Presence.GrainInterfaces;
 
 namespace PlayerWatcher
@@ -15,7 +16,8 @@ namespace PlayerWatcher
         {
             try
             {
-                GrainClient.Initialize("DevTestClientConfiguration.xml");
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
 
                 // Hardcoded player ID
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");

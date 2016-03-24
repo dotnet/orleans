@@ -101,14 +101,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="DevTestClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DevTestServerConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\PresenceGrainInterfaces\PresenceGrainInterfaces.csproj">
       <Project>{60a27932-4b5e-4743-b351-a2c4d4924d94}</Project>
       <Name>PresenceGrainInterfaces</Name>
