@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     /// This is the base class for all typed grain references.
     /// </summary>
     [Serializable]
-    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable, IGrainReferenceInternal
+    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
     {
         private readonly GuidId observerId;
         private readonly string genericArgs;
@@ -717,19 +717,17 @@ namespace Orleans.Runtime
 
         #endregion
 
-        //used for testing
-        string IGrainReferenceInternal.GenericArguments {
+
+        #region Testing
+        
+        internal string GenericArgumentsForTesting {
             get {
                 return this.GenericArguments;
             }
         }
+
+        #endregion
+
     }
-
-
-
-    internal interface IGrainReferenceInternal
-    {
-        string GenericArguments { get; }
-    }
-
+    
 }
