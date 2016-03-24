@@ -121,7 +121,7 @@ On the other hand, for explicit subscriptions, one needs to Resume the subscript
 
 For implicit subscriptions case the grain needs to subscribe in order to attach the processing logic. This should be done in the grain's `OnActivateAsync` method. The grain should simply execute `await stream.SubscribeAsync(OnNext ...)` in its `OnActivateAsync` method. That will cause this particular activation to attach the `OnNext` function to process that stream. The grain can optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this implicit subscriptions to start consuming from that token. There is never a need for implicit subscriptions to call `ResumeAsync`.
 
-```C#
+``` csharp
 public async override Task OnActivateAsync()
 {
     var streamProvider = GetStreamProvider(PROVIDER_NAME);
@@ -135,7 +135,7 @@ public async override Task OnActivateAsync()
 Grain that wants to explicitly subscribe first has to call `SubscribeAsync` in some place in its code, in order to subsribe the first time. This causes the subsription to be established, as well as attaches the processig logic.
 Now imagine a case when the grain got deactivated and reactivated. The grain is still explicitly subscribed, but no processig logic is attached. The grain needs to re-attach the processing logic. To do that, in its `OnActivateAsync`, the grain first needs to find out what subscriptions it has, by calling `stream.GetAllSubscriptionHandles()`. Then the grain has to execute `ResumeAsync` on each  handle. The grain can also optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this explicit subscription to start consuming from that token.
 
-```C#
+``` csharp
 public async override Task OnActivateAsync()
 {
     var streamProvider = GetStreamProvider(PROVIDER_NAME);
@@ -179,7 +179,7 @@ However, there is also an interesting scenario of **automatically scaled-out sta
 **Current Status of Stateless Automatically Scaled-Out Processing:**
 This is currently not implemented (due to priority constrains). An attempt to subscribe to a stream from a `StatelessWorker` grain will result in undefined behavior. [We are currently considering to support this option](https://github.com/dotnet/orleans/issues/433).
 
-### Grains and Orleans Clients<a name="Grains0and-Orleans-Clients"></a>
+### Grains and Orleans Clients<a name="Grains-and-Orleans-Clients"></a>
 
 Orleans streams work **uniformly across grains and Orleans clients**. That is, exactly the same APIs can be used inside a grain and in an Orleans client to produce and consume events. This greatly simplifies the application logic, making special client-side APIs, such as Grain Observers, redundant.
 
@@ -219,14 +219,13 @@ In order to use streams you need to enable stream providers via configuration. Y
 </OrleansConfiguration>
 ```
 
-It is also possible to register a stream provider programatically, via calling one of the:
+It is also possible to register a stream provider programmatically, via calling one of the `RegisterStreamProvider` methods on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
 
 ``` csharp
 public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
 
 public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStreamProvider
 ```
-on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
 
 ## Next
 [Orleans Stream Providers](Stream-Providers)
