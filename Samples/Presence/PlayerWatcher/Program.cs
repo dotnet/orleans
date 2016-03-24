@@ -45,7 +45,7 @@ namespace PlayerWatcher
 
                 // Subscribe for updates
                 var watcher = new GameObserver();
-                game.SubscribeForGameUpdates(GameObserverFactory.CreateObjectReference(watcher).Result).Wait();
+                game.SubscribeForGameUpdates(GrainClient.GrainFactory.CreateObjectReference<IGameObserver>(watcher).Result).Wait();
 
                 // Block main thread so that the process doesn't exit. Updates arrive on thread pool threads.
                 Console.WriteLine("Subscribed successfully. Press <Enter> to stop.");
