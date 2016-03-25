@@ -144,7 +144,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (logger.IsVerbose) logger.Verbose("ReadRow grainRef = {0} reminderName = {1}", grainRef, reminderName);
                 var result = await remTableManager.FindReminderEntry(grainRef, reminderName);
-                return ConvertFromTableEntry(result.Item1, result.Item2);
+                return result == null ? null : ConvertFromTableEntry(result.Item1, result.Item2);
             }
             catch (Exception exc)
             {

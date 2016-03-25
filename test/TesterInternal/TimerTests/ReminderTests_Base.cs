@@ -166,6 +166,15 @@ namespace UnitTests.TimerTests
         }
         #endregion
 
+        public async Task Test_Reminders_ReminderNotFound()
+        {
+            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+
+            // request a reminder that does not exist
+            IGrainReminder reminder = await g1.GetReminderObject("blarg");
+            Assert.IsNull(reminder, "reminder != null");
+        }
+
         #endregion
 
         #region Multiple joins ... multi grain, multi reminders

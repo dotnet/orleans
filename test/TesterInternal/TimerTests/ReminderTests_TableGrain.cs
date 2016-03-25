@@ -65,6 +65,12 @@ namespace UnitTests.TimerTests
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
+
+        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
+        public async Task Rem_Grain_ReminderNotFounds()
+        {
+            await Test_Reminders_ReminderNotFound();
+        }
     }
 
 }
