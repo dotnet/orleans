@@ -641,7 +641,7 @@ namespace UnitTests.General
             var grain = GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));
             var c1 = await grain.GetState();
         }
-
+                
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_GrainWithTypeConstraints()
         {
@@ -653,5 +653,18 @@ namespace UnitTests.General
             result = await grain.GetCount();
             Assert.AreEqual(1, result);
         }
+
+        [Fact, TestCategory("Functional"), TestCategory("Generics")]
+        public async Task Generic_CastToGenericInterfaceAndCallMethod() 
+        {
+            var grain = GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
+
+            var castRef = grain.AsReference<ISomeGenericGrain<string>>();
+
+            var result = await castRef.Hello();
+
+            Assert.AreEqual(result, "Hello!");
+        }
+
     }
 }
