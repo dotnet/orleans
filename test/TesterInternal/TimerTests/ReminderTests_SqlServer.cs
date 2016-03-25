@@ -62,6 +62,12 @@ namespace UnitTests.TimerTests
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
+
+        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        public async Task Rem_Sql_ReminderNotFound()
+        {
+            await Test_Reminders_ReminderNotFound();
+        }
     }
 #endif
 

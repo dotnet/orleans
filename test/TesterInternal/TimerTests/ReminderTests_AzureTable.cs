@@ -69,6 +69,12 @@ namespace UnitTests.TimerTests
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
+        [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("Azure")]
+        public async Task Rem_Azure_ReminderNotFound()
+        {
+            await Test_Reminders_ReminderNotFound();
+        }
+
         #region Basic test
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Basic()
