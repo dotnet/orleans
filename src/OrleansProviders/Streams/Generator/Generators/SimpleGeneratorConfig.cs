@@ -1,9 +1,9 @@
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Orleans.Providers;
 
-namespace Tester.TestStreamProviders.Generator.Generators
+namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>
     /// Simple generator configuration class.

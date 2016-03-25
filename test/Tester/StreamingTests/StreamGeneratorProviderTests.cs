@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,10 +7,9 @@ using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Orleans;
+using Orleans.Providers.Streams.Generator;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester.TestStreamProviders.Generator;
-using Tester.TestStreamProviders.Generator.Generators;
 using TestGrainInterfaces;
 using TestGrains;
 using Tester;

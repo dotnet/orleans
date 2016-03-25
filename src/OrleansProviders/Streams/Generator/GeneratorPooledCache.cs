@@ -2,13 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Microsoft.Data.OData;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Tester.TestStreamProviders.Generator.Generators;
 
-namespace Tester.TestStreamProviders.Generator
+namespace Orleans.Providers.Streams.Generator
 {
     public class GeneratorPooledCache : IQueueCache
     {

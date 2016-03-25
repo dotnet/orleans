@@ -1,9 +1,9 @@
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Orleans.Providers;
 
-namespace Tester.TestStreamProviders.Generator
+namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>
     /// This configuration class is used to configure the GeneratorStreamProvider.

@@ -65,6 +65,15 @@
     <Compile Include="Storage\MemoryStorage.cs" />
     <Compile Include="Storage\MemoryStorageWithLatency.cs" />
     <Compile Include="Storage\ShardedStorageProvider.cs" />
+    <Compile Include="Streams\Generator\GeneratorAdapterConfig.cs" />
+    <Compile Include="Streams\Generator\GeneratorAdapterFactory.cs" />
+    <Compile Include="Streams\Generator\GeneratorPooledCache.cs" />
+    <Compile Include="Streams\Generator\GeneratorStreamProvider.cs" />
+    <Compile Include="Streams\Generator\Generators\GeneratedBatchContainer.cs" />
+    <Compile Include="Streams\Generator\Generators\GeneratedEvent.cs" />
+    <Compile Include="Streams\Generator\Generators\SimpleGenerator.cs" />
+    <Compile Include="Streams\Generator\Generators\SimpleGeneratorConfig.cs" />
+    <Compile Include="Streams\Generator\IStreamGenerator.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

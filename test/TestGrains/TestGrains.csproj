@@ -71,7 +71,6 @@
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="EventSourcing\PersonState.cs" />
     <Compile Include="GeneratedEventCollectorGrain.cs" />
-    <Compile Include="GeneratedEvent.cs" />
     <Compile Include="GeneratedStreamTestConstants.cs" />
     <Compile Include="GeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain.cs" />
     <Compile Include="GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs" />
@@ -128,6 +127,10 @@
     <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj">
       <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
       <Name>OrleansEventSourcing</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
+      <Project>{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}</Project>
+      <Name>OrleansProviders</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj">
       <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>

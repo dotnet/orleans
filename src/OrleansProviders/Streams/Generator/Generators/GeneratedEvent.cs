@@ -1,6 +1,6 @@
 using System;
 
-namespace TestGrains
+namespace Orleans.Providers.Streams.Generator
 {
     [Serializable]
     public class GeneratedEvent
