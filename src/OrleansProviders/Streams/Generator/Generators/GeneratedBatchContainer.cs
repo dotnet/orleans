@@ -1,9 +1,10 @@
+
 using System;
 using System.Collections.Generic;
 using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
 
-namespace Tester.TestStreamProviders.Generator.Generators
+namespace Orleans.Providers.Streams.Generator
 {
     [Serializable]
     internal class GeneratedBatchContainer : IBatchContainer

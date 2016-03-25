@@ -1,14 +1,13 @@
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-namespace Tester.TestStreamProviders.Generator
+namespace Orleans.Providers.Streams.Generator
 {
     public enum StreamGeneratorCommand
     {

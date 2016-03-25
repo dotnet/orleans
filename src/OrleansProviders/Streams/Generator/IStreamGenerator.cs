@@ -1,9 +1,9 @@
+
 using System;
 using System.Collections.Generic;
-using Orleans.Providers;
 using Orleans.Streams;
 
-namespace Tester.TestStreamProviders.Generator
+namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>
     /// Interface of generators used by the GeneratorStreamProvider.  Any method of generating events

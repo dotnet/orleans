@@ -1,10 +1,10 @@
+
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
-using TestGrains;
 
-namespace Tester.TestStreamProviders.Generator.Generators
+namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>
     /// Simple Generator

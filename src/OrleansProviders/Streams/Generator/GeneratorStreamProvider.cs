@@ -1,6 +1,7 @@
+
 using Orleans.Providers.Streams.Common;
 
-namespace Tester.TestStreamProviders.Generator
+namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>
     /// This is a persistent stream provider that generates it's own events rather than reading them from storage.
