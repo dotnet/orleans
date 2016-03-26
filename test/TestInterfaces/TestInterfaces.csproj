@@ -43,6 +43,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="ClassNotReferencingOrleansTypeDto.cs" />
     <Compile Include="ICSharpBaseInterface.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
