@@ -20,7 +20,7 @@ namespace UnitTests.General
             await grain.TakeSerializedData(new Dtos.ClassNotReferencingOrleansTypeDto { MyProperty = "Test" });
         }
 
-        [SkippableFact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
+        [Fact(Skip = "reproduces issue #1480"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task TakeSerializedDataRefOrleans()
         {
             var grain = GrainFactory.GetGrain<ISerializerPresenceTest>(Guid.NewGuid());
