@@ -35,7 +35,13 @@ namespace Orleans.Serialization
             {
                 if (!Parsers.ContainsKey(itemType.TypeHandle))
                 {
-                    var parser = itemType.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                    var prop = itemType.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static);
+                    if (prop == null)
+                    {
+                        return false;
+                    }
+
+                    var parser = prop.GetValue(null, null);
                     Parsers.TryAdd(itemType.TypeHandle, parser);
                 }
                 return true;

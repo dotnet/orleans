@@ -35,20 +35,16 @@ function UnregisterSerializer(
         return
     }
 
-    Try
-    {
-        $projectItem.Save([string]::Empty)
-    }
-    Catch
-    {
-    }
+	$projectItem.Open()
     
-    $projectDocument = $projectItem.Document
-    if ($projectDocument -eq $null) {
-        Write-Error "The project document for $fileKey was null"
+	$documentEntry = $projectItem.Document
+    if ($documentEntry -eq $null) {
+        Write-Error "The fileKey $fileKey had no associated document"
+        return
     }
 
-    $filePath = $projectDocument.FullName
+	$documentEntry.Activate() | Out-Null
+    $filePath = $documentEntry.FullName
     if ([System.IO.File]::Exists($filePath) -eq $false) {
         Write-Error "The file $filePath was not found"
         return
@@ -72,6 +68,8 @@ function UnregisterSerializer(
         $providerNode.ParentNode.RemoveChild($providerNode) | Out-Null
         $fileXml.Save($filePath)
     }
+
+	$documentEntry.Close()
 }
 
 UnregisterSerializer -fileKey "OrleansConfiguration.xml" -project $project -type $bondSerializerTypeName
