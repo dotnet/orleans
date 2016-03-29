@@ -50,6 +50,7 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Extensions\ConfigurationExtensions.cs" />
     <Compile Include="Extensions\TestConfigurationExtensions.cs" />
     <Compile Include="OrleansTestSecrets.cs" />
     <Compile Include="OrleansTestStorageKey.cs" />
