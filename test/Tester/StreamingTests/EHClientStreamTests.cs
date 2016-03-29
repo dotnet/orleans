@@ -1,8 +1,5 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
@@ -14,7 +11,7 @@ using Xunit;
 
 namespace Tester.StreamingTests
 {
-    public class EHClientStreamTests : HostedTestClusterPerTest
+    public class EHClientStreamTests : TestClusterPerTest
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "StreamNamespace";
@@ -36,19 +33,17 @@ namespace Tester.StreamingTests
 
         private ClientStreamTestRunner runner;
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            var siloHost = new TestingSiloHost(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                AdjustConfig = AdjustConfig
-            }, new TestingClientOptions
-            {
-                AdjustConfig = AdjustConfig
-            });
-            runner = new ClientStreamTestRunner(siloHost);
-            return siloHost;
+            var options = new TestClusterOptions(2);
+            AdjustConfig(options.ClusterConfiguration);
+            AdjustConfig(options.ClientConfiguration);
+            return new TestCluster(options);
+        }
+
+        public EHClientStreamTests()
+        {
+            runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
         public override void Dispose()
@@ -77,7 +72,6 @@ namespace Tester.StreamingTests
         private static void AdjustConfig(ClientConfiguration config)
         {
             config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
         }
 
         private static Dictionary<string, string> BuildProviderSettings()

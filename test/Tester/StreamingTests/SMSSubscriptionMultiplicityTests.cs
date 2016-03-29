@@ -1,10 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using Orleans;
-using Orleans.Providers.Streams.SimpleMessageStream;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 using Tester;
@@ -13,26 +11,19 @@ namespace UnitTests.StreamingTests
 {
     public class SMSSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<SMSSubscriptionMultiplicityTests.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            public const string SMSStreamProviderName = "SMSProvider";
+            public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(
-                    new TestingSiloOptions
-                    {
-                        StartFreshOrleans = true,
-                        SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                    },
-                    new TestingClientOptions()
-                    {
-                        AdjustConfig = config =>
-                        {
-                            config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName,
-                                new Dictionary<string, string>());
-                        },
-                    });
+                var options = new TestClusterOptions(2);
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
+                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
+                return new TestCluster(options);
             }
         }
 
@@ -41,7 +32,7 @@ namespace UnitTests.StreamingTests
         
         public SMSSubscriptionMultiplicityTests()
         {
-            runner = new SubscriptionMultiplicityTestRunner(Fixture.SMSStreamProviderName, GrainClient.Logger);
+            runner = new SubscriptionMultiplicityTestRunner(Fixture.StreamProvider, GrainClient.Logger);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]

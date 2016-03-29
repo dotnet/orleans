@@ -8,29 +8,41 @@ using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
 
-    public class DelayedQueueRebalancingTests : HostedTestClusterPerTest
+    public class DelayedQueueRebalancingTests : TestClusterPerTest
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(20); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(5);
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartSecondary = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreaming4SilosUnitTests.xml"),
-                });
+            // Define a cluster of 4, but deploy ony 2 to start.
+            var options = new TestClusterOptions(4);
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            var persistentStreamProviderConfig = new PersistentStreamProviderConfig
+            {
+                SiloMaturityPeriod = SILO_IMMATURE_PERIOD,
+                BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer,
+            };
+
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(adapterName, persistentStreamProviderConfig: persistentStreamProviderConfig);
+            options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
+            var host = new TestCluster(options);
+            host.Deploy(new[] { Silo.PrimarySiloName, "Secondary_1" });
+            return host;
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task DelayedQueueRebalancingTests_1()
         {
@@ -46,7 +58,8 @@ namespace UnitTests.StreamingTests
         {
             await ValidateAgentsState(2, 2, "1");
 
-            HostedCluster.StartAdditionalSilos(2);
+            HostedCluster.RestartStoppedSecondarySilo("Secondary_2");
+            HostedCluster.RestartStoppedSecondarySilo("Secondary_3");
 
             await ValidateAgentsState(4, 2, "2");
 

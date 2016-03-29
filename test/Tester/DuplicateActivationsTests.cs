@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Tester;
@@ -12,27 +13,14 @@ namespace UnitTests.CatalogTests
 {
     public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartPrimary = true,
-                    StartSecondary = true,
-                    AdjustConfig = config =>
-                    {
-                        config.Globals.ResponseTimeout = TimeSpan.FromSeconds(50);
-                        foreach (var nodeConfig in config.Overrides.Values)
-                        {
-                            nodeConfig.MaxActiveThreads = 1;
-                        }
-                    },
-                },
-                new TestingClientOptions
-                {
-                    AdjustConfig = config => { config.ResponseTimeout = TimeSpan.FromSeconds(50); }
-                });
+                var options = new TestClusterOptions(2);
+                options.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(1);
+                options.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.MaxActiveThreads = 1);
+                return new TestCluster(options);
             }
         }
 

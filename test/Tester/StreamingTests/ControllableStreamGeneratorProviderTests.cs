@@ -9,6 +9,7 @@ using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Extensions;
 using Orleans.TestingHost.Utils;
 using TestGrainInterfaces;
 using TestGrains;
@@ -22,44 +23,33 @@ namespace UnitTests.StreamingTests
 {
     public class ControllableStreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamGeneratorProviderTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
             public static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-            public readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
+            public static readonly GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
             {
                 TotalQueueCount = 4,
             };
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config =>
-                    {
-                        var settings = new Dictionary<string, string>();
-                        // get initial settings from configs
-                        AdapterConfig.WriteProperties(settings);
+                var options = new TestClusterOptions(2);
+                var settings = new Dictionary<string, string>();
+                // get initial settings from configs
+                AdapterConfig.WriteProperties(settings);
 
-                        // add queue balancer setting
-                        settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+                // add queue balancer setting
+                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
 
-                        // add pub/sub settting
-                        settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+                // add pub/sub settting
+                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
 
-                        // register stream provider
-                        config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-                        // Make sure a node config exist for each silo in the cluster.
-                        // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                        config.GetOrCreateNodeConfigurationForSilo("Primary");
-                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-                    }
-                });
+                // register stream provider
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+                return new TestCluster(options);
             }
         }
 

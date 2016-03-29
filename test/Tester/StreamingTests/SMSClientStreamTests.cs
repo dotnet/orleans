@@ -1,49 +1,33 @@
-﻿
-using System;
-using System.IO;
+﻿using System;
 using System.Threading.Tasks;
-using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
 
 namespace Tester.StreamingTests
 {
-    public class SMSClientStreamTests : HostedTestClusterPerTest
+    public class SMSClientStreamTests : TestClusterPerTest
     {
-        private const string SMSStreamProviderName = "SMSProvider";
+        private const string SMSStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
         private ClientStreamTestRunner runner;
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartSecondary = false,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                AdjustConfig = config =>
-                {
-                    config.AddMemoryStorageProvider("PubSubStore");
-                    config.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName);
-                    config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-                }
-            };
+            var options = new TestClusterOptions(1);
+            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
+            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
 
-            var clientOptions = new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
-                AdjustConfig = config =>
-                {
-                    config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName);
-                }
-            };
+            options.ClientConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
+            return new TestCluster(options);
+        }
 
-            var testHost = new TestingSiloHost(siloOptions, clientOptions);
-            runner = new ClientStreamTestRunner(testHost);
-
-            return testHost;
+        public SMSClientStreamTests()
+        {
+            runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]

@@ -1,9 +1,6 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
@@ -13,7 +10,6 @@ using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
-using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -25,7 +21,7 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
-    public class EHStreamProviderCheckpointTests : HostedTestClusterPerTest
+    public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
         private static readonly string StreamProviderTypeName = typeof(EventHubStreamProvider).FullName;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
@@ -44,19 +40,14 @@ namespace UnitTests.StreamingTests
             new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
                 TimeSpan.FromSeconds(1));
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = AdjustConfig
-                }, new TestingClientOptions
-                {
-                    AdjustConfig = AdjustConfig
-                });
+            var options = new TestClusterOptions(2);
+            AdjustConfig(options.ClusterConfiguration);
+            AdjustConfig(options.ClientConfiguration);
+            return new TestCluster(options);
         }
-        
+
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task ReloadFromCheckpointTest()
         {
@@ -81,7 +72,7 @@ namespace UnitTests.StreamingTests
 
         private async Task ReloadFromCheckpointTest(string streamNamespace, int streamCount, int eventsInStream)
         {
-            List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_=>Guid.NewGuid()).ToList();
+            List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
@@ -90,7 +81,7 @@ namespace UnitTests.StreamingTests
                 await RestartAgents();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream*2, assertIsTrue), TimeSpan.FromSeconds(30));
+                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, assertIsTrue), TimeSpan.FromSeconds(30));
             }
             finally
             {
@@ -107,7 +98,7 @@ namespace UnitTests.StreamingTests
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
                 await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(30));
 
-                HostedCluster.RestartSilo(HostedCluster.Secondary);
+                HostedCluster.RestartSilo(HostedCluster.SecondarySilos[0]);
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
@@ -177,18 +168,11 @@ namespace UnitTests.StreamingTests
             // register stream provider
             config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
             config.AddAzureTableStorageProvider(ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName);
-
-            // Make sure a node config exist for each silo in the cluster.
-            // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-            // GetConfigurationForNode will materialize a node in the configuration for each silo, if one does not already exist.
-            config.GetOrCreateNodeConfigurationForSilo("Primary");
-            config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-
         }
+
         private static void AdjustConfig(ClientConfiguration config)
         {
             config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
         }
 
         private static Dictionary<string, string> BuildProviderSettings()

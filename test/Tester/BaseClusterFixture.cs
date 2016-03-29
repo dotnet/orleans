@@ -5,19 +5,28 @@ using Orleans.TestingHost;
 
 namespace Tester
 {
-    public abstract class BaseClusterFixture : IDisposable
+    public abstract class BaseTestClusterFixture : IDisposable
     {
-        protected BaseClusterFixture()
+        static BaseTestClusterFixture()
+        {
+            TestClusterOptions.DefaultTraceToConsole = false;
+        }
+
+        protected BaseTestClusterFixture()
         {
             GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();
-            var hostedCluster = CreateClusterHost();
-            this.HostedCluster = hostedCluster;
+            var testCluster = CreateTestCluster();
+            if (testCluster.Primary == null)
+            {
+                testCluster.Deploy();
+            }
+            this.HostedCluster = testCluster;
         }
 
-        protected abstract TestingSiloHost CreateClusterHost();
+        protected abstract TestCluster CreateTestCluster();
 
-        public TestingSiloHost HostedCluster { get; private set; }        
+        public TestCluster HostedCluster { get; private set; }
 
         public virtual void Dispose()
         {

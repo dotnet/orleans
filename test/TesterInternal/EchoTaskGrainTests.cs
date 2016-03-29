@@ -24,6 +24,11 @@ namespace UnitTests.General
         public EchoTaskGrainTests(DefaultClusterFixture fixture)
             : base(fixture)
         {
+            if (HostedCluster.SecondarySilos.Count == 0)
+            {
+                HostedCluster.StartAdditionalSilo();
+                HostedCluster.WaitForLivenessToStabilizeAsync().Wait();
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo")]
@@ -205,7 +210,7 @@ namespace UnitTests.General
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
             SiloAddress silo1 = HostedCluster.Primary.Silo.SiloAddress;
-            SiloAddress silo2 = HostedCluster.Secondary.Silo.SiloAddress;
+            SiloAddress silo2 = HostedCluster.SecondarySilos[0].Silo.SiloAddress;
 
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();
