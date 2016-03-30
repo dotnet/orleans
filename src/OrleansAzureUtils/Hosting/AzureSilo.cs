@@ -61,6 +61,17 @@ namespace Orleans.Runtime.Host
             logger = TraceLogger.GetLogger("OrleansAzureSilo", TraceLogger.LoggerType.Runtime);
         }
 
+        public static ClusterConfiguration DefaultConfiguration()
+        {
+            var config = new ClusterConfiguration();
+
+            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+            config.Globals.DeploymentId = AzureClient.GetDeploymentId();
+            config.Globals.DataConnectionString = AzureClient.GetDataConnectionString();
+
+            return config;
+        }
+
         #region Azure RoleEntryPoint methods
 
         /// <summary>

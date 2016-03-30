@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Threading;
 using Orleans.Runtime.Configuration;
 
@@ -74,6 +75,22 @@ namespace Orleans.Runtime.Host
             GrainClient.Uninitialize();
         }
 
+        /// <summary>
+        /// Returns default client configuration object for passing to AzureClient.
+        /// </summary>
+        /// <returns></returns>
+        public static ClientConfiguration DefaultConfiguration()
+        {
+            var config = new ClientConfiguration
+            {
+                GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
+                DeploymentId = GetDeploymentId(),
+                DataConnectionString = GetDataConnectionString(),
+            };
+            
+            return config;
+        }
+
         #region Internal implementation of client initialization processing
 
         private static void InitializeImpl_FromFile(FileInfo configFile)
@@ -123,12 +140,12 @@ namespace Orleans.Runtime.Host
             InitializeImpl_FromConfig(config);
         }
 
-        private static string GetDeploymentId()
+        internal static string GetDeploymentId()
         {
             return GrainClient.TestOnlyNoConnect ? "FakeDeploymentId" : serviceRuntimeWrapper.DeploymentId;
         }
 
-        private static string GetDataConnectionString()
+        internal static string GetDataConnectionString()
         {
             return GrainClient.TestOnlyNoConnect
                 ? "FakeConnectionString"
