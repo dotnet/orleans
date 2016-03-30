@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -74,6 +75,23 @@ namespace UnitTests
             {
                 Assert.Fail("Unexpected exception thrown when extension is configured. Exc = " + exc);
             }
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("BVT")]
+        public async Task Providers_TestGenericExtensions()
+        {
+            var grain = GrainClient.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var extension = grain.AsReference<ISimpleExtension>();
+            try
+            {
+                var res = await extension.CheckExtension_1();
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail("No exception should have been thrown. Ex: {0}", ex.Message);
+            }
+
+            Assert.IsTrue(true);
         }
     }
 }
