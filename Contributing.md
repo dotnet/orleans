@@ -81,25 +81,6 @@ _Wrong_:
 
 In order to help ensure we keep inter-project references clean, then on the build servers [and local `Build.cmd` script] we deliberately use side-by-side input `.\src` and output `.\Binaries` directories rather than the more normal in-place build directory structure (eg. `[PROJ]\bin\Release`) used by VS on local dev machines.
 
-### External Assembly References
-
-We use "**soft**" assembly references (semantic versions) when referencing external assemblies, rather than the "_hard_" (4-digit) fully qualified assembly names that many tools try to sprinkle into our lives at every opportunity.
-
-What this means in practice is that the `Include="Name"` part of a  `Reference` block in any `.csproj` file in the Orleans code base should **just** use the **short assembly names** (eg. `Newtonsoft.Json`) rather than long fully-qualifies assembly names (eg. `Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL`)
-
-**Right**:
-
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-
-_Wrong_:
-
-    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-
 ### Unified Component Versions
 
 We use the same unified versions of external component throughout the Orleans code base, and so should never need to add `bindingRedirect` entries in `App.config` files.
