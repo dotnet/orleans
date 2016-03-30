@@ -21,6 +21,7 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+      <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.0.0" />
     </dependencies>
   </metadata>
   <files>

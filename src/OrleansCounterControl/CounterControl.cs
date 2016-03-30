@@ -11,6 +11,8 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Counter.Control
 {
+    using Orleans.Serialization;
+
     /// <summary>
     /// Control Orleans Counters - Register or Unregister the Orleans counter set
     /// </summary>
@@ -102,6 +104,8 @@ namespace Orleans.Counter.Control
                 ConsoleText.WriteError("Need to be running in Administrator role to perform the requested operations.");
                 return 1;
             }
+
+            SerializationManager.InitializeForTesting();
 
             InitConsoleLogging();
 
