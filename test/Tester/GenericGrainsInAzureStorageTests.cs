@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -21,11 +21,7 @@ namespace UnitTests.General
                     StartSecondary = false,
                     AdjustConfig = config =>
                     {
-                        const string myProviderFullTypeName = "Orleans.Storage.AzureTableStorage";
-                        const string myProviderName = "AzureStore";
-                        var properties = new Dictionary<string, string>();
-                        properties.Add("DataConnectionString", "UseDevelopmentStorage=true");
-                        config.Globals.RegisterStorageProvider(myProviderFullTypeName, myProviderName, properties);
+                        config.AddAzureTableStorageProvider("AzureStore", StorageTestConstants.DataConnectionString);
                     }
                 });
             }

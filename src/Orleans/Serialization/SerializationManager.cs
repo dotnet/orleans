@@ -27,6 +27,9 @@ namespace Orleans.Serialization
     /// </summary>
     public static class SerializationManager
     {
+        internal const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
+        internal const string IndentJsonProperty = "IndentJSON";
+
         /// <summary>
         /// Deep copier function.
         /// </summary>
@@ -2320,19 +2323,19 @@ namespace Orleans.Serialization
         /// <returns><see cref="JsonSerializerSettings" /></returns>
         public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
         {
-            if (config.Properties.ContainsKey("UseFullAssemblyNames"))
+            if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
             {
-                bool useFullAssemblyNames = false;
-                if (bool.TryParse(config.Properties["UseFullAssemblyNames"], out useFullAssemblyNames) && useFullAssemblyNames)
+                bool useFullAssemblyNames;
+                if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
                 {
                     settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
                 }
             }
 
-            if (config.Properties.ContainsKey("IndentJSON"))
+            if (config.Properties.ContainsKey(IndentJsonProperty))
             {
-                bool indentJSON = false;
-                if (bool.TryParse(config.Properties["IndentJSON"], out indentJSON) && indentJSON)
+                bool indentJSON;
+                if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJSON) && indentJSON)
                 {
                     settings.Formatting = Formatting.Indented;
                 }

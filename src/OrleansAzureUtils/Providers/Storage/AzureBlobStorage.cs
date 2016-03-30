@@ -44,6 +44,10 @@ namespace Orleans.Storage
     /// </example>
     public class AzureBlobStorage : IStorageProvider
     {
+        internal const string DataConnectionStringPropertyName = AzureTableStorage.DataConnectionStringPropertyName;
+        internal const string ContainerNamePropertyName = "ContainerName";
+        internal const string ContainerNamePropertyDefaultValue = "grainstate";
+
         private JsonSerializerSettings jsonSettings;
 
         private CloudBlobContainer container;
@@ -67,11 +71,11 @@ namespace Orleans.Storage
                 this.Name = name;
                 this.jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
 
-                if (!config.Properties.ContainsKey("DataConnectionString")) throw new BadProviderConfigException("The DataConnectionString setting has not been configured in the cloud role. Please add a DataConnectionString setting with a valid Azure Storage connection string.");
+                if (!config.Properties.ContainsKey(DataConnectionStringPropertyName)) throw new BadProviderConfigException($"The {DataConnectionStringPropertyName} setting has not been configured in the cloud role. Please add a {DataConnectionStringPropertyName} setting with a valid Azure Storage connection string.");
 
-                var account = CloudStorageAccount.Parse(config.Properties["DataConnectionString"]);
+                var account = CloudStorageAccount.Parse(config.Properties[DataConnectionStringPropertyName]);
                 var blobClient = account.CreateCloudBlobClient();
-                var containerName = config.Properties.ContainsKey("ContainerName") ? config.Properties["ContainerName"] : "grainstate";
+                var containerName = config.Properties.ContainsKey(ContainerNamePropertyName) ? config.Properties[ContainerNamePropertyName] : ContainerNamePropertyDefaultValue;
                 container = blobClient.GetContainerReference(containerName);
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);
 
@@ -87,7 +91,7 @@ namespace Orleans.Storage
 
         IEnumerable<string> FormatPropertyMessage(IProviderConfiguration config)
         {
-            foreach (var property in new string[] { "ContainerName", "SerializeTypeNames", "PreserveReferencesHandling", "UseFullAssemblyNames", "IndentJSON" })
+            foreach (var property in new string[] { ContainerNamePropertyName, "SerializeTypeNames", "PreserveReferencesHandling", "UseFullAssemblyNames", "IndentJSON" })
             {
                 if (!config.Properties.ContainsKey(property)) continue;
                 yield return string.Format("{0}={1}", property, config.Properties[property]);
