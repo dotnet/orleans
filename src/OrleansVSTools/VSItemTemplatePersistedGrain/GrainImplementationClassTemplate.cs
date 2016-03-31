@@ -17,7 +17,7 @@ namespace $safeprojectname$
     
     }
 
-    public interface I$safeitemname$State : IGrainState
+    public interface I$safeitemname$State
     {
 
     }
