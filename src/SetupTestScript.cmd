@@ -16,26 +16,15 @@ if NOT "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%" == "" (
 	echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set and found "!SECRETS_FILE!". Taking it. >> SetupTestScriptOutput.txt
 	goto Copy
   ) else (
-	  if exist "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt" (
-		SET SECRETS_FILE=%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt
-		echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set and found "!SECRETS_FILE!". Taking it. >> SetupTestScriptOutput.txt
-		goto Copy
-		) else (
-			echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set but not secret files where found in them. >> SetupTestScriptOutput.txt
-		)
+	echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set but not secret files where found in them. >> SetupTestScriptOutput.txt
   )
 ) else (
-	echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is not set. >> SetupTestScriptOutput.txt
+  echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is not set. >> SetupTestScriptOutput.txt
 )
 
 call:GetDirectoryNameOfFileAbove OrleansTestSecrets.json
 IF NOT "!result!"=="" (
    SET SECRETS_FILE=!result!OrleansTestSecrets.json
-) else (
-	call:GetDirectoryNameOfFileAbove OrleansTestStorageKey.txt
-	if NOT "!result!"=="" (
-		SET SECRETS_FILE=!result!OrleansTestStorageKey.txt
-	)
 )
 
 :Copy

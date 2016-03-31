@@ -1,6 +1,6 @@
-﻿using System;
+﻿
+using System;
 using System.Diagnostics;
-using System.Diagnostics.Contracts;
 using System.IO;
 using Newtonsoft.Json;
 
@@ -10,7 +10,11 @@ namespace Orleans.TestingHost
     {
         // In order to specify your own test secrets you should:
         // 1) Create a file named OrleansTestSecrets.json with the below Contract data in it.
-        //    "{\"DataConnectionString\": \"DefaultEndpointsProtocol=https;AccountName=XXX;AccountKey=YYY\"}"
+        //    {
+        //      "DataConnectionString":"DefaultEndpointsProtocol=XXX",
+        //      "EventHubConnectionString":"Endpoint=XXX"
+        //    }
+        //    Each of the above settings is optional, but not including either of them may cause some tests to fail.
         // 2) Define an environment variable ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH and point it to the folder where this file is located.
         // 
         // MSBuild unit test framework runs a script "SetupTestScript.cmd" (that is specified in Local.testsettings), which
