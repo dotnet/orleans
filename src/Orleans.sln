@@ -56,7 +56,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 	ProjectSection(SolutionItems) = preProject
 		NuGet\BondSerializerInstall.ps1 = NuGet\BondSerializerInstall.ps1
 		NuGet\BondSerializerUninstall.ps1 = NuGet\BondSerializerUninstall.ps1
-		NuGet\ClientInstall.ps1 = NuGet\ClientInstall.ps1
 		NuGet\CreateOrleansPackages.bat = NuGet\CreateOrleansPackages.bat
 		NuGet\deprecated-templates-Install.ps1 = NuGet\deprecated-templates-Install.ps1
 		NuGet\deprecated-templates-Readme.txt = NuGet\deprecated-templates-Readme.txt
@@ -81,7 +80,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.Templates.Grains.nuspec-NoSymbols = NuGet\Microsoft.Orleans.Templates.Grains.nuspec-NoSymbols
 		NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec-NoSymbols = NuGet\Microsoft.Orleans.Templates.Interfaces.nuspec-NoSymbols
 		NuGet\Microsoft.Orleans.TestingHost.nuspec = NuGet\Microsoft.Orleans.TestingHost.nuspec
-		NuGet\ServerInstall.ps1 = NuGet\ServerInstall.ps1
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{80801A64-30AD-4B07-801C-2479A87AC527}"

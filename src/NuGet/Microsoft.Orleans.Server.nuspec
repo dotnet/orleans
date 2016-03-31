@@ -27,8 +27,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansConfiguration.xml" target="content" />
     <file src="Configuration\OrleansConfiguration.xsd" target="tools" />
-    <file src="ServerInstall.ps1" target="tools\install.ps1" />
   </files>
 </package>
