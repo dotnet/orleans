@@ -91,6 +91,7 @@
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\IGrainState.cs" />
     <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
+    <Compile Include="Configuration\ConfigurationExtensions.cs" />
     <Compile Include="Core\IGrainInvokeInterceptor.cs" />
     <Compile Include="Core\InterceptedMethodInvoker.cs" />
     <Compile Include="Core\InvocationMethodInfoMap.cs" />

@@ -47,7 +47,7 @@ namespace Orleans.Storage
         internal const string TableNamePropertyName = "TableName";
         internal const string DeleteOnClearPropertyName = "DeleteStateOnClear";
         internal const string UseJsonFormatPropertyName = "UseJsonFormat";
-        internal const string TableNamePropertyDefaultValue = "OrleansGrainState";
+        internal const string TableNameDefaultValue = "OrleansGrainState";
         private string dataConnectionString;
         private string tableName;
         private string serviceId;
@@ -80,7 +80,7 @@ namespace Orleans.Storage
         /// <summary> Default constructor </summary>
         public AzureTableStorage()
         {
-            tableName = TableNamePropertyDefaultValue;
+            tableName = TableNameDefaultValue;
             id = Interlocked.Increment(ref counter);
         }
 

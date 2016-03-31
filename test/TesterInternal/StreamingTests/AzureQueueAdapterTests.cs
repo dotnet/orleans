@@ -50,8 +50,8 @@ namespace UnitTests.StorageTests
         {
             var properties = new Dictionary<string, string>
                 {
-                    {AzureQueueAdapterFactory.DATA_CONNECTION_STRING, StorageTestConstants.DataConnectionString},
-                    {AzureQueueAdapterFactory.DEPLOYMENT_ID, deploymentId}
+                    {AzureQueueAdapterFactory.DataConnectionStringPropertyName, StorageTestConstants.DataConnectionString},
+                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId}
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 

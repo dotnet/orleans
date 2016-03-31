@@ -32,8 +32,8 @@ namespace Orleans.Storage
     [DebuggerDisplay("MemoryStore:{Name}")]
     public class MemoryStorage : IStorageProvider
     {
-        private const int DEFAULT_NUM_STORAGE_GRAINS = 10;
-        private const string NUM_STORAGE_GRAINS = "NumStorageGrains";
+        internal const int NumStorageGrainsDefaultValue = 10;
+        internal const string NumStorageGrainsPropertyName = "NumStorageGrains";
         private int numStorageGrains;
         private static int counter;
         private readonly int id;
@@ -49,7 +49,7 @@ namespace Orleans.Storage
         public Logger Log { get; private set; }
 
         public MemoryStorage()
-            : this(DEFAULT_NUM_STORAGE_GRAINS)
+            : this(NumStorageGrainsDefaultValue)
         {
         }
 
@@ -74,7 +74,7 @@ namespace Orleans.Storage
             Log = providerRuntime.GetLogger(GetLoggerName());
 
             string numStorageGrainsStr;
-            if (config.Properties.TryGetValue(NUM_STORAGE_GRAINS, out numStorageGrainsStr))
+            if (config.Properties.TryGetValue(NumStorageGrainsPropertyName, out numStorageGrainsStr))
                 numStorageGrains = Int32.Parse(numStorageGrainsStr);
             
             Log.Info("Init: Name={0} NumStorageGrains={1}", Name, numStorageGrains);

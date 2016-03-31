@@ -72,7 +72,7 @@ namespace UnitTests.StreamingTests
             int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
             if (expectedState == PersistentStreamProviderState.AgentsStarted)
             {
-                Assert.AreEqual(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, totalNumAgents);
+                Assert.AreEqual(AzureQueueAdapterFactory.NumQueuesDefaultValue, totalNumAgents);
             }
             else
             {

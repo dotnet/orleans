@@ -10,11 +10,11 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
     public class AzureQueueAdapterFactory : IQueueAdapterFactory
     {
-        private const int DEFAULT_CACHE_SIZE = 4096;
-        private const string NUM_QUEUES_PARAM = "NumQueues";
+        internal const int CacheSizeDefaultValue = 4096;
+        internal const string NumQueuesPropertyName = "NumQueues";
 
-        /// <summary> Default number oi\f Azure Queue used in this stream provider.</summary>
-        public const int DEFAULT_NUM_QUEUES = 8; // keep as power of 2.
+        /// <summary> Default number of Azure Queue used in this stream provider.</summary>
+        public const int NumQueuesDefaultValue = 8; // keep as power of 2.
         
         private string deploymentId;
         private string dataConnectionString;
@@ -25,27 +25,27 @@ namespace Orleans.Providers.Streams.AzureQueue
         private IQueueAdapterCache adapterCache;
 
         /// <summary>"DataConnectionString".</summary>
-        public const string DATA_CONNECTION_STRING = "DataConnectionString";
+        public const string DataConnectionStringPropertyName = "DataConnectionString";
         /// <summary>"DeploymentId".</summary>
-        public const string DEPLOYMENT_ID = "DeploymentId";
+        public const string DeploymentIdPropertyName = "DeploymentId";
 
         /// <summary> Init the factory.</summary>
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
         {
             if (config == null) throw new ArgumentNullException("config");
-            if (!config.Properties.TryGetValue(DATA_CONNECTION_STRING, out dataConnectionString))
-                throw new ArgumentException(String.Format("{0} property not set", DATA_CONNECTION_STRING));
-            if (!config.Properties.TryGetValue(DEPLOYMENT_ID, out deploymentId))
-                throw new ArgumentException(String.Format("{0} property not set", DEPLOYMENT_ID));
+            if (!config.Properties.TryGetValue(DataConnectionStringPropertyName, out dataConnectionString))
+                throw new ArgumentException(String.Format("{0} property not set", DataConnectionStringPropertyName));
+            if (!config.Properties.TryGetValue(DeploymentIdPropertyName, out deploymentId))
+                throw new ArgumentException(String.Format("{0} property not set", DeploymentIdPropertyName));
 
-            cacheSize = SimpleQueueAdapterCache.ParseSize(config, DEFAULT_CACHE_SIZE);
+            cacheSize = SimpleQueueAdapterCache.ParseSize(config, CacheSizeDefaultValue);
 
             string numQueuesString;
-            numQueues = DEFAULT_NUM_QUEUES;
-            if (config.Properties.TryGetValue(NUM_QUEUES_PARAM, out numQueuesString))
+            numQueues = NumQueuesDefaultValue;
+            if (config.Properties.TryGetValue(NumQueuesPropertyName, out numQueuesString))
             {
                 if (!int.TryParse(numQueuesString, out numQueues))
-                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", NUM_QUEUES_PARAM));
+                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", NumQueuesPropertyName));
             }
 
             this.providerName = providerName;

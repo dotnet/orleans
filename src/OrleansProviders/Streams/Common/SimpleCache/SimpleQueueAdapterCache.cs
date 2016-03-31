@@ -7,7 +7,7 @@ namespace Orleans.Providers.Streams.Common
 {
     public class SimpleQueueAdapterCache : IQueueAdapterCache
     {
-        private const string CACHE_SIZE_PARAM = "CacheSize";
+        public const string CacheSizePropertyName = "CacheSize";
 
         private readonly int cacheSize;
         private readonly Logger logger;
@@ -29,7 +29,7 @@ namespace Orleans.Providers.Streams.Common
 
         public static int ParseSize(IProviderConfiguration config, int defaultSize)
         {
-            return config.GetIntProperty(CACHE_SIZE_PARAM, defaultSize);
+            return config.GetIntProperty(CacheSizePropertyName, defaultSize);
         }
     }
 }
