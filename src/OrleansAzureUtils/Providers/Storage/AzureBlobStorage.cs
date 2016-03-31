@@ -46,7 +46,7 @@ namespace Orleans.Storage
     {
         internal const string DataConnectionStringPropertyName = AzureTableStorage.DataConnectionStringPropertyName;
         internal const string ContainerNamePropertyName = "ContainerName";
-        internal const string ContainerNamePropertyDefaultValue = "grainstate";
+        internal const string ContainerNameDefaultValue = "grainstate";
 
         private JsonSerializerSettings jsonSettings;
 
@@ -75,7 +75,7 @@ namespace Orleans.Storage
 
                 var account = CloudStorageAccount.Parse(config.Properties[DataConnectionStringPropertyName]);
                 var blobClient = account.CreateCloudBlobClient();
-                var containerName = config.Properties.ContainsKey(ContainerNamePropertyName) ? config.Properties[ContainerNamePropertyName] : ContainerNamePropertyDefaultValue;
+                var containerName = config.Properties.ContainsKey(ContainerNamePropertyName) ? config.Properties[ContainerNamePropertyName] : ContainerNameDefaultValue;
                 container = blobClient.GetContainerReference(containerName);
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);
 

@@ -175,7 +175,7 @@ namespace UnitTests.StreamingTests
         {
             // register stream provider
             config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-            config.AddAzureTableStorageProvider(ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName, StorageTestConstants.DataConnectionString);
+            config.AddAzureTableStorageProvider(ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName);
 
             // Make sure a node config exist for each silo in the cluster.
             // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.

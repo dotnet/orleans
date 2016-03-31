@@ -14,9 +14,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private bool                        fireAndForgetDelivery;
         private StreamPubSubType            pubSubType;
 
-        private const string                STREAM_PUBSUB_TYPE = "PubSubType";
+        internal const string                STREAM_PUBSUB_TYPE = "PubSubType";
         internal const string                FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
-        private const StreamPubSubType      DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
+        internal const StreamPubSubType      DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
 
         public bool IsRewindable { get { return false; } }
 
