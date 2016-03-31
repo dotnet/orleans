@@ -10,6 +10,7 @@ namespace Orleans.Streams
         private StreamImpl<T> streamImpl;
         private readonly IStreamFilterPredicateWrapper filterWrapper;
         private readonly GuidId subscriptionId;
+        private readonly bool isRewindable;
 
         [NonSerialized]
         private IAsyncObserver<T> observer;
@@ -18,7 +19,7 @@ namespace Orleans.Streams
 
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
-
+        internal bool IsRewindable { get { return isRewindable; } }
 
         public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
@@ -26,12 +27,13 @@ namespace Orleans.Streams
         // constructor used by serializator
         private StreamSubscriptionHandleImpl() { }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
-            : this(subscriptionId, null, streamImpl, null, null)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl, bool isRewindable)
+            : this(subscriptionId, null, streamImpl, isRewindable, null, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> streamImpl,
+            bool isRewindable, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
         {
             if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
             if (streamImpl == null) throw new ArgumentNullException("streamImpl");
@@ -40,7 +42,11 @@ namespace Orleans.Streams
             this.observer = observer;
             this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
-            expectedToken = StreamHandshakeToken.CreateStartToken(token);
+            this.isRewindable = isRewindable;
+            if (IsRewindable)
+            {
+                expectedToken = StreamHandshakeToken.CreateStartToken(token);
+            }
         }
 
         public void Invalidate()
@@ -68,6 +74,7 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
+            // we validate expectedToken only for ordered (rewindable) streams
             if (expectedToken != null)
             {
                 if (!expectedToken.Equals(handshakeToken))
@@ -79,8 +86,10 @@ namespace Orleans.Streams
                 await NextItem(itemTuple.Item1, itemTuple.Item2);
             }
 
-            expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
-
+            if (IsRewindable)
+            {
+                expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
+            }
             return null;
         }
 
@@ -100,9 +109,10 @@ namespace Orleans.Streams
                 if (!expectedToken.Equals(handshakeToken))
                     return expectedToken;
             }
-
-            expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
-
+            if (IsRewindable)
+            {
+                expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
+            }
             return null;
         }
 
