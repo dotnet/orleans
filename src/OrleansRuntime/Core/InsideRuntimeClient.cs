@@ -641,7 +641,7 @@ namespace Orleans.Runtime
             await OrleansTaskScheduler.Instance.QueueNamedTask(asyncFunction, context, activityName);
         }
 
-        public void Reset()
+        public void Reset(bool cleanup)
         {
             throw new InvalidOperationException();
         }

@@ -59,7 +59,7 @@ namespace Orleans.Runtime
 
         Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName);
 
-        void Reset();
+        void Reset(bool cleanup);
 
         GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 

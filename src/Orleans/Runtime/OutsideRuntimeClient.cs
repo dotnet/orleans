@@ -679,7 +679,7 @@ namespace Orleans
             callbacks.TryRemove(id, out ignore);
         }
 
-        public void Reset()
+        public void Reset(bool cleanup)
         {
             Utils.SafeExecute(() =>
             {
@@ -693,7 +693,7 @@ namespace Orleans
             {
                 if (clientProviderRuntime != null)
                 {
-                    clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
+                    clientProviderRuntime.Reset(cleanup).WaitWithThrow(resetTimeout);
                 }
             }, logger, "Client.clientProviderRuntime.Reset");
             Utils.SafeExecute(() =>

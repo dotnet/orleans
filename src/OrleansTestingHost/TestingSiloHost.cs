@@ -385,6 +385,15 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Performs a hard kill on client.  Client will not cleanup reasources.
+        /// </summary>
+        public void KillClient()
+        {
+            GrainClient.HardKill();
+        }
+
+
+        /// <summary>
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
@@ -490,6 +499,61 @@ namespace Orleans.TestingHost
             return null;
         }
 
+        public void InitializeClient()
+        {
+            InitializeClient(clientInitOptions, siloInitOptions.LargeMessageWarningThreshold);
+        }
+
+        private void InitializeClient(TestingClientOptions clientOptions, int largeMessageWarningThreshold)
+        {
+            if (!GrainClient.IsInitialized)
+            {
+                WriteLog("Initializing Grain Client");
+                ClientConfiguration clientConfig;
+                if (clientOptions.ClientConfigFile != null)
+                {
+                    clientConfig = ClientConfiguration.LoadFromFile(clientOptions.ClientConfigFile.FullName);
+                }
+                else
+                {
+                    clientConfig = ClientConfiguration.StandardLoad();
+                }
+                if (clientOptions.ProxiedGateway && clientOptions.Gateways != null)
+                {
+                    clientConfig.Gateways = clientOptions.Gateways;
+                    if (clientOptions.PreferedGatewayIndex >= 0)
+                        clientConfig.PreferedGatewayIndex = clientOptions.PreferedGatewayIndex;
+                }
+                if (clientOptions.PropagateActivityId)
+                {
+                    clientConfig.PropagateActivityId = clientOptions.PropagateActivityId;
+                }
+                if (!String.IsNullOrEmpty(DeploymentId))
+                {
+                    clientConfig.DeploymentId = DeploymentId;
+                }
+                if (Debugger.IsAttached)
+                {
+                    // Test is running inside debugger - Make timeout ~= infinite
+                    clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
+                }
+                else if (clientOptions.ResponseTimeout > TimeSpan.Zero)
+                {
+                    clientConfig.ResponseTimeout = clientOptions.ResponseTimeout;
+                }
+
+                if (largeMessageWarningThreshold > 0)
+                {
+                    clientConfig.LargeMessageWarningThreshold = largeMessageWarningThreshold;
+                }
+                AdjustForTest(clientConfig, clientOptions);
+                this.ClientConfig = clientConfig;
+
+                GrainClient.Initialize(clientConfig);
+                GrainFactory = GrainClient.GrainFactory;
+            }
+        }
+
         private async Task InitializeAsync(TestingSiloOptions options, TestingClientOptions clientOptions)
         {
             bool doStartPrimary = false;
@@ -576,53 +640,12 @@ namespace Orleans.TestingHost
                     Secondary = StartOrleansSilo(Silo.SiloType.Secondary, options, InstanceCounter++);
                 }
             }
-
+            
             WriteLog("Done initializing cluster");
+
             if (!GrainClient.IsInitialized && options.StartClient)
             {
-                WriteLog("Initializing Grain Client");
-                ClientConfiguration clientConfig;
-                if (clientOptions.ClientConfigFile != null)
-                {
-                    clientConfig = ClientConfiguration.LoadFromFile(clientOptions.ClientConfigFile.FullName);
-                }
-                else
-                {
-                    clientConfig = ClientConfiguration.StandardLoad();
-                }
-                if (clientOptions.ProxiedGateway && clientOptions.Gateways != null)
-                {
-                    clientConfig.Gateways = clientOptions.Gateways;
-                    if (clientOptions.PreferedGatewayIndex >= 0)
-                        clientConfig.PreferedGatewayIndex = clientOptions.PreferedGatewayIndex;
-                }
-                if (clientOptions.PropagateActivityId)
-                {
-                    clientConfig.PropagateActivityId = clientOptions.PropagateActivityId;
-                }
-                if (!String.IsNullOrEmpty(DeploymentId))
-                {
-                    clientConfig.DeploymentId = DeploymentId;
-                }
-                if (Debugger.IsAttached)
-                {
-                    // Test is running inside debugger - Make timeout ~= infinite
-                    clientConfig.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
-                }
-                else if (clientOptions.ResponseTimeout > TimeSpan.Zero)
-                {
-                    clientConfig.ResponseTimeout = clientOptions.ResponseTimeout;
-                }
-
-                if (options.LargeMessageWarningThreshold > 0)
-                {
-                    clientConfig.LargeMessageWarningThreshold = options.LargeMessageWarningThreshold;
-                }
-                AdjustForTest(clientConfig, clientOptions);
-                this.ClientConfig = clientConfig;
-
-                GrainClient.Initialize(clientConfig);
-                GrainFactory = GrainClient.GrainFactory;
+                InitializeClient(clientOptions, options.LargeMessageWarningThreshold);
             }
         }
 
