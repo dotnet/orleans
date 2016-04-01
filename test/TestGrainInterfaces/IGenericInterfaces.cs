@@ -200,13 +200,34 @@ namespace UnitTests.GrainInterfaces
 
     public interface INonGenericCastableGrain : IGrainWithGuidKey
     {
-
+        Task DoSomething();
     }
 
-    public interface ISomeGenericGrain<T> : IGrainWithGuidKey
+    
+    public interface IGenericCastableGrain<T> : IGrainWithGuidKey
+    { }
+    
+
+
+    public interface IGrainSayingHello : IGrainWithGuidKey
     {
         Task<string> Hello();
     }
+
+    public interface ISomeGenericGrain<T> : IGrainSayingHello
+    { }
+
+    public interface INonGenericCastGrain : IGrainSayingHello
+    { }
+
+    
+
+    public interface IIndependentlyConcretizedGrain : ISomeGenericGrain<string>
+    { }
+
+    public interface IIndependentlyConcretizedGenericGrain<T> : ISomeGenericGrain<T>
+    { }
+
 
 
 }
