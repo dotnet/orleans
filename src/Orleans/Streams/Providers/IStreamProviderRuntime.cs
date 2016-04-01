@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Providers;
@@ -115,59 +116,65 @@ namespace Orleans.Streams
         public static readonly TimeSpan DEFAULT_SILO_MATURITY_PERIOD = TimeSpan.FromMinutes(2);
 
 
-        public TimeSpan GetQueueMsgsTimerPeriod { get; private set; }
-        public TimeSpan InitQueueTimeout { get; private set; }
-        public TimeSpan MaxEventDeliveryTime { get; private set; }
-        public TimeSpan StreamInactivityPeriod { get; private set; }
-        public StreamQueueBalancerType BalancerType { get; private set; }
-        public StreamPubSubType PubSubType { get; private set; }
-        public TimeSpan SiloMaturityPeriod { get; private set; }
+        public TimeSpan GetQueueMsgsTimerPeriod { get; set; } = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
+        public TimeSpan InitQueueTimeout { get; set; } = DEFAULT_INIT_QUEUE_TIMEOUT;
+        public TimeSpan MaxEventDeliveryTime { get; set; } = DEFAULT_MAX_EVENT_DELIVERY_TIME;
+        public TimeSpan StreamInactivityPeriod { get; set; } = DEFAULT_STREAM_INACTIVITY_PERIOD;
+        public StreamQueueBalancerType BalancerType { get; set; } = DEFAULT_STREAM_QUEUE_BALANCER_TYPE;
+        public StreamPubSubType PubSubType { get; set; } = DEFAULT_STREAM_PUBSUB_TYPE;
+        public TimeSpan SiloMaturityPeriod { get; set; } = DEFAULT_SILO_MATURITY_PERIOD;
 
+        public PersistentStreamProviderConfig()
+        {
+        }
 
         public PersistentStreamProviderConfig(IProviderConfiguration config)
         {
             string timePeriod;
-            if (!config.Properties.TryGetValue(GET_QUEUE_MESSAGES_TIMER_PERIOD, out timePeriod))
-                GetQueueMsgsTimerPeriod = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
-            else
+            if (config.Properties.TryGetValue(GET_QUEUE_MESSAGES_TIMER_PERIOD, out timePeriod))
                 GetQueueMsgsTimerPeriod = ConfigUtilities.ParseTimeSpan(timePeriod,
                     "Invalid time value for the " + GET_QUEUE_MESSAGES_TIMER_PERIOD + " property in the provider config values.");
 
             string timeout;
-            if (!config.Properties.TryGetValue(INIT_QUEUE_TIMEOUT, out timeout))
-                InitQueueTimeout = DEFAULT_INIT_QUEUE_TIMEOUT;
-            else
+            if (config.Properties.TryGetValue(INIT_QUEUE_TIMEOUT, out timeout))
                 InitQueueTimeout = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + INIT_QUEUE_TIMEOUT + " property in the provider config values.");
 
             string balanceTypeString;
-            BalancerType = !config.Properties.TryGetValue(QUEUE_BALANCER_TYPE, out balanceTypeString)
-                ? DEFAULT_STREAM_QUEUE_BALANCER_TYPE
-                : (StreamQueueBalancerType)Enum.Parse(typeof(StreamQueueBalancerType), balanceTypeString);
+            if (config.Properties.TryGetValue(QUEUE_BALANCER_TYPE, out balanceTypeString))
+                BalancerType = (StreamQueueBalancerType)Enum.Parse(typeof(StreamQueueBalancerType), balanceTypeString);
 
-            if (!config.Properties.TryGetValue(MAX_EVENT_DELIVERY_TIME, out timeout))
-                MaxEventDeliveryTime = DEFAULT_MAX_EVENT_DELIVERY_TIME;
-            else
+            if (config.Properties.TryGetValue(MAX_EVENT_DELIVERY_TIME, out timeout))
                 MaxEventDeliveryTime = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + MAX_EVENT_DELIVERY_TIME + " property in the provider config values.");
 
-            if (!config.Properties.TryGetValue(STREAM_INACTIVITY_PERIOD, out timeout))
-               StreamInactivityPeriod = DEFAULT_STREAM_INACTIVITY_PERIOD;
-            else
+            if (config.Properties.TryGetValue(STREAM_INACTIVITY_PERIOD, out timeout))
                 StreamInactivityPeriod = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + STREAM_INACTIVITY_PERIOD + " property in the provider config values.");
 
             string pubSubTypeString;
-            PubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
-                ? DEFAULT_STREAM_PUBSUB_TYPE
-                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
+            if (config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString))
+                PubSubType = (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
 
             string immaturityPeriod;
-            if (!config.Properties.TryGetValue(SILO_MATURITY_PERIOD, out immaturityPeriod))
-                SiloMaturityPeriod = DEFAULT_SILO_MATURITY_PERIOD;
-            else
+            if (config.Properties.TryGetValue(SILO_MATURITY_PERIOD, out immaturityPeriod))
                 SiloMaturityPeriod = ConfigUtilities.ParseTimeSpan(immaturityPeriod,
                     "Invalid time value for the " + SILO_MATURITY_PERIOD + " property in the provider config values.");
+        }
+
+        /// <summary>
+        /// Utility function to convert config to property bag for use in stream provider configuration
+        /// </summary>
+        /// <returns></returns>
+        public void WriteProperties(Dictionary<string, string> properties)
+        {
+            properties[GET_QUEUE_MESSAGES_TIMER_PERIOD] = ConfigUtilities.ToParseableTimeSpan(GetQueueMsgsTimerPeriod);
+            properties[INIT_QUEUE_TIMEOUT] = ConfigUtilities.ToParseableTimeSpan(InitQueueTimeout);
+            properties[QUEUE_BALANCER_TYPE] = BalancerType.ToString();
+            properties[MAX_EVENT_DELIVERY_TIME] = ConfigUtilities.ToParseableTimeSpan(MaxEventDeliveryTime);
+            properties[STREAM_INACTIVITY_PERIOD] = ConfigUtilities.ToParseableTimeSpan(StreamInactivityPeriod);
+            properties[STREAM_PUBSUB_TYPE] = PubSubType.ToString();
+            properties[SILO_MATURITY_PERIOD] = ConfigUtilities.ToParseableTimeSpan(SiloMaturityPeriod);
         }
 
         public override string ToString()

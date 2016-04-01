@@ -398,6 +398,11 @@ namespace Orleans.Runtime.Configuration
             return TimeSpan.FromMilliseconds(rawTimeSpan * unitSize);
         }
 
+        internal static string ToParseableTimeSpan(TimeSpan input)
+        {
+            return $"{input.TotalMilliseconds.ToString(CultureInfo.InvariantCulture)}ms";
+        }
+
         internal static byte[] ParseSubnet(string input, string errorMessage)
         {
             return string.IsNullOrEmpty(input) ? null : input.Split('.').Select(s => (byte) ParseInt(s, errorMessage)).ToArray();
