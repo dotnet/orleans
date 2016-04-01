@@ -21,7 +21,6 @@ using System.Runtime.Serialization.Formatters;
 
 namespace Orleans.Serialization
 {
-
     /// <summary>
     /// SerializationManager to oversee the Orleans syrializer system.
     /// </summary>
@@ -137,8 +136,8 @@ namespace Orleans.Serialization
             {
                 RegisterBuiltInSerializers();
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-                AssemblyProcessor.Initialize();
                 RegisterSerializationProviders(serializationProviders);
+                AssemblyProcessor.Initialize();
                 fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
             }
             catch (ReflectionTypeLoadException ex)
@@ -195,8 +194,8 @@ namespace Orleans.Serialization
                 FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
             }
 
-            AssemblyProcessor.Initialize();
             RegisterSerializationProviders(serializationProviders);
+            AssemblyProcessor.Initialize();
         }
 
         internal static void RegisterBuiltInSerializers()
@@ -546,6 +545,7 @@ namespace Orleans.Serialization
             bool systemAssembly = !assembly.IsDynamic
                                   && (assembly.FullName.StartsWith("mscorlib", StringComparison.OrdinalIgnoreCase)
                                       || assembly.FullName.StartsWith("System.", StringComparison.Ordinal));
+            IExternalSerializer externalSerializer;
 
             if (logger.IsVerbose2) logger.Verbose2("Scanning assembly {0} for serialization info", assembly.GetLocationSafe());
 
@@ -679,6 +679,10 @@ namespace Orleans.Serialization
                                         type.Name,
                                         assembly.GetName().Name);
                             }
+                            else if (TryLookupExternalSerializer(type, out externalSerializer))
+                            {
+                                // the lookup registers the serializer.
+                            }
                             else if (!type.GetTypeInfo().IsSerializable)
                             {
                                 // Comparers with no fields can be safely dealt with as just a type name
@@ -703,6 +707,7 @@ namespace Orleans.Serialization
                     }
                     else
                     {
+                        // type is abstract, an interface, system-defined, or its namespace is null
                         Register(type);
                     }
                 }
@@ -1057,10 +1062,10 @@ namespace Orleans.Serialization
         /// <returns>true if <paramref name="t"/> is serializable, false otherwise.</returns>
         internal static bool HasSerializer(Type t)
         {
+            var typeInfo = t.GetTypeInfo();
             lock (serializers)
             {
                 Serializer ser;
-                var typeInfo = t.GetTypeInfo();
                 return serializers.TryGetValue(typeInfo.TypeHandle, out ser)
                        || (typeInfo.IsGenericType && serializers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out ser));
             }
