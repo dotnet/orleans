@@ -65,7 +65,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="My Project\AssemblyInfo.vb" />
-    <Compile Include="orleans.codegen.vb" />
   </ItemGroup>
   <ItemGroup>
     <None Include="AssemblyInfo.vb" />

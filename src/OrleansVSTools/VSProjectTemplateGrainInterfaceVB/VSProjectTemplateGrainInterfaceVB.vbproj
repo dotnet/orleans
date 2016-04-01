@@ -64,6 +64,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="My Project\AssemblyInfo.vb" />
+    <Compile Include="Settings1.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="AssemblyInfo.vb" />
@@ -76,7 +81,10 @@
     <None Include="Resources.Designer.vb" />
     <None Include="Resources.resx" />
     <None Include="Settings.Designer.vb" />
-    <None Include="Settings.settings" />
+    <None Include="Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings1.Designer.vb</LastGenOutput>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <VSTemplate Include="VSProjectTemplateGrainInterfaceVB.vstemplate">
@@ -84,7 +92,6 @@
     </VSTemplate>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="orleans.codegen.vb" />
     <Content Include="Orleans.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />

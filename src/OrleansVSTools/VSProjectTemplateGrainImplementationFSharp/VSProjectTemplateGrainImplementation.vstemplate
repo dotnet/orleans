@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005">
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <TemplateData>
     <Name>Orleans Grain Class Collection</Name>
     <Description>A project for defining a collection of grain classes to be distributed as a unit</Description>
@@ -17,8 +17,24 @@
   <TemplateContent>
     <Project File="ProjectTemplate.fsproj" ReplaceParameters="true">
       <ProjectItem ReplaceParameters="true" OpenInEditor="true">Grain1.fs</ProjectItem>
-      <ProjectItem ReplaceParameters="true" OpenInEditor="false" TargetFileName="GeneratedFiles\orleans.codegen.fs">orleans.codegen.fs</ProjectItem>
       <ProjectItem ReplaceParameters="true" OpenInEditor="false">Script.fsx</ProjectItem>
     </Project>
   </TemplateContent>
+  <WizardExtension>
+    <Assembly>NuGet.VisualStudio.Interop, Version=1.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
+    <FullClassName>NuGet.VisualStudio.TemplateWizard</FullClassName>
+  </WizardExtension>
+  <WizardData>
+    <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
+      <package id="Microsoft.Orleans.Core" version="1.2.0" />
+    </packages>
+    <Assets>
+      <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterface" d:TargetPath="|VSProjectTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
+      <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterface" d:TargetPath="|VSItemTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
+      <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
+      <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceVB" d:TargetPath="|VSItemTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
+      <Asset Type="Microsoft.Orleans.Core.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.2.0.nupkg" d:VsixSubPath="Packages" />
+      <Asset Type="Newtonsoft.Json.7.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.7.0.1.nupkg" d:VsixSubPath="Packages" />
+    </Assets>
+  </WizardData>
 </VSTemplate>
