@@ -77,7 +77,11 @@ namespace UnitTests.Grains
     public class GenericGrainWithNonGenericExtension<T> : Grain, IGenericGrainWithNonGenericExtension<T>
     {
         private SimpleExtension extender;
-
+        
+        public Task DoSomething() {
+            return TaskDone.Done;
+        }
+        
         public override Task OnActivateAsync()
         {
             if (extender == null)

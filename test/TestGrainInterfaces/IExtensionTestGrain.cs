@@ -19,5 +19,6 @@ namespace UnitTests.GrainInterfaces
 
     public interface IGenericGrainWithNonGenericExtension<in T> : IGrainWithIntegerKey
     {
+        Task DoSomething();
     }
 }
