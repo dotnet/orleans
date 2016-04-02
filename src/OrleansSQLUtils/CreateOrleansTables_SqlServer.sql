@@ -161,7 +161,7 @@ BEGIN
 		[Name] NVARCHAR(150) NULL, 
 		[IsDelta] BIT NOT NULL, 
 		[StatValue] NVARCHAR(1024) NOT NULL,
-		[Statistic] NVARCHAR(250) NOT NULL,
+		[Statistic] NVARCHAR(512) NOT NULL,
 
 		CONSTRAINT OrleansStatisticsTable_OrleansStatisticsTableId PRIMARY KEY([OrleansStatisticsTableId])	
 	);
