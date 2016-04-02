@@ -77,7 +77,8 @@ namespace UnitTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
+        [Fact(Skip = "Fix of issue #1624 is still pending"), TestCategory("Functional"), TestCategory("Providers"), 
+            TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ActivateNonGenericExtensionOfGenericInterface()
         {
             var grain = GrainClient.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
@@ -110,6 +111,5 @@ namespace UnitTests
 
             Assert.IsTrue(true);
         }
-
     }
 }
