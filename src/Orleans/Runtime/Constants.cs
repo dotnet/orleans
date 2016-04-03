@@ -65,6 +65,8 @@ namespace Orleans.Runtime
 
         public const int DEFAULT_LOGGER_BULK_MESSAGE_LIMIT = 5;
 
+        public static readonly TimeSpan DEFAULT_CLIENT_DROP_TIMEOUT = TimeSpan.FromMinutes(1);
+
         private static readonly Dictionary<GrainId, string> singletonSystemTargetNames = new Dictionary<GrainId, string>
         {
             {DirectoryServiceId, "DirectoryService"},

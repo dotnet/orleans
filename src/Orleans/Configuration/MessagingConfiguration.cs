@@ -58,6 +58,10 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         int ClientSenderBuckets { get; set; }
         /// <summary>
+        ///  This is the period of time a gateway will wait before dropping a disconnected client.
+        /// </summary>
+        TimeSpan ClientDropTimeout { get; set; }
+        /// <summary>
         /// The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
         /// of the custom Orleans serializer.
         /// This parameter is intended for use only for testing and troubleshooting.
@@ -108,6 +112,7 @@ namespace Orleans.Runtime.Configuration
         public int SiloSenderQueues { get; set; }
         public int GatewaySenderQueues { get; set; }
         public int ClientSenderBuckets { get; set; }
+        public TimeSpan ClientDropTimeout { get; set; }
         public bool UseStandardSerializer { get; set; }
         public bool UseJsonFallbackSerializer { get; set; }
 
@@ -160,6 +165,7 @@ namespace Orleans.Runtime.Configuration
             SiloSenderQueues = DEFAULT_SILO_SENDER_QUEUES;
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
             ClientSenderBuckets = DEFAULT_CLIENT_SENDER_BUCKETS;
+            ClientDropTimeout = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
             UseStandardSerializer = DEFAULT_USE_STANDARD_SERIALIZER;
 
             BufferPoolBufferSize = DEFAULT_BUFFER_POOL_BUFFER_SIZE;
@@ -197,6 +203,7 @@ namespace Orleans.Runtime.Configuration
             {
                 sb.AppendFormat("       Silo Sender queues: {0}", SiloSenderQueues).AppendLine();
                 sb.AppendFormat("       Gateway Sender queues: {0}", GatewaySenderQueues).AppendLine();
+                sb.AppendFormat("       Client Drop Timeout: {0}", ClientDropTimeout).AppendLine();
             }
             else
             {
@@ -262,6 +269,10 @@ namespace Orleans.Runtime.Configuration
                     GatewaySenderQueues = ConfigUtilities.ParseInt(child.GetAttribute("GatewaySenderQueues"),
                                                             "Invalid integer value for the GatewaySenderQueues attribute on the Messaging element");
                 }
+                ClientDropTimeout = child.HasAttribute("ClientDropTimeout")
+                                          ? ConfigUtilities.ParseTimeSpan(child.GetAttribute("ClientDropTimeout"),
+                                                                     "Invalid ClientDropTimeout")
+                                          : Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
             }
             else
             {

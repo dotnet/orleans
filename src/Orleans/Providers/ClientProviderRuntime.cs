@@ -55,13 +55,16 @@ namespace Orleans.Providers
             return streamDirectory;
         }
 
-        public async Task Reset()
+        public async Task Reset(bool cleanup = true)
         {
             if (streamDirectory != null)
             {
                 var tmp = streamDirectory;
                 streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
-                await tmp.Cleanup(true, true);
+                if (cleanup)
+                {
+                    await tmp.Cleanup(true, true);
+                }
             }
         }
 
