@@ -516,10 +516,12 @@ namespace UnitTests
     class TestLogConsumer : ILogConsumer
     {
         private readonly ITestOutputHelper output;
+        private readonly bool traceToOutput;
 
-        public TestLogConsumer(ITestOutputHelper output)
+        public TestLogConsumer(ITestOutputHelper output, bool traceToOutput = false)
         {
             this.output = output;
+            this.traceToOutput = traceToOutput;
         }
 
         private readonly Dictionary<int,int> entryCounts = new Dictionary<int, int>();
@@ -534,7 +536,7 @@ namespace UnitTests
 
                 if (eventCode != lastLogCode)
                 {
-                    output.WriteLine("{0} {1} - {2}", severity, eventCode, message);
+                    if (traceToOutput) output.WriteLine("{0} {1} - {2}", severity, eventCode, message);
                     lastLogCode = eventCode;
                 }
             }
