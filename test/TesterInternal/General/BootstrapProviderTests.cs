@@ -88,7 +88,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Providers"), TestCategory("Bootstrap")]
         public async Task BootstrapProvider_Controllable()
         {
-            SiloHandle[] silos = TestingSiloHost.Instance.GetActiveSilos().ToArray();
+            SiloHandle[] silos = HostedCluster.GetActiveSilos().ToArray();
             int numSilos = silos.Length;
 
             string controllerType = typeof(ControllableBootstrapProvider).FullName;

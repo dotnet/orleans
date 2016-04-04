@@ -13,10 +13,10 @@ namespace UnitTests.StreamingTests
     {
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
 
-        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger)
+        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger, TestingSiloHost siloHost)
         {
-            SiloAddress primSilo = TestingSiloHost.Instance.Primary.Silo.SiloAddress;
-            SiloAddress secSilo = TestingSiloHost.Instance.Secondary != null ? TestingSiloHost.Instance.Secondary.Silo.SiloAddress : null;
+            SiloAddress primSilo = siloHost.Primary.Silo.SiloAddress;
+            SiloAddress secSilo = siloHost.Secondary?.Silo.SiloAddress;
             logger.Info("\n\n**START********************** {0} ********************************* \n\n"
                         + "Running with initial silos Primary={1} Secondary={2} StreamId={3} StreamType={4} \n\n",
                 testName, primSilo, secSilo, streamId, streamProviderName);

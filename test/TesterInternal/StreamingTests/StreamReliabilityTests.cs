@@ -89,7 +89,7 @@ namespace UnitTests.Streaming.Reliability
         {
             // This test case is just a sanity-check that the silo test config is OK.
             const string testName = "Baseline_StreamRel";
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
@@ -98,7 +98,7 @@ namespace UnitTests.Streaming.Reliability
         {
             // This test case is just a sanity-check that the silo test config is OK.
             const string testName = "Baseline_StreamRel_RestartSilos";
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             CheckSilosRunning("Before Restart", numExpectedSilos);
             SiloHandle prim1 = this.HostedCluster.Primary;
@@ -122,7 +122,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = SMS_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain Consumer
 
@@ -142,7 +142,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -363,7 +363,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -419,7 +419,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
 
@@ -456,7 +456,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
 
@@ -497,7 +497,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
             // Note: PubSub should only count distinct grains, even if a grain has multiple consumer handles
@@ -560,7 +560,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = SMS_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             var consumerGrain = GrainClient.GrainFactory.GetGrain<IStreamUnsubscribeTestGrain>(consumerGrainId);
@@ -584,7 +584,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -610,7 +610,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -652,7 +652,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -693,7 +693,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -732,7 +732,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -772,7 +772,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -812,7 +812,7 @@ namespace UnitTests.Streaming.Reliability
 
             const int numLoops = 3;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();

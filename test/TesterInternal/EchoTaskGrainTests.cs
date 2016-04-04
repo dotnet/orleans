@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using UnitTests.Tester;
@@ -20,6 +20,11 @@ namespace UnitTests.General
         private IEchoTaskGrain grain;
 
         public static readonly TimeSpan Epsilon = TimeSpan.FromSeconds(1);
+
+        public EchoTaskGrainTests(DefaultClusterFixture fixture)
+            : base(fixture)
+        {
+        }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo")]
         public void EchoGrain_GetGrain()
@@ -199,9 +204,8 @@ namespace UnitTests.General
             grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
-            var siloHost = TestingSiloHost.Instance;
-            SiloAddress silo1 = siloHost.Primary.Silo.SiloAddress;
-            SiloAddress silo2 = siloHost.Secondary.Silo.SiloAddress;
+            SiloAddress silo1 = HostedCluster.Primary.Silo.SiloAddress;
+            SiloAddress silo2 = HostedCluster.Secondary.Silo.SiloAddress;
 
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();
