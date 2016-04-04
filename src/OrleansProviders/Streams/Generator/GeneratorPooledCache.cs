@@ -166,7 +166,7 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        public int MaxAddCount { get { return 100; } }
+        public int GetMaxAddCount() { return 100; }
 
         public void AddToCache(IList<IBatchContainer> messages)
         {

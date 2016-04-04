@@ -140,6 +140,8 @@
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
+    <Compile Include="Streams\QueueAdapters\IQueueFlowController.cs" />
+    <Compile Include="Streams\QueueAdapters\AggregatedQueueFlowController.cs" />
     <Compile Include="Telemetry\Consumers\ConsoleTelemetryConsumer.cs" />
     <Compile Include="Telemetry\Consumers\FileTelemetryConsumer.cs" />
     <Compile Include="Telemetry\Consumers\TraceTelemetryConsumer.cs" />

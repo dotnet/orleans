@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -45,11 +46,11 @@ namespace Orleans.ServiceBus.Providers
                 throw new ArgumentNullException("bytes");
             }
 
-            Buffer.BlockCopy(BitConverter.GetBytes(bytes.Length), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
+            Array.Copy(BitConverter.GetBytes(bytes.Length), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
             writerOffset += sizeof(int);
             if (bytes.Length != 0)
             {
-                Buffer.BlockCopy(bytes, 0, segment.Array, segment.Offset + writerOffset, bytes.Length);
+                Array.Copy(bytes, 0, segment.Array, segment.Offset + writerOffset, bytes.Length);
                 writerOffset += bytes.Length;
             }
         }
@@ -68,18 +69,18 @@ namespace Orleans.ServiceBus.Providers
             }
             if (str == null)
             {
-                Buffer.BlockCopy(BitConverter.GetBytes(-1), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
+                Array.Copy(BitConverter.GetBytes(-1), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
                 writerOffset += sizeof(int);
             }
             else if (string.IsNullOrEmpty(str))
             {
-                Buffer.BlockCopy(BitConverter.GetBytes(0), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
+                Array.Copy(BitConverter.GetBytes(0), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
                 writerOffset += sizeof(int);
             }
             else
             {
                 var bytes = new byte[str.Length * sizeof(char)];
-                Buffer.BlockCopy(str.ToCharArray(), 0, bytes, 0, bytes.Length);
+                Array.Copy(str.ToCharArray(), 0, bytes, 0, bytes.Length);
                 Append(segment, ref writerOffset, bytes);
             }
         }
@@ -122,7 +123,7 @@ namespace Orleans.ServiceBus.Providers
                 return string.Empty;
             }
             var chars = new char[size / sizeof(char)];
-            Buffer.BlockCopy(segment.Array, segment.Offset + readerOffset, chars, 0, size);
+            Array.Copy(segment.Array, segment.Offset + readerOffset, chars, 0, size);
             readerOffset += size;
             return new string(chars);
         }

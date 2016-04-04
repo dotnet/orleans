@@ -3,13 +3,8 @@ using System.Collections.Generic;
 
 namespace Orleans.Streams
 {
-    public interface IQueueCache
+    public interface IQueueCache : IQueueFlowController
     {
-        /// <summary>
-        /// The limit of the maximum number of items that can be added to the cache in a single AddToCache operation.
-        /// </summary>
-        int MaxAddCount { get; }
-
         /// <summary>
         /// Add messages to the cache
         /// </summary>

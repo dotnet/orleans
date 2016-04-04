@@ -5,7 +5,7 @@ using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
-    public interface IEventHubQueueCache : IDisposable
+    public interface IEventHubQueueCache : IQueueFlowController, IDisposable
     {
         void Add(EventData message);
         object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken);

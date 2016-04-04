@@ -49,9 +49,9 @@ namespace Orleans.Providers.Streams.Common
             get { return cachedMessages.Count; }
         }
 
-        public int MaxAddCount
+        public int GetMaxAddCount()
         {
-            get { return CACHE_HISTOGRAM_MAX_BUCKET_SIZE; }
+            return CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
         }
 
         public SimpleQueueCache(int cacheSize, Logger logger)
