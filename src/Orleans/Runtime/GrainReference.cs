@@ -404,11 +404,15 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
                     
                     default:
-                        if (String.IsNullOrEmpty(message.RejectionInfo))
+                        rejection = message.BodyObject as OrleansException;
+                        if (rejection == null)
                         {
-                            message.RejectionInfo = "Unable to send request - no rejection info available";
+                            if (string.IsNullOrEmpty(message.RejectionInfo))
+                            {
+                                message.RejectionInfo = "Unable to send request - no rejection info available";
+                            } 
+                            rejection = new OrleansException(message.RejectionInfo);
                         }
-                        rejection = new OrleansException(message.RejectionInfo);
                         break;
                 }
                 response = Response.ExceptionResponse(rejection);

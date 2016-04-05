@@ -194,7 +194,7 @@ namespace Orleans.Runtime
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
-                Message rejection = message.CreateRejectionResponse(rejectType, str);
+                Message rejection = message.CreateRejectionResponse(rejectType, str, exc as OrleansException);
                 SendRejectionMessage(rejection);
             }
             else

@@ -46,7 +46,7 @@ namespace Tester.StreamingTests
             return testHost;
         }
 
-        [Fact(Skip="Pending PR #1429"), TestCategory("BVT"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task MSMStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ SMSDeactivationTest *********************************");

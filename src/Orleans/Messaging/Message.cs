@@ -542,12 +542,13 @@ namespace Orleans.Runtime
             return response;
         }
 
-        public Message CreateRejectionResponse(RejectionTypes type, string info)
+        public Message CreateRejectionResponse(RejectionTypes type, string info, OrleansException ex = null)
         {
             var response = CreateResponseMessage();
             response.Result = ResponseTypes.Rejection;
             response.RejectionType = type;
             response.RejectionInfo = info;
+            response.BodyObject = ex;
             if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, new System.Diagnostics.StackTrace(true));
             return response;
         }
